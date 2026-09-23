@@ -29,8 +29,10 @@ def test_calcular_invalido_vai_para_ia():
 def test_abrir_e_pesquisar_abrem_navegador():
     with patch("webbrowser.open") as abrir:
         assert comandos.executar("Abra o YouTube") == "Abrindo youtube."
-        assert comandos.executar("pesquise holding familiar") == "Pesquisando holding familiar no Google."
+        assert comandos.executar("pesquise no google holding familiar") == "Pesquisando holding familiar no Google."
         assert comandos.executar("pesquisar no youtube ironman havai") == "Pesquisando ironman havai no YouTube."
+        # Sem citar o site, a pesquisa fica com a IA.
+        assert comandos.executar("pesquise as notícias da reforma tributária") is None
     assert abrir.call_count == 3
 
 

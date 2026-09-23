@@ -1,3 +1,4 @@
 google-genai>=1.0
-# Só é usado se JARVIS_IA=claude no .env
+openpyxl
+# Só é usado se JARVIS_IA=claude na configuração
 anthropic>=1.0

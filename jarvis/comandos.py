@@ -71,16 +71,16 @@ def cmd_abrir_site(texto: str) -> str | None:
 
 
 def cmd_pesquisar(texto: str) -> str | None:
-    correspondencia = re.match(r"(pesquis\w*|procur\w*|busc\w*)\s+(no youtube\s+)?(por\s+)?(.+)", texto)
+    """Só abre o navegador quando o pedido cita o site ("pesquise no google ...").
+    Outras pesquisas ficam com a IA, que busca na internet e resume."""
+    correspondencia = re.match(r"(pesquis\w*|procur\w*|busc\w*)\s+no\s+(google|youtube)\s+(por\s+)?(.+)", texto)
     if not correspondencia:
         return None
     termo = correspondencia.group(4).strip()
-    if correspondencia.group(2):
-        url = "https://www.youtube.com/results?search_query=" + urllib.parse.quote(termo)
-        webbrowser.open(url)
+    if correspondencia.group(2) == "youtube":
+        webbrowser.open("https://www.youtube.com/results?search_query=" + urllib.parse.quote(termo))
         return f"Pesquisando {termo} no YouTube."
-    url = "https://www.google.com/search?q=" + urllib.parse.quote(termo)
-    webbrowser.open(url)
+    webbrowser.open("https://www.google.com/search?q=" + urllib.parse.quote(termo))
     return f"Pesquisando {termo} no Google."
 
 

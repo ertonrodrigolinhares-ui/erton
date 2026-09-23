@@ -4,8 +4,12 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-# O .env fica na pasta do projeto, não importa de onde o Jarvis foi aberto.
-ARQUIVO_ENV = Path(__file__).resolve().parent.parent / ".env"
+# Pasta do usuário onde o Jarvis guarda configurações e arquivos. Fica fora da pasta do
+# programa, para a chave não se perder quando você baixar uma versão nova do Jarvis.
+PASTA_TRABALHO = Path.home() / "Documents" / "Jarvis"
+ARQUIVO_ENV = PASTA_TRABALHO / "config.env"
+# Um .env na pasta do projeto também é lido (útil para quem programa).
+ENV_PROJETO = Path(__file__).resolve().parent.parent / ".env"
 
 NOME_CHAVE = {"gemini": "GEMINI_API_KEY", "claude": "ANTHROPIC_API_KEY"}
 SITE_CHAVE = {
@@ -15,19 +19,21 @@ SITE_CHAVE = {
 
 
 def _carregar_dotenv() -> None:
-    """Carrega pares CHAVE=valor do .env, sem sobrescrever o ambiente."""
-    if not ARQUIVO_ENV.exists():
-        return
-    for linha in ARQUIVO_ENV.read_text(encoding="utf-8").splitlines():
-        linha = linha.strip()
-        if not linha or linha.startswith("#") or "=" not in linha:
+    """Carrega pares CHAVE=valor dos arquivos de configuração, sem sobrescrever o ambiente."""
+    for arquivo in (ENV_PROJETO, ARQUIVO_ENV):
+        if not arquivo.exists():
             continue
-        chave, valor = linha.split("=", 1)
-        os.environ.setdefault(chave.strip(), valor.strip().strip('"').strip("'"))
+        for linha in arquivo.read_text(encoding="utf-8").splitlines():
+            linha = linha.strip()
+            if not linha or linha.startswith("#") or "=" not in linha:
+                continue
+            chave, valor = linha.split("=", 1)
+            os.environ.setdefault(chave.strip(), valor.strip().strip('"').strip("'"))
 
 
 def salvar_no_env(chave: str, valor: str) -> None:
-    """Grava (ou atualiza) CHAVE=valor no .env e no ambiente atual."""
+    """Grava (ou atualiza) CHAVE=valor no arquivo de configuração e no ambiente atual."""
+    ARQUIVO_ENV.parent.mkdir(parents=True, exist_ok=True)
     linhas = ARQUIVO_ENV.read_text(encoding="utf-8").splitlines() if ARQUIVO_ENV.exists() else []
     linhas = [l for l in linhas if not l.strip().startswith(f"{chave}=")]
     linhas.append(f"{chave}={valor}")

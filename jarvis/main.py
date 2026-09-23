@@ -11,21 +11,33 @@ from pathlib import Path
 
 from . import voz
 from .assistente import remover_palavra_ativacao, responder, saudacao
-from .config import Config
+from .config import ARQUIVO_ENV, Config
 from .ia import criar_cerebro
 
 
 def modo_terminal(usar_voz: bool) -> None:
     config = Config.carregar()
-    cerebro = criar_cerebro(config)
+    falador_aviso = voz.Falador() if usar_voz else None
+
+    def confirmar(titulo: str, detalhe: str) -> bool:
+        print(f"\n[{titulo}]\n{detalhe}")
+        return input("Autoriza? (s/n): ").strip().lower().startswith("s")
+
+    def avisar(texto: str) -> None:
+        print(f"\nJarvis: {texto}")
+        if falador_aviso:
+            falador_aviso.falar(texto)
+
+    cerebro = criar_cerebro(config, confirmar=confirmar, avisar=avisar,
+                            ao_usar=lambda nome: print(f"  (usando {nome})"))
     if cerebro is None:
-        print(f"[Jarvis] Falta a chave {config.nome_chave} no arquivo .env ({config.site_chave}).")
+        print(f"[Jarvis] Falta a chave {config.nome_chave} em {ARQUIVO_ENV} ({config.site_chave}).")
         print("         Por enquanto só os comandos locais vão funcionar.")
 
     if usar_voz and not (voz.fala_disponivel() and voz.microfone_disponivel()):
         print("[Jarvis] Microfone ou bibliotecas de voz indisponíveis; usando texto.")
         usar_voz = False
-    falador = voz.Falador() if usar_voz else None
+    falador = falador_aviso if usar_voz else None
 
     def falar(texto: str) -> None:
         print(f"Jarvis: {texto}")

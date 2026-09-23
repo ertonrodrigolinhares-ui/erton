@@ -1,4 +1,4 @@
-"""Janela do Jarvis: caixa de conversa, botão de microfone e configuração da chave.
+"""Janela do Jarvis: conversa, microfone, modo mãos livres e configuração da chave.
 
 Feita com tkinter, que já vem junto com o Python no Windows.
 """
@@ -10,7 +10,7 @@ import webbrowser
 from tkinter import messagebox
 
 from . import voz
-from .assistente import responder, saudacao
+from .assistente import remover_palavra_ativacao, responder, saudacao
 from .config import Config, salvar_no_env
 from .ia import criar_cerebro
 
@@ -20,6 +20,17 @@ DESTAQUE = "#22d3ee"
 TEXTO = "#e2e8f0"
 APAGADO = "#94a3b8"
 FONTE = ("Segoe UI", 11)
+
+# O que aparece no topo da janela enquanto a IA usa cada ferramenta.
+ACOES = {
+    "listar_arquivos": "Olhando a pasta...", "ler_arquivo_texto": "Lendo o arquivo...",
+    "salvar_arquivo_texto": "Salvando arquivo...", "abrir": "Abrindo...",
+    "ler_planilha": "Lendo a planilha...", "criar_planilha": "Criando a planilha...",
+    "adicionar_linhas_planilha": "Atualizando a planilha...",
+    "executar_codigo_python": "Executando código...", "salvar_contato": "Salvando contato...",
+    "preparar_whatsapp": "Preparando o WhatsApp...", "preparar_email": "Preparando o e-mail...",
+    "criar_lembrete": "Criando lembrete...", "pesquisar_internet": "Pesquisando na internet...",
+}
 
 PASSOS_CHAVE = {
     "gemini": (
@@ -45,6 +56,9 @@ class JanelaJarvis:
         self.eventos: queue.Queue = queue.Queue()
         self.falador = voz.Falador()
         self.falar_respostas = tk.BooleanVar(value=voz.fala_disponivel())
+        self.maos_livres = tk.BooleanVar(value=False)
+        self.escuta_ativa = False  # cópia simples de maos_livres, lida pela thread do microfone
+        self.thread_escuta = None
 
         self._montar_tela()
         self._carregar_cerebro()
@@ -98,6 +112,10 @@ class JanelaJarvis:
         tk.Checkbutton(rodape, text="Falar as respostas", variable=self.falar_respostas,
                        bg=FUNDO, fg=APAGADO, selectcolor=PAINEL, activebackground=FUNDO,
                        activeforeground=TEXTO, font=("Segoe UI", 10)).pack(side="left")
+        tk.Checkbutton(rodape, text="Mãos livres", variable=self.maos_livres,
+                       command=self.alternar_maos_livres, bg=FUNDO, fg=APAGADO, selectcolor=PAINEL,
+                       activebackground=FUNDO, activeforeground=TEXTO,
+                       font=("Segoe UI", 10)).pack(side="left", padx=(10, 0))
         self._botao(rodape, "Trocar chave", self.pedir_chave).pack(side="right")
         self._botao(rodape, "Nova conversa", lambda: self.enviar("nova conversa")).pack(side="right", padx=8)
 
@@ -141,7 +159,7 @@ class JanelaJarvis:
 
     def _concluir(self, resposta: str, acao: str | None) -> None:
         self.ocupado = False
-        self.status.config(text="Pronto", fg=APAGADO)
+        self._status_normal()
         self.mostrar("Jarvis", resposta, falar=True)
         if acao == "sair":
             self.raiz.after(2500, self.raiz.destroy)
@@ -176,11 +194,102 @@ class JanelaJarvis:
         else:
             self.status.config(text="Não entendi. Clique em Falar e tente de novo.", fg=APAGADO)
 
+    # ---------- mãos livres: fica ouvindo e responde quando escuta "Jarvis" ----------
+
+    def alternar_maos_livres(self) -> None:
+        self.escuta_ativa = self.maos_livres.get()
+        if not self.escuta_ativa:
+            self.botao_microfone.config(state="normal")
+            self._status_normal()
+            return
+        if not voz.microfone_disponivel():
+            self.maos_livres.set(False)
+            self.escuta_ativa = False
+            messagebox.showinfo("Microfone", "Não encontrei um microfone para o modo mãos livres.")
+            return
+        self.falar_respostas.set(voz.fala_disponivel())
+        self.botao_microfone.config(state="disabled")
+        palavra = self.config.palavra_ativacao.capitalize()
+        self.mostrar("Jarvis", f"Modo mãos livres ligado. É só dizer \"{palavra}\" e o seu pedido.", falar=True)
+        self._status_normal()
+        if self.thread_escuta is None or not self.thread_escuta.is_alive():
+            self.thread_escuta = threading.Thread(target=self._escutar_sempre, daemon=True)
+            self.thread_escuta.start()
+
+    def _escutar_sempre(self) -> None:
+        palavra = self.config.palavra_ativacao
+        aguardando_pedido = False
+        while self.escuta_ativa:
+            if self.ocupado:
+                threading.Event().wait(0.3)
+                continue
+            self.falador.aguardar()
+            try:
+                ouvido = voz.ouvir_microfone(self.config.idioma)
+            except Exception:
+                threading.Event().wait(1)
+                continue
+            if not ouvido or not self.escuta_ativa:
+                continue
+            pedido = ouvido if aguardando_pedido else remover_palavra_ativacao(ouvido, palavra)
+            if aguardando_pedido or pedido:
+                aguardando_pedido = False
+                self.eventos.put(lambda p=pedido: self.enviar(p))
+            elif palavra in ouvido.lower():
+                # Disse só "Jarvis": responde e escuta o próximo pedido.
+                aguardando_pedido = True
+                self.eventos.put(lambda: self.mostrar("Jarvis", "Pois não?", falar=True))
+
+    def _status_normal(self) -> None:
+        if self.escuta_ativa:
+            texto = f"Ouvindo... diga \"{self.config.palavra_ativacao.capitalize()}\""
+            self.status.config(text=texto, fg=DESTAQUE)
+        else:
+            self.status.config(text="Pronto", fg=APAGADO)
+
+    # ---------- chamadas das ferramentas (vêm de outra thread) ----------
+
+    def _na_janela(self, funcao):
+        """Roda `funcao` na thread da janela e espera o resultado."""
+        pronto = threading.Event()
+        resultado = {}
+
+        def executar():
+            resultado["valor"] = funcao()
+            pronto.set()
+
+        self.eventos.put(executar)
+        pronto.wait()
+        return resultado["valor"]
+
+    def confirmar(self, titulo: str, detalhe: str) -> bool:
+        def perguntar():
+            self.raiz.deiconify()
+            self.raiz.lift()
+            if self.falar_respostas.get():
+                self.falador.falar("Preciso da sua confirmação na tela.")
+            return messagebox.askyesno(titulo, detalhe, parent=self.raiz)
+        return self._na_janela(perguntar)
+
+    def avisar(self, texto: str) -> None:
+        def mostrar_aviso():
+            self.raiz.deiconify()
+            self.raiz.lift()
+            self.raiz.attributes("-topmost", True)
+            self.raiz.after(1500, lambda: self.raiz.attributes("-topmost", False))
+            self.mostrar("Jarvis", texto, falar=True)
+        self.eventos.put(mostrar_aviso)
+
+    def ao_usar(self, ferramenta: str) -> None:
+        texto = ACOES.get(ferramenta, "Trabalhando...")
+        self.eventos.put(lambda: self.status.config(text=texto, fg=DESTAQUE))
+
     # ---------- chave da IA ----------
 
     def _carregar_cerebro(self) -> None:
         try:
-            self.cerebro = criar_cerebro(self.config)
+            self.cerebro = criar_cerebro(self.config, confirmar=self.confirmar,
+                                         avisar=self.avisar, ao_usar=self.ao_usar)
         except Exception as erro:
             self.cerebro = None
             messagebox.showerror("Jarvis", f"Não consegui iniciar a IA: {erro}")

@@ -25,11 +25,27 @@ Dica: clique com o botão direito em `Iniciar Jarvis` → **Enviar para → Áre
 
 ## O que ele sabe fazer
 
-- **Na hora, sem internet de IA:** "que horas são", "que dia é hoje", "abra o YouTube",
-  "pesquise holding familiar", "pesquisar no youtube ironman havaí", "calcule 1500 vezes 12", "conte uma piada".
-- **Qualquer outra pergunta** vai para o Gemini, que lembra o que foi dito antes na conversa.
-- Botão **Nova conversa**: começa do zero. **Trocar chave**: cola uma chave nova.
-- **Falar as respostas**: liga ou desliga a voz do Jarvis.
+Fale ou escreva normalmente. Exemplos:
+
+| Você pede | O Jarvis faz |
+|---|---|
+| "Crie uma planilha de despesas do mês com aluguel 1.500 e luz 320" | Cria `despesas.xlsx` em **Documentos\Jarvis** |
+| "Leia a planilha despesas e me diga o total" | Lê a planilha e responde |
+| "Acrescente internet 150 na planilha despesas" | Acrescenta a linha (pede sua confirmação) |
+| "Mande no WhatsApp para a Emanuele: estou chegando" | Abre o WhatsApp com a mensagem pronta; você aperta enviar |
+| "Escreva um e-mail para cliente@x.com sobre o balanço" | Abre o Gmail com o e-mail pronto; você revisa e envia |
+| "Faça um programa em Python que renomeie os PDFs da pasta" | Gera o código e salva em Documentos\Jarvis |
+| "Rode esse código" | Executa (pede sua confirmação antes) |
+| "Me lembre de ligar para o cliente daqui a 30 minutos" | Avisa na tela e em voz alta |
+| "Quais as notícias de hoje sobre a reforma tributária?" | Pesquisa no Google e resume, com as fontes |
+| "Abra o Excel" / "abra a calculadora" | Abre o programa |
+| "Que horas são?" / "calcule 1500 vezes 12" | Responde na hora |
+
+- **🎤 Falar**: clique e fale um pedido.
+- **Mãos livres**: marque a opção e o Jarvis fica ouvindo. É só dizer **"Jarvis, ..."** e o pedido, e ele responde em voz alta.
+- **Segurança**: antes de alterar um arquivo que já existe ou de executar um código, ele pede sua confirmação. Mensagens e e-mails **nunca** são enviados sozinhos.
+- Se o Gemini estiver sobrecarregado, o Jarvis tenta de novo e troca sozinho para outro modelo gratuito.
+- A chave e os arquivos ficam em **Documentos\Jarvis**. Ao baixar uma versão nova do Jarvis, a chave continua lá.
 
 ## Para programadores
 
@@ -37,12 +53,13 @@ Dica: clique com o botão direito em `Iniciar Jarvis` → **Enviar para → Áre
 |---|---|
 | `Iniciar Jarvis.bat` | Instala o Python e as dependências, e abre a janela |
 | `jarvis/janela.py` | Janela (tkinter) com microfone e configuração da chave |
+| `jarvis/ferramentas.py` | Ações que a IA pode fazer: planilhas, arquivos, código, WhatsApp, e-mail, lembretes, pesquisa |
 | `jarvis/assistente.py` | Decide se o pedido é um comando local ou vai para a IA |
 | `jarvis/comandos.py` | Comandos rápidos (hora, data, sites, pesquisas, contas, piadas) |
 | `jarvis/cerebro_gemini.py` | IA com Google Gemini (padrão, gratuito) |
 | `jarvis/cerebro_claude.py` | IA com Claude (opcional, pago) — use `JARVIS_IA=claude` no `.env` |
 | `jarvis/voz.py` | Fala (pyttsx3) e reconhecimento de voz (SpeechRecognition) |
-| `jarvis/config.py` | Configurações e chave, guardadas no arquivo `.env` |
+| `jarvis/config.py` | Configurações e chave, guardadas em `Documentos\\Jarvis\\config.env` |
 
 ```bash
 pip install -r requirements.txt -r requirements-voz.txt
