@@ -59,7 +59,7 @@ Fale ou escreva normalmente. Exemplos:
 | `jarvis/cerebro_gemini.py` | IA com Google Gemini (padrão, gratuito) |
 | `jarvis/cerebro_claude.py` | IA com Claude (opcional, pago) — use `JARVIS_IA=claude` no `.env` |
 | `jarvis/voz.py` | Fala (pyttsx3) e reconhecimento de voz (SpeechRecognition) |
-| `jarvis/config.py` | Configurações e chave, guardadas em `Documentos\\Jarvis\\config.env` |
+| `jarvis/config.py` | Configurações e chave, guardadas em `Documentos\Jarvis\config.env` |
 
 ```bash
 pip install -r requirements.txt -r requirements-voz.txt
