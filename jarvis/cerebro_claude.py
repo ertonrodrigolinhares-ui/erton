@@ -1,26 +1,16 @@
-"""O "cérebro" do Jarvis: conversa com o Claude (API da Anthropic) mantendo o histórico."""
+"""Cérebro do Jarvis usando o Claude (API da Anthropic, paga por uso)."""
 
 import anthropic
 
-PROMPT_SISTEMA = """Você é o Jarvis, assistente pessoal de {usuario}, empresário e líder da \
-Linhares Prudêncio Contabilidade e Gestão Empresarial (contabilidade, M&A, governança \
-corporativa familiar, holdings e planejamento sucessório).
-
-Suas respostas são lidas em voz alta, então:
-- Responda em português do Brasil, de forma direta, cordial e objetiva.
-- Prefira de 1 a 4 frases; aprofunde só quando for pedido.
-- Não use markdown, listas com símbolos, tabelas ou emojis.
-- Em temas tributários, contábeis ou jurídicos, lembre que a legislação muda e que a \
-decisão final deve ser validada pela equipe técnica.
-Latency-sensitive; begin your visible answer immediately."""
+from .persona import prompt_sistema
 
 
-class Cerebro:
+class CerebroClaude:
     def __init__(self, usuario: str, modelo: str, esforco: str):
         self.cliente = anthropic.Anthropic()
         self.modelo = modelo
         self.esforco = esforco
-        self.sistema = PROMPT_SISTEMA.format(usuario=usuario)
+        self.sistema = prompt_sistema(usuario) + "\nLatency-sensitive; begin your visible answer immediately."
         self.historico: list = []
 
     def perguntar(self, texto: str) -> str:

@@ -2,7 +2,7 @@ from datetime import datetime
 from unittest.mock import patch
 
 from jarvis import comandos
-from jarvis.main import remover_palavra_ativacao
+from jarvis.assistente import remover_palavra_ativacao
 
 
 def test_hora():

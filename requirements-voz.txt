@@ -1,0 +1,4 @@
+# Voz (opcional - sem ela o Jarvis funciona só com texto)
+pyttsx3
+SpeechRecognition
+pyaudio

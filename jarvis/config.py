@@ -1,37 +1,72 @@
-"""Configurações do Jarvis, lidas de variáveis de ambiente (ou de um arquivo .env)."""
+"""Configurações do Jarvis, lidas de variáveis de ambiente (ou do arquivo .env)."""
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
+
+# O .env fica na pasta do projeto, não importa de onde o Jarvis foi aberto.
+ARQUIVO_ENV = Path(__file__).resolve().parent.parent / ".env"
+
+NOME_CHAVE = {"gemini": "GEMINI_API_KEY", "claude": "ANTHROPIC_API_KEY"}
+SITE_CHAVE = {
+    "gemini": "https://aistudio.google.com/apikey",
+    "claude": "https://console.anthropic.com/settings/keys",
+}
 
 
-def _carregar_dotenv(caminho: str = ".env") -> None:
-    """Carrega pares CHAVE=valor de um arquivo .env, sem sobrescrever o ambiente."""
-    if not os.path.exists(caminho):
+def _carregar_dotenv() -> None:
+    """Carrega pares CHAVE=valor do .env, sem sobrescrever o ambiente."""
+    if not ARQUIVO_ENV.exists():
         return
-    with open(caminho, encoding="utf-8") as arquivo:
-        for linha in arquivo:
-            linha = linha.strip()
-            if not linha or linha.startswith("#") or "=" not in linha:
-                continue
-            chave, valor = linha.split("=", 1)
-            os.environ.setdefault(chave.strip(), valor.strip().strip('"').strip("'"))
+    for linha in ARQUIVO_ENV.read_text(encoding="utf-8").splitlines():
+        linha = linha.strip()
+        if not linha or linha.startswith("#") or "=" not in linha:
+            continue
+        chave, valor = linha.split("=", 1)
+        os.environ.setdefault(chave.strip(), valor.strip().strip('"').strip("'"))
+
+
+def salvar_no_env(chave: str, valor: str) -> None:
+    """Grava (ou atualiza) CHAVE=valor no .env e no ambiente atual."""
+    linhas = ARQUIVO_ENV.read_text(encoding="utf-8").splitlines() if ARQUIVO_ENV.exists() else []
+    linhas = [l for l in linhas if not l.strip().startswith(f"{chave}=")]
+    linhas.append(f"{chave}={valor}")
+    ARQUIVO_ENV.write_text("\n".join(linhas) + "\n", encoding="utf-8")
+    os.environ[chave] = valor
 
 
 @dataclass
 class Config:
     nome_usuario: str
     palavra_ativacao: str
-    modelo: str
-    esforco: str
+    ia: str
+    gemini_modelo: str
+    claude_modelo: str
+    claude_esforco: str
     idioma: str
 
     @classmethod
     def carregar(cls) -> "Config":
         _carregar_dotenv()
+        ia = os.getenv("JARVIS_IA", "gemini").lower()
         return cls(
             nome_usuario=os.getenv("JARVIS_USUARIO", "Erton"),
             palavra_ativacao=os.getenv("JARVIS_PALAVRA_ATIVACAO", "jarvis").lower(),
-            modelo=os.getenv("JARVIS_MODELO", "claude-opus-5"),
-            esforco=os.getenv("JARVIS_ESFORCO", "medium"),
+            ia=ia if ia in NOME_CHAVE else "gemini",
+            gemini_modelo=os.getenv("JARVIS_GEMINI_MODELO", "gemini-flash-latest"),
+            claude_modelo=os.getenv("JARVIS_CLAUDE_MODELO", "claude-opus-5"),
+            claude_esforco=os.getenv("JARVIS_CLAUDE_ESFORCO", "medium"),
             idioma=os.getenv("JARVIS_IDIOMA", "pt-BR"),
         )
+
+    @property
+    def nome_chave(self) -> str:
+        return NOME_CHAVE[self.ia]
+
+    @property
+    def site_chave(self) -> str:
+        return SITE_CHAVE[self.ia]
+
+    @property
+    def chave_api(self) -> str:
+        return os.getenv(self.nome_chave, "").strip()

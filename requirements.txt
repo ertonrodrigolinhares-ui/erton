@@ -1,5 +1,3 @@
+google-genai>=1.0
+# Só é usado se JARVIS_IA=claude no .env
 anthropic>=1.0
-# Voz (opcional - sem elas o Jarvis roda em modo texto)
-pyttsx3
-SpeechRecognition
-pyaudio

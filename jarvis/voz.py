@@ -1,8 +1,11 @@
-"""Entrada e saída do Jarvis: fala (microfone/alto-falante) ou texto (terminal).
+"""Fala (alto-falante) e escuta (microfone) do Jarvis.
 
-As bibliotecas de voz são opcionais. Se não estiverem instaladas, ou se não houver
-microfone, o Jarvis funciona normalmente em modo texto.
+As bibliotecas de voz são opcionais: sem elas, o Jarvis funciona só com texto.
+O reconhecimento de fala usa o serviço gratuito do Google (não precisa de chave).
 """
+
+import queue
+import threading
 
 try:
     import pyttsx3
@@ -15,58 +18,71 @@ except ImportError:  # pragma: no cover - depende do ambiente
     sr = None
 
 
-class Interface:
-    def __init__(self, usar_voz: bool, idioma: str = "pt-BR"):
-        self.idioma = idioma
-        self.motor_fala = None
-        self.reconhecedor = None
-        self.usar_voz = usar_voz and pyttsx3 is not None and sr is not None
+def fala_disponivel() -> bool:
+    return pyttsx3 is not None
 
-        if usar_voz and not self.usar_voz:
-            print("[Jarvis] Bibliotecas de voz não encontradas; usando modo texto.")
-            print("         Instale com: pip install pyttsx3 SpeechRecognition pyaudio")
 
-        if self.usar_voz:
+def microfone_disponivel() -> bool:
+    if sr is None:
+        return False
+    try:
+        return len(sr.Microphone.list_microphone_names()) > 0
+    except Exception:  # PyAudio ausente ou sem dispositivo de áudio
+        return False
+
+
+class Falador:
+    """Fala em segundo plano, um texto de cada vez, sem travar a janela."""
+
+    def __init__(self):
+        self.fila: queue.Queue = queue.Queue()
+        if fala_disponivel():
+            threading.Thread(target=self._trabalhar, daemon=True).start()
+
+    def _trabalhar(self) -> None:
+        # O motor precisa ser criado na mesma thread em que fala.
+        try:
+            motor = pyttsx3.init()
+        except Exception:
+            motor = None
+        else:
+            for voz in motor.getProperty("voices"):
+                identificacao = f"{voz.id} {voz.name}".lower()
+                if "pt" in identificacao or "portug" in identificacao or "brazil" in identificacao:
+                    motor.setProperty("voice", voz.id)
+                    break
+            motor.setProperty("rate", 185)
+        while True:
+            texto = self.fila.get()
             try:
-                self.motor_fala = pyttsx3.init()
-                self._escolher_voz_portugues()
-                self.reconhecedor = sr.Recognizer()
-            except Exception as erro:  # sem driver de áudio, por exemplo
-                print(f"[Jarvis] Não foi possível iniciar o áudio ({erro}); usando modo texto.")
-                self.usar_voz = False
-
-    def _escolher_voz_portugues(self) -> None:
-        for voz in self.motor_fala.getProperty("voices"):
-            identificacao = f"{voz.id} {voz.name}".lower()
-            if "pt" in identificacao or "portug" in identificacao or "brazil" in identificacao:
-                self.motor_fala.setProperty("voice", voz.id)
-                break
-        self.motor_fala.setProperty("rate", 185)
+                if motor is not None:
+                    motor.say(texto)
+                    motor.runAndWait()
+            except Exception:
+                pass
+            finally:
+                self.fila.task_done()
 
     def falar(self, texto: str) -> None:
-        print(f"Jarvis: {texto}")
-        if self.usar_voz:
-            self.motor_fala.say(texto)
-            self.motor_fala.runAndWait()
+        if fala_disponivel():
+            self.fila.put(texto)
 
-    def ouvir(self) -> str:
-        """Retorna o que o usuário disse/digitou, em minúsculas. String vazia se nada foi entendido."""
-        if not self.usar_voz:
-            try:
-                return input("Você: ").strip()
-            except EOFError:
-                return "sair"
+    def aguardar(self) -> None:
+        """Espera terminar de falar (para o microfone não ouvir o próprio Jarvis)."""
+        if fala_disponivel():
+            self.fila.join()
 
-        with sr.Microphone() as fonte:
-            print("Ouvindo...")
-            self.reconhecedor.adjust_for_ambient_noise(fonte, duration=0.5)
-            try:
-                audio = self.reconhecedor.listen(fonte, timeout=8, phrase_time_limit=12)
-            except sr.WaitTimeoutError:
-                return ""
+
+def ouvir_microfone(idioma: str = "pt-BR") -> str:
+    """Escuta uma frase pelo microfone e devolve o texto ("" se não entendeu)."""
+    reconhecedor = sr.Recognizer()
+    with sr.Microphone() as fonte:
+        reconhecedor.adjust_for_ambient_noise(fonte, duration=0.5)
         try:
-            texto = self.reconhecedor.recognize_google(audio, language=self.idioma)
-        except (sr.UnknownValueError, sr.RequestError):
+            audio = reconhecedor.listen(fonte, timeout=8, phrase_time_limit=15)
+        except sr.WaitTimeoutError:
             return ""
-        print(f"Você: {texto}")
-        return texto.strip()
+    try:
+        return reconhecedor.recognize_google(audio, language=idioma).strip()
+    except (sr.UnknownValueError, sr.RequestError):
+        return ""
