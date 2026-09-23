@@ -1,0 +1,5 @@
+anthropic>=1.0
+# Voz (opcional - sem elas o Jarvis roda em modo texto)
+pyttsx3
+SpeechRecognition
+pyaudio
