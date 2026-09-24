@@ -32,7 +32,7 @@ copy /y requirements.txt .venv\instalado.txt >nul
 
 :chave
 rem ---- Primeira vez: pede a chave do Gemini ----
-if exist ".env" goto iniciar
+if exist ".env" goto groq
 echo.
 echo ============================================================
 echo  Falta a chave do Gemini. Para pegar a sua, de graca:
@@ -48,8 +48,28 @@ if "%CHAVE%"=="" goto chave
     echo GEMINI_VOICE_NAME="charon"
     echo JARVIS_EFEITO_ULTRON=1
     echo JARVIS_SKIP_CLAP_GATE=1
+    echo JARVIS_PALAVRA_ATIVACAO=1
 ) > .env
 echo Chave salva.
+
+:groq
+rem ---- Uma vez so: pergunta a chave do Groq (reserva gratis, opcional) ----
+findstr /c:"GROQ_API_KEY" .env >nul 2>nul && goto iniciar
+echo.
+echo ============================================================
+echo  OPCIONAL: chave do Groq, a IA reserva gratis.
+echo  Se o Gemini cair ou atingir o limite, o Groq responde no lugar.
+echo  1. Vai abrir o site do Groq. Entre com a sua conta do Google.
+echo  2. Clique em "Create API Key", de o nome Jarvis e copie a chave.
+echo  3. Cole aqui com o botao direito e aperte Enter.
+echo  Para pular, apenas aperte Enter.
+echo ============================================================
+start https://console.groq.com/keys
+set "GROQ="
+set /p "GROQ=Chave do Groq (ou Enter para pular): "
+>> .env echo.
+>> .env echo GROQ_API_KEY="%GROQ%"
+if "%GROQ%"=="" (echo Sem reserva por enquanto. Para colocar depois, veja o LEIA-ME.) else (echo Chave do Groq salva.)
 
 :iniciar
 echo.

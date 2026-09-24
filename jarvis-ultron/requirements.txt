@@ -47,3 +47,6 @@ elevenlabs
 openai
 soundfile
 python-dotenv
+edge-tts
+groq
+openwakeword==0.4.0

@@ -1209,9 +1209,22 @@ class JarvisLive:
         self._self_quit_timer = None
         self._shutdown_requested = threading.Event()
         self._tour_active = False
+        # Jarvis Ultron: palavra de ativação ("Hey Jarvis") e IA reserva (Groq)
+        from core.palavra_ativacao import PortaoDeVoz
+        from core.reserva_groq import ReservaGroq
+
+        if self.external_audio or self.cloud_safe:
+            self._portao = PortaoDeVoz(None, ativo=False)
+        else:
+            self._portao = PortaoDeVoz.da_configuracao(avisar=self.ui.write_log)
+        self._reserva = None if self.cloud_safe else ReservaGroq.da_configuracao()
+        self._modo_reserva = False
+        self._falhas_seguidas = 0
 
     def _on_text_command(self, text: str):
         if not self._loop or not self.session:
+            if getattr(self, "_reserva", None) is not None and str(text or "").strip():
+                threading.Thread(target=self._responder_pela_reserva, args=(text,), daemon=True).start()
             return
         asyncio.run_coroutine_threadsafe(self.send_text(text), self._loop)
 
@@ -1258,6 +1271,8 @@ class JarvisLive:
             self.ui.set_state("SPEAKING")
         elif not self.ui.muted:
             self.ui.set_state("LISTENING")
+        if not value and getattr(self, "_portao", None) is not None:
+            self._portao.estender()
 
     def speak(self, text: str) -> bool:
         if not self._loop or not self.session:
@@ -1503,6 +1518,55 @@ class JarvisLive:
                 )
             ),
         )
+
+    # ---------- Jarvis Ultron: modo reserva (Groq) ----------
+
+    def _ativar_modo_reserva(self) -> None:
+        if self._modo_reserva:
+            return
+        self._modo_reserva = True
+        self.ui.write_log("SYS: Gemini indisponível. Modo reserva (Groq) ligado: converso, mas sem ferramentas.")
+        threading.Thread(target=self._escutar_reserva, daemon=True).start()
+        threading.Thread(target=self._falar_reserva, daemon=True, args=(
+            "A conexão principal caiu. Estou no modo reserva: posso conversar, "
+            "mas sem usar as ferramentas até ela voltar.",)).start()
+
+    def _desativar_modo_reserva(self) -> None:
+        self._modo_reserva = False
+        self.ui.write_log("SYS: Conexão principal de volta. Modo reserva desligado.")
+
+    def _responder_pela_reserva(self, texto: str) -> None:
+        resposta = self._reserva.responder(texto)
+        self.ui.write_log(f"Jarvis: {resposta}")
+        self._falar_reserva(resposta)
+
+    def _falar_reserva(self, texto: str) -> None:
+        from actions.tts_engine import TTSEngine
+
+        TTSEngine(
+            provider="edge",
+            voice_id=os.environ.get("JARVIS_VOZ_RESERVA", "pt-BR-AntonioNeural"),
+            on_speaking_start=lambda: self.set_speaking(True),
+            on_speaking_stop=lambda: self.set_speaking(False),
+        ).speak_sync(texto)
+
+    def _escutar_reserva(self) -> None:
+        """No modo reserva: ouve (depois do "Hey Jarvis"), transcreve e responde pelo Groq."""
+        from core.reserva_groq import capturar_falas
+
+        try:
+            for pcm in capturar_falas(
+                continuar=lambda: self._modo_reserva and not self._shutdown_requested.is_set(),
+                pode_ouvir=lambda: not self._is_speaking and not self.ui.muted,
+                portao=self._portao,
+            ):
+                texto = self._reserva.transcrever(pcm)
+                if texto:
+                    self.ui.write_log(f"You: {texto}")
+                    self._portao.estender()
+                    self._responder_pela_reserva(texto)
+        except Exception as erro:
+            print(f"[Reserva] Microfone do modo reserva parou: {erro}")
 
     def _suspender(self, minutos) -> str:
         """Jarvis Ultron: silencia o microfone por alguns minutos e volta sozinho."""
@@ -1830,11 +1894,12 @@ class JarvisLive:
             with self._speaking_lock:
                 jarvis_speaking = self._is_speaking
             if not jarvis_speaking and not self.ui.muted:
-                data = indata.tobytes()
-                loop.call_soon_threadsafe(
-                    self.out_queue.put_nowait,
-                    {"data": data, "mime_type": "audio/pcm"}
-                )
+                data = self._portao.processar(indata)
+                if data:
+                    loop.call_soon_threadsafe(
+                        self.out_queue.put_nowait,
+                        {"data": data, "mime_type": "audio/pcm"}
+                    )
 
         try:
             with sd.InputStream(
@@ -1885,6 +1950,7 @@ class JarvisLive:
                                     self.ui.show_subtitle(txt)
 
                         if sc.input_transcription and sc.input_transcription.text:
+                            self._portao.estender()
                             txt = _clean_transcript(sc.input_transcription.text)
                             if txt:
                                 if not in_buf:
@@ -2067,6 +2133,9 @@ class JarvisLive:
                     self._turn_done_event = asyncio.Event()
 
                     print("[JARVIS] ✅ Connected.")
+                    self._falhas_seguidas = 0
+                    if self._modo_reserva:
+                        self._desativar_modo_reserva()
                     self.ui.set_state("LISTENING")
                     self.ui.write_log("SYS: JARVIS online.")
                     if not self.cloud_safe:
@@ -2116,6 +2185,11 @@ class JarvisLive:
                 else:
                     print(f"[JARVIS] ⚠️ {e}")
                     traceback.print_exc()
+                    # Jarvis Ultron: espera antes de tentar de novo (o original tentava sem parar)
+                    self._falhas_seguidas += 1
+                    if self._reserva is not None and self._falhas_seguidas >= 2:
+                        self._ativar_modo_reserva()
+                    await self._wait_before_reconnect(min(60, 2 ** min(self._falhas_seguidas, 6)))
 
 def main():
     import sys

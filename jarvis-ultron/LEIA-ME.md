@@ -17,6 +17,17 @@ Cópia do projeto **JARVIS-OS V.2** (licença MIT, veja `LICENSE`), com ajustes 
 - **Gerar imagens (Nano Banana)**: "Jarvis, crie uma imagem de um leão de armadura".
   A imagem abre na hora e fica salva em **Documentos\Jarvis Ultron\Imagens**.
   Atenção: o Google pode não liberar cota grátis de imagens para a sua chave; nesse caso o Jarvis avisa.
+- **Palavra de ativação "Hey Jarvis"** (`core/palavra_ativacao.py`): o Jarvis só começa a ouvir
+  depois que você diz **"Hey Jarvis"** (pronúncia em inglês funciona melhor). A detecção roda no
+  seu computador, sem internet: **nada do que você fala antes disso vai para o Google**.
+  Depois de ativado, ele continua ouvindo durante a conversa e volta a dormir após ~20 segundos
+  de silêncio. A tela mostra "Estou ouvindo" e "Aguardando Hey Jarvis".
+- **IA reserva Groq** (`core/reserva_groq.py`): se o Gemini cair ou atingir o limite, o Jarvis
+  entra no **modo reserva**: continua ouvindo (depois do "Hey Jarvis"), entende com o Whisper do
+  Groq, responde pelo Groq e fala com a voz grátis da Microsoft. No modo reserva ele **conversa,
+  mas não usa as ferramentas** (abrir apps, e-mail...). Quando o Gemini volta, tudo volta ao normal.
+- Correção: quando a conexão falhava, o original tentava reconectar sem parar, várias vezes por
+  segundo (gastando a cota). Agora ele espera entre as tentativas (2 s, 4 s, 8 s... até 1 minuto).
 
 ## Como usar no Windows
 
@@ -37,6 +48,15 @@ Cópia do projeto **JARVIS-OS V.2** (licença MIT, veja `LICENSE`), com ajustes 
   `GEMINI_API_KEY="..."` e salve.
 - **Atualizando para uma versão nova:** copie o arquivo `.env` da pasta antiga para a nova,
   assim ele não pede a chave de novo.
+- **Chave do Groq:** o iniciador pergunta uma vez. Para colocar ou trocar depois, abra o `.env`
+  no Bloco de Notas e edite a linha `GROQ_API_KEY="..."` (chave grátis em https://console.groq.com/keys).
+
+## Se o "Hey Jarvis" não funcionar bem
+
+- **Ele não acorda:** fale "Hey Jarvis" com pronúncia em inglês, perto do microfone. Se ainda
+  falhar, coloque `JARVIS_SENSIBILIDADE=0.3` no `.env`.
+- **Ele acorda sozinho:** aumente para `JARVIS_SENSIBILIDADE=0.7`.
+- **Prefere que ele ouça sempre:** coloque `JARVIS_PALAVRA_ATIVACAO=0`.
 
 ## Configurações (arquivo `.env` nesta pasta)
 
@@ -47,6 +67,11 @@ Abra com o Bloco de Notas para mudar:
 | `GEMINI_VOICE_NAME="charon"` | Voz: charon, fenrir, orus, puck, kore, aoede, leda, schedar, zubenelgenubi |
 | `JARVIS_EFEITO_ULTRON=1` | Efeito metálico. `0` desliga, `robo` deixa com voz de robô |
 | `JARVIS_SKIP_CLAP_GATE=1` | Mude para `0` para ligar o Jarvis batendo **duas palmas** 👏👏 |
+| `JARVIS_PALAVRA_ATIVACAO=1` | "Hey Jarvis" ligado. `0` = ouve sempre, como no original |
+| `JARVIS_SENSIBILIDADE=0.5` | Menor (ex.: `0.3`) = aceita o "Hey Jarvis" com mais facilidade; maior = mais rigoroso |
+| `JARVIS_JANELA_CONVERSA=20` | Segundos que ele continua ouvindo depois da última fala |
+| `GROQ_API_KEY="gsk_..."` | Chave do Groq (reserva grátis). O iniciador pergunta uma vez |
+| `JARVIS_VOZ_RESERVA=pt-BR-AntonioNeural` | Voz do modo reserva (ex.: `pt-BR-FranciscaNeural`) |
 | `JARVIS_MODELO_TEXTO=` | (Opcional) força um modelo de texto, ex.: `gemini-3.1-flash`. Vazio = automático |
 | `JARVIS_MODELO_LEVE=` | (Opcional) força o modelo das tarefas rápidas, ex.: `gemini-3.1-flash-lite` |
 | `JARVIS_MODELO_PRO=` | (Opcional) força o modelo "pro" |
