@@ -40,6 +40,12 @@ Cópia do projeto **JARVIS-OS V.2** (licença MIT, veja `LICENSE`), com ajustes 
 - **Hermes Agent** (pasta `hermes`): orquestrador com sub-agentes, rotina diária das 8h, redes sociais
   pelo Metricool, anúncios pelo Meta e navegador próprio. Veja a seção "Hermes" abaixo.
 
+- **Tela Stark** (`ui_stark.py`): painéis no estilo do HUD do Homem de Ferro em volta da esfera —
+  régua dos dias do mês, relógio em anel, disco, energia, internet, atalhos, STARK INDUSTRIES,
+  clima, uso do computador, bloco de notas (fica salvo sozinho), notícias do Google e botões
+  redondos (posts de hoje, clima, e-mails, música, mãos livres, modo chamada, suspender, pasta,
+  resumo do dia). A **esfera do meio pulsa com o volume da voz** do Jarvis.
+
 ## Como usar no Windows
 
 1. Dê dois cliques em **`Iniciar Jarvis Ultron`**.
@@ -78,6 +84,8 @@ Abra com o Bloco de Notas para mudar:
 |---|---|
 | `GEMINI_VOICE_NAME="charon"` | Voz: charon, fenrir, orus, puck, kore, aoede, leda, schedar, zubenelgenubi |
 | `JARVIS_EFEITO_ULTRON=1` | Efeito metálico. `0` desliga, `robo` deixa com voz de robô |
+| `JARVIS_TEMA_STARK=1` | Tela Stark ligada. `0` = volta para a tela original |
+| `JARVIS_CIDADE=Campina Grande` | Cidade do painel de clima |
 | `JARVIS_SKIP_CLAP_GATE=1` | Mude para `0` para ligar o Jarvis batendo **duas palmas** 👏👏 |
 | `JARVIS_PALAVRA_ATIVACAO=1` | Começa no modo chamada ("Hey Jarvis"). `0` = começa em mãos livres |
 | `JARVIS_SENSIBILIDADE=0.5` | Menor (ex.: `0.3`) = aceita o "Hey Jarvis" com mais facilidade; maior = mais rigoroso |

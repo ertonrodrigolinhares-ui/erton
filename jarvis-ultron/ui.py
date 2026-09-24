@@ -6767,6 +6767,12 @@ class MainWindow(QMainWindow):
         middle_layout2.setSpacing(0)
         middle_layout2.addWidget(self._splitter)
 
+        # Jarvis Ultron: tela Stark (painéis do HUD do Homem de Ferro em volta da esfera)
+        import ui_stark
+        if ui_stark.ligada():
+            middle_section2 = ui_stark.montar_tela_stark(self, middle_section2, UI_FONT, TECH_FONT)
+            self._tela_stark = middle_section2
+
         # Add middle section to main layout
         root.addWidget(middle_section2, stretch=1)
         # ── Tool progress indicator (above footer) ──────────────────────────

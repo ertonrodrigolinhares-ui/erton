@@ -537,3 +537,64 @@ class ModosDeEscutaTests(unittest.TestCase):
         jarvis = self._jarvis(PortaoDeVoz(None, ativo=False))
         self.assertIn("unavailable", jarvis._definir_modo_escuta("chamada"))
         self.assertEqual(jarvis._portao.modo, "maos_livres")
+
+
+# ---------- tela Stark ----------
+
+class TelaStarkTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        from PyQt6.QtWidgets import QApplication
+
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_monta_painel_atualiza_dados_e_botoes_mandam_comandos(self):
+        import tempfile
+
+        from PyQt6.QtWidgets import QWidget
+
+        import ui_stark
+
+        comandos = []
+        with patch.object(ui_stark.TelaStark, "_buscar_da_internet", lambda self: None):
+            tela = ui_stark.TelaStark(QWidget(), comandos.append, pasta_dados=Path(tempfile.mkdtemp()))
+        tela._a_cada_segundo()
+        self.assertIn("Tempo ligado", tela.ligado.text())
+        self.assertTrue(tela.cpu.texto.endswith("%"))
+        self.assertEqual(len(tela.botoes), len(ui_stark.BOTOES))
+        tela.botoes[0].click()
+        self.assertEqual(comandos, ["quais são os posts de hoje?"])
+
+    def test_notas_ficam_salvas(self):
+        import tempfile
+
+        from PyQt6.QtWidgets import QWidget
+
+        import ui_stark
+
+        pasta = Path(tempfile.mkdtemp())
+        with patch.object(ui_stark.TelaStark, "_buscar_da_internet", lambda self: None):
+            tela = ui_stark.TelaStark(QWidget(), lambda texto: None, pasta_dados=pasta)
+            tela.notas.setPlainText("treino de bike às 6h")
+            tela._gravar_notas()
+            outra = ui_stark.TelaStark(QWidget(), lambda texto: None, pasta_dados=pasta)
+        self.assertEqual(outra.notas.toPlainText(), "treino de bike às 6h")
+
+    def test_noticias_e_clima_sem_internet_nao_quebram(self):
+        from PyQt6.QtWidgets import QWidget
+
+        import ui_stark
+
+        with patch.object(ui_stark.TelaStark, "_buscar_da_internet", lambda self: None):
+            tela = ui_stark.TelaStark(QWidget(), lambda texto: None)
+        tela._mostrar_noticias([])
+        tela._mostrar_noticias([("Manchete de teste", "https://example.com")])
+        self.assertEqual(tela.noticias.count(), 1)
+
+    def test_pode_desligar_pelo_env(self):
+        import ui_stark
+
+        with patch.dict("os.environ", {"JARVIS_TEMA_STARK": "0"}):
+            self.assertFalse(ui_stark.ligada())
+        with patch.dict("os.environ", {"JARVIS_TEMA_STARK": "1"}):
+            self.assertTrue(ui_stark.ligada())
