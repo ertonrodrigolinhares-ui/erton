@@ -19,7 +19,7 @@ for ($i = 0; $i -lt $agentes.Count; $i++) {
     $nome = $agentes[$i].Name
     $estado = if (Test-Path (Join-Path $ativos $nome)) { "[LIGADO]   " } else { "[desligado]" }
     $linha = (Get-Content (Join-Path $agentes[$i].FullName "SKILL.md") | Where-Object { $_ -like "description:*" } | Select-Object -First 1)
-    $descricao = if ($linha) { $linha.Substring(12).Trim() } else { "" }
+    $descricao = if ($linha) { $linha.Substring(12).Trim().Trim('"') } else { "" }
     Write-Host ("{0,2}. {1} {2}" -f ($i + 1), $estado, $nome)
     Write-Host ("       {0}" -f $descricao) -ForegroundColor DarkGray
 }

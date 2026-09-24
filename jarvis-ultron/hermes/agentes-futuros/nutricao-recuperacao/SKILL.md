@@ -1,6 +1,6 @@
 ---
 name: nutricao-recuperacao
-description: Nutrição e recuperação: sugere refeições, hidratação e descanso de acordo com o treino do dia.
+description: "Nutrição e recuperação: sugere refeições, hidratação e descanso de acordo com o treino do dia."
 version: 1.0.0
 metadata:
   hermes:

@@ -1,6 +1,6 @@
 ---
 name: relatorio-mensal
-description: Relatório mensal das redes: crescimento de seguidores, alcance e melhores posts do mês.
+description: "Relatório mensal das redes: crescimento de seguidores, alcance e melhores posts do mês."
 version: 1.0.0
 metadata:
   hermes:

@@ -1,6 +1,6 @@
 ---
 name: briefing-diario
-description: Briefing do dia: agenda, e-mails importantes e notícias do setor logo cedo.
+description: "Briefing do dia: agenda, e-mails importantes e notícias do setor logo cedo."
 version: 1.0.0
 metadata:
   hermes:

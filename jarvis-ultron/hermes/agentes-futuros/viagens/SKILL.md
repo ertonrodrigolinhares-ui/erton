@@ -1,6 +1,6 @@
 ---
 name: viagens
-description: Viagens: pesquisa voos e hotéis e monta o roteiro.
+description: "Viagens: pesquisa voos e hotéis e monta o roteiro."
 version: 1.0.0
 metadata:
   hermes:

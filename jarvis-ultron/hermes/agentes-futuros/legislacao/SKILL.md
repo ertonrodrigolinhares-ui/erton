@@ -1,6 +1,6 @@
 ---
 name: legislacao
-description: Legislação: acompanha reforma tributária, Receita Federal, holdings e sucessão, e avisa só quando algo muda.
+description: "Legislação: acompanha reforma tributária, Receita Federal, holdings e sucessão, e avisa só quando algo muda."
 version: 1.0.0
 metadata:
   hermes:

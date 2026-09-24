@@ -1,6 +1,6 @@
 ---
 name: respostas-redes
-description: Respostas nas redes: lê comentários e mensagens e sugere respostas. Quem envia é o Erton.
+description: "Respostas nas redes: lê comentários e mensagens e sugere respostas. Quem envia é o Erton."
 version: 1.0.0
 metadata:
   hermes:

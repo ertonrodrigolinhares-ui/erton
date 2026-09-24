@@ -1,6 +1,6 @@
 ---
 name: treinador-dados
-description: Treinador de dados: lê os treinos do Strava/Garmin e faz o resumo da semana (volume, ritmo, frequência cardíaca, sinais de cansaço).
+description: "Treinador de dados: lê os treinos do Strava/Garmin e faz o resumo da semana (volume, ritmo, frequência cardíaca, sinais de cansaço)."
 version: 1.0.0
 metadata:
   hermes:

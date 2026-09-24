@@ -1,6 +1,6 @@
 ---
 name: agente-provas
-description: Agente de provas: acompanha calendário de triathlon/Ironman, avisa inscrições e monta o checklist de viagem da prova.
+description: "Agente de provas: acompanha calendário de triathlon/Ironman, avisa inscrições e monta o checklist de viagem da prova."
 version: 1.0.0
 metadata:
   hermes:

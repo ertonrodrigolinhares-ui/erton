@@ -1,6 +1,6 @@
 ---
 name: linkedin-lideranca
-description: LinkedIn de liderança: transforma lições do esporte em posts sobre liderança e gestão.
+description: "LinkedIn de liderança: transforma lições do esporte em posts sobre liderança e gestão."
 version: 1.0.0
 metadata:
   hermes:

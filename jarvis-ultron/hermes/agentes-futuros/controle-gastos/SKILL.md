@@ -1,6 +1,6 @@
 ---
 name: controle-gastos
-description: Controle de gastos: lê a fatura do cartão (PDF) e monta a planilha do mês por categoria.
+description: "Controle de gastos: lê a fatura do cartão (PDF) e monta a planilha do mês por categoria."
 version: 1.0.0
 metadata:
   hermes:

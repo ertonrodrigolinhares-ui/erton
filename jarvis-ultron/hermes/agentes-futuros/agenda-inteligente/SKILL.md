@@ -1,6 +1,6 @@
 ---
 name: agenda-inteligente
-description: Agenda inteligente: organiza o Google Agenda, avisa conflitos e lembra aniversários e compromissos da família.
+description: "Agenda inteligente: organiza o Google Agenda, avisa conflitos e lembra aniversários e compromissos da família."
 version: 1.0.0
 metadata:
   hermes:

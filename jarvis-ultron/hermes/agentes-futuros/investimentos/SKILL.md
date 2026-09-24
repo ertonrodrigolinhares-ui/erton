@@ -1,6 +1,6 @@
 ---
 name: investimentos
-description: Investimentos: acompanha cotações e notícias dos ativos escolhidos e faz um resumo semanal.
+description: "Investimentos: acompanha cotações e notícias dos ativos escolhidos e faz um resumo semanal."
 version: 1.0.0
 metadata:
   hermes:
