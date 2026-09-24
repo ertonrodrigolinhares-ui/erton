@@ -6581,6 +6581,7 @@ class MainWindow(QMainWindow):
 
     _log_sig       = pyqtSignal(str)
     _state_sig     = pyqtSignal(str)
+    _mute_sig      = pyqtSignal(bool)  # Jarvis Ultron: mudo seguro vindo de outras threads
     _voice_sig     = pyqtSignal(str)
     _sub_sig       = pyqtSignal(str)
     _sub_clear_sig = pyqtSignal()
@@ -6782,6 +6783,7 @@ class MainWindow(QMainWindow):
 
         self._log_sig.connect(self._log.append_log)
         self._state_sig.connect(self._apply_state)
+        self._mute_sig.connect(self._set_muted)
         self._voice_sig.connect(self._sync_voice_combo)
         self._sub_sig.connect(self._subtitle.set_text)
         self._sub_clear_sig.connect(self._subtitle.clear_subtitle)
@@ -8343,6 +8345,10 @@ class MainWindow(QMainWindow):
             )
             threading.Thread(target=self.on_text_command, args=(msg,), daemon=True).start()
 
+    def _set_muted(self, valor: bool):
+        if bool(valor) != self._muted:
+            self._toggle_mute()
+
     def _toggle_mute(self):
         self._muted = not self._muted
         self.hud.muted = self._muted
@@ -9104,6 +9110,10 @@ class JarvisUI:
 
     def set_state(self, state: str):
         self._win._state_sig.emit(state)
+
+    def set_muted_threadsafe(self, valor: bool):
+        """Liga/desliga o mudo a partir de qualquer thread (usado pela suspensão por tempo)."""
+        self._win._mute_sig.emit(bool(valor))
 
     def write_log(self, text: str):
         self._win._log_sig.emit(text)

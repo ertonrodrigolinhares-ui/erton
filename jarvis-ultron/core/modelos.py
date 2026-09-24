@@ -77,9 +77,24 @@ def _versao(nome: str) -> float:
     return float(achado.group(1)) if achado else 0.0
 
 
+VERSAO_MINIMA = 2.5  # modelos mais antigos que isso ficam só como última reserva
+
+
+def _grupo(nome: str) -> int:
+    """0 = estável e atual, 1 = apelido "latest", 2 = preview/experimental (o Google desliga
+    mais rápido), 3 = versão antiga (perto de ser aposentada)."""
+    if "latest" in nome:
+        return 1
+    if _versao(nome) < VERSAO_MINIMA:
+        return 3
+    if "preview" in nome or "exp" in nome:
+        return 2
+    return 0
+
+
 def _ordenar(nomes: list[str]) -> list[str]:
-    """Mais novo primeiro; na mesma versão, estável antes de preview/experimental."""
-    return sorted(nomes, key=lambda n: (-_versao(n), "preview" in n or "exp" in n, len(n), n))
+    """Estáveis mais novos primeiro; preview e antigos só como reserva."""
+    return sorted(nomes, key=lambda n: (_grupo(n), -_versao(n), len(n), n))
 
 
 def categoria(pedido: str) -> str:
@@ -128,13 +143,13 @@ def candidatos(pedido: str) -> list[str]:
         lista.append(escolhido)
     if modelos:
         disponiveis = {n for n, _ in modelos}
-        if pedido in disponiveis:
-            lista.append(pedido)
         lista += _da_categoria(cat, modelos)
         if cat in ("leve", "pro"):  # reserva: modelos de texto normais
             lista += _da_categoria("texto", modelos)
         if cat in ("texto", "leve", "pro") and _ALIAS[cat] in disponiveis:
             lista.append(_ALIAS[cat])
+        if pedido in disponiveis:  # o modelo escrito no código original, como última opção
+            lista.append(pedido)
     else:  # sem lista (sem internet ou chave): tenta o pedido e o apelido "mais recente"
         lista += [pedido] + ([_ALIAS[cat]] if cat in _ALIAS else [])
         if cat == "imagem":

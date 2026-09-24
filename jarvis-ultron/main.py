@@ -404,6 +404,21 @@ TOOL_DECLARATIONS = [
         }
     },
     {
+        "name": "suspend_listening",
+        "description": (
+            "Suspends JARVIS for a number of minutes: the microphone is muted and JARVIS stops listening, "
+            "then it unmutes automatically and announces it is back. Use when the user asks JARVIS to be "
+            "suspended, pause, stay quiet, sleep or stop listening for some time (default 10 minutes)."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "minutes": {"type": "NUMBER", "description": "How many minutes to stay suspended (1 to 240)"}
+            },
+            "required": ["minutes"]
+        }
+    },
+    {
         "name": "generate_image",
         "description": (
             "Creates an image from a text description using Gemini's image model (Nano Banana), "
@@ -1489,6 +1504,38 @@ class JarvisLive:
             ),
         )
 
+    def _suspender(self, minutos) -> str:
+        """Jarvis Ultron: silencia o microfone por alguns minutos e volta sozinho."""
+        try:
+            minutos = max(1, min(int(round(float(minutos))), 240))
+        except (TypeError, ValueError):
+            minutos = 10
+        anterior = getattr(self, "_suspensao", None)
+        if anterior is not None:
+            anterior.cancel()
+        self.ui.set_muted_threadsafe(True)
+        loop = asyncio.get_running_loop()
+        self._suspensao = loop.call_later(
+            minutos * 60, lambda: asyncio.ensure_future(self._voltar_da_suspensao()))
+        self.ui.write_log(f"SYS: Jarvis suspenso por {minutos} minuto(s).")
+        return (f"Microphone muted for {minutos} minute(s). Tell the user, in one short sentence in "
+                f"Portuguese, that you are suspended and will be back in {minutos} minute(s).")
+
+    async def _voltar_da_suspensao(self):
+        self._suspensao = None
+        if not self.ui.muted:  # o usuário já religou o microfone antes do tempo
+            return
+        self.ui.set_muted_threadsafe(False)
+        self.ui.write_log("SYS: Fim da suspensão. Microfone ativo.")
+        try:
+            await self.session.send_client_content(
+                turns={"parts": [{"text": "(A suspensão terminou. Diga ao usuário, em uma frase curta "
+                                          "em português, que você está de volta.)"}]},
+                turn_complete=True,
+            )
+        except Exception as erro:
+            print(f"[JARVIS] Aviso de volta da suspensão falhou: {erro}")
+
     async def _execute_tool(self, fc) -> types.FunctionResponse:
         name = fc.name
         args = dict(fc.args or {})
@@ -1550,6 +1597,9 @@ class JarvisLive:
             if name == "open_app":
                 r = await asyncio.to_thread(lambda: open_app(parameters=args, response=None, player=self.ui))
                 result = r or f"Opened {args.get('app_name')}."
+
+            elif name == "suspend_listening":
+                result = self._suspender(args.get("minutes", 10))
 
             elif name == "generate_image":
                 from core.modelos import gerar_imagem
