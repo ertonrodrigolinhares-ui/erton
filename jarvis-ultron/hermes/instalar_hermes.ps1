@@ -35,6 +35,32 @@ function Gravar-Env($caminho, $valores) {
     Gravar $caminho (($linhas -join "`r`n") + "`r`n")
 }
 
+function Atualizar-Path {
+    $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" +
+                [System.Environment]::GetEnvironmentVariable("Path", "User") + ";" + $env:Path
+}
+
+function Garantir-Git {
+    # O Hermes precisa do Git (Git Bash) no Windows. O instalador dele tenta baixar uma versao
+    # portatil, mas o antivirus as vezes bloqueia a extracao. Instalar o Git oficial resolve.
+    if (Get-Command git -ErrorAction SilentlyContinue) { return $true }
+    Write-Host "O Hermes precisa do Git. Vou instalar o Git oficial pelo Windows (winget)..."
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        winget install --id Git.Git -e --source winget --accept-source-agreements --accept-package-agreements
+        Atualizar-Path
+        foreach ($caminho in "$env:ProgramFiles\Git\cmd", "$env:LOCALAPPDATA\Programs\Git\cmd") {
+            if ((Test-Path $caminho) -and ($env:Path -notlike "*$caminho*")) { $env:Path = "$caminho;$env:Path" }
+        }
+    }
+    if (Get-Command git -ErrorAction SilentlyContinue) { return $true }
+    Write-Host ""
+    Write-Host "Nao consegui instalar o Git automaticamente." -ForegroundColor Yellow
+    Write-Host "Vai abrir o site do Git: baixe, instale (pode apertar Next em tudo) e depois"
+    Write-Host "abra o 'Instalar Hermes' de novo."
+    Start-Process "https://git-scm.com/download/win"
+    return $false
+}
+
 function Achar-Hermes {
     $comando = Get-Command hermes -ErrorAction SilentlyContinue
     if ($comando) { return $comando.Source }
@@ -49,15 +75,25 @@ function Achar-Hermes {
 Titulo "1/7  Hermes Agent"
 $hermes = Achar-Hermes
 if (-not $hermes) {
+    if (-not (Garantir-Git)) {
+        Read-Host "Aperte Enter para sair"
+        exit 1
+    }
     Write-Host "O Hermes Agent (Nous Research) ainda nao esta instalado."
     Write-Host "Vou rodar o instalador oficial: iex (irm https://hermes-agent.nousresearch.com/install.ps1)"
     Read-Host "Aperte Enter para instalar (ou feche esta janela para cancelar)"
-    Invoke-Expression (Invoke-RestMethod "https://hermes-agent.nousresearch.com/install.ps1")
-    $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "User") + ";" + $env:Path
+    try {
+        Invoke-Expression (Invoke-RestMethod "https://hermes-agent.nousresearch.com/install.ps1")
+    } catch {
+        Write-Host "O instalador do Hermes parou com erro: $_" -ForegroundColor Yellow
+    }
+    Atualizar-Path
     $hermes = Achar-Hermes
     if (-not $hermes) {
-        Write-Host "O Hermes foi instalado, mas o Windows ainda nao o encontrou." -ForegroundColor Yellow
-        Write-Host "Feche esta janela e abra o 'Instalar Hermes' de novo."
+        Write-Host ""
+        Write-Host "A instalacao do Hermes NAO terminou (veja as mensagens em vermelho acima)." -ForegroundColor Red
+        Write-Host "Tire um print desta janela e mande para o suporte. Depois de resolver, abra o"
+        Write-Host "'Instalar Hermes' de novo: ele continua de onde parou."
         Read-Host "Aperte Enter para sair"
         exit 1
     }

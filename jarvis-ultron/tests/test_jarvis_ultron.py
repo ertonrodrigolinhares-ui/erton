@@ -486,7 +486,10 @@ class KitHermesTests(unittest.TestCase):
         gancho = config["hooks"]["pre_tool_call"][0]
         self.assertTrue(gancho["fail_closed"])
         self.assertRegex("mcp__metricool__create_post", gancho["matcher"])
-        for skill in (KIT / "skills" / "jarvis").glob("*/SKILL.md"):
+        habilidades = list((KIT / "skills" / "jarvis").glob("*/SKILL.md")) + \
+            list((KIT / "agentes-futuros").glob("*/SKILL.md"))
+        self.assertGreaterEqual(len(habilidades), 17)
+        for skill in habilidades:
             frente = yaml.safe_load(skill.read_text(encoding="utf-8").split("---")[1])
             self.assertEqual(frente["name"], skill.parent.name)
             self.assertTrue(frente["description"])
