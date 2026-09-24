@@ -1,0 +1,293 @@
+"""Central de modelos do Gemini (Jarvis Ultron).
+
+O projeto original tinha nomes de modelos fixos espalhados pelo código (quase sempre
+"gemini-2.5-flash"). Quando o Google aposenta ou limita um modelo, essas partes param.
+Esta central:
+
+- pergunta ao Google quais modelos a sua chave pode usar e escolhe sempre o mais novo
+  de cada tipo (texto, leve, pro, imagem/Nano Banana, voz ao vivo);
+- se um modelo não existir mais (404) ou acabar a cota gratuita (429), tenta o próximo
+  (cada modelo tem a sua própria cota grátis);
+- vale para a biblioteca nova (google-genai) e para a antiga (google-generativeai).
+
+Para forçar um modelo, coloque no .env:
+  JARVIS_MODELO_TEXTO, JARVIS_MODELO_LEVE, JARVIS_MODELO_PRO, JARVIS_MODELO_IMAGEM, GEMINI_LIVE_MODEL
+"""
+
+from __future__ import annotations
+
+import functools
+import os
+import re
+import threading
+import time
+
+_EXCLUIR_TEXTO = ("lite", "image", "audio", "tts", "live", "embedding", "veo", "imagen",
+                  "gemma", "robotics", "computer-use", "learnlm", "aqa", "nano")
+_cache: list[tuple[str, set[str]]] | None = None
+_cache_momento = 0.0
+_trava = threading.Lock()
+_instalado = False
+
+
+# ---------- lista de modelos da chave ----------
+
+def listar(forcar: bool = False) -> list[tuple[str, set[str]]]:
+    """[(nome, {ações suportadas})] dos modelos disponíveis para a chave. [] se não conseguir."""
+    global _cache, _cache_momento
+    with _trava:
+        # Lista boa vale a sessão toda; lista vazia (falha) é tentada de novo a cada 5 minutos.
+        if _cache and not forcar or (_cache == [] and time.time() - _cache_momento < 300 and not forcar):
+            return _cache
+        chave = _chave()
+        if not chave:
+            return []
+        try:
+            from google import genai
+
+            cliente = genai.Client(api_key=chave, http_options={"api_version": "v1beta"})
+            modelos = []
+            for modelo in _metodo_original(cliente.models, "list")():
+                nome = str(getattr(modelo, "name", "") or "").removeprefix("models/")
+                acoes = {str(a).lower() for a in (getattr(modelo, "supported_actions", None) or [])}
+                if nome:
+                    modelos.append((nome, acoes))
+            _cache = modelos
+        except Exception as erro:
+            print(f"[Modelos] Não consegui listar os modelos da chave: {erro}")
+            _cache = []
+        _cache_momento = time.time()
+        return _cache
+
+
+def _chave() -> str:
+    chave = os.environ.get("GEMINI_API_KEY", "").strip()
+    if chave:
+        return chave
+    try:  # a chave também pode estar guardada no cofre do Windows pela tela de configuração
+        from memory.config_manager import get_gemini_key
+
+        return (get_gemini_key() or "").strip()
+    except Exception:
+        return ""
+
+
+def _versao(nome: str) -> float:
+    achado = re.search(r"gemini-(\d+(?:\.\d+)?)", nome)
+    return float(achado.group(1)) if achado else 0.0
+
+
+def _ordenar(nomes: list[str]) -> list[str]:
+    """Mais novo primeiro; na mesma versão, estável antes de preview/experimental."""
+    return sorted(nomes, key=lambda n: (-_versao(n), "preview" in n or "exp" in n, len(n), n))
+
+
+def categoria(pedido: str) -> str:
+    n = (pedido or "").lower().removeprefix("models/")
+    if "native-audio" in n or "live" in n:
+        return "ao_vivo"
+    if "image" in n:
+        return "imagem"
+    if "lite" in n:
+        return "leve"
+    if "pro" in n:
+        return "pro"
+    return "texto"
+
+
+def _da_categoria(cat: str, modelos: list[tuple[str, set[str]]]) -> list[str]:
+    gerar = [n for n, acoes in modelos if "generatecontent" in acoes and n.startswith("gemini")]
+    if cat == "ao_vivo":
+        vivos = [n for n, acoes in modelos if "bidigeneratecontent" in acoes]
+        return sorted(vivos, key=lambda n: ("native-audio" not in n, -_versao(n), n))
+    if cat == "imagem":
+        return _ordenar([n for n in gerar if "image" in n and "imagen" not in n])
+    if cat == "leve":
+        return _ordenar([n for n in gerar if "lite" in n and not any(x in n for x in _EXCLUIR_TEXTO if x != "lite")])
+    texto = [n for n in gerar if not any(x in n for x in _EXCLUIR_TEXTO)]
+    if cat == "pro":
+        return _ordenar([n for n in texto if "pro" in n])
+    return _ordenar([n for n in texto if "flash" in n])
+
+
+_VARIAVEL = {"texto": "JARVIS_MODELO_TEXTO", "leve": "JARVIS_MODELO_LEVE", "pro": "JARVIS_MODELO_PRO",
+             "imagem": "JARVIS_MODELO_IMAGEM", "ao_vivo": "GEMINI_LIVE_MODEL"}
+_ALIAS = {"texto": "gemini-flash-latest", "leve": "gemini-flash-lite-latest", "pro": "gemini-pro-latest"}
+
+
+def candidatos(pedido: str) -> list[str]:
+    """Modelos a tentar, em ordem, para o modelo que o código pediu."""
+    pedido = (pedido or "").removeprefix("models/")
+    cat = categoria(pedido)
+    escolhido = os.environ.get(_VARIAVEL[cat], "").strip().removeprefix("models/")
+    if cat == "imagem" and not escolhido:  # variável que o projeto original já usava
+        escolhido = os.environ.get("GEMINI_IMAGE_MODEL", "").strip().removeprefix("models/")
+    modelos = listar()
+    lista: list[str] = []
+    if escolhido:
+        lista.append(escolhido)
+    if modelos:
+        disponiveis = {n for n, _ in modelos}
+        if pedido in disponiveis:
+            lista.append(pedido)
+        lista += _da_categoria(cat, modelos)
+        if cat in ("leve", "pro"):  # reserva: modelos de texto normais
+            lista += _da_categoria("texto", modelos)
+        if cat in ("texto", "leve", "pro") and _ALIAS[cat] in disponiveis:
+            lista.append(_ALIAS[cat])
+    else:  # sem lista (sem internet ou chave): tenta o pedido e o apelido "mais recente"
+        lista += [pedido] + ([_ALIAS[cat]] if cat in _ALIAS else [])
+        if cat == "imagem":
+            lista += ["gemini-3.1-flash-image", "gemini-2.5-flash-image"]
+    return list(dict.fromkeys(m for m in lista if m)) or [pedido]
+
+
+def resolver(pedido: str) -> str:
+    return candidatos(pedido)[0]
+
+
+def _deve_tentar_outro(erro: Exception) -> bool:
+    codigo = getattr(erro, "code", None) or getattr(erro, "status_code", None)
+    texto = f"{type(erro).__name__} {erro}".lower()
+    return codigo in (404, 429) or any(p in texto for p in (
+        "not found", "notfound", "resource_exhausted", "resourceexhausted", "quota", "is not supported"))
+
+
+# ---------- ligação com as bibliotecas do Google ----------
+
+def _metodo_original(objeto, nome):
+    metodo = getattr(objeto, nome)
+    return getattr(metodo, "__jarvis_original__", metodo)
+
+
+def _com_reserva(chamar, pedido, **kwargs):
+    ultimo = None
+    for modelo in candidatos(pedido):
+        try:
+            return chamar(model=modelo, **kwargs)
+        except Exception as erro:
+            if not _deve_tentar_outro(erro):
+                raise
+            print(f"[Modelos] {modelo} indisponível ({str(erro)[:80]}). Tentando o próximo...")
+            ultimo = erro
+    raise ultimo
+
+
+def instalar() -> None:
+    """Faz todas as chamadas ao Gemini passarem pela central de modelos."""
+    global _instalado
+    if _instalado:
+        return
+    _instalado = True
+
+    from google.genai import chats, live, models
+
+    original = models.Models.generate_content
+
+    @functools.wraps(original)
+    def generate_content(self, *, model, **kwargs):
+        return _com_reserva(lambda **kw: original(self, **kw), model, **kwargs)
+
+    original_async = models.AsyncModels.generate_content
+
+    @functools.wraps(original_async)
+    async def generate_content_async(self, *, model, **kwargs):
+        ultimo = None
+        for modelo in candidatos(model):
+            try:
+                return await original_async(self, model=modelo, **kwargs)
+            except Exception as erro:
+                if not _deve_tentar_outro(erro):
+                    raise
+                ultimo = erro
+        raise ultimo
+
+    for classe, nome in ((models.Models, "generate_content_stream"),
+                         (models.AsyncModels, "generate_content_stream"),
+                         (chats.Chats, "create"), (chats.AsyncChats, "create"),
+                         (live.AsyncLive, "connect")):
+        _trocar_modelo(classe, nome)
+
+    generate_content.__jarvis_original__ = original
+    generate_content_async.__jarvis_original__ = original_async
+    models.Models.generate_content = generate_content
+    models.AsyncModels.generate_content = generate_content_async
+
+    try:  # biblioteca antiga (descontinuada pelo Google, ainda usada em partes do projeto)
+        import google.generativeai as antiga
+
+        original_init = antiga.GenerativeModel.__init__
+
+        @functools.wraps(original_init)
+        def init(self, model_name: str = "gemini-flash-latest", *args, **kwargs):
+            original_init(self, resolver(model_name), *args, **kwargs)
+            self.__jarvis_pedido__ = model_name
+
+        original_gerar = antiga.GenerativeModel.generate_content
+
+        @functools.wraps(original_gerar)
+        def gerar(self, *args, **kwargs):
+            ultimo = None
+            for modelo in candidatos(getattr(self, "__jarvis_pedido__", self._model_name)):
+                self._model_name = "models/" + modelo
+                try:
+                    return original_gerar(self, *args, **kwargs)
+                except Exception as erro:
+                    if not _deve_tentar_outro(erro):
+                        raise
+                    ultimo = erro
+            raise ultimo
+
+        antiga.GenerativeModel.__init__ = init
+        antiga.GenerativeModel.generate_content = gerar
+    except ImportError:
+        pass
+
+
+def _trocar_modelo(classe, nome: str) -> None:
+    original = getattr(classe, nome)
+
+    @functools.wraps(original)
+    def envolvido(self, *args, model, **kwargs):
+        return original(self, *args, model=resolver(model), **kwargs)
+
+    envolvido.__jarvis_original__ = original
+    setattr(classe, nome, envolvido)
+
+
+# ---------- Nano Banana: gerar imagens ----------
+
+def gerar_imagem(descricao: str, pasta=None) -> str:
+    """Gera uma imagem com o modelo de imagem do Gemini (Nano Banana), salva e abre."""
+    from datetime import datetime
+    from pathlib import Path
+
+    from google import genai
+    from google.genai import types
+
+    pasta = Path(pasta or Path.home() / "Documents" / "Jarvis Ultron" / "Imagens")
+    pasta.mkdir(parents=True, exist_ok=True)
+    cliente = genai.Client(api_key=_chave() or None)
+    try:
+        resposta = cliente.models.generate_content(
+            model="gemini-flash-image", contents=descricao,
+            config=types.GenerateContentConfig(response_modalities=["IMAGE", "TEXT"]))
+    except Exception as erro:
+        texto = str(erro).lower()
+        if "limit: 0" in texto or "quota" in texto or "billing" in texto:
+            return ("A sua chave não tem cota gratuita para gerar imagens (Nano Banana) agora. "
+                    "O Google pode exigir faturamento ativado para esse modelo.")
+        return f"Não consegui gerar a imagem: {str(erro)[:200]}"
+
+    for parte in (resposta.candidates[0].content.parts if resposta.candidates else []) or []:
+        dados = getattr(getattr(parte, "inline_data", None), "data", None)
+        if dados:
+            arquivo = pasta / f"imagem-{datetime.now():%Y%m%d-%H%M%S}.png"
+            arquivo.write_bytes(dados)
+            try:
+                if os.name == "nt":
+                    os.startfile(arquivo)  # noqa: S606 - abre a imagem que o próprio Jarvis criou
+            except OSError:
+                pass
+            return f"Imagem criada e salva em {arquivo}."
+    return "O modelo não devolveu nenhuma imagem. Tente descrever de outro jeito."

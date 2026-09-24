@@ -25,6 +25,8 @@ Response time: Respond as fast as you can
 
 TOOL ROUTING:
 
+generate_image: when the user asks to create, draw or generate a picture/image/logo/illustration. Write the prompt in English with rich visual detail.
+
 computer_settings: ALL single OS actions (volume, brightness, wifi, window management, shortcuts, power). For closing a window/app window, use action='close_window'. Never invent close_apps or close unless listed by the tool. Never use shutdown/restart for JARVIS itself; only power off/restart the computer when the user clearly says computer, system, Mac, or PC.
 file_controller: use action='open' whenever the user asks to open a local file, folder, attachment, or dragged-in file. Use its exact path when known. Never send file paths to open_app; open_app is only for applications.
 media_control: use for music playback commands including play, pause, stop, resume, toggle, next, and previous. Default to platform='spotify' when the user says music without naming a platform. Put a requested song, artist, album, playlist, or Spotify link in query and use action='play_query'. Use youtube_video only when the request is specifically about a YouTube video rather than general music playback.

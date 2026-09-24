@@ -78,6 +78,10 @@ def _load_dotenv():
 
 BASE_DIR        = get_base_dir()
 _load_dotenv()
+
+# Jarvis Ultron: escolhe sozinho os modelos do Gemini disponíveis para a chave
+from core.modelos import instalar as _instalar_central_de_modelos
+_instalar_central_de_modelos()
 API_CONFIG_PATH = BASE_DIR / "config" / "api_keys.json"
 PROMPT_PATH     = BASE_DIR / "core" / "prompt.txt"
 LIVE_MODEL = "models/gemini-2.5-flash-native-audio-preview-12-2025"
@@ -397,6 +401,20 @@ TOOL_DECLARATIONS = [
                 "aspect": {"type": "STRING", "description": "price | specs | reviews"}
             },
             "required": ["query"]
+        }
+    },
+    {
+        "name": "generate_image",
+        "description": (
+            "Creates an image from a text description using Gemini's image model (Nano Banana), "
+            "saves it as PNG and opens it. Use when the user asks to create, draw or generate an image."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "prompt": {"type": "STRING", "description": "Detailed description of the image, in English"}
+            },
+            "required": ["prompt"]
         }
     },
     {
@@ -1532,6 +1550,10 @@ class JarvisLive:
             if name == "open_app":
                 r = await asyncio.to_thread(lambda: open_app(parameters=args, response=None, player=self.ui))
                 result = r or f"Opened {args.get('app_name')}."
+
+            elif name == "generate_image":
+                from core.modelos import gerar_imagem
+                result = await asyncio.to_thread(gerar_imagem, args.get("prompt", ""))
 
             elif name == "weather_report":
                 r = await asyncio.to_thread(lambda: weather_action(parameters=args, player=self.ui))
