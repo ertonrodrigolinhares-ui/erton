@@ -11,6 +11,7 @@ from google import genai
 from google.genai import errors, types
 
 from .ferramentas import criar_ferramentas
+from .ia_base import IAIndisponivel
 from .persona import prompt_sistema
 
 # Usados, em ordem, quando o modelo principal falha. Cada um tem sua própria cota gratuita.
@@ -25,6 +26,7 @@ class CerebroGemini:
         self.modelos = [modelo] + [m for m in MODELOS_RESERVA if m != modelo]
         self.modelo = modelo
         self.usuario = usuario
+        self.desistir_rapido = False
         self.ferramentas = []
         if confirmar and avisar:
             self.ferramentas = criar_ferramentas(confirmar, avisar, self.pesquisar, ao_usar,
@@ -47,11 +49,24 @@ class CerebroGemini:
                                               history=self.chat.get_history())
 
     def perguntar(self, texto: str) -> str:
+        try:
+            return self.perguntar_ou_falhar(texto)
+        except IAIndisponivel as erro:
+            return str(erro)
+
+    def perguntar_ou_falhar(self, texto: str) -> str:
+        """Como perguntar(), mas levanta IAIndisponivel quando o Gemini não consegue responder
+        (assim o Jarvis pode passar a pergunta para a IA reserva)."""
+        # Com uma IA reserva configurada, desiste mais rápido para não deixar você esperando.
+        modelos = [self.modelo] + [m for m in self.modelos if m != self.modelo]
+        esperas = ESPERAS
+        if self.desistir_rapido:
+            modelos, esperas = modelos[:2], ESPERAS[:2]
         ultimo_erro = None
-        for modelo in [self.modelo] + [m for m in self.modelos if m != self.modelo]:
+        for modelo in modelos:
             if modelo != self.modelo:
                 self._trocar_modelo(modelo)
-            for espera in ESPERAS:
+            for espera in esperas:
                 time.sleep(espera)
                 try:
                     resposta = self.chat.send_message(texto)
@@ -60,20 +75,22 @@ class CerebroGemini:
                     ultimo_erro = erro
                     mensagem = str(erro).lower()
                     if erro.code in (401, 403) or "api key" in mensagem:
-                        return "Minha chave do Gemini não é válida. Clique em 'Trocar chave' e cole a chave correta."
+                        raise IAIndisponivel("Minha chave do Gemini não é válida. "
+                                             "Clique em 'Trocar chave' e cole a chave correta.") from erro
                     if erro.code in (404, 429):
                         break  # modelo inexistente ou cota esgotada: vai para o próximo modelo
                     return f"O Gemini recusou o pedido (erro {erro.code}: {_resumo(erro)})."
                 except errors.ServerError as erro:
                     ultimo_erro = erro  # sobrecarregado: espera e tenta de novo
-                except httpx.TransportError:
-                    return "Estou sem conexão com a internet no momento."
+                except httpx.TransportError as erro:
+                    raise IAIndisponivel("Estou sem conexão com a internet no momento.") from erro
 
         if isinstance(ultimo_erro, errors.ClientError) and ultimo_erro.code == 429:
-            return "Atingi o limite gratuito do Gemini por agora. Tente de novo daqui a alguns minutos."
+            raise IAIndisponivel("Atingi o limite gratuito do Gemini por agora. "
+                                 "Tente de novo daqui a alguns minutos.")
         codigo = getattr(ultimo_erro, "code", "?")
-        return (f"O Gemini está sobrecarregado agora (erro {codigo}). "
-                "Tentei outros modelos e não consegui. Tente de novo em um minuto.")
+        raise IAIndisponivel(f"O Gemini está sobrecarregado agora (erro {codigo}). "
+                             "Tentei outros modelos e não consegui. Tente de novo em um minuto.")
 
     def pesquisar(self, pergunta: str) -> str:
         """Faz uma consulta separada com a Pesquisa Google ligada e devolve o resumo com fontes."""

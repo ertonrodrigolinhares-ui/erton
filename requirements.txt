@@ -1,5 +1,7 @@
 google-genai>=1.0
 openpyxl
 Pillow
+# IA reserva gratuita (opcional)
+groq
 # Só é usado se JARVIS_IA=claude na configuração
 anthropic>=1.0

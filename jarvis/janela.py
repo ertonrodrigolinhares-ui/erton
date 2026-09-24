@@ -11,7 +11,7 @@ from tkinter import messagebox, simpledialog
 
 from . import ao_vivo, voz
 from .assistente import remover_palavra_ativacao, responder, saudacao
-from .config import Config, salvar_no_env
+from .config import SITE_CHAVE_GROQ, Config, salvar_no_env
 from .ia import criar_cerebro
 
 FUNDO = "#0b1220"
@@ -33,6 +33,13 @@ ACOES = {
     "lembrar_informacao": "Guardando na memória...", "esquecer_informacao": "Apagando da memória...",
     "ver_tela": "Olhando a tela...",
 }
+
+PASSOS_GROQ = (
+    "Se o Gemini travar ou atingir o limite, o Groq responde no lugar.\n"
+    "1. Clique em \"Abrir site do Groq\" e entre com a sua conta do Google.\n"
+    "2. Clique em \"Create API Key\", dê o nome Jarvis e copie a chave (começa com gsk_).\n"
+    "3. Cole no campo abaixo."
+)
 
 PASSOS_CHAVE = {
     "gemini": (
@@ -201,6 +208,8 @@ class JanelaJarvis:
     def _concluir(self, resposta: str, acao: str | None) -> None:
         self.ocupado = False
         self._status_normal()
+        if getattr(self.cerebro, "respondeu_pela_reserva", False):
+            self.status.config(text="Gemini indisponível: respondi pelo Groq (reserva)", fg=APAGADO)
         self.mostrar("Jarvis", resposta, falar=True)
         if acao == "sair":
             self.raiz.after(2500, self.raiz.destroy)
@@ -444,7 +453,7 @@ class JanelaJarvis:
 
     def pedir_chave(self) -> None:
         janela = tk.Toplevel(self.raiz, bg=FUNDO, padx=20, pady=16)
-        janela.title("Chave da IA")
+        janela.title("Chaves da IA")
         janela.transient(self.raiz)
         janela.grab_set()
         nome_ia = "Google Gemini" if self.config.ia == "gemini" else "Claude"
@@ -463,18 +472,38 @@ class JanelaJarvis:
         campo.insert(0, self.config.chave_api)
         campo.focus_set()
 
+        # ---- reserva opcional: Groq ----
+        tk.Frame(janela, bg=PAINEL, height=1).pack(fill="x", pady=(10, 10))
+        tk.Label(janela, text="Reserva (opcional): Groq, grátis", font=("Segoe UI", 12, "bold"),
+                 fg=DESTAQUE, bg=FUNDO).pack(anchor="w")
+        tk.Label(janela, text=PASSOS_GROQ, justify="left", font=FONTE, fg=TEXTO,
+                 bg=FUNDO).pack(anchor="w", pady=8)
+        self._botao(janela, "Abrir site do Groq", lambda: webbrowser.open(SITE_CHAVE_GROQ)).pack(anchor="w")
+        campo_groq = tk.Entry(janela, font=("Segoe UI", 12), width=48, bg=PAINEL, fg=TEXTO,
+                              insertbackground=TEXTO, relief="flat", show="•")
+        campo_groq.pack(fill="x", pady=(10, 8), ipady=6)
+        campo_groq.insert(0, self.config.chave_groq)
+
         def salvar() -> None:
             chave = campo.get().strip()
-            if not chave:
-                messagebox.showwarning("Chave", "Cole a chave no campo antes de salvar.", parent=janela)
+            chave_groq = campo_groq.get().strip()
+            if not chave and not chave_groq:
+                messagebox.showwarning("Chave", "Cole pelo menos uma chave antes de salvar.", parent=janela)
                 return
-            salvar_no_env(self.config.nome_chave, chave)
+            if chave:
+                salvar_no_env(self.config.nome_chave, chave)
+            if chave_groq != self.config.chave_groq:
+                salvar_no_env("GROQ_API_KEY", chave_groq)
+            self.config = Config.carregar()
             self._carregar_cerebro()
             janela.destroy()
             if self.cerebro:
-                self.mostrar("Jarvis", "Chave salva. Agora posso conversar sobre qualquer assunto.", falar=True)
+                reserva = " O Groq está pronto como reserva." if chave and chave_groq else ""
+                self.mostrar("Jarvis", "Chaves salvas. Agora posso conversar sobre qualquer assunto." + reserva,
+                             falar=True)
 
         campo.bind("<Return>", lambda _e: salvar())
+        campo_groq.bind("<Return>", lambda _e: salvar())
         self._botao(janela, "Salvar", salvar).pack(anchor="e")
 
     # ---------- infraestrutura ----------

@@ -58,6 +58,9 @@ Fale ou escreva normalmente. Exemplos:
   - **Windows**: funciona sem internet; também é usada automaticamente se as outras falharem.
 - **Segurança**: antes de alterar um arquivo que já existe ou de executar um código, ele pede sua confirmação. Mensagens e e-mails **nunca** são enviados sozinhos.
 - Se o Gemini estiver sobrecarregado, o Jarvis tenta de novo e troca sozinho para outro modelo gratuito.
+- **Reserva com o Groq (grátis, opcional)**: clique em **Trocar chave** e cole também a chave do Groq
+  (https://console.groq.com/keys). Se o Gemini travar ou atingir o limite, o Groq responde no lugar,
+  sozinho, com as mesmas ferramentas. A conversa ao vivo e a visão da tela continuam só no Gemini.
 - A chave e os arquivos ficam em **Documentos\Jarvis**. Ao baixar uma versão nova do Jarvis, a chave continua lá.
 
 ## Se algo não funcionar
@@ -80,6 +83,7 @@ Fale ou escreva normalmente. Exemplos:
 | `jarvis/ferramentas.py` | Ações que a IA pode fazer: planilhas, arquivos, código, WhatsApp, e-mail, lembretes, pesquisa |
 | `jarvis/assistente.py` | Decide se o pedido é um comando local ou vai para a IA |
 | `jarvis/comandos.py` | Comandos rápidos (hora, data, sites, pesquisas, contas, piadas) |
+| `jarvis/cerebro_groq.py` | IA reserva com Groq (gratuito), usada quando o Gemini falha |
 | `jarvis/cerebro_gemini.py` | IA com Google Gemini (padrão, gratuito) |
 | `jarvis/cerebro_claude.py` | IA com Claude (opcional, pago) — use `JARVIS_IA=claude` no `.env` |
 | `jarvis/voz.py` | Vozes (Microsoft edge-tts, ElevenLabs, Windows), efeitos, microfone (sounddevice) e reconhecimento |

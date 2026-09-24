@@ -12,6 +12,7 @@ ARQUIVO_ENV = PASTA_TRABALHO / "config.env"
 ENV_PROJETO = Path(__file__).resolve().parent.parent / ".env"
 
 NOME_CHAVE = {"gemini": "GEMINI_API_KEY", "claude": "ANTHROPIC_API_KEY"}
+SITE_CHAVE_GROQ = "https://console.groq.com/keys"
 SITE_CHAVE = {
     "gemini": "https://aistudio.google.com/apikey",
     "claude": "https://console.anthropic.com/settings/keys",
@@ -56,6 +57,8 @@ class Config:
     voz_elevenlabs: str
     voz_ao_vivo: str
     modelo_ao_vivo: str
+    chave_groq: str
+    groq_modelo: str
 
     @classmethod
     def carregar(cls) -> "Config":
@@ -75,6 +78,8 @@ class Config:
             voz_elevenlabs=os.getenv("ELEVENLABS_VOZ_ID", ""),
             voz_ao_vivo=os.getenv("JARVIS_VOZ_AO_VIVO", "Charon"),
             modelo_ao_vivo=os.getenv("JARVIS_MODELO_AO_VIVO", ""),
+            chave_groq=os.getenv("GROQ_API_KEY", "").strip(),
+            groq_modelo=os.getenv("JARVIS_GROQ_MODELO", ""),
         )
 
     @property
