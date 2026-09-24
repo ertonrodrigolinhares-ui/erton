@@ -6,11 +6,13 @@ Vozes disponíveis:
 - Voz do Windows: funciona sem internet, mas é robótica. Também é a reserva se as outras falharem.
 
 Efeitos (em qualquer voz neural): Ultron (metálico), mais grave e robô.
-O reconhecimento de fala usa o serviço gratuito do Google (não precisa de chave).
+O microfone e o alto-falante usam sounddevice (não precisa do PyAudio, que costuma
+falhar na instalação no Windows). O reconhecimento de fala usa o serviço gratuito do Google.
 Todas as bibliotecas de voz são opcionais: sem elas, o Jarvis funciona só com texto.
 """
 
 import asyncio
+import io
 import queue
 import threading
 
@@ -31,14 +33,25 @@ except ImportError:  # pragma: no cover - depende do ambiente
 
 try:
     import edge_tts
-    import miniaudio
 except ImportError:  # pragma: no cover - depende do ambiente
-    edge_tts = miniaudio = None
+    edge_tts = None
 
 try:
-    import pyaudio
-except ImportError:  # pragma: no cover - depende do ambiente
-    pyaudio = None
+    import soundfile
+except (ImportError, OSError):  # pragma: no cover - depende do ambiente
+    soundfile = None
+
+try:
+    import sounddevice
+except (ImportError, OSError):  # pragma: no cover - sem PortAudio no sistema
+    sounddevice = None
+
+# Componente -> pacote a instalar, para dizer exatamente o que faltou.
+COMPONENTES = {
+    "edge_tts": ("edge-tts", lambda: edge_tts), "soundfile": ("soundfile", lambda: soundfile),
+    "sounddevice": ("sounddevice", lambda: sounddevice), "numpy": ("numpy", lambda: np),
+    "speech_recognition": ("SpeechRecognition", lambda: sr), "pyttsx3": ("pyttsx3", lambda: pyttsx3),
+}
 
 TAXA = 24000  # amostras por segundo das vozes neurais
 
@@ -71,8 +84,12 @@ EFEITOS = {
 ELEVENLABS_VOZ_PADRAO = "pNInz6obpgDQGcFmaJgB"  # "Adam", voz masculina da biblioteca
 
 
+def componentes_faltando() -> list[str]:
+    return [pacote for pacote, modulo in COMPONENTES.values() if modulo() is None]
+
+
 def voz_neural_disponivel() -> bool:
-    return None not in (edge_tts, miniaudio, np, pyaudio)
+    return None not in (edge_tts, soundfile, sounddevice, np)
 
 
 def fala_disponivel() -> bool:
@@ -80,12 +97,22 @@ def fala_disponivel() -> bool:
 
 
 def microfone_disponivel() -> bool:
-    if sr is None:
-        return False
+    return diagnostico_microfone() == ""
+
+
+def diagnostico_microfone() -> str:
+    """"" se o microfone pode ser usado; senão, a explicação do problema."""
+    faltando = [p for p in ("SpeechRecognition", "sounddevice", "numpy") if p in componentes_faltando()]
+    if faltando:
+        return ("Faltam componentes de voz: " + ", ".join(faltando) +
+                ". Feche o Jarvis e abra o 'Iniciar Jarvis' de novo para reinstalar.")
     try:
-        return len(sr.Microphone.list_microphone_names()) > 0
-    except Exception:  # PyAudio ausente ou sem dispositivo de áudio
-        return False
+        sounddevice.query_devices(kind="input")
+    except Exception:
+        return ("Não encontrei um microfone. Verifique se ele está conectado e liberado em "
+                "Configurações do Windows > Privacidade e segurança > Microfone "
+                "(ative 'Permitir que aplicativos da área de trabalho acessem o microfone').")
+    return ""
 
 
 # ---------- síntese ----------
@@ -97,9 +124,13 @@ def sintetizar_microsoft(texto: str, voz: str, tom: str = "+0Hz", velocidade: st
         return b"".join([p["data"] async for p in comunicacao.stream() if p["type"] == "audio"])
 
     mp3 = asyncio.run(baixar())
-    audio = miniaudio.decode(mp3, output_format=miniaudio.SampleFormat.SIGNED16,
-                             nchannels=1, sample_rate=TAXA)
-    return np.array(audio.samples, dtype=np.int16)
+    amostras, taxa = soundfile.read(io.BytesIO(mp3), dtype="int16")
+    if amostras.ndim > 1:
+        amostras = amostras[:, 0]
+    if taxa != TAXA:  # converte para 24 kHz, a taxa usada pelos efeitos
+        tempo = np.arange(int(len(amostras) * TAXA / taxa)) / TAXA
+        amostras = np.interp(tempo, np.arange(len(amostras)) / taxa, amostras).astype(np.int16)
+    return amostras
 
 
 def sintetizar_elevenlabs(texto: str, chave: str, voz_id: str):
@@ -149,14 +180,8 @@ def aplicar_efeito(amostras, efeito: str, taxa: int = TAXA):
 
 
 def tocar(amostras, taxa: int = TAXA) -> None:
-    sistema = pyaudio.PyAudio()
-    try:
-        saida = sistema.open(format=pyaudio.paInt16, channels=1, rate=taxa, output=True)
-        saida.write(amostras.tobytes())
-        saida.stop_stream()
-        saida.close()
-    finally:
-        sistema.terminate()
+    sounddevice.play(amostras, taxa)
+    sounddevice.wait()
 
 
 # ---------- quem fala ----------
@@ -238,16 +263,50 @@ def _criar_motor_windows():
 
 # ---------- ouvir ----------
 
+TAXA_MICROFONE = 16000
+BLOCO = 0.1  # segundos por leitura do microfone
+
+
+def capturar_frase(ler_bloco, espera_max: float = 8, fala_max: float = 15, silencio_fim: float = 1.0):
+    """Lê blocos do microfone e devolve só o trecho com fala (int16), ou None se ninguém falou.
+
+    ler_bloco() devolve um bloco de BLOCO segundos. Os primeiros 0,5 s medem o ruído do ambiente.
+    """
+    calibracao = [ler_bloco() for _ in range(int(0.5 / BLOCO))]
+    ruido = float(np.mean([_volume(b) for b in calibracao])) if calibracao else 0.0
+    limiar = max(300.0, ruido * 2.5)
+
+    anteriores = calibracao[-3:]  # guarda um pouquinho antes da fala, para não cortar o começo
+    for _ in range(int(espera_max / BLOCO)):
+        bloco = ler_bloco()
+        if _volume(bloco) > limiar:
+            break
+        anteriores = (anteriores + [bloco])[-3:]
+    else:
+        return None
+
+    fala = anteriores + [bloco]
+    silencio = 0.0
+    while len(fala) * BLOCO < fala_max and silencio < silencio_fim:
+        bloco = ler_bloco()
+        fala.append(bloco)
+        silencio = silencio + BLOCO if _volume(bloco) <= limiar else 0.0
+    return np.concatenate(fala).astype(np.int16)
+
+
+def _volume(bloco) -> float:
+    return float(np.sqrt(np.mean(bloco.astype(np.float32) ** 2))) if len(bloco) else 0.0
+
+
 def ouvir_microfone(idioma: str = "pt-BR") -> str:
     """Escuta uma frase pelo microfone e devolve o texto ("" se não entendeu)."""
-    reconhecedor = sr.Recognizer()
-    with sr.Microphone() as fonte:
-        reconhecedor.adjust_for_ambient_noise(fonte, duration=0.5)
-        try:
-            audio = reconhecedor.listen(fonte, timeout=8, phrase_time_limit=15)
-        except sr.WaitTimeoutError:
-            return ""
+    tamanho = int(TAXA_MICROFONE * BLOCO)
+    with sounddevice.InputStream(samplerate=TAXA_MICROFONE, channels=1, dtype="int16") as entrada:
+        audio = capturar_frase(lambda: entrada.read(tamanho)[0][:, 0])
+    if audio is None:
+        return ""
+    dados = sr.AudioData(audio.tobytes(), TAXA_MICROFONE, 2)
     try:
-        return reconhecedor.recognize_google(audio, language=idioma).strip()
+        return sr.Recognizer().recognize_google(dados, language=idioma).strip()
     except (sr.UnknownValueError, sr.RequestError):
         return ""

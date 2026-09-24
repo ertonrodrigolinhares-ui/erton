@@ -189,9 +189,9 @@ class JanelaJarvis:
     def ouvir(self) -> None:
         if self.ocupado:
             return
-        if not voz.microfone_disponivel():
-            messagebox.showinfo("Microfone", "Não encontrei um microfone. Verifique se ele está "
-                                "conectado e liberado em Configurações > Privacidade > Microfone.")
+        problema = voz.diagnostico_microfone()
+        if problema:
+            messagebox.showinfo("Microfone", problema)
             return
         self.ocupado = True
         self.botao_microfone.config(state="disabled")
@@ -222,10 +222,11 @@ class JanelaJarvis:
             self.botao_microfone.config(state="normal")
             self._status_normal()
             return
-        if not voz.microfone_disponivel():
+        problema = voz.diagnostico_microfone()
+        if problema:
             self.maos_livres.set(False)
             self.escuta_ativa = False
-            messagebox.showinfo("Microfone", "Não encontrei um microfone para o modo mãos livres.")
+            messagebox.showinfo("Microfone", problema)
             return
         self.falar_respostas.set(voz.fala_disponivel())
         self.botao_microfone.config(state="disabled")
@@ -323,14 +324,17 @@ class JanelaJarvis:
 
     def testar_voz(self) -> None:
         if not voz.fala_disponivel():
-            messagebox.showinfo("Voz", "Os componentes de voz não foram instalados.")
+            messagebox.showinfo("Voz", "Faltam componentes de voz: " + ", ".join(voz.componentes_faltando()) +
+                                ".\n\nFeche o Jarvis e abra o 'Iniciar Jarvis' de novo para reinstalar. "
+                                "Se continuar, envie o arquivo instalacao-log.txt da pasta do Jarvis.")
             return
         self.falador.falar(f"Olá, {self.config.nome_usuario}. Esta é a minha nova voz. Como posso ajudar?")
         self.raiz.after(8000, self._verificar_voz)
 
     def _verificar_voz(self) -> None:
         if self.falador.ultimo_erro:
-            self.status.config(text="Voz escolhida falhou; usei a do Windows.", fg=APAGADO)
+            motivo = "sem internet?" if "connect" in self.falador.ultimo_erro.lower() else "veja a chave"
+            self.status.config(text=f"A voz escolhida falhou ({motivo}); usei a do Windows.", fg=APAGADO)
 
     def _configurar_elevenlabs(self) -> bool:
         chave = simpledialog.askstring(

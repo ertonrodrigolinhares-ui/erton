@@ -53,6 +53,15 @@ Fale ou escreva normalmente. Exemplos:
 - Se o Gemini estiver sobrecarregado, o Jarvis tenta de novo e troca sozinho para outro modelo gratuito.
 - A chave e os arquivos ficam em **Documentos\Jarvis**. Ao baixar uma versão nova do Jarvis, a chave continua lá.
 
+## Se algo não funcionar
+
+- **"Faltam componentes de voz"**: feche o Jarvis e abra o `Iniciar Jarvis` de novo. Ele tenta
+  instalar o que faltou. Se continuar, envie o arquivo `instalacao-log.txt` da pasta do Jarvis.
+- **"Não encontrei um microfone"**: confira se o microfone está conectado e vá em
+  **Configurações do Windows → Privacidade e segurança → Microfone**. Ative **"Acesso ao microfone"**
+  e **"Permitir que aplicativos da área de trabalho acessem o microfone"**.
+- **O Jarvis fechou sozinho**: envie o arquivo `jarvis-erro.txt` da pasta do Jarvis.
+
 ## Para programadores
 
 | Arquivo | Função |
@@ -64,7 +73,7 @@ Fale ou escreva normalmente. Exemplos:
 | `jarvis/comandos.py` | Comandos rápidos (hora, data, sites, pesquisas, contas, piadas) |
 | `jarvis/cerebro_gemini.py` | IA com Google Gemini (padrão, gratuito) |
 | `jarvis/cerebro_claude.py` | IA com Claude (opcional, pago) — use `JARVIS_IA=claude` no `.env` |
-| `jarvis/voz.py` | Vozes (Microsoft edge-tts, ElevenLabs, Windows), efeitos e reconhecimento de voz |
+| `jarvis/voz.py` | Vozes (Microsoft edge-tts, ElevenLabs, Windows), efeitos, microfone (sounddevice) e reconhecimento |
 | `jarvis/config.py` | Configurações e chave, guardadas em `Documentos\Jarvis\config.env` |
 
 ```bash

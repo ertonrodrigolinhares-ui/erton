@@ -23,11 +23,20 @@ goto iniciar
 
 :instalar_pacotes
 echo Instalando os componentes do Jarvis...
-".venv\Scripts\python.exe" -m pip install --upgrade pip -q
-".venv\Scripts\python.exe" -m pip install -r requirements.txt -q || goto erro
+echo ==== %date% %time% ==== >> instalacao-log.txt
+".venv\Scripts\python.exe" -m pip install --upgrade pip -q >> instalacao-log.txt 2>&1
+".venv\Scripts\python.exe" -m pip install -r requirements.txt -q >> instalacao-log.txt 2>&1 || goto erro
 echo Instalando os componentes de voz...
-".venv\Scripts\python.exe" -m pip install -r requirements-voz.txt -q || echo Aviso: a voz nao foi instalada. O Jarvis vai funcionar so com texto.
-copy /y .venv\pedido.txt .venv\instalado.txt >nul
+set "VOZ_OK=1"
+for /f "usebackq eol=# delims=" %%p in ("requirements-voz.txt") do (
+    echo   - %%p
+    ".venv\Scripts\python.exe" -m pip install -q %%p >> instalacao-log.txt 2>&1 || (
+        echo     Aviso: nao consegui instalar %%p. Detalhes em instalacao-log.txt
+        set "VOZ_OK=0"
+    )
+)
+rem So marca como instalado se tudo deu certo; senao tenta de novo na proxima vez.
+if "%VOZ_OK%"=="1" copy /y .venv\pedido.txt .venv\instalado.txt >nul
 
 :iniciar
 start "" ".venv\Scripts\pythonw.exe" -m jarvis
@@ -50,5 +59,5 @@ exit /b
 
 :erro
 echo.
-echo Algo deu errado na instalacao. Tire um print desta tela e envie para o suporte.
+echo Algo deu errado na instalacao. Tire um print desta tela e envie o arquivo instalacao-log.txt.
 pause

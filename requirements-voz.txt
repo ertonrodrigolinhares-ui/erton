@@ -1,8 +1,8 @@
 # Voz (opcional - sem ela o Jarvis funciona só com texto)
-pyttsx3
-SpeechRecognition
-pyaudio
-# Vozes neurais gratuitas da Microsoft e efeitos
-edge-tts
-miniaudio
+# Cada linha é instalada separadamente: se uma falhar, as outras continuam.
 numpy
+sounddevice
+soundfile
+SpeechRecognition
+edge-tts
+pyttsx3

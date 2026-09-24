@@ -4,3 +4,4 @@ __pycache__/
 .venv/
 .pytest_cache/
 jarvis-erro.txt
+instalacao-log.txt
