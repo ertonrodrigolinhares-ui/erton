@@ -54,6 +54,8 @@ class Config:
     efeito_voz: str
     chave_elevenlabs: str
     voz_elevenlabs: str
+    voz_ao_vivo: str
+    modelo_ao_vivo: str
 
     @classmethod
     def carregar(cls) -> "Config":
@@ -71,6 +73,8 @@ class Config:
             efeito_voz=os.getenv("JARVIS_EFEITO_VOZ", "ultron"),
             chave_elevenlabs=os.getenv("ELEVENLABS_API_KEY", ""),
             voz_elevenlabs=os.getenv("ELEVENLABS_VOZ_ID", ""),
+            voz_ao_vivo=os.getenv("JARVIS_VOZ_AO_VIVO", "Charon"),
+            modelo_ao_vivo=os.getenv("JARVIS_MODELO_AO_VIVO", ""),
         )
 
     @property

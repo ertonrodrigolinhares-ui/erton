@@ -41,6 +41,13 @@ Fale ou escreva normalmente. Exemplos:
 | "Abra o Excel" / "abra a calculadora" | Abre o programa |
 | "Que horas são?" / "calcule 1500 vezes 12" | Responde na hora |
 
+- **⚡ Conversa ao vivo** (recomendado): clique no botão e converse por voz em tempo real,
+  sem apertar nada, como numa ligação. Ele ouve direto, responde com voz natural, pode ser
+  interrompido e continua usando todas as ferramentas. Escolha a voz em **"Voz ao vivo"**:
+  Charon (grave), Fenrir, Orus, Puck, Kore, Aoede... O efeito escolhido (Ultron, robô) também vale aqui.
+  Usa a mesma chave do Gemini (API Gemini Live).
+- **Memória**: "Jarvis, lembre que o aniversário da Yvnna é em maio". Ele guarda e lembra nas próximas conversas.
+- **Ver a tela**: "Jarvis, o que tem na minha tela?" ou "leia esse erro que apareceu".
 - **🎤 Falar**: clique e fale um pedido.
 - **Mãos livres**: marque a opção e o Jarvis fica ouvindo. É só dizer **"Jarvis, ..."** e o pedido, e ele responde em voz alta.
 - **Voz e Efeito** (embaixo da conversa): escolha a voz e o efeito e clique em **▶ Testar**.
@@ -68,6 +75,8 @@ Fale ou escreva normalmente. Exemplos:
 |---|---|
 | `Iniciar Jarvis.bat` | Instala o Python e as dependências, e abre a janela |
 | `jarvis/janela.py` | Janela (tkinter) com microfone e configuração da chave |
+| `jarvis/ao_vivo.py` | Conversa por voz em tempo real com o Gemini Live |
+| `jarvis/memoria.py` | Memória de longo prazo (Documentos\Jarvis\memoria.json) |
 | `jarvis/ferramentas.py` | Ações que a IA pode fazer: planilhas, arquivos, código, WhatsApp, e-mail, lembretes, pesquisa |
 | `jarvis/assistente.py` | Decide se o pedido é um comando local ou vai para a IA |
 | `jarvis/comandos.py` | Comandos rápidos (hora, data, sites, pesquisas, contas, piadas) |
@@ -86,3 +95,8 @@ python -m pytest                    # testes (pip install pytest)
 
 Para criar um comando novo, escreva uma função em `jarvis/comandos.py` que recebe o texto
 (minúsculo e sem acentos) e retorna a resposta ou `None`. Depois, inclua a função na lista `COMANDOS`.
+
+## Créditos
+
+O modo ao vivo (Gemini Live), a memória e a visão da tela foram inspirados no projeto
+[JARVIS-OS V.2](https://github.com/MAL19INDUSTRIES/JARVIS-OS-V.2) (licença MIT).

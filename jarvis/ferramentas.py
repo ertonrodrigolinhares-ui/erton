@@ -6,6 +6,7 @@ Mensagens e e-mails nunca são enviados sozinhos: o Jarvis abre tudo pronto e vo
 """
 
 import functools
+import io
 import json
 import os
 import re
@@ -18,6 +19,7 @@ from pathlib import Path
 from typing import Callable
 
 # Pasta onde o Jarvis cria e procura arquivos quando você não diz o caminho completo.
+from . import memoria
 from .config import PASTA_TRABALHO
 
 PROGRAMAS = {
@@ -64,6 +66,7 @@ def criar_ferramentas(
     avisar: Callable[[str], None],
     pesquisar: Callable[[str], str] | None = None,
     ao_usar: Callable[[str], None] | None = None,
+    analisar_imagem: Callable[[str, bytes], str] | None = None,
 ) -> list[Callable]:
     """Monta a lista de ferramentas.
 
@@ -71,6 +74,7 @@ def criar_ferramentas(
     avisar(texto)                         mostra/fala um aviso (usado pelos lembretes)
     pesquisar(pergunta) -> str            pesquisa na internet (fornecido pelo cérebro)
     ao_usar(nome)                         avisa a tela qual ferramenta está em uso
+    analisar_imagem(pergunta, png) -> str  descreve uma imagem (fornecido pelo cérebro)
     """
     PASTA_TRABALHO.mkdir(parents=True, exist_ok=True)
     arquivo_contatos = PASTA_TRABALHO / "contatos.json"
@@ -323,6 +327,45 @@ def criar_ferramentas(
                    ler_planilha, criar_planilha, adicionar_linhas_planilha,
                    executar_codigo_python, salvar_contato, preparar_whatsapp,
                    preparar_email, criar_lembrete]
+
+    # ---------- memória ----------
+
+    def lembrar_informacao(assunto: str, informacao: str) -> str:
+        """Guarda uma informação para sempre (preferências, telefones, datas, nomes de clientes...).
+        Use quando o usuário pedir para lembrar algo ou contar um fato pessoal importante.
+
+        Args:
+          assunto: título curto, por exemplo "aniversário da Yvnna".
+          informacao: o que guardar.
+        """
+        return memoria.lembrar(assunto, informacao)
+
+    def esquecer_informacao(assunto: str) -> str:
+        """Apaga uma informação guardada na memória.
+
+        Args:
+          assunto: o título usado ao guardar.
+        """
+        return memoria.esquecer(assunto)
+
+    ferramentas += [lembrar_informacao, esquecer_informacao]
+
+    if analisar_imagem:
+        def ver_tela(pergunta: str = "Descreva o que está na tela.") -> str:
+            """Tira uma foto da tela do computador e responde sobre ela: ler um erro, resumir um
+            documento aberto, explicar um gráfico, dizer o que está aberto.
+
+            Args:
+              pergunta: o que o usuário quer saber sobre a tela.
+            """
+            from PIL import ImageGrab
+
+            imagem = ImageGrab.grab(all_screens=True)
+            imagem.thumbnail((1920, 1920))
+            buffer = io.BytesIO()
+            imagem.save(buffer, format="PNG")
+            return analisar_imagem(pergunta, buffer.getvalue())
+        ferramentas.append(ver_tela)
 
     if pesquisar:
         def pesquisar_internet(pergunta: str) -> str:

@@ -157,26 +157,56 @@ def _atrasar(sinal, amostras: int):
     return saida
 
 
-def aplicar_efeito(amostras, efeito: str, taxa: int = TAXA):
-    """Aplica um efeito de voz às amostras int16 e devolve int16."""
-    if efeito not in ("ultron", "robo") or len(amostras) == 0:
-        return amostras
-    x = amostras.astype(np.float32) / 32768.0
-    t = np.arange(len(x), dtype=np.float32) / taxa
-
+def _processar_efeito(x, t, efeito: str, taxa: int):
+    """Núcleo dos efeitos (sinal em float, t = tempo de cada amostra em segundos)."""
     if efeito == "ultron":
         # Modulação em anel suave + ressonância metálica + uma segunda voz levemente atrasada.
         anel = x * np.sin(2 * np.pi * 38 * t)
         y = 0.7 * x + 0.3 * anel
         atraso = int(0.009 * taxa)
         y = y + 0.45 * _atrasar(y, atraso) + 0.2 * _atrasar(y, 2 * atraso) + 0.1 * _atrasar(y, 3 * atraso)
-        y = y + 0.3 * _atrasar(y, int(0.028 * taxa))
-    else:  # robo: modulação em anel forte, som de máquina
-        y = 0.35 * x + 0.65 * x * np.sin(2 * np.pi * 70 * t)
-        y = y + 0.4 * _atrasar(y, int(0.006 * taxa))
+        return y + 0.3 * _atrasar(y, int(0.028 * taxa))
+    # robo: modulação em anel forte, som de máquina
+    y = 0.35 * x + 0.65 * x * np.sin(2 * np.pi * 70 * t)
+    return y + 0.4 * _atrasar(y, int(0.006 * taxa))
 
+
+def aplicar_efeito(amostras, efeito: str, taxa: int = TAXA):
+    """Aplica um efeito de voz às amostras int16 e devolve int16."""
+    if efeito not in ("ultron", "robo") or len(amostras) == 0:
+        return amostras
+    x = amostras.astype(np.float32) / 32768.0
+    t = np.arange(len(x), dtype=np.float32) / taxa
+    y = _processar_efeito(x, t, efeito, taxa)
     pico = float(np.max(np.abs(y))) or 1.0
     return (y / pico * 0.9 * 32767).astype(np.int16)
+
+
+class EfeitoContinuo:
+    """Aplica o efeito em pedaços de áudio que chegam aos poucos (voz ao vivo), sem cortes
+    entre um pedaço e outro: guarda o final do pedaço anterior para os ecos e o tempo total."""
+
+    HISTORICO = 0.06  # segundos guardados (maior atraso usado pelos efeitos)
+    GANHO = {"ultron": 0.42, "robo": 0.75}  # volume fixo, para não oscilar entre pedaços
+
+    def __init__(self, efeito: str, taxa: int = TAXA):
+        self.efeito = efeito
+        self.taxa = taxa
+        self.anterior = np.zeros(int(self.HISTORICO * taxa), dtype=np.float32)
+        self.amostras_passadas = 0
+
+    def processar(self, pcm: bytes) -> bytes:
+        if self.efeito not in self.GANHO or not pcm:
+            return pcm
+        x = np.frombuffer(pcm, dtype=np.int16).astype(np.float32) / 32768.0
+        junto = np.concatenate([self.anterior, x])
+        inicio = self.amostras_passadas - len(self.anterior)
+        t = (np.arange(len(junto), dtype=np.float64) + inicio) / self.taxa
+        y = _processar_efeito(junto, t.astype(np.float32), self.efeito, self.taxa)[len(self.anterior):]
+        self.anterior = junto[-len(self.anterior):]
+        self.amostras_passadas += len(x)
+        y = np.tanh(y * self.GANHO[self.efeito] * 1.4)  # limita picos com suavidade
+        return (y * 32767).astype(np.int16).tobytes()
 
 
 def tocar(amostras, taxa: int = TAXA) -> None:

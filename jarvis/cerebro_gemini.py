@@ -24,17 +24,20 @@ class CerebroGemini:
         self.cliente = genai.Client(api_key=chave)
         self.modelos = [modelo] + [m for m in MODELOS_RESERVA if m != modelo]
         self.modelo = modelo
-        ferramentas = []
+        self.usuario = usuario
+        self.ferramentas = []
         if confirmar and avisar:
-            ferramentas = criar_ferramentas(confirmar, avisar, self.pesquisar, ao_usar)
-        self.config = types.GenerateContentConfig(
-            system_instruction=prompt_sistema(usuario, com_ferramentas=bool(ferramentas)),
-            tools=ferramentas or None,
-            automatic_function_calling=types.AutomaticFunctionCallingConfig(maximum_remote_calls=20),
-        )
+            self.ferramentas = criar_ferramentas(confirmar, avisar, self.pesquisar, ao_usar,
+                                                 analisar_imagem=self.analisar_imagem)
         self.esquecer()
 
     def esquecer(self) -> None:
+        # Recria as instruções (para incluir a memória atualizada) e começa uma conversa nova.
+        self.config = types.GenerateContentConfig(
+            system_instruction=prompt_sistema(self.usuario, com_ferramentas=bool(self.ferramentas)),
+            tools=self.ferramentas or None,
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(maximum_remote_calls=20),
+        )
         # O objeto de chat guarda o histórico da conversa sozinho.
         self.chat = self.cliente.chats.create(model=self.modelo, config=self.config)
 
@@ -95,6 +98,20 @@ class CerebroGemini:
             texto = (resposta.text or "").strip()
             return texto + ("\n\nFontes:\n" + "\n".join(fontes[:5]) if fontes else "")
         return f"A pesquisa na internet falhou ({_resumo(ultimo_erro)})."
+
+
+    def analisar_imagem(self, pergunta: str, png: bytes) -> str:
+        """Responde uma pergunta sobre uma imagem (usado para ver a tela)."""
+        conteudo = [types.Part.from_bytes(data=png, mime_type="image/png"),
+                    f"Responda em português do Brasil, de forma objetiva: {pergunta}"]
+        ultimo_erro = None
+        for modelo in [self.modelo] + [m for m in self.modelos if m != self.modelo]:
+            try:
+                resposta = self.cliente.models.generate_content(model=modelo, contents=conteudo)
+                return (resposta.text or "").strip() or "Não consegui entender a imagem."
+            except (errors.APIError, httpx.TransportError) as erro:
+                ultimo_erro = erro
+        return f"Não consegui analisar a tela ({_resumo(ultimo_erro)})."
 
 
 def _resumo(erro) -> str:

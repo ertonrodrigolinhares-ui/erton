@@ -9,7 +9,7 @@ import tkinter as tk
 import webbrowser
 from tkinter import messagebox, simpledialog
 
-from . import voz
+from . import ao_vivo, voz
 from .assistente import remover_palavra_ativacao, responder, saudacao
 from .config import Config, salvar_no_env
 from .ia import criar_cerebro
@@ -30,6 +30,8 @@ ACOES = {
     "executar_codigo_python": "Executando código...", "salvar_contato": "Salvando contato...",
     "preparar_whatsapp": "Preparando o WhatsApp...", "preparar_email": "Preparando o e-mail...",
     "criar_lembrete": "Criando lembrete...", "pesquisar_internet": "Pesquisando na internet...",
+    "lembrar_informacao": "Guardando na memória...", "esquecer_informacao": "Apagando da memória...",
+    "ver_tela": "Olhando a tela...",
 }
 
 PASSOS_CHAVE = {
@@ -59,8 +61,10 @@ class JanelaJarvis:
         self.maos_livres = tk.BooleanVar(value=False)
         self.escuta_ativa = False  # cópia simples de maos_livres, lida pela thread do microfone
         self.thread_escuta = None
+        self.sessao_ao_vivo = None
 
         self._montar_tela()
+        self.raiz.protocol("WM_DELETE_WINDOW", self.fechar)
         self._carregar_cerebro()
         self.raiz.after(100, self._atender_eventos)
 
@@ -73,7 +77,7 @@ class JanelaJarvis:
     def _montar_tela(self) -> None:
         r = self.raiz
         r.title("Jarvis")
-        r.geometry("700x720")
+        r.geometry("720x760")
         r.minsize(420, 480)
         r.configure(bg=FUNDO)
 
@@ -83,6 +87,18 @@ class JanelaJarvis:
                  fg=DESTAQUE, bg=FUNDO).pack(side="left")
         self.status = tk.Label(topo, text="Pronto", font=("Segoe UI", 10), fg=APAGADO, bg=FUNDO)
         self.status.pack(side="right")
+
+        barra_ao_vivo = tk.Frame(r, bg=FUNDO)
+        barra_ao_vivo.pack(fill="x", padx=16, pady=(0, 4))
+        self.botao_ao_vivo = self._botao(barra_ao_vivo, "⚡ Ligar conversa ao vivo",
+                                         self.alternar_ao_vivo, destaque=True)
+        self.botao_ao_vivo.pack(side="left")
+        tk.Label(barra_ao_vivo, text="Voz ao vivo:", bg=FUNDO, fg=APAGADO,
+                 font=("Segoe UI", 10)).pack(side="left", padx=(12, 0))
+        voz_inicial = self.config.voz_ao_vivo if self.config.voz_ao_vivo in ao_vivo.VOZES_AO_VIVO else "Charon"
+        self.escolha_voz_ao_vivo = tk.StringVar(value=ao_vivo.VOZES_AO_VIVO[voz_inicial])
+        self._lista(barra_ao_vivo, self.escolha_voz_ao_vivo, list(ao_vivo.VOZES_AO_VIVO.values()),
+                    self.trocar_voz_ao_vivo).pack(side="left", padx=(6, 0))
 
         quadro = tk.Frame(r, bg=PAINEL)
         quadro.pack(fill="both", expand=True, padx=16, pady=6)
@@ -124,10 +140,11 @@ class JanelaJarvis:
         tk.Checkbutton(rodape, text="Falar as respostas", variable=self.falar_respostas,
                        bg=FUNDO, fg=APAGADO, selectcolor=PAINEL, activebackground=FUNDO,
                        activeforeground=TEXTO, font=("Segoe UI", 10)).pack(side="left")
-        tk.Checkbutton(rodape, text="Mãos livres", variable=self.maos_livres,
+        self.caixa_maos_livres = tk.Checkbutton(rodape, text="Mãos livres", variable=self.maos_livres,
                        command=self.alternar_maos_livres, bg=FUNDO, fg=APAGADO, selectcolor=PAINEL,
                        activebackground=FUNDO, activeforeground=TEXTO,
-                       font=("Segoe UI", 10)).pack(side="left", padx=(10, 0))
+                       font=("Segoe UI", 10))
+        self.caixa_maos_livres.pack(side="left", padx=(10, 0))
         self._botao(rodape, "Trocar chave", self.pedir_chave).pack(side="right")
         self._botao(rodape, "Nova conversa", lambda: self.enviar("nova conversa")).pack(side="right", padx=8)
 
@@ -163,6 +180,10 @@ class JanelaJarvis:
             self.enviar(texto)
 
     def enviar(self, texto: str) -> None:
+        if self.sessao_ao_vivo:
+            self.mostrar("Você", texto)
+            self.sessao_ao_vivo.enviar_texto(texto)
+            return
         if self.ocupado:
             return
         self.ocupado = True
@@ -287,7 +308,7 @@ class JanelaJarvis:
         def perguntar():
             self.raiz.deiconify()
             self.raiz.lift()
-            if self.falar_respostas.get():
+            if self.falar_respostas.get() and not self.sessao_ao_vivo:
                 self.falador.falar("Preciso da sua confirmação na tela.")
             return messagebox.askyesno(titulo, detalhe, parent=self.raiz)
         return self._na_janela(perguntar)
@@ -298,12 +319,68 @@ class JanelaJarvis:
             self.raiz.lift()
             self.raiz.attributes("-topmost", True)
             self.raiz.after(1500, lambda: self.raiz.attributes("-topmost", False))
-            self.mostrar("Jarvis", texto, falar=True)
+            if self.sessao_ao_vivo:  # no modo ao vivo, quem avisa é a própria voz do Gemini
+                self.mostrar("Jarvis", texto)
+                self.sessao_ao_vivo.enviar_texto(f"(Aviso do sistema, diga ao usuário agora: {texto})")
+            else:
+                self.mostrar("Jarvis", texto, falar=True)
         self.eventos.put(mostrar_aviso)
 
     def ao_usar(self, ferramenta: str) -> None:
         texto = ACOES.get(ferramenta, "Trabalhando...")
         self.eventos.put(lambda: self.status.config(text=texto, fg=DESTAQUE))
+
+    # ---------- conversa ao vivo (Gemini Live) ----------
+
+    def alternar_ao_vivo(self) -> None:
+        if self.sessao_ao_vivo:
+            self.botao_ao_vivo.config(text="Desligando...", state="disabled")
+            self.sessao_ao_vivo.parar()
+            return
+        if self.config.ia != "gemini" or not self.config.chave_api or self.cerebro is None:
+            messagebox.showinfo("Ao vivo", "O modo ao vivo usa o Gemini. Configure a chave do Gemini primeiro.")
+            return
+        problema = voz.diagnostico_microfone()
+        if problema:
+            messagebox.showinfo("Microfone", problema)
+            return
+        if self.escuta_ativa:
+            self.maos_livres.set(False)
+            self.alternar_maos_livres()
+        voz_escolhida = next(k for k, v in ao_vivo.VOZES_AO_VIVO.items() if v == self.escolha_voz_ao_vivo.get())
+        self.sessao_ao_vivo = ao_vivo.SessaoAoVivo(
+            chave=self.config.chave_api, usuario=self.config.nome_usuario, voz_ao_vivo=voz_escolhida,
+            efeito=self.falador.efeito, ferramentas=getattr(self.cerebro, "ferramentas", []),
+            ao_texto=lambda quem, texto: self.eventos.put(lambda: self.mostrar(quem, texto)),
+            ao_estado=lambda texto: self.eventos.put(lambda: self.status.config(text=texto, fg=DESTAQUE)),
+            ao_terminar=lambda mensagem: self.eventos.put(lambda: self._ao_vivo_terminou(mensagem)),
+            modelo=self.config.modelo_ao_vivo,
+        )
+        self.sessao_ao_vivo.iniciar()
+        self.botao_ao_vivo.config(text="⏹ Desligar conversa ao vivo")
+        self.botao_microfone.config(state="disabled")
+        self.caixa_maos_livres.config(state="disabled")
+        self.mostrar("Jarvis", "Modo ao vivo ligado: é só falar comigo, sem apertar nada. "
+                               "Posso ser interrompido a qualquer momento.")
+
+    def _ao_vivo_terminou(self, mensagem: str | None) -> None:
+        self.sessao_ao_vivo = None
+        self.botao_ao_vivo.config(text="⚡ Ligar conversa ao vivo", state="normal")
+        self.botao_microfone.config(state="normal")
+        self.caixa_maos_livres.config(state="normal")
+        self._status_normal()
+        self.mostrar("Jarvis", mensagem or "Modo ao vivo desligado.")
+
+    def trocar_voz_ao_vivo(self, nome: str) -> None:
+        chave = next(k for k, v in ao_vivo.VOZES_AO_VIVO.items() if v == nome)
+        salvar_no_env("JARVIS_VOZ_AO_VIVO", chave)
+        if self.sessao_ao_vivo:
+            self.mostrar("Jarvis", f"A voz {chave} vale na próxima vez que você ligar o modo ao vivo.")
+
+    def fechar(self) -> None:
+        if self.sessao_ao_vivo:
+            self.sessao_ao_vivo.parar()
+        self.raiz.destroy()
 
     # ---------- voz ----------
 

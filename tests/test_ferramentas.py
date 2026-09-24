@@ -2,12 +2,14 @@ from unittest.mock import patch
 
 import pytest
 
-from jarvis import ferramentas
+from jarvis import config, ferramentas
+from jarvis.persona import prompt_sistema
 
 
 @pytest.fixture
 def kit(tmp_path, monkeypatch):
     monkeypatch.setattr(ferramentas, "PASTA_TRABALHO", tmp_path)
+    monkeypatch.setattr(config, "PASTA_TRABALHO", tmp_path)
     respostas = {"confirmar": True}
     avisos = []
     usadas = []
@@ -16,6 +18,7 @@ def kit(tmp_path, monkeypatch):
         avisar=avisos.append,
         pesquisar=lambda pergunta: f"resultado: {pergunta}",
         ao_usar=usadas.append,
+        analisar_imagem=lambda pergunta, png: f"vi {len(png) > 0}: {pergunta}",
     )
     return {f.__name__: f for f in lista}, respostas, avisos, usadas, tmp_path
 
@@ -82,3 +85,19 @@ def test_erro_vira_texto(kit):
     f, *_ = kit
     assert "não encontrada" in f["ler_planilha"]("nao-existe")
     assert f["ler_planilha"]("x", aba="Z").startswith("Planilha")  # arquivo inexistente, sem exceção
+
+
+def test_memoria_entra_nas_instrucoes(kit):
+    f, *_ = kit
+    assert "Guardei" in f["lembrar_informacao"]("time do Erton", "Treze")
+    assert "- time do erton: Treze" in prompt_sistema("Erton", True)
+    assert "Esqueci" in f["esquecer_informacao"]("Time do Erton")
+    assert "Treze" not in prompt_sistema("Erton", True)
+
+
+def test_ver_tela(kit, monkeypatch):
+    from PIL import Image, ImageGrab
+
+    f, *_ = kit
+    monkeypatch.setattr(ImageGrab, "grab", lambda **_: Image.new("RGB", (3000, 1000), "blue"))
+    assert f["ver_tela"]("qual o erro?") == "vi True: qual o erro?"
