@@ -76,6 +76,15 @@ Cópia do projeto **JARVIS-OS V.2** (licença MIT, veja `LICENSE`), com ajustes 
 - **Prefere que ele ouça sempre:** diga "Hey Jarvis, modo mãos livres" (ou coloque
   `JARVIS_PALAVRA_ATIVACAO=0` para ele já abrir assim).
 
+## Se o Jarvis não conseguir abrir um site
+
+- Para **clicar e digitar sozinho** nos sites, o Jarvis usa o **Chrome** ou o **Edge**. Peça:
+  "Jarvis, abre o Instagram no Chrome" (ou "no Edge").
+- O **Firefox** não pode ser controlado pelo Jarvis. Se você pedir o Firefox, ele abre o site
+  numa janela normal do Firefox, mas não clica nem digita nela.
+- Se o navegador automático não abrir por algum motivo, o Jarvis abre o site no seu navegador
+  padrão, em vez de dar erro.
+
 ## Configurações (arquivo `.env` nesta pasta)
 
 Abra com o Bloco de Notas para mudar:

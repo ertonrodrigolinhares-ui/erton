@@ -425,24 +425,18 @@ class _BrowserSession:
         engine_obj  = getattr(self._pw, engine_name)
 
         if engine_name == "firefox":
-            profile = _firefox_profile_dir() or str(
-                Path.home() / ".jarvis_profiles" / "firefox"
-            )
+            # O Playwright não consegue controlar o firefox.exe normal (só a versão dele) nem o
+            # perfil real que está aberto. Usa a versão do Playwright com o perfil do Jarvis; se
+            # ela não estiver instalada, browser_control() abre o site no Firefox normal.
             kwargs: dict = {
                 "headless":    False,
                 "slow_mo":     0,
                 "viewport":    None,
                 "no_viewport": True,
             }
-            if exe:
-                kwargs["executable_path"] = exe
-            try:
-                self._context = await engine_obj.launch_persistent_context(profile, **kwargs)
-            except Exception as e:
-                print(f"[Browser] Firefox real profile failed ({e}), using JARVIS profile")
-                jarvis = str(Path.home() / ".jarvis_profiles" / "firefox_jarvis")
-                Path(jarvis).mkdir(parents=True, exist_ok=True)
-                self._context = await engine_obj.launch_persistent_context(jarvis, **kwargs)
+            jarvis = str(Path.home() / ".jarvis_profiles" / "firefox_jarvis")
+            Path(jarvis).mkdir(parents=True, exist_ok=True)
+            self._context = await engine_obj.launch_persistent_context(jarvis, **kwargs)
 
             await asyncio.sleep(0.5)  
             self._page = await self._context.new_page()
@@ -509,8 +503,20 @@ class _BrowserSession:
             await asyncio.sleep(0.5)
             self._page = await self._context.new_page()
             print(f"[Browser] ✅ Launched [{label}] with JARVIS profile")
+            return
         except Exception as e2:
-            raise RuntimeError(f"Could not launch {self.browser_name}: {e2}") from e2
+            print(f"[Browser] ⚠️  JARVIS profile failed for {label}: {e2}")
+
+        # Último recurso: o Chromium que o instalador baixa (playwright install chromium).
+        kwargs.pop("executable_path", None)
+        kwargs.pop("channel", None)
+        try:
+            self._context = await self._pw.chromium.launch_persistent_context(jarvis_profile, **kwargs)
+            await asyncio.sleep(0.5)
+            self._page = await self._context.new_page()
+            print(f"[Browser] ✅ Launched bundled Chromium for {self.browser_name}")
+        except Exception as e3:
+            raise RuntimeError(f"Could not launch {self.browser_name}: {e3}") from e3
 
 
     async def _get_page(self) -> Page:
@@ -765,6 +771,18 @@ class _SessionRegistry:
         self._active_browser = browser_name
         return f"Active browser → {browser_name}"
 
+    def descartar(self, sess: "_BrowserSession") -> None:
+        """Esquece uma sessão cujo navegador não abriu (para tentar de novo da próxima vez)."""
+        with self._lock:
+            if self._sessions.get(sess.browser_name) is sess:
+                del self._sessions[sess.browser_name]
+        try:
+            sess.close()
+        except Exception:
+            pass
+        if sess._loop:
+            sess._loop.call_soon_threadsafe(sess._loop.stop)
+
     def close_one(self, browser_name: str) -> str:
         with self._lock:
             sess = self._sessions.pop(browser_name, None)
@@ -881,9 +899,54 @@ def browser_control(
         result = f"Browser action '{action}' timed out (60s)."
     except Exception as e:
         result = f"Browser error ({action}): {e}"
+        destino = _url_do_pedido(action, params)
+        if destino and sess._context is None:  # o navegador automático nem abriu
+            _registry.descartar(sess)
+            result = _abrir_sem_automacao(sess.browser_name, sess._spec, destino)
 
     _log(player, result)
     return result
+
+
+def _url_do_pedido(action: str, params: dict) -> str:
+    """O endereço a abrir para go_to / search / new_tab (vazio para as outras ações)."""
+    if action in ("go_to", "new_tab") and params.get("url"):
+        return _normalize_url(params["url"])
+    if action == "search" and params.get("query"):
+        from urllib.parse import quote_plus
+        return "https://www.google.com/search?q=" + quote_plus(params["query"])
+    return ""
+
+
+def _achar_firefox() -> Optional[str]:
+    candidatos = [shutil.which("firefox")]
+    if _OS == "Windows":
+        for base in (os.environ.get("PROGRAMFILES", ""), os.environ.get("PROGRAMFILES(X86)", ""),
+                     os.environ.get("LOCALAPPDATA", "")):
+            if base:
+                candidatos.append(str(Path(base) / "Mozilla Firefox" / "firefox.exe"))
+    for c in candidatos:
+        if c and Path(c).exists():
+            return c
+    return None
+
+
+def _abrir_sem_automacao(browser_name: str, spec: dict | None, url: str) -> str:
+    """Plano B: abre o site no navegador normal do computador (sem controle automático)."""
+    exe = (spec or {}).get("exe") or (_achar_firefox() if browser_name == "firefox" else None)
+    try:
+        if exe:
+            subprocess.Popen([exe, url])
+            onde = browser_name
+        else:
+            import webbrowser
+            if not webbrowser.open(url):
+                raise RuntimeError("nenhum navegador respondeu")
+            onde = "navegador padrão"
+    except Exception as e:
+        return f"Could not open {url}: {e}"
+    return (f"Opened {url} in {onde} (normal window). Automatic clicking/typing is not "
+            f"available in this window; ask to use Chrome or Edge for that.")
 
 
 def _log(player, text: str):

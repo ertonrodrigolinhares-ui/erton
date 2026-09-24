@@ -601,3 +601,57 @@ class TelaStarkTests(unittest.TestCase):
             self.assertFalse(ui_stark.ligada())
         with patch.dict("os.environ", {"JARVIS_TEMA_STARK": "1"}):
             self.assertTrue(ui_stark.ligada())
+
+
+class NavegadorPlanoBTests(unittest.TestCase):
+    """Se o navegador automático não abrir (ex.: Firefox), o site abre no navegador normal."""
+
+    def _sessao_que_falha(self, nome, exe=None):
+        from actions import browser_control as bc
+
+        class Sessao:
+            browser_name = nome
+            _spec = {"engine": "firefox", "exe": exe, "channel": None}
+            _context = None
+            _loop = None
+
+            def go_to(self, url):
+                return url
+
+            search = new_tab = go_to
+
+            def run(self, coro, timeout=60):
+                raise RuntimeError("Executable doesn't exist")
+
+            def close(self):
+                pass
+
+        sess = Sessao()
+        bc._registry._sessions[nome] = sess
+        return bc, sess
+
+    def test_firefox_abre_o_site_no_firefox_normal(self):
+        bc, _ = self._sessao_que_falha("firefox", exe="C:/Firefox/firefox.exe")
+        with patch.object(bc._registry, "get", return_value=bc._registry._sessions["firefox"]), \
+                patch.object(bc.subprocess, "Popen") as popen:
+            resultado = bc.browser_control({"action": "go_to", "url": "instagram", "browser": "firefox"})
+        popen.assert_called_once_with(["C:/Firefox/firefox.exe", "https://instagram.com"])
+        self.assertIn("Opened https://instagram.com in firefox", resultado)
+        self.assertNotIn("firefox", bc._registry._sessions)  # tenta de novo da próxima vez
+
+    def test_sem_executavel_usa_o_navegador_padrao(self):
+        bc, sess = self._sessao_que_falha("chrome")
+        with patch.object(bc._registry, "get", return_value=sess), \
+                patch("webbrowser.open", return_value=True) as abrir:
+            resultado = bc.browser_control({"action": "search", "query": "ironman 70.3", "browser": "chrome"})
+        abrir.assert_called_once_with("https://www.google.com/search?q=ironman+70.3")
+        self.assertIn("navegador padrão", resultado)
+
+    def test_clique_nao_abre_nada_por_fora(self):
+        bc, sess = self._sessao_que_falha("chrome")
+        with patch.object(bc._registry, "get", return_value=sess), \
+                patch("webbrowser.open") as abrir:
+            resultado = bc.browser_control({"action": "click", "text": "Entrar", "browser": "chrome"})
+        abrir.assert_not_called()
+        self.assertIn("Browser error (click)", resultado)
+        bc._registry._sessions.pop("chrome", None)
