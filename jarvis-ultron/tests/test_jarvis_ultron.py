@@ -339,3 +339,154 @@ class ModoReservaNoJarvisTests(unittest.TestCase):
         self.assertEqual(sum("Modo reserva (Groq) ligado" in l for l in jarvis.ui.logs), 1)
         jarvis._desativar_modo_reserva()
         self.assertFalse(jarvis._modo_reserva)
+
+
+# ---------- Hermes: trava de aprovação, ponte e kit ----------
+
+import importlib.util
+import json as _json
+import subprocess
+import sys
+import time as _time
+
+from core import hermes_ponte
+
+KIT = Path(__file__).resolve().parent.parent / "hermes"
+
+
+def _carregar_gancho():
+    spec = importlib.util.spec_from_file_location("aprovacao_jarvis", KIT / "hooks" / "aprovacao_jarvis.py")
+    modulo = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(modulo)
+    return modulo
+
+
+class TravaDeAprovacaoTests(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+
+        self.pasta = Path(tempfile.mkdtemp())
+        self.env = patch.dict("os.environ", {"HERMES_HOME": str(self.pasta), "HERMES_JARVIS_HOME": str(self.pasta),
+                                             "HERMES_API_KEY": "chave"})
+        self.env.start()
+        self.gancho = _carregar_gancho()
+
+    def tearDown(self):
+        self.env.stop()
+
+    def _evento(self, ferramenta):
+        return {"hook_event_name": "pre_tool_call", "tool_name": ferramenta, "tool_input": {}}
+
+    def test_leitura_passa_e_publicacao_e_bloqueada_sem_ok(self):
+        self.assertIsNone(self.gancho.decidir(self._evento("mcp__metricool__get_posts")))
+        self.assertIsNone(self.gancho.decidir(self._evento("mcp__metricool__best_time_to_post")))
+        bloqueio = self.gancho.decidir(self._evento("mcp__metricool__create_post"))
+        self.assertEqual(bloqueio["action"], "block")
+        self.assertIn("ok", bloqueio["message"])
+        self.assertEqual(self.gancho.decidir(self._evento("mcp__meta_ads__update_budget"))["action"], "block")
+
+    def test_outras_ferramentas_nao_sao_afetadas(self):
+        self.assertIsNone(self.gancho.decidir(self._evento("terminal")))
+        self.assertIsNone(self.gancho.decidir(self._evento("mcp__github__create_issue")))
+
+    def test_ok_do_jarvis_libera_so_a_categoria_e_so_por_10_minutos(self):
+        hermes_ponte.registrar_aprovacao("redes")
+        self.assertIsNone(self.gancho.decidir(self._evento("mcp__metricool__create_post")))
+        self.assertEqual(self.gancho.decidir(self._evento("mcp__meta_ads__create_campaign"))["action"], "block")
+        depois = _time.time() + hermes_ponte.JANELA_APROVACAO + 1
+        self.assertEqual(self.gancho.decidir(self._evento("mcp__metricool__create_post"), agora=depois)["action"], "block")
+
+    def test_script_segue_o_protocolo_do_hermes(self):
+        entrada = _json.dumps(self._evento("mcp__metricool__schedule_post"))
+        saida = subprocess.run([sys.executable, str(KIT / "hooks" / "aprovacao_jarvis.py")], input=entrada,
+                               capture_output=True, text=True, timeout=30)
+        self.assertEqual(_json.loads(saida.stdout)["action"], "block")
+        leitura = subprocess.run([sys.executable, str(KIT / "hooks" / "aprovacao_jarvis.py")],
+                                 input=_json.dumps(self._evento("mcp__metricool__get_posts")),
+                                 capture_output=True, text=True, timeout=30)
+        self.assertEqual(leitura.stdout.strip(), "")
+
+    def test_aprovacao_exige_ok_na_fala_do_usuario(self):
+        with patch.object(hermes_ponte, "perguntar", return_value="Publicado.") as pedido:
+            self.assertIn("Não registrei", hermes_ponte.aprovar_e_executar("redes", "posts 1 e 3", "quais os posts de hoje?"))
+            self.assertIn("Não registrei", hermes_ponte.aprovar_e_executar("redes", "posts 1", "não pode publicar"))
+            pedido.assert_not_called()
+            self.assertFalse(hermes_ponte.arquivo_aprovacao().exists())
+            self.assertEqual(hermes_ponte.aprovar_e_executar("redes", "posts 1 e 3", "ok, pode publicar o 1 e o 3"), "Publicado.")
+            self.assertIn("publicar-aprovados", pedido.call_args.args[0])
+        self.assertIsNone(self.gancho.decidir(self._evento("mcp__metricool__create_post")))
+
+
+class RespostaHttp:
+    def __init__(self, status, dados=None, texto=""):
+        self.status_code, self._dados, self.text = status, dados, texto
+
+    def json(self):
+        return self._dados
+
+
+class PonteHermesTests(unittest.TestCase):
+    def test_pergunta_pela_api_local(self):
+        import requests
+
+        chamadas = []
+
+        def post(url, headers, json, timeout):
+            chamadas.append((url, headers, json))
+            return RespostaHttp(200, {"choices": [{"message": {"content": " Preparei 3 posts. "}}]})
+
+        with patch.dict("os.environ", {"HERMES_API_KEY": "k", "HERMES_API_URL": "http://127.0.0.1:8642/"}), \
+                patch.object(requests, "post", post):
+            self.assertEqual(hermes_ponte.perguntar("quais os posts de hoje?"), "Preparei 3 posts.")
+        url, cabecalho, corpo = chamadas[0]
+        self.assertEqual(url, "http://127.0.0.1:8642/v1/chat/completions")
+        self.assertEqual(cabecalho["Authorization"], "Bearer k")
+        self.assertEqual(corpo["model"], "hermes-agent")
+
+    def test_erros_viram_mensagens(self):
+        import requests
+
+        with patch.dict("os.environ", {"HERMES_API_KEY": "k"}):
+            with patch.object(requests, "post", side_effect=requests.exceptions.ConnectionError()):
+                self.assertIn("desligado", hermes_ponte.perguntar("oi"))
+            with patch.object(requests, "post", return_value=RespostaHttp(401)):
+                self.assertIn("não confere", hermes_ponte.perguntar("oi"))
+        with patch.dict("os.environ", {"HERMES_API_KEY": ""}):
+            self.assertIn("Instalar Hermes", hermes_ponte.perguntar("oi"))
+
+
+class VozElevenLabsTests(unittest.TestCase):
+    def test_fala_a_resposta_pela_voz_externa(self):
+        import main
+
+        class Motor:
+            def __init__(self):
+                self.falas = []
+
+            def speak(self, texto):
+                self.falas.append(texto)
+
+        jarvis = object.__new__(main.JarvisLive)
+        jarvis.ui = UIFalsa()
+        jarvis._tts_engine, jarvis._ext_tts_provider = Motor(), "elevenlabs"
+        jarvis._falar_com_voz_externa("Bom dia, Erton.")
+        self.assertEqual(jarvis._tts_engine.falas, ["Bom dia, Erton."])
+        jarvis._ext_tts_provider = "gemini"
+        jarvis._falar_com_voz_externa("não deve falar")
+        self.assertEqual(len(jarvis._tts_engine.falas), 1)
+
+
+class KitHermesTests(unittest.TestCase):
+    def test_config_e_skills_validos(self):
+        import yaml
+
+        config = yaml.safe_load((KIT / "config-jarvis.yaml").read_text(encoding="utf-8"))
+        self.assertEqual(config["model"]["provider"], "openrouter")
+        self.assertEqual(set(config["mcp_servers"]), {"metricool", "meta_ads"})
+        gancho = config["hooks"]["pre_tool_call"][0]
+        self.assertTrue(gancho["fail_closed"])
+        self.assertRegex("mcp__metricool__create_post", gancho["matcher"])
+        for skill in (KIT / "skills" / "jarvis").glob("*/SKILL.md"):
+            frente = yaml.safe_load(skill.read_text(encoding="utf-8").split("---")[1])
+            self.assertEqual(frente["name"], skill.parent.name)
+            self.assertTrue(frente["description"])

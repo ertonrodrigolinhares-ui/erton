@@ -29,6 +29,12 @@ Cópia do projeto **JARVIS-OS V.2** (licença MIT, veja `LICENSE`), com ajustes 
 - Correção: quando a conexão falhava, o original tentava reconectar sem parar, várias vezes por
   segundo (gastando a cota). Agora ele espera entre as tentativas (2 s, 4 s, 8 s... até 1 minuto).
 
+- **Voz ElevenLabs**: com `ELEVENLABS_API_KEY` no `.env`, o Jarvis fala as respostas pela ElevenLabs
+  (com o efeito Ultron por cima, se ligado). Correção: no original, escolher a ElevenLabs deixava o
+  Jarvis mudo, e a escolha não voltava ao reabrir.
+- **Hermes Agent** (pasta `hermes`): orquestrador com sub-agentes, rotina diária das 8h, redes sociais
+  pelo Metricool, anúncios pelo Meta e navegador próprio. Veja a seção "Hermes" abaixo.
+
 ## Como usar no Windows
 
 1. Dê dois cliques em **`Iniciar Jarvis Ultron`**.
@@ -86,3 +92,43 @@ Deixe essas linhas de fora para o Jarvis escolher sozinho. Esse é o recomendado
 - Algumas funções exigem configuração extra (Gmail, Instagram, Spotify). Veja `docs/USAGE.md`.
 - Os testes do projeto original já vinham com 71 falhas (testes desatualizados em relação ao código).
   Os ajustes do Jarvis Ultron não mudaram nenhum resultado.
+
+## Hermes: agentes, rotina das 8h e redes sociais
+
+O Hermes Agent (Nous Research, código aberto) é o "orquestrador" do Jarvis. Ele divide tarefas
+entre sub-agentes, usa o **OpenRouter** como cérebro e se conecta ao **Metricool** (posts em todas as
+redes) e ao **MCP oficial do Meta** (anúncios do Facebook e Instagram).
+
+### Instalar (uma vez)
+1. Dê dois cliques em **`Instalar Hermes`** (nesta pasta). Ele:
+   - instala o Hermes pelo instalador oficial (se ainda não tiver);
+   - cria o perfil **"jarvis"** com as habilidades, a personalidade e a trava de aprovação;
+   - pede a chave do **OpenRouter** (obrigatória) e da **ElevenLabs** (opcional);
+   - abre o navegador para você autorizar o **Metricool** e, se quiser, o **Meta**;
+   - cria a **rotina diária das 8h** e faz o Hermes ligar sozinho com o Windows.
+2. Abra o Jarvis Ultron normalmente.
+
+### Como usar
+- **"Hey Jarvis, quais são os posts de hoje?"**: ele lê as propostas que a rotina das 8h preparou.
+- **"Ok, pode publicar os posts 1 e 3"**: ele registra o seu ok e manda publicar pelo Metricool.
+- **"Como estão meus anúncios?"**: relatório do Meta Ads.
+- **"Entre no painel do Metricool e veja os seguidores desta semana"**: o Hermes usa o navegador sozinho.
+
+### Segurança
+- A rotina das 8h **só prepara** os posts. **Nada é publicado sem o seu "ok".**
+- A trava é garantida por um programa (`hermes/hooks/aprovacao_jarvis.py`), não só por instrução:
+  publicar, agendar, editar, apagar ou mexer em anúncios é bloqueado, a não ser que você tenha dito
+  "ok" ao Jarvis nos últimos 10 minutos. Se você disser "não pode publicar", ele não considera aprovado.
+- No navegador, o Hermes não digita senhas, não paga nada e não envia mensagens sem o seu ok.
+- Os posts ficam no perfil de atleta; nada da empresa ou de clientes.
+
+### Custos
+- **Hermes**: grátis. **Metricool**: o conector funciona inclusive no plano grátis.
+- **OpenRouter**: cobra por uso da IA dos agentes (tem modelos gratuitos também). Coloque um limite
+  de gastos no site do OpenRouter.
+- **ElevenLabs**: plano grátis pequeno; depois, pago.
+
+### Limitações conhecidas
+- Os sub-agentes compartilham os mesmos conectores do agente principal (o Hermes ainda não separa
+  ferramentas por sub-agente); a trava de aprovação vale para todos.
+- O MCP oficial do Meta é para **anúncios**. Posts normais saem pelo Metricool.

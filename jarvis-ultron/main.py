@@ -404,6 +404,39 @@ TOOL_DECLARATIONS = [
         }
     },
     {
+        "name": "hermes_agent",
+        "description": (
+            "Sends a task to Hermes, JARVIS's autonomous orchestrator with sub-agents. Use for: social media "
+            "posts of the user's athlete profile (daily post proposals, Metricool, best time to post, "
+            "performance), Meta/Facebook/Instagram ads reports, opening and reading web panels/dashboards "
+            "by itself, and long multi-step tasks. Examples: 'what are today's posts?', 'how are my ads "
+            "doing?', 'prepare 3 posts about my training'. Never use it to publish without approval."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "request": {"type": "STRING", "description": "The full task for Hermes, in Portuguese"}
+            },
+            "required": ["request"]
+        }
+    },
+    {
+        "name": "approve_publication",
+        "description": (
+            "Records the user's explicit approval and tells Hermes to publish/schedule the approved posts "
+            "(kind='redes') or apply the approved ad change (kind='anuncios'). Call ONLY right after the user "
+            "clearly approves in their own words (e.g. 'ok, pode publicar os posts 1 e 3'). Never assume approval."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "kind": {"type": "STRING", "enum": ["redes", "anuncios"], "description": "redes = posts; anuncios = Meta ads"},
+                "details": {"type": "STRING", "description": "Exactly what was approved, e.g. 'posts 1 e 3, agendar no horario sugerido'"}
+            },
+            "required": ["kind", "details"]
+        }
+    },
+    {
         "name": "suspend_listening",
         "description": (
             "Suspends JARVIS for a number of minutes: the microphone is muted and JARVIS stops listening, "
@@ -1519,6 +1552,15 @@ class JarvisLive:
             ),
         )
 
+    def _falar_com_voz_externa(self, texto: str) -> None:
+        """Jarvis Ultron: com ElevenLabs/OpenAI/Edge escolhida, fala a resposta por ela."""
+        motor = getattr(self, "_tts_engine", None)
+        if motor is None or self._ext_tts_provider in ("", "gemini"):
+            return
+        motor.on_speaking_start = lambda: self.set_speaking(True)
+        motor.on_speaking_stop = lambda: self.set_speaking(False)
+        motor.speak(texto)
+
     # ---------- Jarvis Ultron: modo reserva (Groq) ----------
 
     def _ativar_modo_reserva(self) -> None:
@@ -1661,6 +1703,18 @@ class JarvisLive:
             if name == "open_app":
                 r = await asyncio.to_thread(lambda: open_app(parameters=args, response=None, player=self.ui))
                 result = r or f"Opened {args.get('app_name')}."
+
+            elif name == "hermes_agent":
+                from core import hermes_ponte
+                result = await asyncio.to_thread(hermes_ponte.perguntar, args.get("request", ""))
+
+            elif name == "approve_publication":
+                from core import hermes_ponte
+                ultima_fala = self._current_input_transcript or self._last_input_transcript
+                result = await asyncio.to_thread(
+                    hermes_ponte.aprovar_e_executar,
+                    args.get("kind", ""), args.get("details", ""), ultima_fala,
+                )
 
             elif name == "suspend_listening":
                 result = self._suspender(args.get("minutes", 10))
@@ -1983,6 +2037,7 @@ class JarvisLive:
                             full_out = " ".join(out_buf).strip()
                             if full_out:
                                 self.ui.write_log(f"Jarvis: {full_out}")
+                                self._falar_com_voz_externa(full_out)
                             if (
                                 getattr(self, "_pending_self_quit", False)
                                 and (full_out or turn_had_audio)
@@ -2270,6 +2325,10 @@ def main():
                     except Exception as e:
                         print(f"[JARVIS] Could not close session: {e}")
         ui.on_tts_provider_change = _on_tts_change
+        chave_eleven = os.environ.get("ELEVENLABS_API_KEY", "").strip()
+        if chave_eleven and os.environ.get("JARVIS_USAR_ELEVENLABS", "1").strip() != "0":
+            _on_tts_change("elevenlabs", chave_eleven,
+                           os.environ.get("JARVIS_VOZ_ELEVENLABS", "").strip() or "pNInz6obpgDQGcFmaJgB")
         try:
             asyncio.run(jarvis.run())
         except KeyboardInterrupt:

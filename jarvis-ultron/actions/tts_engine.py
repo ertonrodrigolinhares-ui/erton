@@ -124,6 +124,11 @@ class TTSEngine:
                     print(f"[TTS] Got {len(mp3)} bytes of audio")
                     pcm = _mp3_bytes_to_pcm(mp3)
                     print(f"[TTS] Decoded to {len(pcm)} PCM samples")
+                    # Jarvis Ultron: aplica o efeito metálico também nas vozes externas
+                    from core.efeito_ultron import criar_efeito
+                    efeito = criar_efeito(RECEIVE_SAMPLE_RATE)
+                    if efeito is not None and pcm.size:
+                        pcm = np.frombuffer(efeito.processar(pcm.tobytes()), dtype=np.int16)
                     _play_pcm(pcm, self.on_speaking_start, self.on_speaking_stop)
                     print(f"[TTS] Playback complete")
                 else:
@@ -147,7 +152,7 @@ class TTSEngine:
         try:
             from elevenlabs.client import ElevenLabs
             client = ElevenLabs(api_key=self.api_key)
-            voice_id = self.voice_id or ELEVENLABS_VOICES[0][1]
+            voice_id = self.voice_id or "pNInz6obpgDQGcFmaJgB"  # Jarvis Ultron: a lista do original não existia
             audio_gen = client.text_to_speech.convert(
                 voice_id=voice_id,
                 text=text,
