@@ -96,6 +96,11 @@ python -m pytest                    # testes (pip install pytest)
 Para criar um comando novo, escreva uma função em `jarvis/comandos.py` que recebe o texto
 (minúsculo e sem acentos) e retorna a resposta ou `None`. Depois, inclua a função na lista `COMANDOS`.
 
+## Jarvis Ultron (pasta `jarvis-ultron`)
+
+Cópia completa do projeto JARVIS-OS V.2, com voz Ultron, português e iniciador para Windows.
+Veja [jarvis-ultron/LEIA-ME.md](jarvis-ultron/LEIA-ME.md).
+
 ## Créditos
 
 O modo ao vivo (Gemini Live), a memória e a visão da tela foram inspirados no projeto
