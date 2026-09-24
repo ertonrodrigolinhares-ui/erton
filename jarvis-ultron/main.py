@@ -404,6 +404,21 @@ TOOL_DECLARATIONS = [
         }
     },
     {
+        "name": "listening_mode",
+        "description": (
+            "Switches how JARVIS listens. 'maos_livres' (hands-free): answers everything the user says, "
+            "no wake word needed. 'chamada' (call mode): answers only after the user says 'Hey Jarvis'. "
+            "Use when the user says 'modo mãos livres' or 'modo chamada'."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "mode": {"type": "STRING", "enum": ["maos_livres", "chamada"], "description": "The listening mode"}
+            },
+            "required": ["mode"]
+        }
+    },
+    {
         "name": "hermes_agent",
         "description": (
             "Sends a task to Hermes, JARVIS's autonomous orchestrator with sub-agents. Use for: social media "
@@ -1270,6 +1285,7 @@ class JarvisLive:
             return False
         self._last_input_transcript = self._current_input_transcript
         self._last_input_transcript_at = time.monotonic()
+        self._checar_pedido_de_modo(self._current_input_transcript)
         outgoing_text = self._current_input_transcript
         if (
             not getattr(self, "_pending_self_quit", False)
@@ -1552,6 +1568,33 @@ class JarvisLive:
             ),
         )
 
+    def _definir_modo_escuta(self, modo: str) -> str:
+        """Jarvis Ultron: 'maos_livres' (ouve tudo) ou 'chamada' (só depois de "Hey Jarvis")."""
+        portao = getattr(self, "_portao", None)
+        if modo not in ("maos_livres", "chamada") or portao is None:
+            return "Invalid mode. Use 'maos_livres' or 'chamada'."
+        if portao.modo == modo:
+            return f"Already in {modo} mode. Confirm it to the user in one short sentence in Portuguese."
+        if not portao.definir_modo(modo):
+            return ("Call mode is unavailable because the 'Hey Jarvis' detector did not load. "
+                    "Tell the user, in Portuguese, that you will keep listening to everything.")
+        if modo == "maos_livres":
+            self.ui.write_log("SYS: Modo mãos livres: estou ouvindo tudo.")
+            return ("Hands-free mode on. Tell the user, in one short sentence in Portuguese, that you will "
+                    "now answer everything they say, and that saying 'Jarvis, modo chamada' turns it off.")
+        self.ui.write_log('SYS: Modo chamada: diga "Hey Jarvis" para falar comigo.')
+        return ("Call mode on. Tell the user, in one short sentence in Portuguese, that from now on you only "
+                "answer after they say 'Hey Jarvis'.")
+
+    def _checar_pedido_de_modo(self, fala: str) -> None:
+        """Troca o modo pela frase falada, mesmo que a IA não chame a ferramenta."""
+        from core.palavra_ativacao import modo_pedido
+
+        modo = modo_pedido(fala)
+        portao = getattr(self, "_portao", None)
+        if modo and portao is not None and portao.modo != modo:
+            self._definir_modo_escuta(modo)
+
     def _falar_com_voz_externa(self, texto: str) -> None:
         """Jarvis Ultron: com ElevenLabs/OpenAI/Edge escolhida, fala a resposta por ela."""
         motor = getattr(self, "_tts_engine", None)
@@ -1605,6 +1648,7 @@ class JarvisLive:
                 texto = self._reserva.transcrever(pcm)
                 if texto:
                     self.ui.write_log(f"You: {texto}")
+                    self._checar_pedido_de_modo(texto)
                     self._portao.estender()
                     self._responder_pela_reserva(texto)
         except Exception as erro:
@@ -1703,6 +1747,9 @@ class JarvisLive:
             if name == "open_app":
                 r = await asyncio.to_thread(lambda: open_app(parameters=args, response=None, player=self.ui))
                 result = r or f"Opened {args.get('app_name')}."
+
+            elif name == "listening_mode":
+                result = self._definir_modo_escuta(args.get("mode", ""))
 
             elif name == "hermes_agent":
                 from core import hermes_ponte
@@ -2023,6 +2070,7 @@ class JarvisLive:
 
                             full_in = " ".join(in_buf).strip()
                             if full_in:
+                                self._checar_pedido_de_modo(full_in)
                                 self._current_input_transcript = full_in
                                 self._last_input_transcript = full_in
                                 self._last_input_transcript_at = time.monotonic()

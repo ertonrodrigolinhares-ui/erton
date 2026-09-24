@@ -4,8 +4,13 @@ O detector (openWakeWord, modelo "hey_jarvis") roda no próprio computador, sem 
 Enquanto não ouve a palavra, nenhum áudio vai para o Google. Depois de ativado, o Jarvis
 fica ouvindo durante a conversa e volta a dormir após alguns segundos de silêncio.
 
+Dois modos, que também podem ser trocados por voz:
+  - modo chamada (padrão): só responde depois de "Hey Jarvis";
+  - modo mãos livres: responde a tudo o que for falado.
+  "Hey Jarvis, modo mãos livres" / "Jarvis, modo chamada".
+
 Configuração no .env:
-  JARVIS_PALAVRA_ATIVACAO=1        (0 = sempre ouvindo, como no projeto original)
+  JARVIS_PALAVRA_ATIVACAO=1        (0 = começa no modo mãos livres, sempre ouvindo)
   JARVIS_SENSIBILIDADE=0.5         (menor = aceita com mais facilidade; maior = mais rigoroso)
   JARVIS_JANELA_CONVERSA=20        (segundos ouvindo depois da última fala)
 """
@@ -75,8 +80,7 @@ class PortaoDeVoz:
 
     @classmethod
     def da_configuracao(cls, avisar: Callable[[str], None] | None = None) -> "PortaoDeVoz":
-        if not _ligado("JARVIS_PALAVRA_ATIVACAO"):
-            return cls(None, ativo=False, avisar=avisar)
+        # O detector é carregado mesmo começando em mãos livres, para dar para trocar por voz.
         try:
             detector = carregar_detector()
         except Exception as erro:
@@ -84,10 +88,33 @@ class PortaoDeVoz:
             if avisar:
                 avisar("SYS: Palavra de ativação indisponível; o Jarvis vai ouvir sempre.")
             return cls(None, ativo=False, avisar=avisar)
-        portao = cls(detector, limiar=_numero("JARVIS_SENSIBILIDADE", 0.5),
+        chamada = _ligado("JARVIS_PALAVRA_ATIVACAO")
+        portao = cls(detector, ativo=chamada, limiar=_numero("JARVIS_SENSIBILIDADE", 0.5),
                      janela=_numero("JARVIS_JANELA_CONVERSA", 20.0), avisar=avisar)
-        portao.avisar("SYS: Diga \"Hey Jarvis\" para falar comigo.")
+        portao.avisar("SYS: Diga \"Hey Jarvis\" para falar comigo." if chamada
+                      else "SYS: Modo mãos livres: estou ouvindo tudo.")
         return portao
+
+    @property
+    def modo(self) -> str:
+        return "chamada" if self.ativo else "maos_livres"
+
+    def definir_modo(self, modo: str) -> bool:
+        """'chamada' (só depois de "Hey Jarvis") ou 'maos_livres' (ouve tudo).
+        Devolve False se o modo chamada não estiver disponível (detector não carregou)."""
+        with self._trava:
+            if modo == "maos_livres":
+                self.ativo = False
+                return True
+            if self.detector is None:
+                return False
+            self.ativo = True
+            self.acordado = False  # volta a esperar o "Hey Jarvis"
+            self._pendente = np.zeros(0, dtype=np.int16)
+            self._anteriores.clear()
+            self._amostras_anteriores = 0
+            self._reiniciar_detector()
+            return True
 
     def estender(self) -> None:
         """Mantém o Jarvis ouvindo (chamado quando você fala ou quando ele termina de responder)."""
@@ -138,3 +165,20 @@ class PortaoDeVoz:
         reiniciar = getattr(self.detector, "reset", None)
         if callable(reiniciar):
             reiniciar()
+
+
+_MAOS_LIVRES = ("modo maos livres", "modo mao livre", "modo de maos livres", "modo maos-livres")
+_CHAMADA = ("modo chamada", "modo de chamada", "modo chamado")
+
+
+def modo_pedido(fala: str) -> str | None:
+    """Reconhece "modo mãos livres" / "modo chamada" numa fala (sem depender da IA)."""
+    import unicodedata
+
+    texto = unicodedata.normalize("NFKD", (fala or "").lower())
+    texto = " ".join("".join(c for c in texto if not unicodedata.combining(c)).replace(",", " ").split())
+    if any(frase in texto for frase in _MAOS_LIVRES):
+        return "maos_livres"
+    if any(frase in texto for frase in _CHAMADA):
+        return "chamada"
+    return None

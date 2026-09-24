@@ -490,3 +490,50 @@ class KitHermesTests(unittest.TestCase):
             frente = yaml.safe_load(skill.read_text(encoding="utf-8").split("---")[1])
             self.assertEqual(frente["name"], skill.parent.name)
             self.assertTrue(frente["description"])
+
+
+# ---------- modos de escuta: mãos livres / chamada ----------
+
+class ModosDeEscutaTests(unittest.TestCase):
+    def setUp(self):
+        try:
+            self.detector = palavra_ativacao.carregar_detector()
+        except Exception as erro:  # pragma: no cover
+            raise unittest.SkipTest(f"openwakeword indisponível: {erro}")
+        self.detector.reset()
+
+    def _jarvis(self, portao):
+        import main
+
+        jarvis = object.__new__(main.JarvisLive)
+        jarvis.ui = UIFalsa()
+        jarvis._portao = portao
+        return jarvis
+
+    def test_reconhece_as_frases(self):
+        self.assertEqual(palavra_ativacao.modo_pedido("Hey Jarvis, modo mãos livres"), "maos_livres")
+        self.assertEqual(palavra_ativacao.modo_pedido("Jarvis, modo chamada"), "chamada")
+        self.assertIsNone(palavra_ativacao.modo_pedido("que horas são?"))
+
+    def test_maos_livres_libera_tudo_e_chamada_volta_a_esperar_hey_jarvis(self):
+        portao = PortaoDeVoz(self.detector)
+        frase = _audio("frase_comum")
+        self.assertEqual([s for s in (portao.processar(b) for b in _em_blocos(frase)) if s], [])
+
+        jarvis = self._jarvis(portao)
+        jarvis._checar_pedido_de_modo("Hey Jarvis, modo mãos livres")
+        self.assertEqual(portao.modo, "maos_livres")
+        self.assertIn("SYS: Modo mãos livres: estou ouvindo tudo.", jarvis.ui.logs)
+        self.assertTrue(all(portao.processar(b) for b in _em_blocos(frase)))
+
+        resposta = jarvis._definir_modo_escuta("chamada")
+        self.assertIn("Call mode on", resposta)
+        self.assertEqual(portao.modo, "chamada")
+        self.assertFalse(portao.acordado)
+        self.assertEqual([s for s in (portao.processar(b) for b in _em_blocos(frase)) if s], [])
+        self.assertIn("Already", jarvis._definir_modo_escuta("chamada"))
+
+    def test_chamada_indisponivel_sem_detector(self):
+        jarvis = self._jarvis(PortaoDeVoz(None, ativo=False))
+        self.assertIn("unavailable", jarvis._definir_modo_escuta("chamada"))
+        self.assertEqual(jarvis._portao.modo, "maos_livres")
