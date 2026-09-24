@@ -50,6 +50,10 @@ class Config:
     claude_modelo: str
     claude_esforco: str
     idioma: str
+    voz: str
+    efeito_voz: str
+    chave_elevenlabs: str
+    voz_elevenlabs: str
 
     @classmethod
     def carregar(cls) -> "Config":
@@ -63,6 +67,10 @@ class Config:
             claude_modelo=os.getenv("JARVIS_CLAUDE_MODELO", "claude-opus-5"),
             claude_esforco=os.getenv("JARVIS_CLAUDE_ESFORCO", "medium"),
             idioma=os.getenv("JARVIS_IDIOMA", "pt-BR"),
+            voz=os.getenv("JARVIS_VOZ", "antonio"),
+            efeito_voz=os.getenv("JARVIS_EFEITO_VOZ", "ultron"),
+            chave_elevenlabs=os.getenv("ELEVENLABS_API_KEY", ""),
+            voz_elevenlabs=os.getenv("ELEVENLABS_VOZ_ID", ""),
         )
 
     @property

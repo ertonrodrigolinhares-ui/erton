@@ -7,7 +7,7 @@ import queue
 import threading
 import tkinter as tk
 import webbrowser
-from tkinter import messagebox
+from tkinter import messagebox, simpledialog
 
 from . import voz
 from .assistente import remover_palavra_ativacao, responder, saudacao
@@ -54,7 +54,7 @@ class JanelaJarvis:
         self.cerebro = None
         self.ocupado = False
         self.eventos: queue.Queue = queue.Queue()
-        self.falador = voz.Falador()
+        self.falador = voz.Falador.da_config(self.config)
         self.falar_respostas = tk.BooleanVar(value=voz.fala_disponivel())
         self.maos_livres = tk.BooleanVar(value=False)
         self.escuta_ativa = False  # cópia simples de maos_livres, lida pela thread do microfone
@@ -73,7 +73,7 @@ class JanelaJarvis:
     def _montar_tela(self) -> None:
         r = self.raiz
         r.title("Jarvis")
-        r.geometry("600x700")
+        r.geometry("700x720")
         r.minsize(420, 480)
         r.configure(bg=FUNDO)
 
@@ -107,6 +107,18 @@ class JanelaJarvis:
         self.botao_microfone = self._botao(entrada, "🎤 Falar", self.ouvir, destaque=True)
         self.botao_microfone.pack(side="left", padx=(8, 0))
 
+        linha_voz = tk.Frame(r, bg=FUNDO)
+        linha_voz.pack(fill="x", padx=16, pady=(0, 6))
+        tk.Label(linha_voz, text="Voz:", bg=FUNDO, fg=APAGADO, font=("Segoe UI", 10)).pack(side="left")
+        self.escolha_voz = tk.StringVar(value=voz.VOZES[self.falador.voz][0])
+        self._lista(linha_voz, self.escolha_voz, [n for n, _ in voz.VOZES.values()],
+                    self.trocar_voz).pack(side="left", padx=(6, 10))
+        tk.Label(linha_voz, text="Efeito:", bg=FUNDO, fg=APAGADO, font=("Segoe UI", 10)).pack(side="left")
+        self.escolha_efeito = tk.StringVar(value=voz.EFEITOS[self.falador.efeito][0])
+        self._lista(linha_voz, self.escolha_efeito, [n for n, *_ in voz.EFEITOS.values()],
+                    self.trocar_efeito).pack(side="left", padx=(6, 10))
+        self._botao(linha_voz, "▶ Testar", self.testar_voz).pack(side="right")
+
         rodape = tk.Frame(r, bg=FUNDO)
         rodape.pack(fill="x", padx=16, pady=(0, 12))
         tk.Checkbutton(rodape, text="Falar as respostas", variable=self.falar_respostas,
@@ -118,6 +130,14 @@ class JanelaJarvis:
                        font=("Segoe UI", 10)).pack(side="left", padx=(10, 0))
         self._botao(rodape, "Trocar chave", self.pedir_chave).pack(side="right")
         self._botao(rodape, "Nova conversa", lambda: self.enviar("nova conversa")).pack(side="right", padx=8)
+
+    def _lista(self, pai, variavel, opcoes, ao_escolher) -> tk.OptionMenu:
+        menu = tk.OptionMenu(pai, variavel, *opcoes, command=ao_escolher)
+        menu.config(bg=PAINEL, fg=TEXTO, activebackground=DESTAQUE, activeforeground=FUNDO,
+                    relief="flat", highlightthickness=0, font=("Segoe UI", 10))
+        menu["menu"].config(bg=PAINEL, fg=TEXTO, activebackground=DESTAQUE,
+                            activeforeground=FUNDO, font=("Segoe UI", 10))
+        return menu
 
     def _botao(self, pai, texto, comando, destaque=False) -> tk.Button:
         return tk.Button(pai, text=texto, command=comando, font=("Segoe UI", 10, "bold"),
@@ -283,6 +303,53 @@ class JanelaJarvis:
     def ao_usar(self, ferramenta: str) -> None:
         texto = ACOES.get(ferramenta, "Trabalhando...")
         self.eventos.put(lambda: self.status.config(text=texto, fg=DESTAQUE))
+
+    # ---------- voz ----------
+
+    def trocar_voz(self, nome: str) -> None:
+        chave = next(k for k, (n, _) in voz.VOZES.items() if n == nome)
+        if chave == "elevenlabs" and not self._configurar_elevenlabs():
+            self.escolha_voz.set(voz.VOZES[self.falador.voz][0])
+            return
+        self.falador.voz = chave
+        salvar_no_env("JARVIS_VOZ", chave)
+        self.testar_voz()
+
+    def trocar_efeito(self, nome: str) -> None:
+        chave = next(k for k, (n, *_) in voz.EFEITOS.items() if n == nome)
+        self.falador.efeito = chave
+        salvar_no_env("JARVIS_EFEITO_VOZ", chave)
+        self.testar_voz()
+
+    def testar_voz(self) -> None:
+        if not voz.fala_disponivel():
+            messagebox.showinfo("Voz", "Os componentes de voz não foram instalados.")
+            return
+        self.falador.falar(f"Olá, {self.config.nome_usuario}. Esta é a minha nova voz. Como posso ajudar?")
+        self.raiz.after(8000, self._verificar_voz)
+
+    def _verificar_voz(self) -> None:
+        if self.falador.ultimo_erro:
+            self.status.config(text="Voz escolhida falhou; usei a do Windows.", fg=APAGADO)
+
+    def _configurar_elevenlabs(self) -> bool:
+        chave = simpledialog.askstring(
+            "ElevenLabs",
+            "Cole a sua chave da ElevenLabs.\n\nCrie de graça em elevenlabs.io:\n"
+            "entre na conta > clique no seu nome > API Keys > Create.",
+            initialvalue=self.falador.chave_elevenlabs, show="•", parent=self.raiz)
+        if not chave:
+            return False
+        voz_id = simpledialog.askstring(
+            "ElevenLabs",
+            "Opcional: cole o ID da voz que você escolheu na biblioteca da ElevenLabs\n"
+            "(Voices > escolha a voz > copiar Voice ID).\n\nDeixe em branco para usar a voz padrão.",
+            initialvalue=self.falador.voz_elevenlabs, parent=self.raiz) or ""
+        salvar_no_env("ELEVENLABS_API_KEY", chave.strip())
+        salvar_no_env("ELEVENLABS_VOZ_ID", voz_id.strip())
+        self.falador.chave_elevenlabs = chave.strip()
+        self.falador.voz_elevenlabs = voz_id.strip()
+        return True
 
     # ---------- chave da IA ----------
 

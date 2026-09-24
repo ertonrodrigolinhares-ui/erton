@@ -17,7 +17,7 @@ from .ia import criar_cerebro
 
 def modo_terminal(usar_voz: bool) -> None:
     config = Config.carregar()
-    falador_aviso = voz.Falador() if usar_voz else None
+    falador_aviso = voz.Falador.da_config(config) if usar_voz else None
 
     def confirmar(titulo: str, detalhe: str) -> bool:
         print(f"\n[{titulo}]\n{detalhe}")

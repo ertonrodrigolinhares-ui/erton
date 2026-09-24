@@ -2,3 +2,7 @@
 pyttsx3
 SpeechRecognition
 pyaudio
+# Vozes neurais gratuitas da Microsoft e efeitos
+edge-tts
+miniaudio
+numpy

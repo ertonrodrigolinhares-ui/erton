@@ -16,7 +16,8 @@ if not exist ".venv\Scripts\python.exe" (
 )
 
 rem ---- Instala os componentes se ainda nao instalou ou se mudaram ----
-fc /b requirements.txt .venv\instalado.txt >nul 2>nul
+copy /b /y requirements.txt+requirements-voz.txt .venv\pedido.txt >nul
+fc /b .venv\pedido.txt .venv\instalado.txt >nul 2>nul
 if errorlevel 1 goto instalar_pacotes
 goto iniciar
 
@@ -26,7 +27,7 @@ echo Instalando os componentes do Jarvis...
 ".venv\Scripts\python.exe" -m pip install -r requirements.txt -q || goto erro
 echo Instalando os componentes de voz...
 ".venv\Scripts\python.exe" -m pip install -r requirements-voz.txt -q || echo Aviso: a voz nao foi instalada. O Jarvis vai funcionar so com texto.
-copy /y requirements.txt .venv\instalado.txt >nul
+copy /y .venv\pedido.txt .venv\instalado.txt >nul
 
 :iniciar
 start "" ".venv\Scripts\pythonw.exe" -m jarvis

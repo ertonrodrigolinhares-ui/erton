@@ -43,6 +43,12 @@ Fale ou escreva normalmente. Exemplos:
 
 - **🎤 Falar**: clique e fale um pedido.
 - **Mãos livres**: marque a opção e o Jarvis fica ouvindo. É só dizer **"Jarvis, ..."** e o pedido, e ele responde em voz alta.
+- **Voz e Efeito** (embaixo da conversa): escolha a voz e o efeito e clique em **▶ Testar**.
+  - Vozes grátis da Microsoft: Antonio, Francisca e Thalita (Brasil), Duarte e Raquel (Portugal),
+    e vozes com sotaque (Andrew, Brian, Ava, Emma, Rémy, Florian, Giuseppe).
+  - Efeitos: **Ultron (metálico)**, **Mais grave**, **Robô** ou sem efeito.
+  - **ElevenLabs**: vozes mais humanas, com a sua chave de elevenlabs.io (a janela pede).
+  - **Windows**: funciona sem internet; também é usada automaticamente se as outras falharem.
 - **Segurança**: antes de alterar um arquivo que já existe ou de executar um código, ele pede sua confirmação. Mensagens e e-mails **nunca** são enviados sozinhos.
 - Se o Gemini estiver sobrecarregado, o Jarvis tenta de novo e troca sozinho para outro modelo gratuito.
 - A chave e os arquivos ficam em **Documentos\Jarvis**. Ao baixar uma versão nova do Jarvis, a chave continua lá.
@@ -58,7 +64,7 @@ Fale ou escreva normalmente. Exemplos:
 | `jarvis/comandos.py` | Comandos rápidos (hora, data, sites, pesquisas, contas, piadas) |
 | `jarvis/cerebro_gemini.py` | IA com Google Gemini (padrão, gratuito) |
 | `jarvis/cerebro_claude.py` | IA com Claude (opcional, pago) — use `JARVIS_IA=claude` no `.env` |
-| `jarvis/voz.py` | Fala (pyttsx3) e reconhecimento de voz (SpeechRecognition) |
+| `jarvis/voz.py` | Vozes (Microsoft edge-tts, ElevenLabs, Windows), efeitos e reconhecimento de voz |
 | `jarvis/config.py` | Configurações e chave, guardadas em `Documentos\Jarvis\config.env` |
 
 ```bash
