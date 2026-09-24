@@ -2134,6 +2134,10 @@ class HudCanvas(QWidget):
         self.state    = "INITIALISING"
 
         self._tick       = 0
+        # Jarvis Ultron: volume da voz (0 a 1) enviado pelo áudio enquanto o Jarvis fala
+        self.nivel_voz       = 0.0
+        self.nivel_voz_em    = 0.0
+        self._nivel_suave    = 0.0
         self._scale      = 1.0
         self._tgt_scale  = 1.0
         self._brightness = 0.6
@@ -2293,7 +2297,15 @@ class HudCanvas(QWidget):
         now = time.time()
         is_active = self.speaking or self.state in ("THINKING", "PROCESSING")
 
-        if now - self._last_t > (0.10 if is_active else 0.45):
+        # Jarvis Ultron: com voz chegando, a esfera segue o volume (sobe rápido, desce suave)
+        voz_ativa = now - self.nivel_voz_em < 0.35
+        alvo = self.nivel_voz if voz_ativa else 0.0
+        self._nivel_suave += (alvo - self._nivel_suave) * (0.55 if alvo > self._nivel_suave else 0.18)
+        if voz_ativa and not self.muted:
+            self._tgt_scale = 1.0 + 0.20 * self._nivel_suave
+            self._tgt_bright = 0.55 + 0.45 * self._nivel_suave
+            self._last_t = now
+        elif now - self._last_t > (0.10 if is_active else 0.45):
             if self.speaking:
                 _speak_breath = 0.5 + 0.5 * math.sin(self._tick * 0.08)
                 self._tgt_scale = random.uniform(1.03, 1.08) + _speak_breath * 0.04
@@ -2310,7 +2322,7 @@ class HudCanvas(QWidget):
                 self._tgt_bright = 0.25 + breath * 0.55
             self._last_t = now
 
-        sp = 0.30 if is_active else 0.10
+        sp = 0.45 if voz_ativa else (0.30 if is_active else 0.10)
         self._scale     += (self._tgt_scale  - self._scale)     * sp
         self._brightness += (self._tgt_bright - self._brightness) * sp
 
@@ -9110,6 +9122,14 @@ class JarvisUI:
 
     def set_state(self, state: str):
         self._win._state_sig.emit(state)
+
+    def set_voice_level(self, nivel: float):
+        """Jarvis Ultron: volume atual da voz do Jarvis (0 a 1); faz a esfera pulsar com a fala.
+        Pode ser chamado de qualquer thread (só grava dois números lidos pela animação)."""
+        hud = getattr(self._win, "hud", None)
+        if hud is not None:
+            hud.nivel_voz = max(0.0, min(1.0, float(nivel)))
+            hud.nivel_voz_em = time.time()
 
     def set_muted_threadsafe(self, valor: bool):
         """Liga/desliga o mudo a partir de qualquer thread (usado pela suspensão por tempo)."""

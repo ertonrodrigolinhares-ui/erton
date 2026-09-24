@@ -1595,6 +1595,13 @@ class JarvisLive:
         if modo and portao is not None and portao.modo != modo:
             self._definir_modo_escuta(modo)
 
+    def _mostrar_volume(self, pcm: bytes) -> None:
+        """Jarvis Ultron: manda o volume da voz para a esfera pulsar enquanto ele fala."""
+        definir = getattr(self.ui, "set_voice_level", None)
+        if callable(definir):
+            from core.efeito_ultron import nivel_da_voz
+            definir(nivel_da_voz(pcm))
+
     def _falar_com_voz_externa(self, texto: str) -> None:
         """Jarvis Ultron: com ElevenLabs/OpenAI/Edge escolhida, fala a resposta por ela."""
         motor = getattr(self, "_tts_engine", None)
@@ -1602,6 +1609,7 @@ class JarvisLive:
             return
         motor.on_speaking_start = lambda: self.set_speaking(True)
         motor.on_speaking_stop = lambda: self.set_speaking(False)
+        motor.on_level = self._mostrar_volume
         motor.speak(texto)
 
     # ---------- Jarvis Ultron: modo reserva (Groq) ----------
@@ -1628,12 +1636,14 @@ class JarvisLive:
     def _falar_reserva(self, texto: str) -> None:
         from actions.tts_engine import TTSEngine
 
-        TTSEngine(
+        motor = TTSEngine(
             provider="edge",
             voice_id=os.environ.get("JARVIS_VOZ_RESERVA", "pt-BR-AntonioNeural"),
             on_speaking_start=lambda: self.set_speaking(True),
             on_speaking_stop=lambda: self.set_speaking(False),
-        ).speak_sync(texto)
+        )
+        motor.on_level = self._mostrar_volume
+        motor.speak_sync(texto)
 
     def _escutar_reserva(self) -> None:
         """No modo reserva: ouve (depois do "Hey Jarvis"), transcreve e responde pelo Groq."""
@@ -2165,6 +2175,7 @@ class JarvisLive:
                     elif stream is not None:
                         if efeito_ultron is not None:
                             chunk = efeito_ultron.processar(chunk)
+                        self._mostrar_volume(chunk)
                         await asyncio.to_thread(stream.write, chunk)
         except Exception as e:
             print(f"[JARVIS] ❌ Play: {e}")

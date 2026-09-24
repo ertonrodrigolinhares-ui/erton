@@ -61,3 +61,17 @@ def criar_efeito(taxa: int = 24000) -> EfeitoUltron | None:
     if valor in {"0", "false", "no", "off", "nao", "não", ""}:
         return None
     return EfeitoUltron("robo" if valor == "robo" else "ultron", taxa)
+
+
+def nivel_da_voz(pcm: bytes) -> float:
+    """Volume de um pedaço de áudio int16 em escala de 0 a 1 (usado para animar a esfera)."""
+    if not pcm:
+        return 0.0
+    x = np.frombuffer(pcm[: len(pcm) - len(pcm) % 2], dtype=np.int16).astype(np.float32)
+    if x.size == 0:
+        return 0.0
+    rms = float(np.sqrt(np.mean(x * x)))
+    if rms < 1.0:
+        return 0.0
+    decibeis = 20.0 * np.log10(rms)  # fala baixa ~50 dB, fala forte ~80 dB
+    return float(min(1.0, max(0.0, (decibeis - 50.0) / 28.0)))

@@ -51,7 +51,7 @@ def _mp3_bytes_to_pcm(mp3_bytes: bytes) -> np.ndarray:
 
 
 def _play_pcm(pcm: np.ndarray, on_start: Callable | None = None,
-              on_stop: Callable | None = None) -> None:
+              on_stop: Callable | None = None, on_level: Callable | None = None) -> None:
     """Play int16 PCM array through sounddevice using RawOutputStream (blocking)."""
     if pcm.size == 0:
         if on_stop:
@@ -69,6 +69,8 @@ def _play_pcm(pcm: np.ndarray, on_start: Callable | None = None,
         stream.start()
         chunk_size = 4096
         for i in range(0, len(raw), chunk_size):
+            if on_level:  # Jarvis Ultron: volume para a esfera pulsar
+                on_level(raw[i:i + chunk_size])
             stream.write(raw[i:i + chunk_size])
         stream.stop()
         stream.close()
@@ -129,7 +131,8 @@ class TTSEngine:
                     efeito = criar_efeito(RECEIVE_SAMPLE_RATE)
                     if efeito is not None and pcm.size:
                         pcm = np.frombuffer(efeito.processar(pcm.tobytes()), dtype=np.int16)
-                    _play_pcm(pcm, self.on_speaking_start, self.on_speaking_stop)
+                    _play_pcm(pcm, self.on_speaking_start, self.on_speaking_stop,
+                              getattr(self, "on_level", None))
                     print(f"[TTS] Playback complete")
                 else:
                     print(f"[TTS] No audio returned from {self.provider}")
