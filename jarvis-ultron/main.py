@@ -345,6 +345,13 @@ def wait_for_startup_claps(
     print("[JARVIS] ⚡ Two claps detected. Powering up...")
     return True
 
+def _latencia_audio() -> str:
+    """Jarvis Ultron: 'low' (padrão) deixa a voz sair e entrar mais rápido. Se o som ficar
+    picotado neste computador, coloque JARVIS_LATENCIA_AUDIO=high no .env."""
+    valor = os.environ.get("JARVIS_LATENCIA_AUDIO", "low").strip().lower()
+    return valor if valor in {"low", "high"} else "low"
+
+
 def _get_api_key() -> str:
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
@@ -2171,6 +2178,7 @@ class JarvisLive:
                 dtype="int16",
                 blocksize=CHUNK_SIZE,
                 callback=callback,
+                latency=_latencia_audio(),
             ):
                 print("[JARVIS] 🎤 Mic stream open")
                 while not self._shutdown_requested.is_set():
@@ -2303,6 +2311,7 @@ class JarvisLive:
                 channels=CHANNELS,
                 dtype="int16",
                 blocksize=CHUNK_SIZE,
+                latency=_latencia_audio(),
             )
             stream.start()
 

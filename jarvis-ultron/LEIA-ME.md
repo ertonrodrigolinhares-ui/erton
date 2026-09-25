@@ -123,7 +123,8 @@ Abra com o Bloco de Notas para mudar:
 | Linha | O que faz |
 |---|---|
 | `GEMINI_VOICE_NAME="charon"` | Voz: charon, fenrir, orus, puck, kore, aoede, leda, schedar, zubenelgenubi |
-| `JARVIS_EFEITO_ULTRON=1` | Efeito metálico. `0` desliga, `robo` deixa com voz de robô |
+| `JARVIS_EFEITO_ULTRON=leve` | Voz metálica sem eco (padrão). `ultron` = com eco (mais "atrasada"), `robo` = robô, `0` = desliga |
+| `JARVIS_LATENCIA_AUDIO=low` | Som com menos atraso (padrão). Se picotar, use `high` |
 | `JARVIS_TEMA_STARK=1` | Tela Stark ligada. `0` = volta para a tela original |
 | `JARVIS_CIDADE=Campina Grande` | Cidade do painel de clima |
 | `JARVIS_VERSAO_MINIMA=3.0` | Modelos mais antigos que isso (ex.: Gemini 2.5, que o Google está aposentando) só são usados como última reserva |
