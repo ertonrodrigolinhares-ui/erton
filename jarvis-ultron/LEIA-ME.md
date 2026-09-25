@@ -147,6 +147,10 @@ redes) e ao **MCP oficial do Meta** (anúncios do Facebook e Instagram).
    - cria a **rotina diária das 8h** e faz o Hermes ligar sozinho com o Windows.
 2. Abra o Jarvis Ultron normalmente.
 
+**Se o Jarvis disser "O Hermes está desligado":** dê dois cliques em **`Ligar Hermes`**. Ele liga o
+serviço e testa a ligação; se o serviço automático não subir, ele liga o Hermes na própria janela
+(deixe aberta, pode minimizar).
+
 Pode rodar o **`Instalar Hermes`** de novo sempre que receber uma atualização: ele não reinstala
 o que já existe e só pergunta do Metricool se você quiser reconectar.
 
