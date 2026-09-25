@@ -24,6 +24,9 @@ Cópia do projeto **JARVIS-OS V.2** (licença MIT, veja `LICENSE`), com ajustes 
     reconhecidas no seu computador, sem internet.
   - Não tem tempo limite: ele fica ouvindo até você bater as 2 palmas de novo.
   - Dica: palmas firmes, com meio segundo entre elas, e depois fique um instante em silêncio.
+  - **Aviso:** um **som** curto (sobe = chamada aberta, desce = encerrada, três notas = mãos livres)
+    e um **selo** embaixo do título: verde "CHAMADA ATIVA", amarelo "AGUARDANDO 2 PALMAS" ou azul
+    "MÃOS LIVRES". `JARVIS_SOM_AVISO=0` desliga o som.
   - Prefere o "Hey Jarvis"? Coloque `JARVIS_ATIVACAO=voz` no `.env`.
 - **Trocar o modo falando** (com a chamada ligada):
   - **"Jarvis, modo mãos livres"**: ele passa a responder a **tudo**, sem precisar das palmas.

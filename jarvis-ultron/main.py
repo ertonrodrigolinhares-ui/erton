@@ -1265,6 +1265,10 @@ class JarvisLive:
             self._portao = PortaoDeVoz(None, ativo=False)
         else:
             self._portao = PortaoDeVoz.da_configuracao(avisar=self.ui.write_log)
+            self._portao.ao_mudar = self._aviso_de_escuta
+            mostrar = getattr(self.ui, "set_listening_status", None)
+            if callable(mostrar):
+                mostrar(self._portao.estado)  # selo na tela desde a abertura, sem som
         self._reserva = None if self.cloud_safe else ReservaGroq.da_configuracao()
         self._modo_reserva = False
         self._falhas_seguidas = 0
@@ -1574,6 +1578,7 @@ class JarvisLive:
         if modo not in ("maos_livres", "chamada") or portao is None:
             return "Invalid mode. Use 'maos_livres' or 'chamada'."
         if portao.modo == modo:
+            self._aviso_de_escuta(portao.estado)  # confirma com o som e o selo
             return f"Already in {modo} mode. Confirm it to the user in one short sentence in Portuguese."
         if not portao.definir_modo(modo):
             return ("Call mode is unavailable because the activation detector did not load. "
@@ -1588,6 +1593,16 @@ class JarvisLive:
                     "clap twice to start talking to you and clap twice again to end.")
         return ("Call mode on. Tell the user, in one short sentence in Portuguese, that from now on you only "
                 "answer after they say 'Hey Jarvis'.")
+
+    def _aviso_de_escuta(self, estado: str) -> None:
+        """Jarvis Ultron: som curto + selo na tela quando a chamada abre/fecha ou o modo muda."""
+        from core.palavra_ativacao import tocar_aviso
+
+        print(f"[Ativação] {estado}")
+        tocar_aviso(estado)
+        mostrar = getattr(self.ui, "set_listening_status", None)
+        if callable(mostrar):
+            mostrar(estado)
 
     def _checar_pedido_de_modo(self, fala: str) -> None:
         """Troca o modo pela frase falada, mesmo que a IA não chame a ferramenta."""

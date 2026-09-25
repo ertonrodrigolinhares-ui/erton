@@ -723,6 +723,25 @@ class PalmasTests(unittest.TestCase):
             self._tocar(portao, np.concatenate([audio, audio, audio]))
             self.assertFalse(portao.acordado, nome)
 
+    def test_avisa_cada_mudanca_de_estado(self):
+        portao, _ = self._portao()
+        estados = []
+        portao.ao_mudar = estados.append
+        duas = np.concatenate([_palma(), _silencio(0.45), _palma(), _silencio(0.6)])
+        self._tocar(portao, _silencio(1.0))
+        self._tocar(portao, duas)
+        self._tocar(portao, duas)
+        portao.definir_modo("maos_livres")
+        portao.definir_modo("chamada")
+        self.assertEqual(estados, ["ouvindo", "aguardando", "maos_livres", "aguardando"])
+
+    def test_aviso_com_erro_nao_derruba_o_microfone(self):
+        portao, _ = self._portao()
+        portao.ao_mudar = lambda estado: 1 / 0
+        duas = np.concatenate([_palma(), _silencio(0.45), _palma(), _silencio(0.6)])
+        self._tocar(portao, np.concatenate([_silencio(1.0), duas]))
+        self.assertTrue(portao.acordado)
+
     def test_digitacao_varios_estalos_seguidos_nao_conta(self):
         portao, _ = self._portao()
         estalos = [np.concatenate([_palma(0.5, semente=i), _silencio(0.22)]) for i in range(12)]

@@ -6636,6 +6636,7 @@ class MainWindow(QMainWindow):
     _log_sig       = pyqtSignal(str)
     _state_sig     = pyqtSignal(str)
     _mute_sig      = pyqtSignal(bool)  # Jarvis Ultron: mudo seguro vindo de outras threads
+    _escuta_sig    = pyqtSignal(str)   # Jarvis Ultron: ouvindo / aguardando / mãos livres
     _voice_sig     = pyqtSignal(str)
     _sub_sig       = pyqtSignal(str)
     _sub_clear_sig = pyqtSignal()
@@ -6844,6 +6845,7 @@ class MainWindow(QMainWindow):
         self._log_sig.connect(self._log.append_log)
         self._state_sig.connect(self._apply_state)
         self._mute_sig.connect(self._set_muted)
+        self._escuta_sig.connect(self._mostrar_escuta)
         self._voice_sig.connect(self._sync_voice_combo)
         self._sub_sig.connect(self._subtitle.set_text)
         self._sub_clear_sig.connect(self._subtitle.clear_subtitle)
@@ -8405,6 +8407,12 @@ class MainWindow(QMainWindow):
             )
             threading.Thread(target=self.on_text_command, args=(msg,), daemon=True).start()
 
+    def _mostrar_escuta(self, estado: str):
+        tela = getattr(self, "_tela_stark", None)
+        selo = getattr(tela, "selo", None)
+        if selo is not None:
+            selo.mostrar(estado)
+
     def _set_muted(self, valor: bool):
         if bool(valor) != self._muted:
             self._toggle_mute()
@@ -9182,6 +9190,10 @@ class JarvisUI:
     def set_muted_threadsafe(self, valor: bool):
         """Liga/desliga o mudo a partir de qualquer thread (usado pela suspensão por tempo)."""
         self._win._mute_sig.emit(bool(valor))
+
+    def set_listening_status(self, estado: str):
+        """Jarvis Ultron: 'ouvindo', 'aguardando' (as palmas) ou 'maos_livres'. Qualquer thread."""
+        self._win._escuta_sig.emit(str(estado))
 
     def write_log(self, text: str):
         self._win._log_sig.emit(text)

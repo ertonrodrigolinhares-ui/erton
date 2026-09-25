@@ -137,12 +137,16 @@ class DetectorDePalmas:
                 continue
             if self._confirmar is not None:  # um 3º estalo logo depois: era barulho, não palmas
                 self._confirmar = self._primeira = None
+                print("[Palmas] 3 estalos seguidos: ignorado (bata só 2).")
             elif self._eh_segunda(agora):
                 self._confirmar = agora
                 self._primeira = None
+                print("[Palmas] 2ª palma")
             else:
                 antes = [t for t in self._estalos if agora - t < self.SOSSEGO_ANTES]
                 self._primeira = None if antes else agora
+                if self._primeira is not None:
+                    print("[Palmas] 1ª palma")
             self._estalos = [t for t in self._estalos if agora - t < 3.0] + [agora]
 
         sobra = self._proximo - self.ANTES - self._inicio
@@ -162,6 +166,42 @@ class DetectorDePalmas:
         self._estalos = []
 
 
+# Sons curtos de aviso (tocados no computador, sem internet): (frequência Hz, duração ms)
+SONS_AVISO = {
+    "ouvindo": ((660, 90), (990, 140)),            # sobe: chamada aberta
+    "aguardando": ((990, 90), (660, 140)),         # desce: chamada encerrada
+    "maos_livres": ((660, 70), (830, 70), (990, 120)),
+}
+
+
+def tocar_aviso(estado: str) -> None:
+    """Toca o som do estado sem travar o Jarvis (JARVIS_SOM_AVISO=0 desliga)."""
+    notas = SONS_AVISO.get(estado)
+    if not notas or not _ligado("JARVIS_SOM_AVISO"):
+        return
+
+    def tocar():
+        try:
+            import winsound  # Windows
+            for freq, ms in notas:
+                winsound.Beep(freq, ms)
+            return
+        except ImportError:
+            pass
+        except Exception as erro:  # pragma: no cover - depende do som do computador
+            print(f"[Aviso] Som indisponível: {erro}")
+            return
+        try:
+            import sounddevice as sd
+            taxa = 22050
+            partes = [0.25 * np.sin(2 * np.pi * f * np.arange(int(taxa * ms / 1000)) / taxa) for f, ms in notas]
+            sd.play(np.concatenate(partes).astype(np.float32), taxa)
+        except Exception as erro:  # pragma: no cover
+            print(f"[Aviso] Som indisponível: {erro}")
+
+    threading.Thread(target=tocar, daemon=True, name="SomAviso").start()
+
+
 def gatilho_configurado() -> str:
     valor = os.environ.get("JARVIS_ATIVACAO", "palmas").strip().lower()
     return "voz" if valor in {"voz", "hey jarvis", "palavra"} else "palmas"
@@ -173,6 +213,9 @@ class PortaoDeVoz:
                  relogio: Callable[[], float] = time.monotonic, palmas: DetectorDePalmas | None = None):
         self.detector = detector
         self.palmas = palmas
+        # Chamado com "ouvindo", "aguardando" ou "maos_livres" quando o estado muda
+        # (o Jarvis usa para tocar o som e mostrar o selo na tela).
+        self.ao_mudar: Callable[[str], None] = lambda estado: None
         ativo = ativo and (detector is not None or palmas is not None)
         self.ativo = bool(ativo)
         self.limiar = limiar
@@ -185,6 +228,18 @@ class PortaoDeVoz:
         self._anteriores: deque = deque()
         self._amostras_anteriores = 0
         self._trava = threading.Lock()
+
+    @property
+    def estado(self) -> str:
+        if not self.ativo:
+            return "maos_livres"
+        return "ouvindo" if self.acordado else "aguardando"
+
+    def _avisar_mudanca(self) -> None:
+        try:
+            self.ao_mudar(self.estado)
+        except Exception as erro:  # o aviso nunca pode derrubar o microfone
+            print(f"[Ativação] Aviso falhou: {erro}")
 
     @property
     def como_chamar(self) -> str:
@@ -222,6 +277,7 @@ class PortaoDeVoz:
         with self._trava:
             if modo == "maos_livres":
                 self.ativo = False
+                self._avisar_mudanca()
                 return True
             if self.detector is None and self.palmas is None:
                 return False
@@ -233,6 +289,7 @@ class PortaoDeVoz:
             self._anteriores.clear()
             self._amostras_anteriores = 0
             self._reiniciar_detector()
+            self._avisar_mudanca()
             return True
 
     def estender(self) -> None:
@@ -255,6 +312,7 @@ class PortaoDeVoz:
                 self.acordado = False
                 self._reiniciar_detector()
                 self.avisar("SYS: Aguardando \"Hey Jarvis\".")
+                self._avisar_mudanca()
 
             self._guardar(audio)
             self._pendente = np.concatenate([self._pendente, audio])
@@ -274,6 +332,7 @@ class PortaoDeVoz:
             self._amostras_anteriores = 0
             self._pendente = np.zeros(0, dtype=np.int16)
             self.avisar("SYS: Estou ouvindo.")
+            self._avisar_mudanca()
             return dados
 
     def _processar_palmas(self, audio) -> bytes | None:
@@ -286,6 +345,7 @@ class PortaoDeVoz:
                 self.avisar("SYS: Estou ouvindo. Bata 2 palmas para encerrar.")
             else:
                 self.avisar("SYS: Chamada encerrada. Bata 2 palmas para falar comigo.")
+            self._avisar_mudanca()
             return None  # o som das palmas não vai para a IA
 
     def _guardar(self, audio) -> None:

@@ -34,6 +34,7 @@ LINHA = "#0d3a55"
 FUNDO = "#000306"
 TEXTO = "#a8e8ff"
 AMBAR = "#ffb300"
+VERDE = "#39ff9a"
 
 MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto",
          "Setembro", "Outubro", "Novembro", "Dezembro"]
@@ -374,6 +375,49 @@ class Titulo(QWidget):
         p.drawText(area, Qt.AlignmentFlag.AlignCenter, self.texto)
 
 
+class SeloEscuta(QWidget):
+    """Selo embaixo do título: mostra se o Jarvis está ouvindo, esperando as palmas ou em mãos livres."""
+
+    ESTADOS = {
+        "ouvindo": ("●  CHAMADA ATIVA  ·  2 PALMAS PARA ENCERRAR", VERDE),
+        "aguardando": ("○  AGUARDANDO 2 PALMAS", AMBAR),
+        "maos_livres": ("●  MÃOS LIVRES  ·  OUVINDO TUDO", AZUL_FORTE),
+    }
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedHeight(30)
+        self.estado = ""
+        self._brilho = 0
+
+    def mostrar(self, estado: str) -> None:
+        if estado in self.ESTADOS:
+            self.estado = estado
+            self._brilho = 10  # pisca forte por um instante quando muda
+            self.update()
+            QTimer.singleShot(600, self._apagar_brilho)
+
+    def _apagar_brilho(self):
+        self._brilho = 0
+        self.update()
+
+    def paintEvent(self, _):
+        if self.estado not in self.ESTADOS:
+            return
+        texto, cor = self.ESTADOS[self.estado]
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        fonte = Fontes.de(10, True, tech=True)
+        p.setFont(fonte)
+        largura = p.fontMetrics().horizontalAdvance(texto) + 36
+        caixa = QRectF((self.width() - largura) / 2, 3, largura, self.height() - 6)
+        p.setPen(_caneta(cor, 1.4, 230))
+        p.setBrush(_cor(cor, 40 + self._brilho * 8))
+        p.drawRoundedRect(caixa, caixa.height() / 2, caixa.height() / 2)
+        p.setPen(_cor(cor))
+        p.drawText(caixa, Qt.AlignmentFlag.AlignCenter, texto)
+
+
 class BotaoRedondo(QPushButton):
     def __init__(self, simbolo: str, dica: str, parent=None):
         super().__init__(parent)
@@ -458,6 +502,8 @@ class TelaStark(QWidget):
         centro_coluna = QVBoxLayout()
         centro_coluna.setSpacing(0)
         centro_coluna.addWidget(Titulo("JARVIS  ULTRON", 24))
+        self.selo = SeloEscuta()
+        centro_coluna.addWidget(self.selo)
         centro_coluna.addWidget(centro, stretch=1)
         meio.addLayout(centro_coluna, stretch=1)
         meio.addWidget(self.direita)
