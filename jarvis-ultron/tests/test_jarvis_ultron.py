@@ -1144,7 +1144,7 @@ class AutomacoesTests(unittest.TestCase):
         from core.automacoes import carregar_ferramentas
         pasta = self._pasta()
         exemplo = Path(__file__).resolve().parent.parent / "automacoes" / "dias_ate_a_data.py.exemplo"
-        self.assertEqual(carregar_ferramentas(exemplo.parent).ferramentas, {})  # .exemplo não carrega
+        self.assertNotIn("days_until_date", carregar_ferramentas(exemplo.parent).ferramentas)  # .exemplo não carrega
         shutil.copy(exemplo, pasta / "dias_ate_a_data.py")
         carga = carregar_ferramentas(pasta)
         self.assertIn("Faltam", carga.ferramentas["days_until_date"].executar({"date": "2999-01-01"}, None))
@@ -1182,3 +1182,72 @@ class AutomacoesTests(unittest.TestCase):
 
             resposta = asyncio.run(jarvis._execute_tool(Chamada()))
         self.assertEqual(resposta.response["result"], "oi!")
+
+
+class AutoconsertoTests(unittest.TestCase):
+    def _plugin(self):
+        from core.automacoes import carregar_ferramentas
+        from pathlib import Path
+        carga = carregar_ferramentas(Path(__file__).resolve().parent.parent / "automacoes")
+        self.assertEqual(carga.erros, [])
+        return carga.ferramentas["self_repair"]
+
+    def test_conserta_o_que_e_seguro_e_diz_o_que_falta(self):
+        import sys
+        from core import autodiagnostico as ad
+        plugin = self._plugin()
+        acoes = []
+
+        class Jarvis:
+            _portao = None
+            _reserva = object()
+            _modo_reserva = False
+
+            def _ativar_modo_reserva(self):
+                acoes.append("reserva")
+                self._modo_reserva = True
+
+            def _definir_modo_escuta(self, modo):
+                acoes.append(modo)
+
+            class ui:
+                @staticmethod
+                def set_graphics_quality(q):
+                    acoes.append("grafico-" + q)
+
+        itens = [ad.Item("Internet", "defeito", "sem conexão", "Confira o Wi-Fi."),
+                 ad.Item("Chave do Gemini", "defeito", "chave recusada", "Crie outra."),
+                 ad.Item("Computador", "atencao", "memória 88%, disco 40%", "Feche abas."),
+                 ad.Item("Escuta", "defeito", "o detector do 'Hey Jarvis' não carregou", "x"),
+                 ad.Item("Microfone", "ok", "USB")]
+        with patch.object(ad, "diagnosticar", side_effect=[itens, [itens[0]]]):
+            resposta = plugin.executar({}, Jarvis())
+        self.assertEqual(acoes, ["reserva", "grafico-low", "maos_livres"])
+        self.assertIn("Consertei: liguei a reserva Groq", resposta)
+        self.assertIn("Ainda precisa de você: Internet: sem conexão. Confira o Wi-Fi.", resposta)
+
+    def test_hermes_desligado_liga_o_servico(self):
+        import sys
+        from core import autodiagnostico as ad
+        plugin = self._plugin()
+        g = plugin.executar.__globals__  # o módulo da automação (carregado do arquivo)
+        chamadas = []
+
+        class Resultado:
+            returncode = 0
+
+        with patch("core.automacoes._hermes", return_value="hermes"), \
+                patch.object(g["subprocess"], "run", side_effect=lambda cmd, **k: chamadas.append(cmd) or Resultado()), \
+                patch.object(g["time"], "sleep"), \
+                patch.object(ad, "verificar_hermes", return_value=ad.Item("Hermes (agentes)", "ok", "ligado")):
+            feitos = g["consertar"]([ad.Item("Hermes (agentes)", "defeito", "o Hermes está desligado")], object())
+        self.assertEqual(chamadas, [["hermes", "gateway", "restart"]])
+        self.assertEqual(feitos, ["liguei o Hermes"])
+
+    def test_tudo_ok_nao_mexe_em_nada(self):
+        from core import autodiagnostico as ad
+        plugin = self._plugin()
+        with patch.object(ad, "diagnosticar", return_value=[ad.Item("Internet", "ok", "conectado")]):
+            resposta = plugin.executar({}, object())
+        self.assertIn("Não havia nada que eu pudesse consertar", resposta)
+        self.assertIn("tudo funcionando", resposta)

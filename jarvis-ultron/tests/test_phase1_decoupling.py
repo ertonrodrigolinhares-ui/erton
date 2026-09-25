@@ -75,7 +75,11 @@ class PhaseOneDecouplingTests(unittest.TestCase):
         jarvis = main.JarvisLive(client)
 
         self.assertFalse(jarvis.cloud_safe)
-        self.assertEqual(jarvis.tool_declarations, main.TOOL_DECLARATIONS)
+        base = len(main.TOOL_DECLARATIONS)
+        self.assertEqual(jarvis.tool_declarations[:base], main.TOOL_DECLARATIONS)
+        # Jarvis Ultron: depois das ferramentas fixas vêm as da pasta 'automacoes'
+        extras = {item["name"] for item in jarvis.tool_declarations[base:]}
+        self.assertEqual(extras, set(main.carregar_automacoes().ferramentas))
 
     def test_cloud_safe_mode_loads_only_the_hosted_allowlist(self):
         client = StubClient()
