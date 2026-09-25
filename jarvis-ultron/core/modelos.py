@@ -10,6 +10,8 @@ Esta central:
   (cada modelo tem a sua própria cota grátis);
 - vale para a biblioteca nova (google-genai) e para a antiga (google-generativeai).
 
+Para preferir uma versão (ex.: Gemini 3.5), coloque no .env: JARVIS_GEMINI_VERSAO=3.5
+
 Para forçar um modelo, coloque no .env:
   JARVIS_MODELO_TEXTO, JARVIS_MODELO_LEVE, JARVIS_MODELO_PRO, JARVIS_MODELO_IMAGEM, GEMINI_LIVE_MODEL
 """
@@ -92,9 +94,23 @@ def _grupo(nome: str) -> int:
     return 0
 
 
+def versao_preferida() -> float | None:
+    """JARVIS_GEMINI_VERSAO=3.5 no .env: usa primeiro os modelos dessa versão (mesmo em preview).
+    Se a chave não tiver essa versão, segue a escolha normal."""
+    try:
+        return float(os.environ.get("JARVIS_GEMINI_VERSAO", "").strip().replace(",", "."))
+    except ValueError:
+        return None
+
+
+def _fora_da_preferida(nome: str) -> int:
+    pref = versao_preferida()
+    return 0 if pref is None or abs(_versao(nome) - pref) < 1e-6 else 1
+
+
 def _ordenar(nomes: list[str]) -> list[str]:
-    """Estáveis mais novos primeiro; preview e antigos só como reserva."""
-    return sorted(nomes, key=lambda n: (_grupo(n), -_versao(n), len(n), n))
+    """Versão escolhida no .env primeiro; depois estáveis mais novos; preview e antigos na reserva."""
+    return sorted(nomes, key=lambda n: (_fora_da_preferida(n), _grupo(n), -_versao(n), len(n), n))
 
 
 def categoria(pedido: str) -> str:
@@ -114,7 +130,7 @@ def _da_categoria(cat: str, modelos: list[tuple[str, set[str]]]) -> list[str]:
     gerar = [n for n, acoes in modelos if "generatecontent" in acoes and n.startswith("gemini")]
     if cat == "ao_vivo":
         vivos = [n for n, acoes in modelos if "bidigeneratecontent" in acoes]
-        return sorted(vivos, key=lambda n: ("native-audio" not in n, -_versao(n), n))
+        return sorted(vivos, key=lambda n: ("native-audio" not in n, _fora_da_preferida(n), -_versao(n), n))
     if cat == "imagem":
         return _ordenar([n for n in gerar if "image" in n and "imagen" not in n])
     if cat == "leve":
@@ -161,6 +177,13 @@ def resolver(pedido: str) -> str:
     return candidatos(pedido)[0]
 
 
+def resumo() -> str:
+    """Quais modelos o Jarvis vai usar agora (aparece na janela preta ao abrir)."""
+    partes = [("Voz", "gemini-live-native-audio"), ("Texto", "gemini-flash"), ("Pro", "gemini-pro"),
+              ("Imagem", "gemini-flash-image")]
+    return " | ".join(f"{rotulo}: {resolver(pedido)}" for rotulo, pedido in partes)
+
+
 def _deve_tentar_outro(erro: Exception) -> bool:
     codigo = getattr(erro, "code", None) or getattr(erro, "status_code", None)
     texto = f"{type(erro).__name__} {erro}".lower()
@@ -194,6 +217,13 @@ def instalar() -> None:
     if _instalado:
         return
     _instalado = True
+    if _chave():
+        def mostrar():
+            try:
+                print(f"[Modelos] {resumo()}")
+            except Exception as erro:
+                print(f"[Modelos] Não consegui montar o resumo: {erro}")
+        threading.Thread(target=mostrar, daemon=True, name="ResumoModelos").start()
 
     from google.genai import chats, live, models
 

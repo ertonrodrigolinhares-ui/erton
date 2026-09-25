@@ -37,6 +37,21 @@ class CentralDeModelosTests(unittest.TestCase):
         self.assertEqual(modelos.resolver("models/gemini-2.5-flash-native-audio-preview-12-2025"),
                          "gemini-3.1-flash-native-audio")
 
+    def test_versao_preferida_3_5_vem_primeiro(self):
+        modelos._cache += _lista("gemini-3.5-flash-native-audio-preview", "gemini-3.5-pro-preview",
+                                 acao="generatecontent")
+        modelos._cache += _lista("gemini-3.5-flash-native-audio-preview", acao="bidigeneratecontent")
+        with patch.dict("os.environ", {"JARVIS_GEMINI_VERSAO": "3.5"}):
+            self.assertEqual(modelos.resolver("gemini-2.5-flash"), "gemini-3.5-flash-preview")
+            self.assertEqual(modelos.resolver("gemini-2.5-pro"), "gemini-3.5-pro-preview")
+            self.assertEqual(modelos.resolver("gemini-live-native-audio"), "gemini-3.5-flash-native-audio-preview")
+            # sem 3.5 de imagem na chave: segue a escolha normal
+            self.assertEqual(modelos.resolver("gemini-flash-image"), "gemini-3.1-flash-image")
+            self.assertIn("gemini-3.5-flash-preview", modelos.resumo())
+        with patch.dict("os.environ", {"JARVIS_GEMINI_VERSAO": "3,5"}):
+            self.assertEqual(modelos.versao_preferida(), 3.5)
+        self.assertEqual(modelos.resolver("gemini-2.5-flash"), "gemini-3.1-flash")  # sem preferência
+
     def test_escolha_manual_no_env(self):
         with patch.dict("os.environ", {"JARVIS_MODELO_TEXTO": "gemini-2.5-flash"}):
             self.assertEqual(modelos.resolver("gemini-2.5-flash"), "gemini-2.5-flash")

@@ -117,6 +117,7 @@ Abra com o Bloco de Notas para mudar:
 | `JARVIS_EFEITO_ULTRON=1` | Efeito metálico. `0` desliga, `robo` deixa com voz de robô |
 | `JARVIS_TEMA_STARK=1` | Tela Stark ligada. `0` = volta para a tela original |
 | `JARVIS_CIDADE=Campina Grande` | Cidade do painel de clima |
+| `JARVIS_GEMINI_VERSAO=3.5` | Usa primeiro os modelos Gemini dessa versão (se a sua chave tiver). Apague a linha para voltar à escolha automática |
 | `JARVIS_ATIVACAO=voz` | Palmas desligadas no começo (`ambos` = já começa com palmas ligadas). Depois vale o que você pedir por voz |
 | `JARVIS_PALAVRA_ATIVACAO=1` | Começa no modo chamada (esperando as palmas). `0` = começa em mãos livres |
 | `JARVIS_SENSIBILIDADE=0.5` | Menor (ex.: `0.3`) = aceita o "Hey Jarvis" com mais facilidade; maior = mais rigoroso |
