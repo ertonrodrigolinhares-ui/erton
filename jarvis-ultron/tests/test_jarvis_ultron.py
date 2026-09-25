@@ -876,3 +876,26 @@ class HermesEnderecoTests(unittest.TestCase):
 
         with patch.dict("os.environ", {"HERMES_API_KEY": "k" * 20}), patch.object(requests, "post", side_effect=desligado):
             self.assertIn("desligado", hermes_ponte.perguntar("posts"))
+
+
+class EnvArquivoTests(unittest.TestCase):
+    def test_troca_so_a_linha_da_chave(self):
+        import tempfile
+        from pathlib import Path
+        from core.env_arquivo import atualizar_env
+        arquivo = Path(tempfile.mkdtemp()) / ".env"
+        arquivo.write_text('GEMINI_API_KEY="velha"\nJARVIS_CIDADE=João Pessoa\nGROQ_API_KEY="g"\n', encoding="utf-8")
+        atualizar_env(arquivo, "GEMINI_API_KEY", "AQ.nova-chave_123")
+        texto = arquivo.read_text(encoding="utf-8")
+        self.assertIn('GEMINI_API_KEY="AQ.nova-chave_123"', texto)
+        self.assertNotIn("velha", texto)
+        self.assertIn("JARVIS_CIDADE=João Pessoa", texto)
+        self.assertIn('GROQ_API_KEY="g"', texto)
+        atualizar_env(arquivo, "NOVA", "x")
+        self.assertTrue(arquivo.read_text(encoding="utf-8").rstrip().endswith('NOVA="x"'))
+
+    def test_chave_nova_do_google_passa_na_conferencia_basica(self):
+        from core.api_key_validator import _basic_key_check, normalize_gemini_api_key
+        chave = "AQ.Ab8RN6KEj8a3O9m5KDhiGMLUxxxxxxxxxxxxxxxx"
+        self.assertEqual(normalize_gemini_api_key(f'GEMINI_API_KEY="{chave}"'), chave)
+        self.assertIsNone(_basic_key_check(chave))

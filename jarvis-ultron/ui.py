@@ -8762,6 +8762,16 @@ class MainWindow(QMainWindow):
                 self._log.append_log("SYS: Gemini API key set for this session (not saved).")
         except Exception:
             pass
+        # Jarvis Ultron: o iniciador guarda a chave no .env e ela é lida antes de tudo. Se a chave
+        # nova foi aceita aqui, troca também no .env (senão a antiga, recusada, volta a cada abertura).
+        try:
+            env_jarvis = BASE_DIR / ".env"
+            if env_jarvis.exists() and isinstance(key, str) and key.strip():
+                from core.env_arquivo import atualizar_env
+                atualizar_env(env_jarvis, "GEMINI_API_KEY", key.strip())
+                self._log.append_log("SYS: Chave do Gemini atualizada no arquivo .env.")
+        except Exception as e:
+            self._log.append_log(f"SYS: Não consegui atualizar a chave no .env: {e}")
         self._ready = True
         if self._overlay:
             self._overlay.hide()
