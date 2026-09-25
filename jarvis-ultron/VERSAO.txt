@@ -15,5 +15,8 @@ Novidades desta versão:
   mostra "[Modelos] Voz: ... | Texto: ..."). Pesquisa na internet sem pedir licença.
 - Agentes (Hermes): cérebro grátis do Nous (rode o "Instalar Hermes" de novo).
 - Tarefas longas dos agentes não travam mais a conversa.
+- Botão "Ligar Hermes": liga o Hermes e testa a ligação com o Jarvis (Hermes novo: perfil em /p/jarvis).
+- Chave do Gemini aceita na tela vai sozinha para o .env.
+- Se o Google recusar a chave (defeito das chaves "AQ."), botão "Continuar com a reserva (Groq)".
 
 Como conferir que atualizou: a tela mostra o selo embaixo do título "JARVIS ULTRON".
