@@ -860,3 +860,27 @@ class SilencioComChamadaFechadaTests(unittest.TestCase):
             asyncio.run(jarvis._announce_startup())
             asyncio.run(jarvis._announce_startup())  # reconexão
         self.assertEqual(len(Sessao.enviados), 1)
+
+
+class IdiomaTests(unittest.TestCase):
+    def test_instrucoes_mandam_falar_portugues_e_voz_pt_br(self):
+        import main
+        jarvis = object.__new__(main.JarvisLive)
+        jarvis.voice_name = "charon"
+        with patch("main.load_memory", return_value={}), patch.object(main.JarvisLive, "_get_current_voice", return_value="charon"):
+            config = jarvis._build_config()
+        texto = config.system_instruction if isinstance(config.system_instruction, str) else str(config.system_instruction)
+        self.assertTrue(texto.startswith("[IDIOMA"))
+        self.assertTrue(texto.rstrip().endswith(main.REGRA_IDIOMA.rstrip()))
+        self.assertEqual(config.speech_config.language_code, "pt-BR")
+        jarvis._idioma_recusado = True  # modelo que não aceita escolher o idioma
+        with patch("main.load_memory", return_value={}), patch.object(main.JarvisLive, "_get_current_voice", return_value="charon"):
+            self.assertIsNone(jarvis._build_config().speech_config.language_code)
+
+    def test_desligar_em_portugues(self):
+        import main
+        jarvis = object.__new__(main.JarvisLive)
+        self.assertTrue(jarvis._is_explicit_self_quit_transcript("desliga o Jarvis"))
+        self.assertTrue(jarvis._is_explicit_self_quit_transcript("Jarvis, saia do ar"))
+        self.assertFalse(jarvis._is_explicit_self_quit_transcript("Jarvis, desligar palmas"))
+        self.assertIn("Até a próxima", main.SELF_QUIT_GOODBYE)

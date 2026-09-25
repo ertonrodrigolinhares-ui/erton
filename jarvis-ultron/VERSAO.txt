@@ -7,6 +7,7 @@ Novidades desta versão:
 - Som curto + selo na tela: OUVINDO (verde), AGUARDANDO (amarelo), MÃOS LIVRES (azul).
 - Com a chamada fechada ele fica em silêncio: não cumprimenta de novo nem anuncia o modo.
 - Não precisa mais bater palmas para abrir o programa.
+- Fala sempre em português do Brasil (regra reforçada + voz pt-BR).
 - Gemini 3.5: o Jarvis usa primeiro os modelos 3.5 (a janela preta mostra "[Modelos] Voz: ... | Texto: ...").
 
 Como conferir que atualizou: a tela mostra o selo embaixo do título "JARVIS ULTRON".

@@ -96,6 +96,16 @@ DEFAULT_VOICE_NAME   = "puck"
 RECEIVE_SAMPLE_RATE = 24000
 CHUNK_SIZE          = 1024
 LIVE_VAD_SILENCE_MS = 200
+# Jarvis Ultron: fala sempre em português do Brasil (as instruções e as ferramentas estão em
+# inglês, e o "Hey Jarvis" também puxa o modelo para o inglês).
+REGRA_IDIOMA = (
+    "[IDIOMA — REGRA MAIS IMPORTANTE]\n"
+    "Fale SEMPRE em português do Brasil, com sotaque brasileiro, em todas as respostas. "
+    "Mesmo que o usuário diga \"Hey Jarvis\", use palavras em inglês, ou que as instruções e os "
+    "resultados das ferramentas estejam em inglês, responda em português do Brasil. "
+    "Só use outro idioma se o usuário pedir claramente (ex.: \"responda em inglês\").\n"
+)
+
 # Jarvis Ultron: a troca de modo já é avisada por um som e pelo selo na tela.
 QUIET_MODE_RESULT = ("Done. The user already heard a chime and sees the mode on screen: do not announce "
                      "or explain the listening mode. Say nothing at all.")
@@ -103,8 +113,8 @@ STARTUP_CLAPS_REQUIRED = 2
 STARTUP_CLAP_MAX_GAP_SECONDS = 4.0
 STARTUP_CLAP_COOLDOWN_SECONDS = 0.22
 SELF_QUIT_GOODBYE = (
-    "Certainly, sir. It has been a privilege. JARVIS is going offline now. "
-    "Until next time."
+    "Certamente, senhor. Foi um privilégio. O Jarvis está saindo do ar agora. "
+    "Até a próxima."
 )
 
 _SELF_QUIT_PATTERNS = tuple(re.compile(pattern, re.IGNORECASE) for pattern in (
@@ -113,6 +123,9 @@ _SELF_QUIT_PATTERNS = tuple(re.compile(pattern, re.IGNORECASE) for pattern in (
     r"\b(?:shut\s+down|turn\s+off|power\s+down)\s+(?:jarvis|yourself)\b",
     r"\bjarvis\b.{0,36}\b(?:quit|close|exit|shut\s+down|turn\s+off|go\s+offline)\b",
     r"\b(?:go|take\s+yourself)\s+offline(?:\s+jarvis)?\b",
+    # Jarvis Ultron: em português ("desliga o Jarvis", "Jarvis, saia do ar")
+    r"\b(?:desligue|desliga|desligar|feche|fecha|fechar|encerre|encerra|encerrar)\s+(?:o\s+)?jarvis\b",
+    r"\bjarvis\b.{0,36}\b(?:desligue-se|se\s+desligue|saia\s+do\s+ar|sair\s+do\s+ar)\b",
 ))
 
 
@@ -1549,10 +1562,11 @@ class JarvisLive:
             f"Use this to calculate exact times for reminders.\n\n"
         )
 
-        parts = [time_ctx]
+        parts = [REGRA_IDIOMA, time_ctx]
         if mem_str:
             parts.append(mem_str)
         parts.append(sys_prompt)
+        parts.append(REGRA_IDIOMA)
 
         return types.LiveConnectConfig(
             response_modalities=["AUDIO"],
@@ -1580,9 +1594,16 @@ class JarvisLive:
                     prebuilt_voice_config=types.PrebuiltVoiceConfig(
                         voice_name=self._get_current_voice()
                     )
-                )
+                ),
+                **({"language_code": self._idioma_voz()} if self._idioma_voz() else {}),
             ),
         )
+
+    def _idioma_voz(self) -> str:
+        """Jarvis Ultron: idioma da voz (JARVIS_IDIOMA, padrão pt-BR). Vazio se o modelo recusou."""
+        if getattr(self, "_idioma_recusado", False):
+            return ""
+        return os.environ.get("JARVIS_IDIOMA", "pt-BR").strip()
 
     def _definir_modo_escuta(self, modo: str) -> str:
         """Jarvis Ultron: 'maos_livres' (ouve tudo) ou 'chamada' (só depois das palmas / "Hey Jarvis")."""
@@ -2317,7 +2338,13 @@ class JarvisLive:
                 if isinstance(e, ExceptionGroup) and len(e.exceptions) == 1:
                     actual = e.exceptions[0]
 
-                if _is_unsupported_voice_error(actual) and self.voice_name != DEFAULT_VOICE_NAME:
+                if (self._idioma_voz() and isinstance(actual, genai.errors.APIError)
+                        and "language" in str(actual).lower()):
+                    # Jarvis Ultron: este modelo de voz não aceita escolher o idioma; segue só com a regra
+                    print(f"[JARVIS] ⚠️ O modelo de voz não aceitou language_code ({str(actual)[:120]}); "
+                          "seguindo sem ele.")
+                    self._idioma_recusado = True
+                elif _is_unsupported_voice_error(actual) and self.voice_name != DEFAULT_VOICE_NAME:
                     old_voice = self.voice_name
                     self.voice_name = DEFAULT_VOICE_NAME
                     self.ui.write_log(
