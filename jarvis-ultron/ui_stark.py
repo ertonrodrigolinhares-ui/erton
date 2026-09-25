@@ -482,13 +482,18 @@ class TelaStark(QWidget):
         self._relogio.timeout.connect(self._a_cada_segundo)
         self._relogio.start(1000)
         self._animacao = QTimer(self)
-        self._animacao.timeout.connect(lambda: [b.girar(3) for b in self.botoes])
-        self._animacao.start(50)
+        self._animacao.timeout.connect(self._girar_botoes)
+        self._animacao.start(100)
         self._a_cada_segundo()
         self._buscar_da_internet()
         self._internet = QTimer(self)
         self._internet.timeout.connect(self._buscar_da_internet)
         self._internet.start(30 * 60 * 1000)
+
+    def _girar_botoes(self):
+        if self.isVisible() and not self.window().isMinimized():
+            for b in self.botoes:
+                b.girar(6)
 
     # ---- colunas
     def _montar_esquerda(self) -> QWidget:

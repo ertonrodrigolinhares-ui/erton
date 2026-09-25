@@ -245,8 +245,41 @@ class C:
 
 
 
+_QCOL_CACHE: dict = {}
+
+
 def qcol(h: str, a: int = 255) -> QColor:
-    c = QColor(h); c.setAlpha(a); return c
+    # Jarvis Ultron (economia): guarda as cores já convertidas; devolve uma cópia.
+    chave = (h, a)
+    c = _QCOL_CACHE.get(chave)
+    if c is None:
+        c = QColor(h); c.setAlpha(a)
+        if len(_QCOL_CACHE) < 4096:
+            _QCOL_CACHE[chave] = c
+    return QColor(c)
+
+
+def _economia_ligada() -> bool:
+    return os.environ.get("JARVIS_ECONOMIA", "1").strip().lower() not in {"0", "false", "no", "off", "nao", "não"}
+
+
+def _janela_escondida(widget) -> bool:
+    """True se não adianta desenhar (janela minimizada ou widget escondido)."""
+    if not widget.isVisible():
+        return True
+    janela = widget.window()
+    return bool(janela and janela.isMinimized())
+
+
+def _css(widget, estilo: str) -> None:
+    """setStyleSheet só quando muda (trocar o estilo à toa redesenha tudo e pesa)."""
+    if widget.styleSheet() != estilo:
+        widget.setStyleSheet(estilo)
+
+
+def _texto(widget, texto: str) -> None:
+    if widget.text() != texto:
+        widget.setText(texto)
 
 
 # ---------------------------------------------------------------------------
@@ -2377,6 +2410,13 @@ class HudCanvas(QWidget):
         if self._blink_tick >= 32:
             self._blink = not self._blink
             self._blink_tick = 0
+        # Jarvis Ultron (economia): parado, redesenha 1 a cada 3 quadros; com voz ou
+        # pensando, todos. Minimizado, não redesenha.
+        if _economia_ligada():
+            if _janela_escondida(self):
+                return
+            if not (voz_ativa or is_active) and self._tick % 3:
+                return
         self.update()
 
     def _proj(self, r, theta, phi, sr, cx, cy):
@@ -3619,27 +3659,27 @@ class AgentGridWidget(QWidget):
                 bg_style   = "background: transparent; border-left: 2px solid #1a3535;"
 
             # Apply bg to card widget
-            card["widget"].setStyleSheet(bg_style)
-            card["dot"].setStyleSheet(
+            _css(card["widget"], bg_style)
+            _css(card["dot"],
                 f"color: {dot_col}; background: transparent;"
             )
-            card["icon_lbl"].setStyleSheet(
+            _css(card["icon_lbl"],
                 f"color: {icon_col}; background: transparent;"
             )
-            card["name_lbl"].setStyleSheet(
+            _css(card["name_lbl"],
                 f"color: {name_col}; background: transparent;"
             )
-            card["conf_lbl"].setText(f"{int(conf * 100)}%")
-            card["conf_lbl"].setStyleSheet(
+            _texto(card["conf_lbl"], f"{int(conf * 100)}%")
+            _css(card["conf_lbl"],
                 f"color: {conf_col}; background: transparent;"
             )
-            card["status_lbl"].setStyleSheet(
+            _css(card["status_lbl"],
                 f"color: {status_col}; background: transparent; letter-spacing: 1px;"
             )
-            card["obj_lbl"].setText(
+            _texto(card["obj_lbl"],
                 self._OBJECTIVES.get(name, ["Operating"])[st[2]]
             )
-            card["obj_lbl"].setStyleSheet(
+            _css(card["obj_lbl"],
                 f"color: {obj_col}; background: transparent;"
             )
             # line_lbl hidden — no connector
@@ -3731,6 +3771,8 @@ class AIActivityCanvas(QWidget):
                 self._init_nodes(self._quality_node_count)
 
     def _step(self):
+        if _economia_ligada() and _janela_escondida(self):
+            return
         self._tick += 1
         W, H = max(1, self.width()), max(1, self.height())
 

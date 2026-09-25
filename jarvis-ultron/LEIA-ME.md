@@ -85,6 +85,17 @@ Cópia do projeto **JARVIS-OS V.2** (licença MIT, veja `LICENSE`), com ajustes 
 - Se o navegador automático não abrir por algum motivo, o Jarvis abre o site no seu navegador
   padrão, em vez de dar erro.
 
+## Se o computador ficar lento (CPU ou memória alta)
+
+- O que mais pesa é a **animação da tela**, não a inteligência. O Jarvis já economiza sozinho:
+  parado, ele desenha a esfera mais devagar; minimizado, não desenha nada.
+- Para deixar ainda mais leve, diga: **"Jarvis, qualidade gráfica baixa"**. Para voltar:
+  "qualidade gráfica média" (ou "alta").
+- Minimize a janela do Jarvis quando não estiver olhando para ela: ele continua ouvindo.
+- Memória alta costuma ser o navegador com muitas abas, o Hermes e o próprio Jarvis juntos.
+  Feche abas que não usa e reinicie o computador de vez em quando.
+- Para desligar a economia automática (não recomendado), coloque `JARVIS_ECONOMIA=0` no `.env`.
+
 ## Configurações (arquivo `.env` nesta pasta)
 
 Abra com o Bloco de Notas para mudar:
