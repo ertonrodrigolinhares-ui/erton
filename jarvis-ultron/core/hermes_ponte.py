@@ -51,26 +51,42 @@ def configurado() -> bool:
     return bool(os.environ.get("HERMES_API_KEY", "").strip())
 
 
+def enderecos() -> list[str]:
+    """Onde procurar o perfil jarvis. O Hermes novo atende todos os perfis num serviço só, e o do
+    Jarvis fica em .../p/jarvis; o Hermes antigo (ou perfil separado) atende direto na porta."""
+    base = os.environ.get("HERMES_API_URL", "http://127.0.0.1:8642").strip().rstrip("/")
+    raiz = base.split("/p/")[0]
+    return list(dict.fromkeys([base, raiz + "/p/jarvis", raiz]))
+
+
 def perguntar(pedido: str, tempo_maximo: float = TEMPO_MAXIMO) -> str:
     if not configurado():
         return SEM_HERMES
     import requests
 
-    url = os.environ.get("HERMES_API_URL", "http://127.0.0.1:8642").rstrip("/") + "/v1/chat/completions"
-    try:
-        resposta = requests.post(
-            url,
-            headers={"Authorization": f"Bearer {os.environ['HERMES_API_KEY'].strip()}"},
-            json={"model": "hermes-agent", "messages": [{"role": "user", "content": pedido}]},
-            timeout=tempo_maximo,
-        )
-    except requests.exceptions.ConnectionError:
+    resposta = None
+    desligado = True
+    for endereco in enderecos():
+        try:
+            tentativa = requests.post(
+                endereco + "/v1/chat/completions",
+                headers={"Authorization": f"Bearer {os.environ['HERMES_API_KEY'].strip()}"},
+                json={"model": "hermes-agent", "messages": [{"role": "user", "content": pedido}]},
+                timeout=tempo_maximo,
+            )
+        except requests.exceptions.ConnectionError:
+            continue
+        except requests.exceptions.Timeout:
+            return "O Hermes demorou demais para responder. A tarefa pode continuar rodando; pergunte de novo daqui a pouco."
+        desligado = False
+        resposta = tentativa
+        if tentativa.status_code not in (401, 404):  # 401/404: endereço errado para este perfil
+            break
+    if desligado:
         return ("O Hermes está desligado. Ele liga sozinho com o Windows; se não ligou, abra o "
                 "'Instalar Hermes' de novo ou reinicie o computador.")
-    except requests.exceptions.Timeout:
-        return "O Hermes demorou demais para responder. A tarefa pode continuar rodando; pergunte de novo daqui a pouco."
-    if resposta.status_code == 401:
-        return "A chave do Hermes no .env do Jarvis não confere. Rode o 'Instalar Hermes' de novo."
+    if resposta.status_code in (401, 404):
+        return "O Hermes não reconheceu o Jarvis (chave ou endereço). Rode o 'Instalar Hermes' de novo."
     if resposta.status_code >= 400:
         return f"O Hermes respondeu com erro {resposta.status_code}: {resposta.text[:200]}"
     try:

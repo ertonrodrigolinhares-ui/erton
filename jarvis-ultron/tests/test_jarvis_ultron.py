@@ -476,7 +476,7 @@ class PonteHermesTests(unittest.TestCase):
             with patch.object(requests, "post", side_effect=requests.exceptions.ConnectionError()):
                 self.assertIn("desligado", hermes_ponte.perguntar("oi"))
             with patch.object(requests, "post", return_value=RespostaHttp(401)):
-                self.assertIn("não confere", hermes_ponte.perguntar("oi"))
+                self.assertIn("não reconheceu o Jarvis", hermes_ponte.perguntar("oi"))
         with patch.dict("os.environ", {"HERMES_API_KEY": ""}):
             self.assertIn("Instalar Hermes", hermes_ponte.perguntar("oi"))
 
@@ -835,3 +835,44 @@ class HermesSemTravarTests(unittest.TestCase):
         self.assertTrue(any("relatório pronto" in l for l in jarvis.ui.logs))
         self.assertEqual(len(enviados), 1)
         self.assertIn("relatório pronto", enviados[0]["turns"]["parts"][0]["text"])
+
+
+class HermesEnderecoTests(unittest.TestCase):
+    def test_procura_o_perfil_jarvis_no_servico_unico(self):
+        from core import hermes_ponte
+        with patch.dict("os.environ", {"HERMES_API_URL": "http://127.0.0.1:8642"}):
+            self.assertEqual(hermes_ponte.enderecos(),
+                             ["http://127.0.0.1:8642", "http://127.0.0.1:8642/p/jarvis"])
+        with patch.dict("os.environ", {"HERMES_API_URL": "http://127.0.0.1:8642/p/jarvis/"}):
+            self.assertEqual(hermes_ponte.enderecos(),
+                             ["http://127.0.0.1:8642/p/jarvis", "http://127.0.0.1:8642"])
+
+    def test_pula_endereco_errado_e_usa_o_certo(self):
+        import requests
+        from core import hermes_ponte
+
+        class Resp:
+            def __init__(self, codigo, texto=""):
+                self.status_code, self.text = codigo, texto
+
+            def json(self):
+                return {"choices": [{"message": {"content": "3 posts prontos"}}]}
+
+        chamados = []
+
+        def post(url, **kw):
+            chamados.append(url)
+            if "/p/jarvis" in url:
+                return Resp(200)
+            return Resp(401)
+
+        with patch.dict("os.environ", {"HERMES_API_URL": "http://127.0.0.1:8642", "HERMES_API_KEY": "k" * 20}), \
+                patch.object(requests, "post", side_effect=post):
+            self.assertEqual(hermes_ponte.perguntar("posts"), "3 posts prontos")
+        self.assertEqual(chamados[-1], "http://127.0.0.1:8642/p/jarvis/v1/chat/completions")
+
+        def desligado(url, **kw):
+            raise requests.exceptions.ConnectionError()
+
+        with patch.dict("os.environ", {"HERMES_API_KEY": "k" * 20}), patch.object(requests, "post", side_effect=desligado):
+            self.assertIn("desligado", hermes_ponte.perguntar("posts"))

@@ -159,6 +159,15 @@ if (-not $chaves["API_SERVER_KEY"]) {
     $chaves["API_SERVER_KEY"] = -join ((48..57) + (97..122) | Get-Random -Count 40 | ForEach-Object { [char]$_ })
 }
 Gravar-Env $envHermes $chaves
+# O Hermes novo atende todos os perfis num servico so (o do perfil principal). A porta dele
+# precisa estar ligada para o Jarvis falar com o perfil jarvis em http://127.0.0.1:8642/p/jarvis.
+$envRaiz = Join-Path $raizHermes ".env"
+$raizEnv = Ler-Env $envRaiz
+$raizEnv["API_SERVER_ENABLED"] = "true"
+if (-not $raizEnv["API_SERVER_KEY"] -or $raizEnv["API_SERVER_KEY"].Length -lt 16) {
+    $raizEnv["API_SERVER_KEY"] = -join ((48..57) + (97..122) | Get-Random -Count 40 | ForEach-Object { [char]$_ })
+}
+Gravar-Env $envRaiz $raizEnv
 Write-Host "Chaves salvas." -ForegroundColor Green
 
 # ---------------------------------------------------------------- 5. config.yaml do perfil
@@ -176,7 +185,7 @@ Gravar (Join-Path $perfil "shell-hooks-allowlist.json") $permissoes
 # Liga o Jarvis Ultron ao Hermes (e a voz ElevenLabs, se houver chave).
 $envUltron = Join-Path $ultron ".env"
 $ultronEnv = Ler-Env $envUltron
-$ultronEnv["HERMES_API_URL"] = "http://127.0.0.1:8642"
+$ultronEnv["HERMES_API_URL"] = "http://127.0.0.1:8642/p/jarvis"
 $ultronEnv["HERMES_API_KEY"] = $chaves["API_SERVER_KEY"]
 $ultronEnv["HERMES_JARVIS_HOME"] = $perfil
 if ($chaves["ELEVENLABS_API_KEY"]) {
@@ -209,8 +218,13 @@ $rotinas = (& $hermes -p jarvis cron list 2>&1 | Out-String)
 if ($rotinas -notmatch "Rotina do atleta 8h") {
     & $hermes -p jarvis cron create "0 8 * * *" "Execute a rotina diaria do perfil de atleta do Erton." --skill rotina-atleta-8h --name "Rotina do atleta 8h" --deliver local
 }
-& $hermes -p jarvis gateway install
-& $hermes -p jarvis gateway restart  # para o Hermes ja usar a configuracao nova
+# Um servico so (do perfil principal) atende o perfil jarvis e a rotina das 8h.
+& $hermes gateway restart  # para o Hermes ja usar a configuracao nova
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Instalando o servico do Hermes (se o Windows pedir permissao, aceite)..."
+    & $hermes gateway install
+    & $hermes gateway start
+}
 Write-Host ""
 Write-Host "Pronto! O Hermes do Jarvis liga sozinho com o Windows e roda a rotina todo dia as 8h." -ForegroundColor Green
 Write-Host "Abra o Jarvis Ultron e diga: 'Hey Jarvis, quais sao os posts de hoje?'"
