@@ -379,8 +379,10 @@ class SeloEscuta(QWidget):
     """Selo embaixo do título: mostra se o Jarvis está ouvindo, esperando as palmas ou em mãos livres."""
 
     ESTADOS = {
-        "ouvindo": ("●  CHAMADA ATIVA  ·  2 PALMAS PARA ENCERRAR", VERDE),
-        "aguardando": ("○  AGUARDANDO 2 PALMAS", AMBAR),
+        "ouvindo:palmas": ("●  CHAMADA ATIVA  ·  2 PALMAS PARA ENCERRAR", VERDE),
+        "ouvindo:voz": ("●  OUVINDO", VERDE),
+        "aguardando:palmas": ('○  AGUARDANDO 2 PALMAS OU "HEY JARVIS"', AMBAR),
+        "aguardando:voz": ('○  AGUARDANDO "HEY JARVIS"', AMBAR),
         "maos_livres": ("●  MÃOS LIVRES  ·  OUVINDO TUDO", AZUL_FORTE),
     }
 
@@ -391,6 +393,10 @@ class SeloEscuta(QWidget):
         self._brilho = 0
 
     def mostrar(self, estado: str) -> None:
+        if estado.startswith("maos_livres"):
+            estado = "maos_livres"
+        elif ":" not in estado:
+            estado += ":voz"
         if estado in self.ESTADOS:
             self.estado = estado
             self._brilho = 10  # pisca forte por um instante quando muda

@@ -23,10 +23,12 @@ Configuração no .env:
 
 from __future__ import annotations
 
+import json
 import os
 import threading
 import time
 from collections import deque
+from pathlib import Path
 from typing import Callable
 
 import numpy as np
@@ -85,7 +87,16 @@ class DetectorDePalmas:
     SOSSEGO_ANTES = 0.5  # sem estalos neste tempo antes da primeira palma
     SOSSEGO_DEPOIS = 0.4  # nem logo depois da segunda
 
-    def __init__(self):
+    def __init__(self, sensibilidade: float | None = None):
+        # JARVIS_SENSIBILIDADE_PALMAS: 1 = padrão; maior (ex.: 1.5) aceita palmas mais fracas;
+        # menor (ex.: 0.7) é mais rigoroso.
+        if sensibilidade is None:
+            sensibilidade = _numero("JARVIS_SENSIBILIDADE_PALMAS", 1.0)
+        s = max(0.3, min(3.0, float(sensibilidade)))
+        self.minimo = 0.02 / s  # volume mínimo de uma palma
+        self.subida = max(3.0, 8.0 / s)  # quantas vezes mais alta que o instante anterior
+        self.agudo_min = 0.18 / s
+        self.cauda_max = min(0.8, 0.5 * s)  # quanto do som pode sobrar logo depois
         self.ruido = 0.002
         self._pendente = np.zeros(0, dtype=np.float32)
         self._forca: list[float] = []  # volume de cada pedaço de 5 ms
@@ -96,17 +107,34 @@ class DetectorDePalmas:
         self._primeira = None
         self._confirmar = None  # hora da 2ª palma, esperando o silêncio depois dela
 
-    def _analisar(self, k: int) -> bool:
+    def medir(self, k: int) -> dict:
+        """As medidas do pedaço k (também usadas pelo 'Testar Palmas')."""
         i = k - self._inicio
         forca = self._forca[i]
         antes = self._forca[max(0, i - self.ANTES):i]
         base = (sum(antes) / len(antes)) if antes else self.ruido
         depois = self._forca[i + 6:i + self.DEPOIS]
-        cauda = sum(depois) / len(depois)
-        return (forca >= max(0.03, self.ruido * 12.0)
-                and forca >= 5.0 * max(base, self.ruido)  # começa de repente
-                and max(self._agudo[i], self._agudo[i + 1]) >= 0.25  # é agudo
-                and cauda <= 0.3 * forca)  # e acaba rápido
+        return {
+            "forca": forca,
+            "subida": forca / max(base, self.ruido),
+            "agudo": max(self._agudo[i], self._agudo[i + 1]),
+            "cauda": (sum(depois) / len(depois)) / max(forca, 1e-9),
+        }
+
+    def motivo_recusa(self, m: dict) -> str:
+        """'' se parece palma; senão, o que faltou."""
+        if m["forca"] < max(self.minimo, self.ruido * 8.0):
+            return "fraca"
+        if m["subida"] < self.subida:
+            return "não começou de repente"
+        if m["agudo"] < self.agudo_min:
+            return "som grave (parece voz)"
+        if m["cauda"] > self.cauda_max:
+            return "som longo (parece voz)"
+        return ""
+
+    def _analisar(self, k: int) -> bool:
+        return not self.motivo_recusa(self.medir(k))
 
     def processar(self, pedaco) -> bool:
         """True quando acabou de ouvir a segunda palma."""
@@ -176,7 +204,7 @@ SONS_AVISO = {
 
 def tocar_aviso(estado: str) -> None:
     """Toca o som do estado sem travar o Jarvis (JARVIS_SOM_AVISO=0 desliga)."""
-    notas = SONS_AVISO.get(estado)
+    notas = SONS_AVISO.get(estado.split(":")[0])
     if not notas or not _ligado("JARVIS_SOM_AVISO"):
         return
 
@@ -202,22 +230,45 @@ def tocar_aviso(estado: str) -> None:
     threading.Thread(target=tocar, daemon=True, name="SomAviso").start()
 
 
+ARQUIVO_PREFERENCIA = Path.home() / ".jarvis" / "config" / "escuta.json"
+
+
+def palmas_preferidas() -> bool:
+    """Palmas ligadas? A escolha feita por voz fica guardada; senão vale o .env
+    (JARVIS_ATIVACAO=ambos/palmas liga; o padrão é só "Hey Jarvis")."""
+    try:
+        return bool(json.loads(ARQUIVO_PREFERENCIA.read_text(encoding="utf-8"))["palmas"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return gatilho_configurado() in ("ambos", "palmas")
+
+
+def guardar_preferencia_palmas(ligadas: bool) -> None:
+    try:
+        ARQUIVO_PREFERENCIA.parent.mkdir(parents=True, exist_ok=True)
+        ARQUIVO_PREFERENCIA.write_text(json.dumps({"palmas": bool(ligadas)}), encoding="utf-8")
+    except OSError as erro:
+        print(f"[Palmas] Não consegui guardar a escolha: {erro}")
+
+
 def gatilho_configurado() -> str:
-    """'ambos' (padrão: palmas ou "Hey Jarvis" abrem a chamada), 'palmas' ou 'voz'."""
-    valor = os.environ.get("JARVIS_ATIVACAO", "ambos").strip().lower()
-    if valor in {"voz", "hey jarvis", "palavra"}:
-        return "voz"
+    """'voz' (padrão: só "Hey Jarvis"), 'ambos' (palmas ou "Hey Jarvis") ou 'palmas'."""
+    valor = os.environ.get("JARVIS_ATIVACAO", "voz").strip().lower()
     if valor in {"palmas", "palma"}:
         return "palmas"
-    return "ambos"
+    if valor in {"ambos", "os dois"}:
+        return "ambos"
+    return "voz"
 
 
 class PortaoDeVoz:
     def __init__(self, detector=None, *, ativo: bool = True, limiar: float = 0.5,
                  janela: float = 20.0, avisar: Callable[[str], None] | None = None,
-                 relogio: Callable[[], float] = time.monotonic, palmas: DetectorDePalmas | None = None):
+                 relogio: Callable[[], float] = time.monotonic, palmas: DetectorDePalmas | None = None,
+                 usar_palmas: bool | None = None):
         self.detector = detector
         self.palmas = palmas
+        # Palmas são opcionais: o usuário liga ou desliga ("Jarvis, ligar palmas").
+        self.usar_palmas = bool(palmas is not None if usar_palmas is None else usar_palmas and palmas is not None)
         # Chamado com "ouvindo", "aguardando" ou "maos_livres" quando o estado muda
         # (o Jarvis usa para tocar o som e mostrar o selo na tela).
         self.ao_mudar: Callable[[str], None] = lambda estado: None
@@ -248,38 +299,44 @@ class PortaoDeVoz:
 
     @property
     def como_chamar(self) -> str:
-        if self.palmas is None:
+        if not self.usar_palmas:
             return 'diga "Hey Jarvis"'
         return 'bata 2 palmas ou diga "Hey Jarvis"' if self.detector is not None else "bata 2 palmas"
+
+    def ligar_palmas(self, ligar: bool, guardar: bool = True) -> bool:
+        """Liga/desliga as palmas. False se não der (sem detector de palmas, ou sem "Hey Jarvis"
+        para ficar no lugar delas)."""
+        ligar = bool(ligar)
+        if (ligar and self.palmas is None) or (not ligar and self.detector is None):
+            return False
+        with self._trava:
+            self.usar_palmas = ligar
+            if self.palmas is not None:
+                self.palmas.reiniciar()
+            if self.acordado:  # a conversa continua; sem palmas, fecha sozinha após o silêncio
+                self.acordado_ate = self.relogio() + self.janela
+        if guardar:
+            guardar_preferencia_palmas(ligar)
+        self._avisar_mudanca()
+        return True
 
     @classmethod
     def da_configuracao(cls, avisar: Callable[[str], None] | None = None) -> "PortaoDeVoz":
         chamada = _ligado("JARVIS_PALAVRA_ATIVACAO")
-        gatilho = gatilho_configurado()
-        if gatilho in ("palmas", "ambos"):
-            detector = None
-            if gatilho == "ambos":  # "Hey Jarvis" também abre a chamada
-                try:
-                    detector = carregar_detector()
-                except Exception as erro:
-                    print(f"[Ativação] \"Hey Jarvis\" indisponível ({erro}); só palmas.")
-            portao = cls(detector, ativo=chamada, limiar=_numero("JARVIS_SENSIBILIDADE", 0.5),
-                         avisar=avisar, palmas=DetectorDePalmas())
-            portao.avisar(f"SYS: {portao.como_chamar.capitalize()} para falar comigo "
-                          "(e 2 palmas para encerrar)." if chamada
-                          else "SYS: Modo mãos livres: estou ouvindo tudo.")
-            return portao
-        # O detector é carregado mesmo começando em mãos livres, para dar para trocar por voz.
+        usar_palmas = palmas_preferidas()
+        # O "Hey Jarvis" é carregado sempre (mesmo em mãos livres), para dar para trocar por voz.
         try:
             detector = carregar_detector()
         except Exception as erro:
-            print(f"[Ativação] Detector indisponível ({erro}); ouvindo sempre.")
-            if avisar:
-                avisar("SYS: Palavra de ativação indisponível; o Jarvis vai ouvir sempre.")
-            return cls(None, ativo=False, avisar=avisar)
+            print(f"[Ativação] \"Hey Jarvis\" indisponível ({erro}).")
+            detector = None
+            usar_palmas = True  # sobra só a palma para chamar
         portao = cls(detector, ativo=chamada, limiar=_numero("JARVIS_SENSIBILIDADE", 0.5),
-                     janela=_numero("JARVIS_JANELA_CONVERSA", 20.0), avisar=avisar)
-        portao.avisar("SYS: Diga \"Hey Jarvis\" para falar comigo." if chamada
+                     janela=_numero("JARVIS_JANELA_CONVERSA", 20.0), avisar=avisar,
+                     palmas=DetectorDePalmas(), usar_palmas=usar_palmas)
+        print(f"[Ativação] Palmas {'ligadas' if portao.usar_palmas else 'desligadas'}"
+              " (\"Jarvis, ligar palmas\" / \"Jarvis, desligar palmas\").")
+        portao.avisar(f"SYS: {portao.como_chamar.capitalize()} para falar comigo." if chamada
                       else "SYS: Modo mãos livres: estou ouvindo tudo.")
         return portao
 
@@ -318,8 +375,10 @@ class PortaoDeVoz:
         audio = np.asarray(pedaco, dtype=np.int16).reshape(-1)
         if not self.ativo:
             return audio.tobytes()
-        if self.palmas is not None:
+        if self.usar_palmas:
             return self._processar_palmas(audio)
+        if self.detector is None:
+            return None
         with self._trava:
             agora = self.relogio()
             if self.acordado and agora < self.acordado_ate:
@@ -418,4 +477,23 @@ def modo_pedido(fala: str) -> str | None:
         return "maos_livres"
     if any(frase in texto for frase in _CHAMADA):
         return "chamada"
+    return None
+
+
+_LIGAR_PALMAS = ("ligar palmas", "liga as palmas", "ligar as palmas", "ativar palmas", "ativa as palmas",
+                 "ativar as palmas", "ligar a palma", "ativar a palma")
+_DESLIGAR_PALMAS = ("desligar palmas", "desliga as palmas", "desligar as palmas", "desativar palmas",
+                    "desativa as palmas", "desativar as palmas", "desligar a palma", "desativar a palma")
+
+
+def palmas_pedido(fala: str) -> bool | None:
+    """True = ligar palmas, False = desligar, None = a fala não pediu isso."""
+    import unicodedata
+
+    texto = unicodedata.normalize("NFKD", (fala or "").lower())
+    texto = " ".join("".join(c for c in texto if not unicodedata.combining(c)).replace(",", " ").split())
+    if any(frase in texto for frase in _DESLIGAR_PALMAS):
+        return False
+    if any(frase in texto for frase in _LIGAR_PALMAS):
+        return True
     return None

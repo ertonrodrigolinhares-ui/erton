@@ -756,20 +756,37 @@ class PalmasTests(unittest.TestCase):
         self.assertIsNone(portao.processar(_silencio(0.1)))
         self.assertEqual(portao.como_chamar, "bata 2 palmas")
 
-    def test_padrao_e_palmas_ou_hey_jarvis(self):
+    def test_palmas_sao_opcionais_e_a_escolha_fica_guardada(self):
         import os
-        with patch.dict("os.environ", {"JARVIS_PALAVRA_ATIVACAO": "1"}), \
-                patch("core.palavra_ativacao.carregar_detector", return_value="detector") as carregar:
+        import tempfile
+        from pathlib import Path
+        pasta = Path(tempfile.mkdtemp())
+        with patch.object(palavra_ativacao, "ARQUIVO_PREFERENCIA", pasta / "escuta.json"), \
+                patch.dict("os.environ", {"JARVIS_PALAVRA_ATIVACAO": "1"}), \
+                patch("core.palavra_ativacao.carregar_detector", return_value="detector"):
             os.environ.pop("JARVIS_ATIVACAO", None)
             portao = PortaoDeVoz.da_configuracao()
-        carregar.assert_called_once()
-        self.assertTrue(portao.ativo)
-        self.assertIsNotNone(portao.palmas)
-        self.assertIn("Hey Jarvis", portao.como_chamar)
-        with patch.dict("os.environ", {"JARVIS_ATIVACAO": "palmas"}), \
-                patch("core.palavra_ativacao.carregar_detector") as carregar:
-            self.assertIsNone(PortaoDeVoz.da_configuracao().detector)
-        carregar.assert_not_called()
+            self.assertFalse(portao.usar_palmas)  # padrão: só "Hey Jarvis"
+            self.assertEqual(portao.como_chamar, 'diga "Hey Jarvis"')
+            estados = []
+            portao.ao_mudar = estados.append
+            self.assertTrue(portao.ligar_palmas(True))
+            self.assertEqual(estados, ["aguardando"])
+            self.assertTrue(PortaoDeVoz.da_configuracao().usar_palmas)  # lembrou da escolha
+            self.assertTrue(portao.ligar_palmas(False))
+            self.assertFalse(PortaoDeVoz.da_configuracao().usar_palmas)
+            (pasta / "escuta.json").unlink()
+            with patch.dict("os.environ", {"JARVIS_ATIVACAO": "ambos"}):
+                self.assertTrue(PortaoDeVoz.da_configuracao().usar_palmas)
+        self.assertEqual(palavra_ativacao.palmas_pedido("Jarvis, liga as palmas"), True)
+        self.assertEqual(palavra_ativacao.palmas_pedido("desativar palmas"), False)
+        self.assertIsNone(palavra_ativacao.palmas_pedido("que horas são"))
+
+    def test_sem_hey_jarvis_nao_da_para_desligar_as_palmas(self):
+        from core.palavra_ativacao import DetectorDePalmas
+        portao = PortaoDeVoz(None, palmas=DetectorDePalmas())
+        self.assertFalse(portao.ligar_palmas(False, guardar=False))
+        self.assertTrue(portao.usar_palmas)
 
     def test_hey_jarvis_tambem_abre_a_chamada_e_palmas_fecham(self):
         from core.palavra_ativacao import DetectorDePalmas
