@@ -11,6 +11,7 @@ Novidades desta versão:
   anuncia o modo.
 - Fala sempre em português do Brasil (regra reforçada + voz pt-BR).
 - Janela preta mostra [Tempo]: quanto cada resposta e cada ferramenta demoraram.
-- Gemini 3.5: o Jarvis usa primeiro os modelos 3.5 (a janela preta mostra "[Modelos] Voz: ... | Texto: ...").
+- Prioridade rapidez: modelos estáveis, que respondem mais rápido e travam menos (a janela preta
+  mostra "[Modelos] Voz: ... | Texto: ..."). Pesquisa na internet sem pedir licença.
 
 Como conferir que atualizou: a tela mostra o selo embaixo do título "JARVIS ULTRON".

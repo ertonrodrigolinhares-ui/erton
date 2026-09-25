@@ -10,7 +10,8 @@ Esta central:
   (cada modelo tem a sua própria cota grátis);
 - vale para a biblioteca nova (google-genai) e para a antiga (google-generativeai).
 
-Para preferir uma versão (ex.: Gemini 3.5), coloque no .env: JARVIS_GEMINI_VERSAO=3.5
+Padrão: rapidez (modelos estáveis). Para preferir uma versão (ex.: Gemini 3.5, mesmo em preview),
+coloque no .env: JARVIS_PRIORIDADE=versao e JARVIS_GEMINI_VERSAO=3.5
 
 Para forçar um modelo, coloque no .env:
   JARVIS_MODELO_TEXTO, JARVIS_MODELO_LEVE, JARVIS_MODELO_PRO, JARVIS_MODELO_IMAGEM, GEMINI_LIVE_MODEL
@@ -94,9 +95,18 @@ def _grupo(nome: str) -> int:
     return 0
 
 
+def prioridade() -> str:
+    """JARVIS_PRIORIDADE: 'rapidez' (padrão: modelos estáveis, que respondem mais rápido e travam
+    menos) ou 'versao' (usa JARVIS_GEMINI_VERSAO, mesmo que seja preview)."""
+    valor = os.environ.get("JARVIS_PRIORIDADE", "rapidez").strip().lower()
+    return "versao" if valor in {"versao", "versão", "novidade"} else "rapidez"
+
+
 def versao_preferida() -> float | None:
-    """JARVIS_GEMINI_VERSAO=3.5 no .env: usa primeiro os modelos dessa versão (mesmo em preview).
-    Se a chave não tiver essa versão, segue a escolha normal."""
+    """JARVIS_GEMINI_VERSAO=3.5 + JARVIS_PRIORIDADE=versao no .env: usa primeiro os modelos dessa
+    versão (mesmo em preview). Se a chave não tiver essa versão, segue a escolha normal."""
+    if prioridade() != "versao":
+        return None
     try:
         return float(os.environ.get("JARVIS_GEMINI_VERSAO", "").strip().replace(",", "."))
     except ValueError:
@@ -130,7 +140,9 @@ def _da_categoria(cat: str, modelos: list[tuple[str, set[str]]]) -> list[str]:
     gerar = [n for n, acoes in modelos if "generatecontent" in acoes and n.startswith("gemini")]
     if cat == "ao_vivo":
         vivos = [n for n, acoes in modelos if "bidigeneratecontent" in acoes]
-        return sorted(vivos, key=lambda n: ("native-audio" not in n, _fora_da_preferida(n), -_versao(n), n))
+        # Voz: áudio nativo (mais rápido), estável antes de preview/experimental, depois o mais novo.
+        return sorted(vivos, key=lambda n: ("native-audio" not in n, _fora_da_preferida(n),
+                                            _grupo(n) == 2 and prioridade() == "rapidez", -_versao(n), n))
     if cat == "imagem":
         return _ordenar([n for n in gerar if "image" in n and "imagen" not in n])
     if cat == "leve":

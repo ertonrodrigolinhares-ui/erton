@@ -41,16 +41,27 @@ class CentralDeModelosTests(unittest.TestCase):
         modelos._cache += _lista("gemini-3.5-flash-native-audio-preview", "gemini-3.5-pro-preview",
                                  acao="generatecontent")
         modelos._cache += _lista("gemini-3.5-flash-native-audio-preview", acao="bidigeneratecontent")
-        with patch.dict("os.environ", {"JARVIS_GEMINI_VERSAO": "3.5"}):
+        with patch.dict("os.environ", {"JARVIS_GEMINI_VERSAO": "3.5"}):  # sem pedir "versao": rapidez manda
+            self.assertEqual(modelos.resolver("gemini-2.5-flash"), "gemini-3.1-flash")
+        with patch.dict("os.environ", {"JARVIS_GEMINI_VERSAO": "3.5", "JARVIS_PRIORIDADE": "versao"}):
             self.assertEqual(modelos.resolver("gemini-2.5-flash"), "gemini-3.5-flash-preview")
             self.assertEqual(modelos.resolver("gemini-2.5-pro"), "gemini-3.5-pro-preview")
             self.assertEqual(modelos.resolver("gemini-live-native-audio"), "gemini-3.5-flash-native-audio-preview")
             # sem 3.5 de imagem na chave: segue a escolha normal
             self.assertEqual(modelos.resolver("gemini-flash-image"), "gemini-3.1-flash-image")
             self.assertIn("gemini-3.5-flash-preview", modelos.resumo())
-        with patch.dict("os.environ", {"JARVIS_GEMINI_VERSAO": "3,5"}):
+        with patch.dict("os.environ", {"JARVIS_GEMINI_VERSAO": "3,5", "JARVIS_PRIORIDADE": "versao"}):
             self.assertEqual(modelos.versao_preferida(), 3.5)
         self.assertEqual(modelos.resolver("gemini-2.5-flash"), "gemini-3.1-flash")  # sem preferência
+
+    def test_rapidez_prefere_voz_estavel_a_preview(self):
+        modelos._cache += _lista("gemini-3.5-flash-native-audio-preview", "gemini-2.5-flash-native-audio",
+                                 acao="bidigeneratecontent")
+        self.assertEqual(modelos.prioridade(), "rapidez")
+        vivos = modelos.candidatos("gemini-live-native-audio")
+        self.assertEqual(vivos[0], "gemini-3.1-flash-native-audio")  # estável e mais novo
+        self.assertLess(vivos.index("gemini-2.5-flash-native-audio"),
+                        vivos.index("gemini-3.5-flash-native-audio-preview"))
 
     def test_escolha_manual_no_env(self):
         with patch.dict("os.environ", {"JARVIS_MODELO_TEXTO": "gemini-2.5-flash"}):

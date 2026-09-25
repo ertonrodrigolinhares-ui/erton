@@ -72,11 +72,6 @@ set /p "GROQ=Chave do Groq (ou Enter para pular): "
 if "%GROQ%"=="" (echo Sem reserva por enquanto. Para colocar depois, veja o LEIA-ME.) else (echo Chave do Groq salva.)
 
 :iniciar
-rem ---- Uma vez so: prefere os modelos Gemini 3.5 (troque ou apague a linha no .env) ----
-findstr /c:"JARVIS_GEMINI_VERSAO" .env >nul 2>nul && goto iniciar_jarvis
->> .env echo.
->> .env echo JARVIS_GEMINI_VERSAO=3.5
-:iniciar_jarvis
 echo.
 echo Iniciando o Jarvis Ultron... Deixe esta janela aberta enquanto usa.
 set JARVIS_CLI=1
