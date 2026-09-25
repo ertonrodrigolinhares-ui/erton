@@ -2286,6 +2286,10 @@ class JarvisLive:
                 stream.close()
 
     async def run(self):
+        # Jarvis Ultron: aberto pela reserva (Google recusou a chave): conversa pelo Groq já, e
+        # continua tentando o Gemini em segundo plano.
+        if os.environ.get("JARVIS_SEM_GEMINI") == "1" and self._reserva is not None:
+            self._ativar_modo_reserva()
         api_key = self._api_key or _get_api_key()
         client = genai.Client(
             api_key=api_key,

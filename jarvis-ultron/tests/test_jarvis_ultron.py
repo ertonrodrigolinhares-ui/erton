@@ -899,3 +899,31 @@ class EnvArquivoTests(unittest.TestCase):
         chave = "AQ.Ab8RN6KEj8a3O9m5KDhiGMLUxxxxxxxxxxxxxxxx"
         self.assertEqual(normalize_gemini_api_key(f'GEMINI_API_KEY="{chave}"'), chave)
         self.assertIsNone(_basic_key_check(chave))
+
+
+class ReservaNaTelaDaChaveTests(unittest.TestCase):
+    def test_chave_recusada_mostra_botao_da_reserva_e_abre(self):
+        import os
+        from PyQt6.QtWidgets import QApplication
+        app = QApplication.instance() or QApplication([])
+        import ui
+        with patch.dict("os.environ", {"GROQ_API_KEY": "gsk_teste", "GEMINI_API_KEY": ""}):
+            tela = ui.SetupOverlay()
+            self.assertTrue(tela._reserva_btn.isHidden())
+            tela._on_validation_finished(False, "API key was rejected by Gemini.", "AQ.xxxxxxxxxxxxxxxxxxxxxxxx", False)
+            self.assertFalse(tela._reserva_btn.isHidden())
+            recebido = []
+            tela.done.connect(lambda chave, so, lembrar: recebido.append((chave, lembrar)))
+            tela._key_input.setText("AQ.xxxxxxxxxxxxxxxxxxxxxxxx")
+            tela._continuar_com_reserva()
+            self.assertEqual(recebido, [("AQ.xxxxxxxxxxxxxxxxxxxxxxxx", False)])
+            self.assertTrue(tela._modo_reserva)
+
+    def test_sem_groq_nao_mostra_o_botao(self):
+        from PyQt6.QtWidgets import QApplication
+        app = QApplication.instance() or QApplication([])
+        import ui
+        with patch.dict("os.environ", {"GROQ_API_KEY": ""}):
+            tela = ui.SetupOverlay()
+            tela._on_validation_finished(False, "API key was rejected by Gemini.", "AQ.x" * 6, False)
+            self.assertTrue(tela._reserva_btn.isHidden())

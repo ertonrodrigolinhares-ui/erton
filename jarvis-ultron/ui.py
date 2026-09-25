@@ -4814,6 +4814,31 @@ class SetupOverlay(QWidget):
         self._init_btn.clicked.connect(self._submit)
         layout.addWidget(self._init_btn)
 
+        # Jarvis Ultron: se o Google recusar a chave, dá para abrir mesmo assim pela reserva (Groq).
+        self._reserva_btn = QPushButton("▸  CONTINUAR COM A RESERVA (GROQ)")
+        self._reserva_btn.setFont(QFont("Courier New", 9, QFont.Weight.Bold))
+        self._reserva_btn.setFixedHeight(32)
+        self._reserva_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._reserva_btn.setToolTip("Abre o Jarvis conversando pelo Groq (sem as ferramentas) "
+                                     "até a chave do Gemini voltar a funcionar.")
+        self._reserva_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent; color: {C.ACC2};
+                border: 1px solid {C.ACC2}; border-radius: 3px;
+            }}
+        """)
+        self._reserva_btn.clicked.connect(self._continuar_com_reserva)
+        self._reserva_btn.hide()
+        layout.addWidget(self._reserva_btn)
+        self._modo_reserva = False
+
+    def _continuar_com_reserva(self):
+        from core.api_key_validator import normalize_gemini_api_key
+        chave = normalize_gemini_api_key(self._key_input.text()) or "sem-gemini"
+        self._modo_reserva = True
+        self._verified_key = chave
+        self.done.emit(chave, self._sel_os, False)
+
     def _sel(self, key: str):
         self._sel_os = key
         pal = {"windows":(C.PRI,C.DARK2),"mac":(C.ACC2,C.DARK),"linux":(C.GREEN,C.DARK)}
@@ -4911,7 +4936,11 @@ class SetupOverlay(QWidget):
         if not valid:
             if os.environ.get("GEMINI_API_KEY", "").strip() == key:
                 os.environ.pop("GEMINI_API_KEY", None)
+            if os.environ.get("GROQ_API_KEY", "").strip():
+                message += "  Se a chave estiver certa, o problema pode ser do Google: use a reserva abaixo."
+                self._reserva_btn.show()
             self._validation_lbl.setText(message)
+            self._validation_lbl.setWordWrap(True)
             self._validation_lbl.setStyleSheet(f"color: {C.RED}; background: transparent;")
             self._key_input.setStyleSheet(f"""
                 QLineEdit {{
@@ -7448,7 +7477,7 @@ class MainWindow(QMainWindow):
         super().resizeEvent(event)
         cw = self.centralWidget()
         if self._overlay and self._overlay.isVisible():
-            ow, oh = 460, 420
+            ow, oh = 460, 470
             self._overlay.setGeometry(
                 (cw.width()  - ow) // 2,
                 (cw.height() - oh) // 2,
@@ -8728,11 +8757,16 @@ class MainWindow(QMainWindow):
 
         normalized_key = normalize_gemini_api_key(key)
         verified_key = getattr(self._overlay, "_verified_key", "") if self._overlay else ""
-        if not normalized_key or normalized_key != verified_key:
+        modo_reserva = bool(getattr(self._overlay, "_modo_reserva", False)) if self._overlay else False
+        if not modo_reserva and (not normalized_key or normalized_key != verified_key):
             self._log.append_log("ERR: Setup blocked because the Gemini API key was not verified.")
             self._ready = False
             return
-        key = normalized_key
+        key = normalized_key or verified_key
+        if modo_reserva:  # Jarvis Ultron: abre pela reserva Groq; não guarda a chave recusada
+            os.environ["JARVIS_SEM_GEMINI"] = "1"
+            remember_key = False
+            self._log.append_log("SYS: Chave do Gemini recusada pelo Google. Usando a reserva (Groq).")
 
         # Persist API key only if user explicitly opts in.
         if remember_key and isinstance(key, str) and key.strip():
@@ -8766,7 +8800,7 @@ class MainWindow(QMainWindow):
         # nova foi aceita aqui, troca também no .env (senão a antiga, recusada, volta a cada abertura).
         try:
             env_jarvis = BASE_DIR / ".env"
-            if env_jarvis.exists() and isinstance(key, str) and key.strip():
+            if env_jarvis.exists() and isinstance(key, str) and key.strip() and not modo_reserva:
                 from core.env_arquivo import atualizar_env
                 atualizar_env(env_jarvis, "GEMINI_API_KEY", key.strip())
                 self._log.append_log("SYS: Chave do Gemini atualizada no arquivo .env.")
