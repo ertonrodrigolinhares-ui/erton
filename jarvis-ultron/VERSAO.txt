@@ -13,5 +13,7 @@ Novidades desta versão:
 - Janela preta mostra [Tempo]: quanto cada resposta e cada ferramenta demoraram.
 - Prioridade rapidez: modelos estáveis, que respondem mais rápido e travam menos (a janela preta
   mostra "[Modelos] Voz: ... | Texto: ..."). Pesquisa na internet sem pedir licença.
+- Agentes (Hermes): cérebro grátis do Nous (rode o "Instalar Hermes" de novo).
+- Tarefas longas dos agentes não travam mais a conversa.
 
 Como conferir que atualizou: a tela mostra o selo embaixo do título "JARVIS ULTRON".

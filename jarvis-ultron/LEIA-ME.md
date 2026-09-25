@@ -134,23 +134,29 @@ Deixe essas linhas de fora para o Jarvis escolher sozinho. Esse é o recomendado
 ## Hermes: agentes, rotina das 8h e redes sociais
 
 O Hermes Agent (Nous Research, código aberto) é o "orquestrador" do Jarvis. Ele divide tarefas
-entre sub-agentes, usa o **OpenRouter** como cérebro e se conecta ao **Metricool** (posts em todas as
+entre sub-agentes, usa os **modelos grátis do Nous Portal** como cérebro e se conecta ao **Metricool** (posts em todas as
 redes) e ao **MCP oficial do Meta** (anúncios do Facebook e Instagram).
 
 ### Instalar (uma vez)
 1. Dê dois cliques em **`Instalar Hermes`** (nesta pasta). Ele:
    - instala o Hermes pelo instalador oficial (se ainda não tiver);
    - cria o perfil **"jarvis"** com as habilidades, a personalidade e a trava de aprovação;
-   - pede a chave do **OpenRouter** (obrigatória) e da **ElevenLabs** (opcional);
+   - usa o login do **Nous Portal** feito na instalação (se não tiver, abre o navegador para entrar)
+     e pede a chave da **ElevenLabs** (opcional);
    - abre o navegador para você autorizar o **Metricool** e, se quiser, o **Meta**;
    - cria a **rotina diária das 8h** e faz o Hermes ligar sozinho com o Windows.
 2. Abra o Jarvis Ultron normalmente.
+
+Pode rodar o **`Instalar Hermes`** de novo sempre que receber uma atualização: ele não reinstala
+o que já existe e só pergunta do Metricool se você quiser reconectar.
 
 ### Como usar
 - **"Hey Jarvis, quais são os posts de hoje?"**: ele lê as propostas que a rotina das 8h preparou.
 - **"Ok, pode publicar os posts 1 e 3"**: ele registra o seu ok e manda publicar pelo Metricool.
 - **"Como estão meus anúncios?"**: relatório do Meta Ads.
 - **"Entre no painel do Metricool e veja os seguidores desta semana"**: o Hermes usa o navegador sozinho.
+- Tarefas longas não travam a conversa: se o Hermes demorar mais de ~25 segundos, o Jarvis avisa e
+  traz a resposta quando ficar pronta (com o modo chamada esperando, ela aparece só na tela).
 
 ### Segurança
 - A rotina das 8h **só prepara** os posts. **Nada é publicado sem o seu "ok".**
@@ -162,8 +168,8 @@ redes) e ao **MCP oficial do Meta** (anúncios do Facebook e Instagram).
 
 ### Custos
 - **Hermes**: grátis. **Metricool**: o conector funciona inclusive no plano grátis.
-- **OpenRouter**: cobra por uso da IA dos agentes (tem modelos gratuitos também). Coloque um limite
-  de gastos no site do OpenRouter.
+- **Cérebro dos agentes**: modelos **grátis** do Nous Portal (os que terminam em `:free`). Se um estiver
+  fora do ar, ele tenta outro grátis. Para trocar: `hermes -p jarvis model`.
 - **ElevenLabs**: plano grátis pequeno; depois, pago.
 
 ### Limitações conhecidas

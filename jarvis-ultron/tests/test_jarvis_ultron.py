@@ -507,7 +507,10 @@ class KitHermesTests(unittest.TestCase):
         import yaml
 
         config = yaml.safe_load((KIT / "config-jarvis.yaml").read_text(encoding="utf-8"))
-        self.assertEqual(config["model"]["provider"], "openrouter")
+        self.assertEqual(config["model"]["provider"], "nous")  # cérebro grátis
+        self.assertTrue(config["model"]["default"].endswith(":free"))
+        self.assertTrue(all(r["model"].endswith(":free") for r in config["fallback_providers"]))
+        self.assertNotIn("provider", config["delegation"])  # sub-agentes herdam o cérebro grátis
         self.assertEqual(set(config["mcp_servers"]), {"metricool", "meta_ads"})
         gancho = config["hooks"]["pre_tool_call"][0]
         self.assertTrue(gancho["fail_closed"])
@@ -790,3 +793,45 @@ class BotoesDeModoTests(unittest.TestCase):
             jarvis._on_text_command("Jarvis, modo chamada")
             self.assertEqual(jarvis._portao.modo, "chamada")
         self.assertTrue(aviso.called)
+
+
+class HermesSemTravarTests(unittest.TestCase):
+    def _jarvis(self):
+        import main
+        jarvis = object.__new__(main.JarvisLive)
+        jarvis.ui = UIFalsa()
+        jarvis._portao = PortaoDeVoz(object(), ativo=False)  # mãos livres: pode falar
+        return jarvis
+
+    def test_resposta_rapida_volta_direto(self):
+        jarvis = self._jarvis()
+        with patch("core.hermes_ponte.perguntar", return_value="3 posts prontos"):
+            self.assertEqual(asyncio.run(jarvis._hermes_sem_travar("posts de hoje")), "3 posts prontos")
+
+    def test_tarefa_longa_nao_trava_e_entrega_depois(self):
+        import time as _time
+        jarvis = self._jarvis()
+        jarvis.HERMES_ESPERA = 0.2
+        enviados = []
+
+        class Sessao:
+            async def send_client_content(self, **kw):
+                enviados.append(kw)
+
+        def devagar(pedido):
+            _time.sleep(0.6)
+            return "relatório pronto"
+
+        async def cenario():
+            jarvis.session, jarvis._loop = Sessao(), asyncio.get_running_loop()
+            inicio = _time.monotonic()
+            resposta = await jarvis._hermes_sem_travar("relatório de anúncios")
+            self.assertLess(_time.monotonic() - inicio, 0.5)  # não esperou a tarefa inteira
+            self.assertIn("still working", resposta)
+            await asyncio.sleep(0.8)
+
+        with patch("core.hermes_ponte.perguntar", side_effect=devagar):
+            asyncio.run(cenario())
+        self.assertTrue(any("relatório pronto" in l for l in jarvis.ui.logs))
+        self.assertEqual(len(enviados), 1)
+        self.assertIn("relatório pronto", enviados[0]["turns"]["parts"][0]["text"])

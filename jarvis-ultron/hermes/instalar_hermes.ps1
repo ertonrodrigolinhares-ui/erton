@@ -1,5 +1,5 @@
 # Instalador do Hermes Agent para o Jarvis Ultron (Windows).
-# Cria o perfil "jarvis" do Hermes com: OpenRouter, sub-agentes, habilidades do perfil de atleta,
+# Cria o perfil "jarvis" do Hermes com: cerebro gratis (Nous), sub-agentes, habilidades do perfil de atleta,
 # conectores Metricool e Meta, voz ElevenLabs, trava de aprovacao e a rotina diaria das 8h.
 
 $ErrorActionPreference = "Stop"
@@ -130,16 +130,19 @@ $gancho = (Join-Path $pastaGancho "aprovacao_jarvis.py") -replace '\\', '/'
 Write-Host "5 habilidades instaladas e trava de aprovacao ligada." -ForegroundColor Green
 
 # ---------------------------------------------------------------- 4. Chaves
-Titulo "4/7  Chaves (OpenRouter e ElevenLabs)"
+Titulo "4/7  Cerebro gratis (Nous) e chave da ElevenLabs"
 $envHermes = Join-Path $perfil ".env"
 $chaves = Ler-Env $envHermes
-if (-not $chaves["OPENROUTER_API_KEY"]) {
-    Write-Host "Chave do OpenRouter (o cerebro dos agentes):"
-    Write-Host "  1. Vai abrir o site do OpenRouter. Entre com a sua conta do Google."
-    Write-Host "  2. Clique em 'Create Key', de o nome Jarvis e copie a chave (comeca com sk-or-)."
-    Start-Process "https://openrouter.ai/keys"
-    do { $valor = Read-Host "Cole a chave do OpenRouter e aperte Enter" } while (-not $valor.Trim())
-    $chaves["OPENROUTER_API_KEY"] = $valor.Trim()
+# O cerebro dos agentes sao os modelos gratis do Nous Portal. O login do Nous feito na instalacao
+# do Hermes (auth.json na pasta do Hermes) vale para o perfil jarvis.
+$authRaiz = Join-Path $raizHermes "auth.json"
+$temNous = (Test-Path $authRaiz) -and ([System.IO.File]::ReadAllText($authRaiz) -match '"nous"')
+if ($temNous) {
+    Write-Host "Login do Nous encontrado: os agentes vao usar os modelos gratis." -ForegroundColor Green
+} else {
+    Write-Host "Falta entrar no Nous Portal (gratis). Vai abrir o navegador: entre e clique em Autorizar."
+    Read-Host "Aperte Enter para entrar no Nous"
+    & $hermes auth add nous --type oauth
 }
 if (-not $chaves.Contains("ELEVENLABS_API_KEY")) {
     Write-Host ""
@@ -159,7 +162,7 @@ Gravar-Env $envHermes $chaves
 Write-Host "Chaves salvas." -ForegroundColor Green
 
 # ---------------------------------------------------------------- 5. config.yaml do perfil
-Titulo "5/7  Configuracao (OpenRouter, Metricool, Meta, voz, trava)"
+Titulo "5/7  Configuracao (cerebro gratis, Metricool, Meta, voz, trava)"
 $configDestino = Join-Path $perfil "config.yaml"
 if ((Test-Path $configDestino) -and -not (Test-Path "$configDestino.antes-do-jarvis")) {
     Copy-Item $configDestino "$configDestino.antes-do-jarvis"
@@ -185,11 +188,20 @@ Write-Host "Configuracao aplicada e Jarvis Ultron ligado ao Hermes." -Foreground
 
 # ---------------------------------------------------------------- 6. Conectores (login uma vez)
 Titulo "6/7  Conectar Metricool e Meta (uma vez so)"
-Write-Host "Vai abrir o navegador para voce autorizar o Metricool (entre na sua conta e clique em Permitir)."
-Read-Host "Aperte Enter para conectar o Metricool"
-& $hermes -p jarvis mcp login metricool
-$meta = Read-Host "Conectar tambem os anuncios do Meta (Facebook/Instagram Ads)? Digite S ou N"
-if ($meta -match '^[sS]') { & $hermes -p jarvis mcp login meta_ads }
+$marcaConectores = Join-Path $pastaJarvis "conectores-feitos.txt"
+$conectar = $true
+if (Test-Path $marcaConectores) {
+    $resposta = Read-Host "O Metricool ja foi conectado antes. Conectar de novo? Digite S ou N (Enter = N)"
+    $conectar = $resposta -match '^[sS]'
+}
+if ($conectar) {
+    Write-Host "Vai abrir o navegador para voce autorizar o Metricool (entre na sua conta e clique em Permitir)."
+    Read-Host "Aperte Enter para conectar o Metricool"
+    & $hermes -p jarvis mcp login metricool
+    $meta = Read-Host "Conectar tambem os anuncios do Meta (Facebook/Instagram Ads)? Digite S ou N"
+    if ($meta -match '^[sS]') { & $hermes -p jarvis mcp login meta_ads }
+    Gravar $marcaConectores (Get-Date -Format "yyyy-MM-dd HH:mm")
+}
 
 # ---------------------------------------------------------------- 7. Rotina das 8h e inicio automatico
 Titulo "7/7  Rotina diaria das 8h e inicio automatico"
@@ -198,6 +210,7 @@ if ($rotinas -notmatch "Rotina do atleta 8h") {
     & $hermes -p jarvis cron create "0 8 * * *" "Execute a rotina diaria do perfil de atleta do Erton." --skill rotina-atleta-8h --name "Rotina do atleta 8h" --deliver local
 }
 & $hermes -p jarvis gateway install
+& $hermes -p jarvis gateway restart  # para o Hermes ja usar a configuracao nova
 Write-Host ""
 Write-Host "Pronto! O Hermes do Jarvis liga sozinho com o Windows e roda a rotina todo dia as 8h." -ForegroundColor Green
 Write-Host "Abra o Jarvis Ultron e diga: 'Hey Jarvis, quais sao os posts de hoje?'"

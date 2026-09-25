@@ -1,16 +1,21 @@
 # Configuração do perfil "jarvis" do Hermes Agent (instalada pelo "Instalar Hermes.bat").
 # Os marcadores __ASSIM__ são trocados pelo instalador.
 
-# Cérebro: OpenRouter. "openrouter/auto" escolhe sozinho o melhor modelo para cada pedido.
-# Para fixar um modelo: rode "hermes -p jarvis model" e escolha na lista.
+# Cérebro: modelos GRÁTIS do Nous Portal (o login do Nous feito na instalação do Hermes vale
+# para este perfil). Se o primeiro estiver fora do ar ou no limite, tenta os de reserva.
+# Para trocar: rode "hermes -p jarvis model" e escolha outro da lista (os ":free" são grátis).
 model:
-  provider: openrouter
-  default: openrouter/auto
+  provider: nous
+  default: upstage/solar-pro4:free
 
-# Sub-agentes (delegate_task): até 3 trabalhando ao mesmo tempo.
+fallback_providers:
+  - provider: nous
+    model: stepfun/step-3.7-flash:free
+  - provider: nous
+    model: meituan/longcat-2.0:free
+
+# Sub-agentes (delegate_task): usam o mesmo cérebro grátis; até 3 trabalhando ao mesmo tempo.
 delegation:
-  provider: openrouter
-  model: openrouter/auto
   max_concurrent_children: 3
   max_spawn_depth: 1
 

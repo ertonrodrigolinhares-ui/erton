@@ -1523,6 +1523,37 @@ class JarvisLive:
                 return voice
         return _load_voice_name()
 
+    HERMES_ESPERA = 25  # segundos que a conversa espera o Hermes; depois ele termina em segundo plano
+
+    async def _hermes_sem_travar(self, pedido: str) -> str:
+        """Jarvis Ultron: tarefas do Hermes podem levar minutos. Espera um pouco; se demorar, a
+        conversa segue e o resultado é entregue quando ficar pronto (antes o Jarvis travava)."""
+        from core import hermes_ponte
+
+        tarefa = asyncio.ensure_future(asyncio.to_thread(hermes_ponte.perguntar, pedido))
+        try:
+            return await asyncio.wait_for(asyncio.shield(tarefa), timeout=self.HERMES_ESPERA)
+        except asyncio.TimeoutError:
+            tarefa.add_done_callback(lambda t: self._entregar_resultado_hermes(pedido, t))
+            self.ui.write_log("SYS: Hermes trabalhando em segundo plano...")
+            return ("Hermes is still working on this long task in the background. Tell the user, in one short "
+                    "sentence in Portuguese, that you will bring the answer as soon as it is ready. Do not wait.")
+
+    def _entregar_resultado_hermes(self, pedido: str, tarefa) -> None:
+        """Mostra o resultado na tela e, se a conversa estiver aberta, pede para o Jarvis resumir em voz."""
+        try:
+            texto = tarefa.result()
+        except Exception as erro:
+            texto = f"O Hermes falhou: {erro}"
+        self.ui.write_log(f"Hermes: {texto[:500]}")
+        session, loop = getattr(self, "session", None), getattr(self, "_loop", None)
+        if session is None or loop is None or self._chamada_fechada():
+            return  # modo chamada esperando o "Hey Jarvis": fica só na tela
+        aviso = (f"[Resultado do Hermes para o pedido: {pedido}]\n{texto}\n"
+                 "Resuma isso para o usuário agora, em português do Brasil, em poucas frases.")
+        asyncio.run_coroutine_threadsafe(
+            session.send_client_content(turns={"parts": [{"text": aviso}]}, turn_complete=True), loop)
+
     def _chamada_fechada(self) -> bool:
         """Jarvis Ultron: True no modo chamada enquanto ninguém disse "Hey Jarvis"."""
         portao = getattr(self, "_portao", None)
@@ -1817,8 +1848,7 @@ class JarvisLive:
                 result = self._definir_modo_escuta(args.get("mode", ""))
 
             elif name == "hermes_agent":
-                from core import hermes_ponte
-                result = await asyncio.to_thread(hermes_ponte.perguntar, args.get("request", ""))
+                result = await self._hermes_sem_travar(args.get("request", ""))
 
             elif name == "approve_publication":
                 from core import hermes_ponte
