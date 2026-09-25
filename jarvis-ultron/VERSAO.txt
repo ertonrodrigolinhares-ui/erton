@@ -3,10 +3,12 @@ Jarvis Ultron - versão 2026-09-25
 Novidades desta versão:
 - Navegador: se o automático não abrir, o site abre no navegador normal (Firefox ou o padrão).
 - Tela mais leve: bem menos processador (esfera parada desenha menos; minimizado não desenha).
-- Chamar: "Hey Jarvis". Palmas são opcionais: "Jarvis, ligar palmas" / "Jarvis, desligar palmas".
-- Som curto + selo na tela: OUVINDO (verde), AGUARDANDO (amarelo), MÃOS LIVRES (azul).
-- Com a chamada fechada ele fica em silêncio: não cumprimenta de novo nem anuncia o modo.
-- Não precisa mais bater palmas para abrir o programa.
+- Sem palmas: o Jarvis abre direto e você chama com "Hey Jarvis".
+- Botões MODO CHAMADA e MÃOS LIVRES embaixo do título (ou fale "Jarvis, modo chamada" /
+  "Jarvis, modo mãos livres").
+- Som curto + selo na tela: OUVINDO (verde), MODO CHAMADA (amarelo), MÃOS LIVRES (azul).
+- No modo chamada, esperando o "Hey Jarvis", ele fica em silêncio: não cumprimenta de novo nem
+  anuncia o modo.
 - Fala sempre em português do Brasil (regra reforçada + voz pt-BR).
 - Gemini 3.5: o Jarvis usa primeiro os modelos 3.5 (a janela preta mostra "[Modelos] Voz: ... | Texto: ...").
 

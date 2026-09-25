@@ -8412,6 +8412,11 @@ class MainWindow(QMainWindow):
         selo = getattr(tela, "selo", None)
         if selo is not None:
             selo.mostrar(estado)
+        maos_livres = estado.startswith("maos_livres")
+        for nome, aceso in (("botao_chamada", not maos_livres), ("botao_maos_livres", maos_livres)):
+            botao = getattr(tela, nome, None)
+            if botao is not None:
+                botao.acender(aceso)
 
     def _set_muted(self, valor: bool):
         if bool(valor) != self._muted:
@@ -9192,7 +9197,7 @@ class JarvisUI:
         self._win._mute_sig.emit(bool(valor))
 
     def set_listening_status(self, estado: str):
-        """Jarvis Ultron: 'ouvindo', 'aguardando' (as palmas) ou 'maos_livres'. Qualquer thread."""
+        """Jarvis Ultron: 'ouvindo', 'aguardando' (o "Hey Jarvis") ou 'maos_livres'. Qualquer thread."""
         self._win._escuta_sig.emit(str(estado))
 
     def write_log(self, text: str):

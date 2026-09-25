@@ -5,7 +5,7 @@ Cópia do projeto **JARVIS-OS V.2** (licença MIT, veja `LICENSE`), com ajustes 
 - **Voz Ultron**: a voz do Gemini ao vivo passa por um efeito metálico (`core/efeito_ultron.py`).
 - **Voz grave "Charon"** como padrão.
 - **Português do Brasil** como idioma padrão e saudação em português.
-- **Sem palmas para abrir o programa** (o original exigia). As palmas viraram opção para abrir/fechar a conversa.
+- **Sem palmas para abrir o programa** (o original exigia bater palmas duas vezes).
 - **Iniciador para Windows** (`Iniciar Jarvis Ultron.bat`) que instala tudo e pede a chave.
 - Correção: o iniciador original do Windows não abria o programa (faltava `JARVIS_CLI=1`).
 - **Central de modelos** (`core/modelos.py`): o Jarvis pergunta ao Google quais modelos a sua chave
@@ -17,27 +17,22 @@ Cópia do projeto **JARVIS-OS V.2** (licença MIT, veja `LICENSE`), com ajustes 
 - **Gerar imagens (Nano Banana)**: "Jarvis, crie uma imagem de um leão de armadura".
   A imagem abre na hora e fica salva em **Documentos\Jarvis Ultron\Imagens**.
   Atenção: o Google pode não liberar cota grátis de imagens para a sua chave; nesse caso o Jarvis avisa.
-- **Chamar o Jarvis** (`core/palavra_ativacao.py`): diga **"Hey Jarvis"** (dá para emendar o pedido:
-  "Hey Jarvis, que horas são?"). O reconhecimento roda no seu computador, sem internet: **nada do
-  que você fala antes disso vai para o Google**. Depois de ~20 segundos de silêncio ele volta a esperar.
-  - **Com a chamada fechada ele fica em silêncio**: não fala sozinho, não cumprimenta de novo quando
+- **Chamar o Jarvis** (`core/palavra_ativacao.py`): no **modo chamada**, diga **"Hey Jarvis"** (dá para
+  emendar o pedido: "Hey Jarvis, que horas são?"). O reconhecimento roda no seu computador, sem
+  internet: **nada do que você fala antes disso vai para o Google**. Depois de ~20 segundos de
+  silêncio ele volta a esperar.
+  - **Esperando o "Hey Jarvis" ele fica em silêncio**: não fala sozinho, não cumprimenta de novo quando
     a conexão reinicia e não fica anunciando o modo.
-  - **Aviso:** um **som** curto (sobe = ouvindo, desce = parou, três notas = mãos livres) e um **selo**
-    embaixo do título: verde "OUVINDO", amarelo "AGUARDANDO", azul "MÃOS LIVRES".
-    `JARVIS_SOM_AVISO=0` desliga o som.
-- **Palmas (opcional, você escolhe):** diga **"Jarvis, ligar palmas"** para ativar e
-  **"Jarvis, desligar palmas"** para desativar. A escolha fica guardada.
-  - Com as palmas ligadas: **2 palmas** 👏👏 abrem a conversa e **mais 2 palmas** fecham (sem tempo limite).
-  - Palmas firmes, com meio segundo entre elas, e depois um instante de silêncio. Três ou mais
-    seguidas não contam (é assim que ele ignora a digitação).
-  - Se ele não perceber as suas palmas: `JARVIS_SENSIBILIDADE_PALMAS=1.5` no `.env`
-    (maior = aceita palmas mais fracas; menor = mais rigoroso).
+  - **Aviso:** um **som** curto (sobe = ouvindo, desce = voltou a esperar, três notas = mãos livres) e
+    um **selo** embaixo do título. `JARVIS_SOM_AVISO=0` desliga o som.
+- **Botões de modo** embaixo do selo: **☏ MODO CHAMADA** e **⛭ MÃOS LIVRES** (o aceso é o modo atual).
+  Trocam na hora, sem passar pela IA.
 - **Trocar o modo falando** (com a chamada ligada):
   - **"Jarvis, modo mãos livres"**: ele passa a responder a **tudo**, sem precisar chamar.
-  - **"Jarvis, modo chamada"**: ele volta a esperar o **"Hey Jarvis"** (ou as palmas, se ligadas).
+  - **"Jarvis, modo chamada"**: ele volta a esperar o **"Hey Jarvis"**.
   - Ao abrir, ele começa no modo chamada (mude com `JARVIS_PALAVRA_ATIVACAO=0` para começar em mãos livres).
 - **IA reserva Groq** (`core/reserva_groq.py`): se o Gemini cair ou atingir o limite, o Jarvis
-  entra no **modo reserva**: continua ouvindo (depois das palmas), entende com o Whisper do
+  entra no **modo reserva**: continua ouvindo (depois do "Hey Jarvis"), entende com o Whisper do
   Groq, responde pelo Groq e fala com a voz grátis da Microsoft. No modo reserva ele **conversa,
   mas não usa as ferramentas** (abrir apps, e-mail...). Quando o Gemini volta, tudo volta ao normal.
 - Correção: quando a conexão falhava, o original tentava reconectar sem parar, várias vezes por
@@ -77,15 +72,13 @@ Cópia do projeto **JARVIS-OS V.2** (licença MIT, veja `LICENSE`), com ajustes 
 - **Chave do Groq:** o iniciador pergunta uma vez. Para colocar ou trocar depois, abra o `.env`
   no Bloco de Notas e edite a linha `GROQ_API_KEY="..."` (chave grátis em https://console.groq.com/keys).
 
-## Se o "Hey Jarvis" ou as palmas não funcionarem bem
+## Se o "Hey Jarvis" não funcionar bem
 
-- **"Hey Jarvis" não acorda:** fale com pronúncia em inglês, perto do microfone. Se ainda falhar,
-  `JARVIS_SENSIBILIDADE=0.3` no `.env`. **Acorda sozinho:** `JARVIS_SENSIBILIDADE=0.7`.
-- **Palmas não funcionam:** a janela preta mostra `[Palmas] 1ª palma` / `2ª palma` quando ele ouve.
-  Se nada aparece, aumente `JARVIS_SENSIBILIDADE_PALMAS` (ex.: `1.5`). Se preferir, desligue:
-  "Jarvis, desligar palmas".
-- **Prefere que ele ouça sempre:** diga "Jarvis, modo mãos livres" (ou coloque
-  `JARVIS_PALAVRA_ATIVACAO=0` para ele já abrir assim).
+- **Ele não acorda:** fale "Hey Jarvis" com pronúncia em inglês, perto do microfone. Se ainda
+  falhar, coloque `JARVIS_SENSIBILIDADE=0.3` no `.env`.
+- **Ele acorda sozinho:** aumente para `JARVIS_SENSIBILIDADE=0.7`.
+- **Prefere que ele ouça sempre:** aperte **⛭ MÃOS LIVRES** (ou coloque `JARVIS_PALAVRA_ATIVACAO=0`
+  para ele já abrir assim).
 
 ## Se o Jarvis não conseguir abrir um site
 
@@ -118,8 +111,7 @@ Abra com o Bloco de Notas para mudar:
 | `JARVIS_TEMA_STARK=1` | Tela Stark ligada. `0` = volta para a tela original |
 | `JARVIS_CIDADE=Campina Grande` | Cidade do painel de clima |
 | `JARVIS_GEMINI_VERSAO=3.5` | Usa primeiro os modelos Gemini dessa versão (se a sua chave tiver). Apague a linha para voltar à escolha automática |
-| `JARVIS_ATIVACAO=voz` | Palmas desligadas no começo (`ambos` = já começa com palmas ligadas). Depois vale o que você pedir por voz |
-| `JARVIS_PALAVRA_ATIVACAO=1` | Começa no modo chamada (esperando as palmas). `0` = começa em mãos livres |
+| `JARVIS_PALAVRA_ATIVACAO=1` | Começa no modo chamada (esperando o "Hey Jarvis"). `0` = começa em mãos livres |
 | `JARVIS_SENSIBILIDADE=0.5` | Menor (ex.: `0.3`) = aceita o "Hey Jarvis" com mais facilidade; maior = mais rigoroso |
 | `JARVIS_JANELA_CONVERSA=20` | Segundos que ele continua ouvindo depois da última fala |
 | `GROQ_API_KEY="gsk_..."` | Chave do Groq (reserva grátis). O iniciador pergunta uma vez |

@@ -53,8 +53,6 @@ BOTOES = [
     ("☀", "Clima", "como está o tempo hoje?"),
     ("✉", "E-mails", "tenho e-mails não lidos?"),
     ("♫", "Música", "toque uma música no Spotify"),
-    ("⛭", "Mãos livres", "modo mãos livres"),
-    ("☏", "Modo chamada", "modo chamada"),
     ("⏸", "Suspender 10 min", "fique suspenso por 10 minutos"),
     ("⌂", "Pasta do Jarvis", "@pasta"),
     ("⚡", "Resumo do dia", "me dê um resumo do meu dia"),
@@ -376,13 +374,11 @@ class Titulo(QWidget):
 
 
 class SeloEscuta(QWidget):
-    """Selo embaixo do título: mostra se o Jarvis está ouvindo, esperando as palmas ou em mãos livres."""
+    """Selo embaixo do título: mostra se o Jarvis está ouvindo, esperando o "Hey Jarvis" ou em mãos livres."""
 
     ESTADOS = {
-        "ouvindo:palmas": ("●  CHAMADA ATIVA  ·  2 PALMAS PARA ENCERRAR", VERDE),
-        "ouvindo:voz": ("●  OUVINDO", VERDE),
-        "aguardando:palmas": ('○  AGUARDANDO 2 PALMAS OU "HEY JARVIS"', AMBAR),
-        "aguardando:voz": ('○  AGUARDANDO "HEY JARVIS"', AMBAR),
+        "ouvindo": ("●  OUVINDO", VERDE),
+        "aguardando": ('○  MODO CHAMADA  ·  DIGA "HEY JARVIS"', AMBAR),
         "maos_livres": ("●  MÃOS LIVRES  ·  OUVINDO TUDO", AZUL_FORTE),
     }
 
@@ -393,10 +389,7 @@ class SeloEscuta(QWidget):
         self._brilho = 0
 
     def mostrar(self, estado: str) -> None:
-        if estado.startswith("maos_livres"):
-            estado = "maos_livres"
-        elif ":" not in estado:
-            estado += ":voz"
+        estado = estado.split(":")[0]
         if estado in self.ESTADOS:
             self.estado = estado
             self._brilho = 10  # pisca forte por um instante quando muda
@@ -422,6 +415,26 @@ class SeloEscuta(QWidget):
         p.drawRoundedRect(caixa, caixa.height() / 2, caixa.height() / 2)
         p.setPen(_cor(cor))
         p.drawText(caixa, Qt.AlignmentFlag.AlignCenter, texto)
+
+
+class BotaoModo(QPushButton):
+    """Botão com nome (Modo chamada / Mãos livres); aceso quando é o modo atual."""
+
+    def __init__(self, texto: str, dica: str, parent=None):
+        super().__init__(texto, parent)
+        self.setToolTip(dica)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFont(Fontes.de(9, True, tech=True))
+        self.setFixedHeight(26)
+        self.acender(False)
+
+    def acender(self, aceso: bool) -> None:
+        cor = AZUL_FORTE if aceso else AZUL_ESCURO
+        fundo = "rgba(0,229,255,45)" if aceso else "transparent"
+        self.setStyleSheet(
+            f"QPushButton {{ color: {cor}; background: {fundo}; border: 1px solid {cor};"
+            f" border-radius: 13px; padding: 0 14px; }}"
+            f"QPushButton:hover {{ color: {AZUL_FORTE}; border-color: {AZUL_FORTE}; }}")
 
 
 class BotaoRedondo(QPushButton):
@@ -510,6 +523,17 @@ class TelaStark(QWidget):
         centro_coluna.addWidget(Titulo("JARVIS  ULTRON", 24))
         self.selo = SeloEscuta()
         centro_coluna.addWidget(self.selo)
+        linha_modos = QHBoxLayout()
+        linha_modos.setSpacing(10)
+        linha_modos.addStretch(1)
+        self.botao_chamada = BotaoModo("☏  MODO CHAMADA", "Só responde depois de \"Hey Jarvis\"")
+        self.botao_maos_livres = BotaoModo("⛭  MÃOS LIVRES", "Responde a tudo o que você falar")
+        self.botao_chamada.clicked.connect(lambda: self._acionar("modo chamada"))
+        self.botao_maos_livres.clicked.connect(lambda: self._acionar("modo mãos livres"))
+        linha_modos.addWidget(self.botao_chamada)
+        linha_modos.addWidget(self.botao_maos_livres)
+        linha_modos.addStretch(1)
+        centro_coluna.addLayout(linha_modos)
         centro_coluna.addWidget(centro, stretch=1)
         meio.addLayout(centro_coluna, stretch=1)
         meio.addWidget(self.direita)

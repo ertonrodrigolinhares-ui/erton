@@ -423,15 +423,13 @@ TOOL_DECLARATIONS = [
         "name": "listening_mode",
         "description": (
             "Switches how JARVIS listens. 'maos_livres' (hands-free): answers everything the user says, "
-            "no wake word needed. 'chamada' (call mode): answers only after the user claps twice (or says 'Hey Jarvis' if configured). "
-            "Use when the user says 'modo mãos livres' or 'modo chamada'. 'palmas_ligadas'/'palmas_desligadas': "
-            "the user asked to turn clapping (2 claps open/close the call) on or off."
+            "no wake word needed. 'chamada' (call mode): answers only after the user says 'Hey Jarvis'. "
+            "Use when the user says 'modo mãos livres' or 'modo chamada'."
         ),
         "parameters": {
             "type": "OBJECT",
             "properties": {
-                "mode": {"type": "STRING", "enum": ["maos_livres", "chamada", "palmas_ligadas", "palmas_desligadas"],
-                         "description": "The listening mode, or turn the optional clap trigger on/off"}
+                "mode": {"type": "STRING", "enum": ["maos_livres", "chamada"], "description": "The listening mode"}
             },
             "required": ["mode"]
         }
@@ -1290,6 +1288,14 @@ class JarvisLive:
         self._falhas_seguidas = 0
 
     def _on_text_command(self, text: str):
+        # Jarvis Ultron: "modo chamada" / "modo mãos livres" (botões ou digitado) trocam na hora,
+        # aqui mesmo, sem passar pela IA.
+        from core.palavra_ativacao import modo_pedido
+
+        modo = modo_pedido(text)
+        if modo and len(str(text).split()) <= 6:
+            self._definir_modo_escuta(modo)  # o som e o selo confirmam
+            return
         if not self._loop or not self.session:
             if getattr(self, "_reserva", None) is not None and str(text or "").strip():
                 threading.Thread(target=self._responder_pela_reserva, args=(text,), daemon=True).start()
@@ -1518,7 +1524,7 @@ class JarvisLive:
         return _load_voice_name()
 
     def _chamada_fechada(self) -> bool:
-        """Jarvis Ultron: True no modo chamada enquanto ninguém chamou (palmas / "Hey Jarvis")."""
+        """Jarvis Ultron: True no modo chamada enquanto ninguém disse "Hey Jarvis"."""
         portao = getattr(self, "_portao", None)
         return portao is not None and portao.estado == "aguardando"
 
@@ -1606,13 +1612,8 @@ class JarvisLive:
         return os.environ.get("JARVIS_IDIOMA", "pt-BR").strip()
 
     def _definir_modo_escuta(self, modo: str) -> str:
-        """Jarvis Ultron: 'maos_livres' (ouve tudo) ou 'chamada' (só depois das palmas / "Hey Jarvis")."""
+        """Jarvis Ultron: 'maos_livres' (ouve tudo) ou 'chamada' (só depois de "Hey Jarvis")."""
         portao = getattr(self, "_portao", None)
-        if modo in ("palmas_ligadas", "palmas_desligadas") and portao is not None:
-            if not portao.ligar_palmas(modo == "palmas_ligadas"):
-                return "Could not change the clap option on this computer. Tell the user briefly in Portuguese."
-            self.ui.write_log(f"SYS: Palmas {'ligadas' if portao.usar_palmas else 'desligadas'}.")
-            return QUIET_MODE_RESULT
         if modo not in ("maos_livres", "chamada") or portao is None:
             return "Invalid mode. Use 'maos_livres' or 'chamada'."
         if portao.modo == modo:
@@ -1628,7 +1629,7 @@ class JarvisLive:
         return QUIET_MODE_RESULT
 
     def _aviso_de_escuta(self, estado: str) -> None:
-        """Jarvis Ultron: som curto + selo na tela quando a chamada abre/fecha ou o modo muda."""
+        """Jarvis Ultron: som curto + selo na tela quando ele começa/para de ouvir ou o modo muda."""
         from core.palavra_ativacao import tocar_aviso
 
         print(f"[Ativação] {estado}")
@@ -1636,20 +1637,15 @@ class JarvisLive:
         self._mostrar_selo(estado)
 
     def _mostrar_selo(self, estado: str) -> None:
-        portao = getattr(self, "_portao", None)
         mostrar = getattr(self.ui, "set_listening_status", None)
         if callable(mostrar):
-            jeito = "palmas" if portao is not None and portao.usar_palmas else "voz"
-            mostrar(f"{estado}:{jeito}")
+            mostrar(estado)
 
     def _checar_pedido_de_modo(self, fala: str) -> None:
         """Troca o modo pela frase falada, mesmo que a IA não chame a ferramenta."""
-        from core.palavra_ativacao import modo_pedido, palmas_pedido
+        from core.palavra_ativacao import modo_pedido
 
         portao = getattr(self, "_portao", None)
-        palmas = palmas_pedido(fala)
-        if palmas is not None and portao is not None and portao.usar_palmas != palmas:
-            self._definir_modo_escuta("palmas_ligadas" if palmas else "palmas_desligadas")
         modo = modo_pedido(fala)
         if modo and portao is not None and portao.modo != modo:
             self._definir_modo_escuta(modo)
@@ -1705,7 +1701,7 @@ class JarvisLive:
         motor.speak_sync(texto)
 
     def _escutar_reserva(self) -> None:
-        """No modo reserva: ouve (depois das palmas / "Hey Jarvis"), transcreve e responde pelo Groq."""
+        """No modo reserva: ouve (depois do "Hey Jarvis"), transcreve e responde pelo Groq."""
         from core.reserva_groq import capturar_falas
 
         try:
@@ -2222,7 +2218,7 @@ class JarvisLive:
                         if self._complete_self_quit_after_audio():
                             return
                     continue
-                # Jarvis Ultron: com a chamada fechada (esperando palmas), ele não fala sozinho.
+                # Jarvis Ultron: no modo chamada, esperando o "Hey Jarvis", ele não fala sozinho.
                 if self._chamada_fechada():
                     continue
                 # Skip Gemini audio when external TTS is active
@@ -2388,9 +2384,7 @@ def main():
     if os.environ.get("JARVIS_CLI") != "1" and not running_as_app:
         print("[JARVIS] Please launch with the JARVIS CLI: jarvis")
         return
-    # Jarvis Ultron: abre direto (palmas para abrir o programa só com JARVIS_PALMAS_PARA_ABRIR=1).
-    if os.environ.get("JARVIS_PALMAS_PARA_ABRIR", "").strip() == "1" and not wait_for_startup_claps():
-        return
+    # Jarvis Ultron: abre direto, sem palmas.
     print("[JARVIS] ⚡ Powering up the interface...")
     try:
         ui = JarvisUI("face.png")
