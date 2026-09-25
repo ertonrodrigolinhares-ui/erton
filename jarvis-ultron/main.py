@@ -2563,7 +2563,7 @@ class JarvisLive:
         )
         live_model = await asyncio.to_thread(pick_live_model, client, API_CONFIG_PATH)
         live_model_id = live_model.removeprefix("models/")
-        self.ui.write_log(f"SYS: Gemini Live model selected: {live_model_id}")
+        from core import modelos as central_de_modelos
 
         start_time = time.time()
         while True:
@@ -2600,8 +2600,13 @@ class JarvisLive:
                     print(f"[JARVIS] 🔒 Locked path check error: {e}")
                     time.sleep(1)
                     continue
+            # Jarvis Ultron: o modelo de voz que vai ser usado agora (3.x antes do 2.5; se um falhar,
+            # a central passa para o próximo).
+            modelo_voz = central_de_modelos.resolver(live_model_id)
+            conectou = False
             try:
-                print("[JARVIS] 🔌 Connecting...")
+                print(f"[JARVIS] 🔌 Connecting ({modelo_voz})...")
+                self.ui.write_log(f"SYS: Modelo de voz: {modelo_voz}")
                 self.ui.set_state("THINKING")
                 config = self._build_config()
 
@@ -2616,6 +2621,7 @@ class JarvisLive:
                     self._turn_done_event = asyncio.Event()
 
                     print("[JARVIS] ✅ Connected.")
+                    conectou = True
                     self._falhas_seguidas = 0
                     if self._modo_reserva:
                         self._desativar_modo_reserva()
@@ -2678,7 +2684,26 @@ class JarvisLive:
                     self._falhas_seguidas += 1
                     if self._reserva is not None and self._falhas_seguidas >= 2:
                         self._ativar_modo_reserva()
-                    await self._wait_before_reconnect(min(60, 2 ** min(self._falhas_seguidas, 6)))
+                    proximo = modelo_voz
+                    if not conectou or _modelo_indisponivel(actual):
+                        # Este modelo não pegou: deixa ele de lado e tenta outro modelo do Gemini.
+                        central_de_modelos.pular(modelo_voz)
+                        proximo = central_de_modelos.resolver(live_model_id)
+                    if proximo != modelo_voz:
+                        self.ui.write_log(f"SYS: A voz {modelo_voz} não respondeu. Tentando {proximo}...")
+                        print(f"[Modelos] Voz: {modelo_voz} falhou; trocando para {proximo}.")
+                        await self._wait_before_reconnect(2)
+                    else:
+                        await self._wait_before_reconnect(min(60, 2 ** min(self._falhas_seguidas, 6)))
+
+def _modelo_indisponivel(erro: Exception) -> bool:
+    """Erro que é do modelo (aposentado, sem cota, não suporta voz ao vivo), não da internet."""
+    texto = f"{type(erro).__name__} {erro}".lower()
+    codigo = getattr(erro, "code", None) or getattr(erro, "status_code", None)
+    return codigo in (404, 429) or any(p in texto for p in (
+        "not found", "not supported", "is not supported", "resource_exhausted", "quota", "deprecated",
+        "no longer available", "retired", "1008"))
+
 
 def main():
     import sys

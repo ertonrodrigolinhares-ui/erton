@@ -28,6 +28,8 @@ Novidades desta versão:
 - Lembretes falados (automacoes/lembretes.py): "Jarvis, me lembra às 15h de..."; no modo chamada
   o aviso espera o "Hey Jarvis". Os lembretes do Geekie também esperam, em vez de se perderem.
 - Rotinas salvas (automacoes/rotinas.py): "Jarvis, rotina bom dia" — seus agentes para tarefas repetidas.
+- Voz: usa o Gemini 3.x (3.5, depois 3.1) antes do 2.5; se um modelo não pegar, troca sozinho
+  para o próximo (a tela mostra "Modelo de voz: ...").
 - Central de missões na tela Stark (automacoes/painel_stark.py): próximo lembrete, Geekie, agentes e
   botões das rotinas.
 

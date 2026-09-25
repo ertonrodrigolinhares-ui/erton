@@ -65,6 +65,29 @@ class CentralDeModelosTests(unittest.TestCase):
         self.assertLess(vivos.index("gemini-3.5-flash-native-audio-preview"),
                         vivos.index("gemini-2.5-flash-native-audio"))
 
+    def test_voz_3x_antes_do_2_5_mesmo_sem_audio_nativo_e_troca_quando_falha(self):
+        modelos._cache = _lista("gemini-2.5-flash-native-audio-preview-12-2025", "gemini-3.1-flash-live-preview",
+                                "gemini-3.5-flash-live-preview", acao="bidigeneratecontent")
+        modelos._falharam.clear()
+        with patch.dict("os.environ", {"JARVIS_PRIORIDADE": "rapidez"}):
+            self.assertEqual(modelos.candidatos("gemini-live-native-audio"), [
+                "gemini-3.5-flash-live-preview", "gemini-3.1-flash-live-preview",
+                "gemini-2.5-flash-native-audio-preview-12-2025"])
+            modelos.pular("models/gemini-3.5-flash-live-preview")  # a voz não conectou nele
+            self.assertEqual(modelos.resolver("gemini-live-native-audio"), "gemini-3.1-flash-live-preview")
+            modelos.pular("gemini-3.1-flash-live-preview")
+            self.assertEqual(modelos.resolver("gemini-live-native-audio"),
+                             "gemini-2.5-flash-native-audio-preview-12-2025")
+            modelos.pular("gemini-2.5-flash-native-audio-preview-12-2025")  # todos falharam: recomeça
+            self.assertEqual(modelos.resolver("gemini-live-native-audio"), "gemini-3.5-flash-live-preview")
+        modelos._falharam.clear()
+
+    def test_erro_de_modelo_indisponivel(self):
+        import main
+        self.assertTrue(main._modelo_indisponivel(RuntimeError("models/x is not found for API version v1beta")))
+        self.assertTrue(main._modelo_indisponivel(RuntimeError("1008 policy violation: model deprecated")))
+        self.assertFalse(main._modelo_indisponivel(OSError("Temporary failure in name resolution")))
+
     def test_escolha_manual_no_env(self):
         with patch.dict("os.environ", {"JARVIS_MODELO_TEXTO": "gemini-2.5-flash"}):
             self.assertEqual(modelos.resolver("gemini-2.5-flash"), "gemini-2.5-flash")

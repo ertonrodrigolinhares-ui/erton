@@ -145,10 +145,12 @@ def _da_categoria(cat: str, modelos: list[tuple[str, set[str]]]) -> list[str]:
     gerar = [n for n, acoes in modelos if "generatecontent" in acoes and n.startswith("gemini")]
     if cat == "ao_vivo":
         vivos = [n for n, acoes in modelos if "bidigeneratecontent" in acoes]
-        # Voz: áudio nativo (mais rápido), estável antes de preview/experimental, depois o mais novo.
-        return sorted(vivos, key=lambda n: ("native-audio" not in n, _fora_da_preferida(n),
-                                            _versao(n) < VERSAO_MINIMA,  # 2.5: aposentando
-                                            _grupo(n) == 2 and prioridade() == "rapidez", -_versao(n), n))
+        # Voz: 3.x sempre antes do 2.5 (aposentando), mesmo que o 2.5 seja de áudio nativo; depois a
+        # versão escolhida no .env, estável antes de preview, a mais nova (3.5 antes de 3.1) e, na
+        # mesma versão, o áudio nativo (mais rápido).
+        return sorted(vivos, key=lambda n: (_versao(n) < VERSAO_MINIMA, _fora_da_preferida(n),
+                                            _grupo(n) == 2 and prioridade() == "rapidez", -_versao(n),
+                                            "native-audio" not in n, n))
     if cat == "imagem":
         return _ordenar([n for n in gerar if "image" in n and "imagen" not in n])
     if cat == "leve":
@@ -188,7 +190,28 @@ def candidatos(pedido: str) -> list[str]:
         lista += [pedido] + ([_ALIAS[cat]] if cat in _ALIAS else [])
         if cat == "imagem":
             lista += ["gemini-3.1-flash-image", "gemini-2.5-flash-image"]
-    return list(dict.fromkeys(m for m in lista if m)) or [pedido]
+    return _sem_os_que_falharam(list(dict.fromkeys(m for m in lista if m)) or [pedido])
+
+
+# ---------- modelos que acabaram de falhar ----------
+
+PULAR_POR = 10 * 60  # segundos que um modelo que falhou fica de lado antes de ser tentado de novo
+_falharam: dict[str, float] = {}
+
+
+def pular(modelo: str) -> None:
+    """Deixa este modelo de lado por um tempo (ex.: a voz não conectou nele): usa o próximo."""
+    _falharam[str(modelo or "").removeprefix("models/")] = time.time()
+
+
+def _sem_os_que_falharam(lista: list[str]) -> list[str]:
+    agora = time.time()
+    ativos = [m for m in lista if agora - _falharam.get(m, 0) > PULAR_POR]
+    if ativos:
+        return ativos + [m for m in lista if m not in ativos]  # os que falharam vão para o fim
+    for m in lista:  # todos falharam: começa a volta de novo
+        _falharam.pop(m, None)
+    return lista
 
 
 def resolver(pedido: str) -> str:
