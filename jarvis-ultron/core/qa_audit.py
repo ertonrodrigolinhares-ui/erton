@@ -10,7 +10,7 @@ from core.qa_report import Finding
 
 
 EXPECTED_TOOLS = {
-    "open_app", "web_search", "weather_report", "check_messages", "generate_image", "suspend_listening", "hermes_agent", "approve_publication", "listening_mode",
+    "open_app", "web_search", "weather_report", "check_messages", "generate_image", "suspend_listening", "hermes_agent", "approve_publication", "listening_mode", "self_diagnosis",
     "prepare_message_reply", "send_message", "email_control", "reminder", "youtube_video", "media_control",
     "screen_process", "computer_settings", "browser_control", "file_controller",
     "desktop_control", "code_helper", "dev_agent", "agent_task",

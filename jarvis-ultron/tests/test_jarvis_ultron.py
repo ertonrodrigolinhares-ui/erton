@@ -960,3 +960,84 @@ class VozDaReservaTests(unittest.TestCase):
         from actions.tts_engine import falar_com_voz_do_windows
         with patch("os.name", "posix"):
             self.assertFalse(falar_com_voz_do_windows("oi"))
+
+
+class AutodiagnosticoTests(unittest.TestCase):
+    def test_reconhece_o_pedido(self):
+        from core.autodiagnostico import pediu_diagnostico
+        for frase in ("faça um autodiagnóstico do sistema", "Jarvis, diagnóstico", "o que está com defeito?",
+                      "verifique seu sistema"):
+            self.assertTrue(pediu_diagnostico(frase), frase)
+        self.assertFalse(pediu_diagnostico("que horas são?"))
+
+    def test_relatorio_e_resumo_falado(self):
+        from core.autodiagnostico import Item, relatorio, resumo_falado, salvar
+        import tempfile
+        itens = [Item("Internet", "ok", "conectado"),
+                 Item("Hermes (agentes)", "defeito", "o Hermes está desligado", "Dê dois cliques em 'Ligar Hermes'."),
+                 Item("Computador", "atencao", "memória 88%", "Feche abas.")]
+        texto = relatorio(itens)
+        self.assertIn("[DEFEITO] Hermes (agentes): o Hermes está desligado", texto)
+        self.assertIn("→ Dê dois cliques em 'Ligar Hermes'.", texto)
+        falado = resumo_falado(itens)
+        self.assertIn("encontrei 2 pontos", falado)
+        self.assertLess(falado.index("Hermes"), falado.index("Computador"))  # defeito antes de atenção
+        self.assertIn("tudo funcionando", resumo_falado([Item("Internet", "ok", "conectado")]))
+        arquivo = salvar(texto, tempfile.mkdtemp())
+        self.assertEqual(arquivo.read_text(encoding="utf-8").strip(), texto.strip())
+
+    def test_hermes_desligado_e_sem_chaves(self):
+        import requests
+        from core import autodiagnostico as ad
+
+        def recusa(*a, **k):
+            raise requests.exceptions.ConnectionError()
+
+        with patch.dict("os.environ", {"HERMES_API_KEY": "k" * 20, "GROQ_API_KEY": ""}), \
+                patch.object(requests, "get", side_effect=recusa):
+            hermes = ad.verificar_hermes()
+            groq = ad.verificar_groq()
+        self.assertEqual((hermes.estado, groq.estado), ("defeito", "atencao"))
+        self.assertIn("Ligar Hermes", hermes.dica)
+
+    def test_chave_aq_recusada_vira_dica_certa(self):
+        from core import autodiagnostico as ad
+
+        class Cliente:
+            def __init__(self, **kw):
+                self.models = self
+
+            def list(self):
+                raise RuntimeError("401 UNAUTHENTICATED ... ACCESS_TOKEN_TYPE_UNSUPPORTED")
+
+        with patch.dict("os.environ", {"GEMINI_API_KEY": "AQ.ExemploFalso0000000000000000"}), \
+                patch("google.genai.Client", Cliente):
+            item = ad.verificar_gemini()
+        self.assertEqual(item.estado, "defeito")
+        self.assertIn("outro Gmail", item.dica)
+
+    def test_uma_verificacao_quebrada_nao_derruba_as_outras(self):
+        from core import autodiagnostico as ad
+        with patch.object(ad, "verificar_internet", side_effect=RuntimeError("boom")), \
+                patch.object(ad, "verificar_gemini", return_value=ad.Item("Chave do Gemini", "ok", "x")), \
+                patch.object(ad, "verificar_groq", return_value=ad.Item("Reserva Groq", "ok", "x")), \
+                patch.object(ad, "verificar_hermes", return_value=ad.Item("Hermes (agentes)", "ok", "x")), \
+                patch.object(ad, "verificar_modelos", return_value=ad.Item("Modelos do Gemini", "ok", "x")):
+            itens = ad.diagnosticar(None)
+        nomes = [i.nome for i in itens]
+        self.assertIn("Internet", nomes)
+        self.assertEqual(itens[0].estado, "atencao")
+        self.assertIn("Computador", nomes)
+
+    def test_botao_sem_gemini_roda_local(self):
+        import main
+        jarvis = object.__new__(main.JarvisLive)
+        jarvis.ui = UIFalsa()
+        jarvis._portao = PortaoDeVoz(object())
+        jarvis.session = None
+        jarvis._reserva = None
+        with patch.object(main.JarvisLive, "_autodiagnostico") as auto:
+            jarvis._on_text_command("faça um autodiagnóstico do sistema")
+            import time as _t
+            _t.sleep(0.2)
+        auto.assert_called_once()

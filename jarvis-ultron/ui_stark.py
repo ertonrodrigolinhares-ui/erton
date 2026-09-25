@@ -56,6 +56,7 @@ BOTOES = [
     ("⏸", "Suspender 10 min", "fique suspenso por 10 minutos"),
     ("⌂", "Pasta do Jarvis", "@pasta"),
     ("⚡", "Resumo do dia", "me dê um resumo do meu dia"),
+    ("✚", "Autodiagnóstico", "faça um autodiagnóstico do sistema"),
 ]
 
 

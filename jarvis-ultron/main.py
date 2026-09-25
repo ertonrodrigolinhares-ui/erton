@@ -451,6 +451,16 @@ TOOL_DECLARATIONS = [
         }
     },
     {
+        "name": "self_diagnosis",
+        "description": (
+            "Runs JARVIS's self-diagnosis: checks internet, the Gemini key and models, the Groq backup, "
+            "Hermes (agents), microphone, speakers, computer memory/disk, the automation browser and the "
+            "wake word. Use when the user asks what is wrong, to check/diagnose the system, or why something "
+            "is not working. Afterwards, tell the user in Portuguese only the problems found and how to fix them."
+        ),
+        "parameters": {"type": "OBJECT", "properties": {}}
+    },
+    {
         "name": "hermes_agent",
         "description": (
             "Sends a task to Hermes, JARVIS's autonomous orchestrator with sub-agents. Use for: social media "
@@ -1312,6 +1322,11 @@ class JarvisLive:
         if modo and len(str(text).split()) <= 6:
             self._definir_modo_escuta(modo)  # o som e o selo confirmam
             return
+        # Autodiagnóstico sem depender do Gemini (é justamente quando ele falha que mais precisa)
+        from core.autodiagnostico import pediu_diagnostico
+        if pediu_diagnostico(text) and (not self.session or getattr(self, "_modo_reserva", False)):
+            threading.Thread(target=self._autodiagnostico, daemon=True).start()
+            return
         if not self._loop or not self.session:
             if getattr(self, "_reserva", None) is not None and str(text or "").strip():
                 threading.Thread(target=self._responder_pela_reserva, args=(text,), daemon=True).start()
@@ -1538,6 +1553,25 @@ class JarvisLive:
             if voice in SUPPORTED_VOICE_NAMES:
                 return voice
         return _load_voice_name()
+
+    def _autodiagnostico(self, falar: bool = True) -> str:
+        """Jarvis Ultron: confere as próprias peças; mostra na tela, salva em Documentos e (se falar) diz."""
+        from core import autodiagnostico
+
+        self.ui.write_log("SYS: Fazendo o autodiagnóstico...")
+        itens = autodiagnostico.diagnosticar(getattr(self, "_portao", None))
+        texto = autodiagnostico.relatorio(itens)
+        try:
+            arquivo = autodiagnostico.salvar(texto)
+            self.ui.write_log(f"SYS: Relatório salvo em {arquivo}")
+        except OSError:
+            pass
+        for linha in texto.splitlines()[2:]:
+            self.ui.write_log(f"SYS: {linha.strip()}")
+        print(texto)
+        if falar:
+            self._falar_reserva(autodiagnostico.resumo_falado(itens))
+        return texto + "\n\nSummarize for the user in Portuguese: only the problems (DEFEITO/ATENÇÃO) and how to fix them."
 
     HERMES_ESPERA = 25  # segundos que a conversa espera o Hermes; depois ele termina em segundo plano
 
@@ -1772,6 +1806,10 @@ class JarvisLive:
                     self.ui.write_log(f"You: {texto}")
                     self._checar_pedido_de_modo(texto)
                     self._portao.estender()
+                    from core.autodiagnostico import pediu_diagnostico
+                    if pediu_diagnostico(texto):
+                        self._autodiagnostico()
+                        continue
                     self._responder_pela_reserva(texto)
         except Exception as erro:
             print(f"[Reserva] Microfone do modo reserva parou: {erro}")
@@ -1875,6 +1913,9 @@ class JarvisLive:
 
             elif name == "hermes_agent":
                 result = await self._hermes_sem_travar(args.get("request", ""))
+
+            elif name == "self_diagnosis":
+                result = await asyncio.to_thread(self._autodiagnostico, False)
 
             elif name == "approve_publication":
                 from core import hermes_ponte

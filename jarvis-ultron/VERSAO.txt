@@ -20,5 +20,7 @@ Novidades desta versão:
 - Se o Google recusar a chave (defeito das chaves "AQ."), botão "Continuar com a reserva (Groq)".
 - Reserva (Groq) sempre fala: se a voz da internet falhar, usa a voz do Windows.
 - Instalação do zero: pergunta a cidade do clima; botão "Desinstalar Hermes" para recomeçar.
+- Autodiagnóstico: "Jarvis, faça um autodiagnóstico" ou botão ✚ — diz o que está com defeito e como resolver.
+- Gemini 2.5 (aposentando) só como última reserva; usa os modelos 3.x primeiro.
 
 Como conferir que atualizou: a tela mostra o selo embaixo do título "JARVIS ULTRON".

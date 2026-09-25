@@ -88,6 +88,14 @@ Cópia do projeto **JARVIS-OS V.2** (licença MIT, veja `LICENSE`), com ajustes 
 - **Prefere que ele ouça sempre:** aperte **⛭ MÃOS LIVRES** (ou coloque `JARVIS_PALAVRA_ATIVACAO=0`
   para ele já abrir assim).
 
+## Autodiagnóstico (o Jarvis confere a si mesmo)
+
+Diga **"Jarvis, faça um autodiagnóstico"** (ou "o que está com defeito?"), ou aperte o botão **✚** na
+tela. Ele confere internet, chave do Gemini e modelos, reserva Groq, Hermes, microfone, alto-falante,
+memória/disco, navegador automático e o "Hey Jarvis", e **fala só o que está com problema e como
+resolver**. O relatório completo aparece na tela e fica salvo em **Documentos\Jarvis Ultron\diagnostico.txt**.
+Funciona até com o Gemini fora do ar (pelo botão, digitando "diagnóstico" ou falando no modo reserva).
+
 ## Se o Jarvis não conseguir abrir um site
 
 - Para **clicar e digitar sozinho** nos sites, o Jarvis usa o **Chrome** ou o **Edge**. Peça:
