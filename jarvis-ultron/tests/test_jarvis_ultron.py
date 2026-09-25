@@ -1251,3 +1251,216 @@ class AutoconsertoTests(unittest.TestCase):
             resposta = plugin.executar({}, object())
         self.assertIn("Não havia nada que eu pudesse consertar", resposta)
         self.assertIn("tudo funcionando", resposta)
+
+
+def _plugin_da_pasta(arquivo: str):
+    """Carrega um arquivo da pasta 'automacoes' como módulo (igual o Jarvis faz)."""
+    import importlib.util
+    from pathlib import Path
+    caminho = Path(__file__).resolve().parent.parent / "automacoes" / arquivo
+    spec = importlib.util.spec_from_file_location(f"teste_{caminho.stem}", caminho)
+    modulo = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(modulo)
+    return modulo
+
+
+class AutomacoesQueIniciamTests(unittest.TestCase):
+    def test_iniciar_sozinho_ou_junto_com_ferramenta(self):
+        import tempfile
+        from pathlib import Path
+        from core.automacoes import carregar_ferramentas
+        pasta = Path(tempfile.mkdtemp())
+        (pasta / "so_tela.py").write_text("def iniciar(jarvis):\n    jarvis.append('tela')\n", encoding="utf-8")
+        (pasta / "os_dois.py").write_text(
+            'FERRAMENTA = {"name": "both_things", "description": "x"}\n'
+            "def executar(a, j): return 'ok'\ndef iniciar(jarvis):\n    jarvis.append('dois')\n", encoding="utf-8")
+        (pasta / "vazia.py").write_text("X = 1\n", encoding="utf-8")
+        carga = carregar_ferramentas(pasta)
+        self.assertEqual(list(carga.ferramentas), ["both_things"])
+        self.assertEqual(sorted(a for a, _ in carga.inicios), ["os_dois.py", "so_tela.py"])
+        self.assertEqual([a for a, _ in carga.erros], ["vazia.py"])
+        feitos = []
+        for _, iniciar in carga.inicios:
+            iniciar(feitos)
+        self.assertEqual(sorted(feitos), ["dois", "tela"])
+
+    def test_novas_automacoes_da_pasta_carregam_sem_erro(self):
+        from pathlib import Path
+        from core.automacoes import carregar_ferramentas
+        carga = carregar_ferramentas(Path(__file__).resolve().parent.parent / "automacoes")
+        self.assertEqual(carga.erros, [])
+        self.assertTrue({"spoken_reminders", "saved_routines", "self_repair"} <= set(carga.ferramentas))
+        self.assertEqual(sorted(a for a, _ in carga.inicios), ["lembretes.py", "painel_stark.py"])
+
+
+class AvisosFaladosTests(unittest.TestCase):
+    def _jarvis(self, chamada_fechada: bool):
+        import main
+        jarvis = object.__new__(main.JarvisLive)
+        jarvis.ui, jarvis.session = UIFalsa(), SessaoFalsa()
+        jarvis._modo_reserva = False
+        jarvis._chamada_fechada = lambda: chamada_fechada
+        return jarvis
+
+    def test_conversa_aberta_fala_na_hora(self):
+        jarvis = self._jarvis(False)
+
+        async def cenario():
+            jarvis._loop = asyncio.get_running_loop()
+            self.assertEqual(jarvis.anunciar("tirar o bolo do forno"), "falado")
+            await asyncio.sleep(0.05)
+        asyncio.run(cenario())
+        self.assertIn("tirar o bolo do forno", jarvis.session.textos[0])
+        self.assertTrue(any("🔔" in l for l in jarvis.ui.logs))
+
+    def test_modo_chamada_guarda_e_fala_quando_chamar(self):
+        jarvis = self._jarvis(True)
+        jarvis.AVISO_ESPERA_AO_CHAMAR = 0
+
+        async def cenario():
+            jarvis._loop = asyncio.get_running_loop()
+            self.assertEqual(jarvis.anunciar("ligar para o contador"), "guardado")
+            await asyncio.sleep(0.05)
+            self.assertEqual(jarvis.session.textos, [])  # não interrompe o modo chamada
+            jarvis._chamada_fechada = lambda: False  # disse "Hey Jarvis"
+            with patch("core.palavra_ativacao.tocar_aviso"):
+                jarvis._aviso_de_escuta("ouvindo")
+            for _ in range(40):
+                await asyncio.sleep(0.05)
+                if jarvis.session.textos:
+                    break
+        asyncio.run(cenario())
+        self.assertIn("Enquanto você estava fora: ligar para o contador", jarvis.session.textos[0])
+        self.assertEqual(jarvis._avisos_guardados, [])
+
+    def test_sem_gemini_fala_com_a_voz_reserva(self):
+        jarvis = self._jarvis(False)
+        jarvis.session, jarvis._loop = None, None
+        falados = []
+        jarvis._falar_reserva = falados.append
+        self.assertEqual(jarvis.anunciar("beber água"), "falado")
+        import time as _t
+        for _ in range(40):
+            if falados:
+                break
+            _t.sleep(0.05)
+        self.assertEqual(falados, ["beber água"])
+
+
+class LembretesFaladosTests(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+        from datetime import datetime
+        from pathlib import Path
+        self.m = _plugin_da_pasta("lembretes.py")
+        self.arquivo = Path(tempfile.mkdtemp()) / "lembretes.json"
+        self.agora = datetime(2026, 9, 25, 14, 0)  # sexta-feira
+
+    def test_criar_por_minutos_e_por_horario(self):
+        r = self.m.criar({"text": "tirar o bolo", "in_minutes": 20}, self.agora, self.arquivo)
+        self.assertIn("hoje às 14:20", r)
+        r = self.m.criar({"text": "treino", "time": "7h"}, self.agora, self.arquivo)  # já passou: amanhã
+        self.assertIn("amanhã às 07:00", r)
+        r = self.m.criar({"text": "e-mails", "time": "08:00", "repeat": "weekdays"}, self.agora, self.arquivo)
+        self.assertIn("em 28/09 às 08:00", r)  # sábado e domingo pulados
+        self.assertIn("de segunda a sexta", r)
+        self.assertIn("Não consegui marcar", self.m.criar({"text": "x", "time": "25:00"}, self.agora, self.arquivo))
+        lista = self.m.listar(self.agora, self.arquivo)
+        self.assertIn("1) hoje às 14:20: tirar o bolo", lista)
+
+    def test_vencidos_avisa_repete_e_cancela(self):
+        from datetime import timedelta
+        self.m.criar({"text": "tirar o bolo", "in_minutes": 20}, self.agora, self.arquivo)
+        self.m.criar({"text": "treino", "time": "15:00", "repeat": "daily"}, self.agora, self.arquivo)
+        self.m.criar({"text": "reunião", "time": "18:00"}, self.agora, self.arquivo)
+        self.assertEqual(self.m.vencidos(self.agora + timedelta(minutes=10), self.arquivo), [])
+        frases = self.m.vencidos(self.agora + timedelta(hours=1, minutes=1), self.arquivo)
+        self.assertEqual(frases, ["tirar o bolo (era para as 14:20)", "treino"])
+        dados = self.m.ler(self.arquivo)
+        self.assertEqual(sorted(l["texto"] for l in dados["lembretes"]), ["reunião", "treino"])
+        treino = [l for l in dados["lembretes"] if l["texto"] == "treino"][0]
+        self.assertEqual(treino["quando"], "2026-09-26T15:00")  # repete amanhã
+        self.assertIn("ultimo_aviso", dados)
+        self.assertIn("cancelado", self.m.cancelar({"text": "reunião"}, self.arquivo))
+        self.assertIn("Não achei", self.m.cancelar({"number": 99}, self.arquivo))
+
+    def test_lembrete_muito_antigo_nao_e_falado(self):
+        from datetime import timedelta
+        self.m.criar({"text": "velho", "in_minutes": 5}, self.agora, self.arquivo)
+        self.assertEqual(self.m.vencidos(self.agora + timedelta(days=2), self.arquivo), [])
+        self.assertEqual(self.m.ler(self.arquivo)["lembretes"], [])
+
+    def test_avisar_usa_o_anunciar_do_jarvis(self):
+        avisos = []
+
+        class Jarvis:
+            def anunciar(self, texto, titulo=""):
+                avisos.append((titulo, texto))
+        self.m._avisar(Jarvis(), ["beber água"])
+        self.assertEqual(avisos, [("Lembrete", "Lembrete: beber água.")])
+
+
+class RotinasSalvasTests(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+        from pathlib import Path
+        self.m = _plugin_da_pasta("rotinas.py")
+        self.arquivo = Path(tempfile.mkdtemp()) / "rotinas.json"
+
+    def test_prontas_salvar_rodar_e_apagar(self):
+        self.assertIn("bom dia", self.m.listar(self.arquivo))
+        r = self.m.salvar({"name": "Rotina Treino", "steps": ["veja o clima", "abra o Strava"]}, self.arquivo)
+        self.assertIn("Rotina 'treino' salva com 2 passos", r)
+        r = self.m.rodar({"name": "treino"}, None, self.arquivo)
+        self.assertIn("1) veja o clima 2) abra o Strava", r)
+        self.assertIn("explicit 'ok'", r)  # regras de segurança sempre junto
+        self.assertIn("1) Diga como está o tempo", self.m.rodar({"name": "Bom Dia"}, None, self.arquivo))
+        self.assertIn("apagada", self.m.apagar({"name": "treino"}, self.arquivo))
+        self.assertIn("Não achei", self.m.rodar({"name": "treino"}, None, self.arquivo))
+        self.assertIn("Faltam os passos", self.m.salvar({"name": "x"}, self.arquivo))
+
+    def test_rotina_do_hermes_vai_para_o_hermes(self):
+        self.m.salvar({"name": "pesquisa", "steps": "pesquise provas de triathlon; liste as datas",
+                       "agent": "hermes"}, self.arquivo)
+        pedidos = []
+
+        class Jarvis:
+            _loop = None
+        with patch("core.hermes_ponte.perguntar", side_effect=lambda p: pedidos.append(p) or "3 provas"):
+            r = self.m.rodar({"name": "pesquisa"}, Jarvis(), self.arquivo)
+        self.assertEqual(r, "[Hermes, rotina pesquisa] 3 provas")
+        self.assertIn("1) pesquise provas de triathlon 2) liste as datas", pedidos[0])
+        self.assertIn("Nunca publique", pedidos[0])
+
+
+class PainelStarkTests(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+        from pathlib import Path
+        self.m = _plugin_da_pasta("painel_stark.py")
+        self.pasta = Path(tempfile.mkdtemp())
+        self.m.pasta_dados = lambda: self.pasta
+
+    def test_textos_do_painel(self):
+        import json
+        from datetime import datetime
+        agora = datetime(2026, 9, 25, 14, 0)
+        self.assertEqual(self.m.texto_lembrete(agora), ("Nenhum lembrete marcado", False))
+        self.assertEqual(self.m.nomes_rotinas(), ["bom dia", "fim do dia"])
+        (self.pasta / "lembretes.json").write_text(json.dumps({"lembretes": [
+            {"texto": "treino", "quando": "2026-09-26T06:00"}, {"texto": "reunião", "quando": "2026-09-25T18:00"}],
+            "ultimo_aviso": None}), encoding="utf-8")
+        self.assertEqual(self.m.texto_lembrete(agora), ("hoje 18:00 · reunião  (+1)", False))
+        dados = json.loads((self.pasta / "lembretes.json").read_text(encoding="utf-8"))
+        dados["ultimo_aviso"] = {"texto": "beber água", "em": "2026-09-25T13:59:30"}
+        (self.pasta / "lembretes.json").write_text(json.dumps(dados), encoding="utf-8")
+        self.assertEqual(self.m.texto_lembrete(agora), ("⚠ beber água", True))
+        (self.pasta / "rotinas.json").write_text(json.dumps({"rotinas": {"treino": {}}}), encoding="utf-8")
+        self.assertEqual(self.m.nomes_rotinas(), ["treino"])
+
+    def test_estado_da_voz(self):
+        class J:
+            session, _modo_reserva = object(), False
+        self.assertEqual(self.m.texto_voz(J()), ("Voz: Gemini ao vivo", True))
+        J._modo_reserva = True
+        self.assertEqual(self.m.texto_voz(J()), ("Voz: reserva (Groq)", False))

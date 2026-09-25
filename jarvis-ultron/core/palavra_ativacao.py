@@ -65,6 +65,7 @@ SONS_AVISO = {
     "ouvindo": ((660, 90), (990, 140)),            # sobe: ouvindo
     "aguardando": ((990, 90), (660, 140)),         # desce: voltou a esperar o "Hey Jarvis"
     "maos_livres": ((660, 70), (830, 70), (990, 120)),
+    "lembrete": ((880, 120), (0, 60), (880, 120), (0, 60), (1175, 200)),  # "plim-plim-plóm": um lembrete
 }
 
 
@@ -78,7 +79,10 @@ def tocar_aviso(estado: str) -> None:
         try:
             import winsound  # Windows
             for freq, ms in notas:
-                winsound.Beep(freq, ms)
+                if freq:
+                    winsound.Beep(freq, ms)
+                else:
+                    time.sleep(ms / 1000)  # pausa entre as notas
             return
         except ImportError:
             pass

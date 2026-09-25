@@ -6,6 +6,9 @@ Coloque o arquivo na pasta `automacoes` do Jarvis e abra o Jarvis de novo. Dois 
        FERRAMENTA = {"name": "nome_em_ingles", "description": "...", "parameters": {...}}
        def executar(args: dict, jarvis) -> str: ...
    (a mesma forma das ferramentas do Gemini; "parameters" pode ser omitido).
+   Opcional: `def iniciar(jarvis): ...` roda uma vez quando o Jarvis abre (para automações que
+   trabalham sozinhas, como lembretes, ou que acrescentam algo na tela). Um arquivo pode ter só o
+   `iniciar`, sem FERRAMENTA. Para mexer na tela, use `core.na_tela.executar(funcao)`.
 
 2. `nome.md`: um agente/habilidade para o Hermes (mesmo formato de SKILL.md, com
    `name:` no cabeçalho). O Jarvis copia para o perfil jarvis do Hermes ao abrir. Se o cabeçalho
@@ -41,6 +44,7 @@ class Carga:
     ferramentas: dict = field(default_factory=dict)  # nome -> Automacao
     erros: list = field(default_factory=list)  # (arquivo, motivo)
     habilidades: list = field(default_factory=list)  # nomes das skills copiadas para o Hermes
+    inicios: list = field(default_factory=list)  # (arquivo, iniciar) que rodam quando o Jarvis abre
 
 
 def pasta_padrao() -> Path:
@@ -63,8 +67,16 @@ def carregar_ferramentas(pasta: Path | None = None, reservados: set[str] | None 
             spec = importlib.util.spec_from_file_location(f"automacao_{arquivo.stem}", arquivo)
             modulo = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(modulo)
+            iniciar = getattr(modulo, "iniciar", None)
+            if iniciar is not None and not callable(iniciar):
+                raise ValueError("'iniciar' precisa ser uma função iniciar(jarvis)")
+            if not hasattr(modulo, "FERRAMENTA"):
+                if iniciar is None:
+                    raise ValueError("falta FERRAMENTA (ou a função iniciar(jarvis))")
+                carga.inicios.append((arquivo.name, iniciar))
+                continue
             declaracao = dict(getattr(modulo, "FERRAMENTA"))
-            executar = getattr(modulo, "executar")
+            executar = getattr(modulo, "executar", None)
             nome = str(declaracao.get("name", "")).strip()
             if not NOME_VALIDO.match(nome):
                 raise ValueError(f"nome inválido '{nome}' (use letras minúsculas, números e _)")
@@ -76,6 +88,8 @@ def carregar_ferramentas(pasta: Path | None = None, reservados: set[str] | None 
                 raise ValueError("falta a descrição (description)")
             declaracao.setdefault("parameters", {"type": "OBJECT", "properties": {}})
             carga.ferramentas[nome] = Automacao(nome, declaracao, executar, arquivo)
+            if iniciar is not None:
+                carga.inicios.append((arquivo.name, iniciar))
         except Exception as erro:
             carga.erros.append((arquivo.name, str(erro)[:160]))
     return carga

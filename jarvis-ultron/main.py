@@ -1347,6 +1347,8 @@ class JarvisLive:
         self._reserva = None if self.cloud_safe else ReservaGroq.da_configuracao()
         self._modo_reserva = False
         self._falhas_seguidas = 0
+        self._avisos_trava = threading.Lock()  # avisos guardados no modo chamada
+        self._avisos_guardados = []
         if not self.cloud_safe:
             self._iniciar_lembretes_geekie()
             threading.Thread(target=self._preparar_automacoes, daemon=True, name="Automacoes").start()
@@ -1634,16 +1636,97 @@ class JarvisLive:
         if not devidas:
             return []
         frases = [geekie.frase_lembrete(a) for a in devidas]
-        for frase in frases:
-            self.ui.write_log(f"SYS: {frase}")
-        session, loop = getattr(self, "session", None), getattr(self, "_loop", None)
-        if session is not None and loop is not None and not self._chamada_fechada():
-            aviso = ("[Lembretes do Geekie] " + " ".join(frases) +
-                     "\nDiga isso ao usuário agora, em português do Brasil, em uma ou duas frases.")
-            asyncio.run_coroutine_threadsafe(
-                session.send_client_content(turns={"parts": [{"text": aviso}]}, turn_complete=True), loop)
+        self.anunciar(" ".join(frases), titulo="Geekie")
         geekie.marcar_avisados(devidas)
         return frases
+
+    # ---------- Jarvis Ultron: avisos falados (lembretes, Geekie, automações) ----------
+
+    AVISO_ESPERA_AO_CHAMAR = 4.0  # segundos depois do "Hey Jarvis" para falar os avisos guardados
+
+    def anunciar(self, texto: str, titulo: str = "Lembrete") -> str:
+        """Fala um aviso em voz alta respeitando o modo de escuta. Qualquer fio pode chamar.
+
+        - conversa aberta (mãos livres ou depois do "Hey Jarvis"): o Jarvis fala agora;
+        - modo chamada esperando o "Hey Jarvis": toca um som, mostra na tela e guarda o aviso
+          para falar assim que você chamar (JARVIS_AVISO_FALA_SEMPRE=1 fala mesmo assim);
+        - sem o Gemini (modo reserva): fala com a voz reserva.
+        Devolve "falado", "guardado" ou "na_tela".
+        """
+        texto = " ".join(str(texto or "").split())
+        if not texto:
+            return "na_tela"
+        self.ui.write_log(f"SYS: 🔔 {titulo}: {texto}")
+        self._notificar_na_tela(titulo, texto)
+        try:
+            from core.palavra_ativacao import tocar_aviso
+
+            tocar_aviso("lembrete")
+        except Exception:
+            pass
+        fala_sempre = os.environ.get("JARVIS_AVISO_FALA_SEMPRE", "0").strip().lower() in {"1", "true", "sim", "yes"}
+        if self._chamada_fechada() and not fala_sempre:
+            with self._trava_avisos():
+                self._avisos_guardados.append(texto)
+            return "guardado"
+        return self._falar_aviso(texto)
+
+    def _trava_avisos(self):
+        if not hasattr(self, "_avisos_trava"):
+            self._avisos_trava = threading.Lock()
+            self._avisos_guardados = []
+        return self._avisos_trava
+
+    def _falar_aviso(self, texto: str) -> str:
+        session, loop = getattr(self, "session", None), getattr(self, "_loop", None)
+        if session is not None and loop is not None and not getattr(self, "_modo_reserva", False):
+            aviso = (f"[Aviso do Jarvis] {texto}\n"
+                     "Diga isso ao usuário agora, em português do Brasil, em uma ou duas frases curtas. "
+                     "Não chame ferramentas.")
+            asyncio.run_coroutine_threadsafe(
+                session.send_client_content(turns={"parts": [{"text": aviso}]}, turn_complete=True), loop)
+            return "falado"
+        if getattr(self, "ui", None) is not None and not getattr(self.ui, "muted", False):
+            threading.Thread(target=self._falar_reserva, args=(texto,), daemon=True, name="Aviso").start()
+            return "falado"
+        return "na_tela"
+
+    def _falar_avisos_guardados(self) -> None:
+        """Chamado quando a conversa abre ("Hey Jarvis" ou mãos livres): fala o que ficou guardado."""
+        with self._trava_avisos():
+            if not self._avisos_guardados:
+                return
+        def depois():
+            time.sleep(self.AVISO_ESPERA_AO_CHAMAR)
+            if self._chamada_fechada():
+                return  # a conversa fechou de novo; continuam guardados
+            with self._trava_avisos():
+                guardados, self._avisos_guardados = self._avisos_guardados, []
+            if guardados:
+                self._falar_aviso("Enquanto você estava fora: " + " ".join(guardados))
+        threading.Thread(target=depois, daemon=True, name="AvisosGuardados").start()
+
+    def _notificar_na_tela(self, titulo: str, texto: str) -> None:
+        """Balão do Windows (perto do relógio) e aviso dentro da janela do Jarvis."""
+        janela = getattr(getattr(self, "ui", None), "_win", None)
+        if janela is None:
+            return
+        try:
+            from core.na_tela import executar
+
+            def mostrar():
+                bandeja = getattr(janela, "_tray", None)
+                if bandeja is not None and bandeja.isVisible():
+                    from PyQt6.QtWidgets import QSystemTrayIcon
+
+                    bandeja.showMessage(f"Jarvis · {titulo}", texto, QSystemTrayIcon.MessageIcon.Information, 10000)
+                mostrar_aviso = getattr(janela, "_show_toast", None)
+                if callable(mostrar_aviso):
+                    mostrar_aviso(f"{titulo}: {texto}", "warning")
+
+            executar(mostrar)
+        except Exception as erro:
+            print(f"[Aviso] Tela: {erro}")
 
     def _preparar_automacoes(self) -> None:
         """Mostra as automações da pasta 'automacoes' e copia as do Hermes (.md) para o perfil dele."""
@@ -1651,12 +1734,20 @@ class JarvisLive:
 
         carga = carregar_automacoes()
         habilidades = sincronizar_habilidades()
-        nomes = list(carga.ferramentas) + [f"{n} (Hermes)" for n in habilidades.habilidades]
+        com_ferramenta = {a.arquivo.name for a in carga.ferramentas.values()}
+        nomes = list(carga.ferramentas) + [a.rsplit(".", 1)[0] for a, _ in carga.inicios if a not in com_ferramenta]
+        nomes += [f"{n} (Hermes)" for n in habilidades.habilidades]
         if nomes:
             self.ui.write_log("SYS: Automações: " + ", ".join(nomes))
         for arquivo, motivo in carga.erros + habilidades.erros:
             self.ui.write_log(f"SYS: Automação com problema: {arquivo}: {motivo}")
             print(f"[Automações] {arquivo}: {motivo}")
+        for arquivo, iniciar in carga.inicios:
+            try:
+                iniciar(self)
+            except Exception as erro:
+                self.ui.write_log(f"SYS: Automação com problema: {arquivo}: {erro}")
+                print(f"[Automações] {arquivo}: {erro}")
 
     def _iniciar_lembretes_geekie(self) -> None:
         def laco():
@@ -1813,6 +1904,8 @@ class JarvisLive:
         print(f"[Ativação] {estado}")
         tocar_aviso(estado)
         self._mostrar_selo(estado)
+        if estado in ("ouvindo", "maos_livres"):
+            self._falar_avisos_guardados()
 
     def _mostrar_selo(self, estado: str) -> None:
         mostrar = getattr(self.ui, "set_listening_status", None)
@@ -2610,6 +2703,12 @@ def main():
         print(f"[JARVIS] ❌ Interface startup failed: {exc}")
         traceback.print_exc()
         return
+    try:
+        from core import na_tela
+
+        na_tela.preparar()  # Jarvis Ultron: automações podem mexer na tela com segurança
+    except Exception as exc:
+        print(f"[Automações] Tela: {exc}")
 
     def runner():
         ui.wait_for_api_key()

@@ -214,7 +214,8 @@ def verificar_automacoes() -> Item:
     pasta = pasta_padrao()
     extras = [p.name for p in pasta.glob("*.md") if p.name.lower() not in {"leia-me.md", "readme.md"}] \
         if pasta.is_dir() else []
-    total = len(carga.ferramentas) + len(extras)
+    arquivos_py = {a.arquivo.name for a in carga.ferramentas.values()} | {a for a, _ in carga.inicios}
+    total = len(arquivos_py) + len(extras)
     if carga.erros:
         arquivo, motivo = carga.erros[0]
         return Item("Automações", "defeito", f"{arquivo}: {motivo}",
