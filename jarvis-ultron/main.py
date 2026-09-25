@@ -96,6 +96,9 @@ DEFAULT_VOICE_NAME   = "puck"
 RECEIVE_SAMPLE_RATE = 24000
 CHUNK_SIZE          = 1024
 LIVE_VAD_SILENCE_MS = 200
+# Jarvis Ultron: a troca de modo já é avisada por um som e pelo selo na tela.
+QUIET_MODE_RESULT = ("Done. The user already heard a chime and sees the mode on screen: do not announce "
+                     "or explain the listening mode. Say nothing at all.")
 STARTUP_CLAPS_REQUIRED = 2
 STARTUP_CLAP_MAX_GAP_SECONDS = 4.0
 STARTUP_CLAP_COOLDOWN_SECONDS = 0.22
@@ -1501,7 +1504,16 @@ class JarvisLive:
                 return voice
         return _load_voice_name()
 
+    def _chamada_fechada(self) -> bool:
+        """Jarvis Ultron: True no modo chamada enquanto ninguém chamou (palmas / "Hey Jarvis")."""
+        portao = getattr(self, "_portao", None)
+        return portao is not None and portao.estado == "aguardando"
+
     async def _announce_startup(self):
+        # Jarvis Ultron: cumprimenta uma vez só (não a cada reconexão) e nunca com a chamada fechada.
+        if getattr(self, "_ja_cumprimentou", False) or self._chamada_fechada():
+            return
+        self._ja_cumprimentou = True
         try:
             memory = load_memory()
             name_entry = memory.get("identity", {}).get("name")
@@ -1579,20 +1591,15 @@ class JarvisLive:
             return "Invalid mode. Use 'maos_livres' or 'chamada'."
         if portao.modo == modo:
             self._aviso_de_escuta(portao.estado)  # confirma com o som e o selo
-            return f"Already in {modo} mode. Confirm it to the user in one short sentence in Portuguese."
+            return QUIET_MODE_RESULT
         if not portao.definir_modo(modo):
             return ("Call mode is unavailable because the activation detector did not load. "
                     "Tell the user, in Portuguese, that you will keep listening to everything.")
         if modo == "maos_livres":
             self.ui.write_log("SYS: Modo mãos livres: estou ouvindo tudo.")
-            return ("Hands-free mode on. Tell the user, in one short sentence in Portuguese, that you will "
-                    "now answer everything they say, and that saying 'Jarvis, modo chamada' turns it off.")
-        self.ui.write_log(f"SYS: Modo chamada: {portao.como_chamar} para falar comigo.")
-        if portao.palmas is not None:
-            return ("Call mode on. Tell the user, in one short sentence in Portuguese, that from now on they "
-                    "clap twice to start talking to you and clap twice again to end.")
-        return ("Call mode on. Tell the user, in one short sentence in Portuguese, that from now on you only "
-                "answer after they say 'Hey Jarvis'.")
+        else:
+            self.ui.write_log(f"SYS: Modo chamada: {portao.como_chamar} para falar comigo.")
+        return QUIET_MODE_RESULT
 
     def _aviso_de_escuta(self, estado: str) -> None:
         """Jarvis Ultron: som curto + selo na tela quando a chamada abre/fecha ou o modo muda."""
@@ -1623,7 +1630,7 @@ class JarvisLive:
     def _falar_com_voz_externa(self, texto: str) -> None:
         """Jarvis Ultron: com ElevenLabs/OpenAI/Edge escolhida, fala a resposta por ela."""
         motor = getattr(self, "_tts_engine", None)
-        if motor is None or self._ext_tts_provider in ("", "gemini"):
+        if motor is None or self._ext_tts_provider in ("", "gemini") or self._chamada_fechada():
             return
         motor.on_speaking_start = lambda: self.set_speaking(True)
         motor.on_speaking_stop = lambda: self.set_speaking(False)
@@ -2180,6 +2187,9 @@ class JarvisLive:
                         self._turn_done_event.clear()
                         if self._complete_self_quit_after_audio():
                             return
+                    continue
+                # Jarvis Ultron: com a chamada fechada (esperando palmas), ele não fala sozinho.
+                if self._chamada_fechada():
                     continue
                 # Skip Gemini audio when external TTS is active
                 if self._tts_engine and self._ext_tts_provider and self._ext_tts_provider != "gemini":

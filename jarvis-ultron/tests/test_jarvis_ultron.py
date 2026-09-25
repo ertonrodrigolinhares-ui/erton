@@ -530,11 +530,11 @@ class ModosDeEscutaTests(unittest.TestCase):
         self.assertTrue(all(portao.processar(b) for b in _em_blocos(frase)))
 
         resposta = jarvis._definir_modo_escuta("chamada")
-        self.assertIn("Call mode on", resposta)
+        self.assertIn("do not announce", resposta)  # o som e o selo já avisam
         self.assertEqual(portao.modo, "chamada")
         self.assertFalse(portao.acordado)
         self.assertEqual([s for s in (portao.processar(b) for b in _em_blocos(frase)) if s], [])
-        self.assertIn("Already", jarvis._definir_modo_escuta("chamada"))
+        self.assertIn("Say nothing", jarvis._definir_modo_escuta("chamada"))
 
     def test_chamada_indisponivel_sem_detector(self):
         jarvis = self._jarvis(PortaoDeVoz(None, ativo=False))
@@ -756,12 +756,75 @@ class PalmasTests(unittest.TestCase):
         self.assertIsNone(portao.processar(_silencio(0.1)))
         self.assertEqual(portao.como_chamar, "bata 2 palmas")
 
-    def test_padrao_e_palmas_sem_carregar_o_hey_jarvis(self):
+    def test_padrao_e_palmas_ou_hey_jarvis(self):
+        import os
         with patch.dict("os.environ", {"JARVIS_PALAVRA_ATIVACAO": "1"}), \
-                patch("core.palavra_ativacao.carregar_detector") as carregar:
-            import os
+                patch("core.palavra_ativacao.carregar_detector", return_value="detector") as carregar:
             os.environ.pop("JARVIS_ATIVACAO", None)
             portao = PortaoDeVoz.da_configuracao()
-        carregar.assert_not_called()
+        carregar.assert_called_once()
         self.assertTrue(portao.ativo)
         self.assertIsNotNone(portao.palmas)
+        self.assertIn("Hey Jarvis", portao.como_chamar)
+        with patch.dict("os.environ", {"JARVIS_ATIVACAO": "palmas"}), \
+                patch("core.palavra_ativacao.carregar_detector") as carregar:
+            self.assertIsNone(PortaoDeVoz.da_configuracao().detector)
+        carregar.assert_not_called()
+
+    def test_hey_jarvis_tambem_abre_a_chamada_e_palmas_fecham(self):
+        from core.palavra_ativacao import DetectorDePalmas
+        try:
+            detector = palavra_ativacao.carregar_detector()
+        except Exception as erro:  # pragma: no cover
+            raise unittest.SkipTest(f"openwakeword indisponível: {erro}")
+        estados = []
+        portao = PortaoDeVoz(detector, palmas=DetectorDePalmas())
+        portao.ao_mudar = estados.append
+        self.assertEqual([r for r in self._tocar(portao, _audio("frase_comum")) if r], [])
+        liberado = [r for r in self._tocar(portao, _audio("hey_jarvis")) if r]
+        self.assertTrue(portao.acordado)
+        self.assertTrue(liberado)  # o que foi falado junto com o "Hey Jarvis" vai para a IA
+        self._tocar(portao, np.concatenate([_silencio(1.0), _palma(), _silencio(0.45), _palma(), _silencio(0.6)]))
+        self.assertFalse(portao.acordado)
+        self.assertEqual(estados, ["ouvindo", "aguardando"])
+
+
+class SilencioComChamadaFechadaTests(unittest.TestCase):
+    def _jarvis(self, acordado):
+        import main
+        from core.palavra_ativacao import DetectorDePalmas
+        jarvis = object.__new__(main.JarvisLive)
+        jarvis.ui = UIFalsa()
+        jarvis._portao = PortaoDeVoz(None, palmas=DetectorDePalmas())
+        jarvis._portao.acordado = acordado
+        return jarvis
+
+    def test_chamada_fechada_nao_cumprimenta_nem_fala(self):
+        jarvis = self._jarvis(acordado=False)
+        self.assertTrue(jarvis._chamada_fechada())
+
+        class Sessao:
+            enviados = []
+
+            async def send_client_content(self, **kw):
+                self.enviados.append(kw)
+
+        jarvis.session = Sessao()
+        asyncio.run(jarvis._announce_startup())
+        self.assertEqual(Sessao.enviados, [])
+
+    def test_cumprimenta_uma_vez_so(self):
+        jarvis = self._jarvis(acordado=True)
+        self.assertFalse(jarvis._chamada_fechada())
+
+        class Sessao:
+            enviados = []
+
+            async def send_client_content(self, **kw):
+                self.enviados.append(kw)
+
+        jarvis.session = Sessao()
+        with patch("main.load_memory", return_value={}):
+            asyncio.run(jarvis._announce_startup())
+            asyncio.run(jarvis._announce_startup())  # reconexão
+        self.assertEqual(len(Sessao.enviados), 1)

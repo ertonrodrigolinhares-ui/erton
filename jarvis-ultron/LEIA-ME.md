@@ -18,16 +18,19 @@ Cópia do projeto **JARVIS-OS V.2** (licença MIT, veja `LICENSE`), com ajustes 
   A imagem abre na hora e fica salva em **Documentos\Jarvis Ultron\Imagens**.
   Atenção: o Google pode não liberar cota grátis de imagens para a sua chave; nesse caso o Jarvis avisa.
 - **Chamar o Jarvis com palmas** (`core/palavra_ativacao.py`):
-  - **Bata 2 palmas** 👏👏: ele começa a ouvir. A tela mostra "Estou ouvindo".
+  - **Bata 2 palmas** 👏👏 **ou diga "Hey Jarvis"**: ele começa a ouvir (dá para já emendar o pedido:
+    "Hey Jarvis, que horas são?").
   - **Bata mais 2 palmas** 👏👏: ele para de ouvir. A tela mostra "Chamada encerrada".
   - Enquanto a chamada está desligada, **nada do que você fala vai para o Google**: as palmas são
     reconhecidas no seu computador, sem internet.
   - Não tem tempo limite: ele fica ouvindo até você bater as 2 palmas de novo.
+  - **Com a chamada fechada ele fica em silêncio**: não fala sozinho, não cumprimenta de novo quando
+    a conexão reinicia e não fica anunciando o modo. Só volta a falar quando você chamar.
   - Dica: palmas firmes, com meio segundo entre elas, e depois fique um instante em silêncio.
   - **Aviso:** um **som** curto (sobe = chamada aberta, desce = encerrada, três notas = mãos livres)
     e um **selo** embaixo do título: verde "CHAMADA ATIVA", amarelo "AGUARDANDO 2 PALMAS" ou azul
     "MÃOS LIVRES". `JARVIS_SOM_AVISO=0` desliga o som.
-  - Prefere o "Hey Jarvis"? Coloque `JARVIS_ATIVACAO=voz` no `.env`.
+  - Só palmas: `JARVIS_ATIVACAO=palmas` no `.env`. Só "Hey Jarvis": `JARVIS_ATIVACAO=voz`.
 - **Trocar o modo falando** (com a chamada ligada):
   - **"Jarvis, modo mãos livres"**: ele passa a responder a **tudo**, sem precisar das palmas.
   - **"Jarvis, modo chamada"**: ele volta a esperar as **palmas**.
@@ -115,7 +118,7 @@ Abra com o Bloco de Notas para mudar:
 | `JARVIS_EFEITO_ULTRON=1` | Efeito metálico. `0` desliga, `robo` deixa com voz de robô |
 | `JARVIS_TEMA_STARK=1` | Tela Stark ligada. `0` = volta para a tela original |
 | `JARVIS_CIDADE=Campina Grande` | Cidade do painel de clima |
-| `JARVIS_ATIVACAO=palmas` | Como chamar o Jarvis: `palmas` (2 palmas liga, 2 desliga) ou `voz` ("Hey Jarvis") |
+| `JARVIS_ATIVACAO=ambos` | Como chamar o Jarvis: `ambos` (palmas ou "Hey Jarvis"), `palmas` ou `voz` |
 | `JARVIS_PALAVRA_ATIVACAO=1` | Começa no modo chamada (esperando as palmas). `0` = começa em mãos livres |
 | `JARVIS_SENSIBILIDADE=0.5` | Menor (ex.: `0.3`) = aceita o "Hey Jarvis" com mais facilidade; maior = mais rigoroso |
 | `JARVIS_JANELA_CONVERSA=20` | Segundos que ele continua ouvindo depois da última fala |

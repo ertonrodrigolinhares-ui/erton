@@ -1,7 +1,7 @@
 """Como chamar o Jarvis Ultron: 2 palmas (padrão) ou "Hey Jarvis".
 
-Com palmas (JARVIS_ATIVACAO=palmas, o padrão):
-  - bata 2 palmas: o Jarvis começa a ouvir (a "chamada" começa);
+Com palmas (JARVIS_ATIVACAO=ambos, o padrão; "palmas" = só palmas):
+  - bata 2 palmas ou diga "Hey Jarvis": o Jarvis começa a ouvir (a "chamada" começa);
   - bata mais 2 palmas: ele para de ouvir (a "chamada" termina).
   Tudo roda no próprio computador; enquanto a chamada está desligada, nenhum áudio vai
   para a internet.
@@ -15,7 +15,7 @@ Dois modos, que também podem ser trocados por voz:
   "Jarvis, modo mãos livres" / "Jarvis, modo chamada".
 
 Configuração no .env:
-  JARVIS_ATIVACAO=palmas           (palmas ou voz)
+  JARVIS_ATIVACAO=ambos            (ambos, palmas ou voz)
   JARVIS_PALAVRA_ATIVACAO=1        (0 = começa no modo mãos livres, sempre ouvindo)
   JARVIS_SENSIBILIDADE=0.5         ("Hey Jarvis": menor = aceita com mais facilidade)
   JARVIS_JANELA_CONVERSA=20        ("Hey Jarvis": segundos ouvindo depois da última fala)
@@ -203,8 +203,13 @@ def tocar_aviso(estado: str) -> None:
 
 
 def gatilho_configurado() -> str:
-    valor = os.environ.get("JARVIS_ATIVACAO", "palmas").strip().lower()
-    return "voz" if valor in {"voz", "hey jarvis", "palavra"} else "palmas"
+    """'ambos' (padrão: palmas ou "Hey Jarvis" abrem a chamada), 'palmas' ou 'voz'."""
+    valor = os.environ.get("JARVIS_ATIVACAO", "ambos").strip().lower()
+    if valor in {"voz", "hey jarvis", "palavra"}:
+        return "voz"
+    if valor in {"palmas", "palma"}:
+        return "palmas"
+    return "ambos"
 
 
 class PortaoDeVoz:
@@ -243,14 +248,25 @@ class PortaoDeVoz:
 
     @property
     def como_chamar(self) -> str:
-        return "bata 2 palmas" if self.palmas is not None else 'diga "Hey Jarvis"'
+        if self.palmas is None:
+            return 'diga "Hey Jarvis"'
+        return 'bata 2 palmas ou diga "Hey Jarvis"' if self.detector is not None else "bata 2 palmas"
 
     @classmethod
     def da_configuracao(cls, avisar: Callable[[str], None] | None = None) -> "PortaoDeVoz":
         chamada = _ligado("JARVIS_PALAVRA_ATIVACAO")
-        if gatilho_configurado() == "palmas":
-            portao = cls(None, ativo=chamada, avisar=avisar, palmas=DetectorDePalmas())
-            portao.avisar("SYS: Bata 2 palmas para falar comigo (e mais 2 para encerrar)." if chamada
+        gatilho = gatilho_configurado()
+        if gatilho in ("palmas", "ambos"):
+            detector = None
+            if gatilho == "ambos":  # "Hey Jarvis" também abre a chamada
+                try:
+                    detector = carregar_detector()
+                except Exception as erro:
+                    print(f"[Ativação] \"Hey Jarvis\" indisponível ({erro}); só palmas.")
+            portao = cls(detector, ativo=chamada, limiar=_numero("JARVIS_SENSIBILIDADE", 0.5),
+                         avisar=avisar, palmas=DetectorDePalmas())
+            portao.avisar(f"SYS: {portao.como_chamar.capitalize()} para falar comigo "
+                          "(e 2 palmas para encerrar)." if chamada
                           else "SYS: Modo mãos livres: estou ouvindo tudo.")
             return portao
         # O detector é carregado mesmo começando em mãos livres, para dar para trocar por voz.
@@ -339,14 +355,42 @@ class PortaoDeVoz:
         """2 palmas começam a chamada; mais 2 palmas terminam. Sem tempo limite."""
         with self._trava:
             if not self.palmas.processar(audio):
-                return audio.tobytes() if self.acordado else None
+                if self.acordado:
+                    return audio.tobytes()
+                return self._ouvir_hey_jarvis(audio)
             self.acordado = not self.acordado
+            if not self.acordado:
+                self._reiniciar_detector()
+                self._anteriores.clear()
+                self._amostras_anteriores = 0
             if self.acordado:
                 self.avisar("SYS: Estou ouvindo. Bata 2 palmas para encerrar.")
             else:
                 self.avisar("SYS: Chamada encerrada. Bata 2 palmas para falar comigo.")
             self._avisar_mudanca()
             return None  # o som das palmas não vai para a IA
+
+    def _ouvir_hey_jarvis(self, audio) -> bytes | None:
+        """Com a chamada fechada: "Hey Jarvis" também abre (e o pedido falado junto vai inteiro)."""
+        if self.detector is None:
+            return None
+        self._guardar(audio)
+        self._pendente = np.concatenate([self._pendente, audio])
+        disparou = False
+        while len(self._pendente) >= QUADRO:
+            quadro, self._pendente = self._pendente[:QUADRO], self._pendente[QUADRO:]
+            if max(self.detector.predict(quadro).values(), default=0.0) >= self.limiar:
+                disparou = True
+        if not disparou:
+            return None
+        self.acordado = True
+        dados = np.concatenate(list(self._anteriores)).tobytes()
+        self._anteriores.clear()
+        self._amostras_anteriores = 0
+        self._pendente = np.zeros(0, dtype=np.int16)
+        self.avisar("SYS: Estou ouvindo. Bata 2 palmas para encerrar.")
+        self._avisar_mudanca()
+        return dados
 
     def _guardar(self, audio) -> None:
         self._anteriores.append(audio)
