@@ -1,0 +1,11 @@
+Jarvis Ultron - versão 2026-09-25
+
+Novidades desta versão:
+- Navegador: se o automático não abrir, o site abre no navegador normal (Firefox ou o padrão).
+- Tela mais leve: bem menos processador (esfera parada desenha menos; minimizado não desenha).
+- Chamada por palmas: 2 palmas ou "Hey Jarvis" abrem a conversa; mais 2 palmas fecham.
+- Som curto + selo na tela: CHAMADA ATIVA (verde), AGUARDANDO 2 PALMAS (amarelo), MÃOS LIVRES (azul).
+- Com a chamada fechada ele fica em silêncio: não cumprimenta de novo nem anuncia o modo.
+- Não precisa mais bater palmas para abrir o programa.
+
+Como conferir que atualizou: a tela mostra o selo embaixo do título "JARVIS ULTRON".
