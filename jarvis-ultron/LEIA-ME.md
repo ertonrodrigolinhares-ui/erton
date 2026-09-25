@@ -58,8 +58,16 @@ Cópia do projeto **JARVIS-OS V.2** (licença MIT, veja `LICENSE`), com ajustes 
      Não feche a janela preta.
 2. Quando pedir a chave do Gemini, o site do Google abre sozinho: entre com o Gmail, clique em
    **Create API key**, copie, volte à janela preta, **clique com o botão direito** para colar e aperte **Enter**.
-3. A tela do Jarvis abre. Na primeira vez ele mostra uma apresentação (em inglês). Depois é só **falar**.
-4. **Deixe a janela preta aberta** enquanto usa. Ela mostra o que o Jarvis está fazendo.
+3. Depois ele pergunta a chave do **Groq** (reserva grátis, opcional) e a **cidade** do clima.
+4. A tela do Jarvis abre. Na primeira vez ele mostra uma apresentação (em inglês). Depois é só **falar**.
+5. **Deixe a janela preta aberta** enquanto usa. Ela mostra o que o Jarvis está fazendo.
+6. Para os agentes (posts, Metricool, rotina das 8h): dê dois cliques em **`Instalar Hermes`**.
+
+### Reinstalar do zero
+1. Se já tinha o Hermes: dê dois cliques em **`Desinstalar Hermes`** e digite **SIM**
+   (apaga o Hermes e as configurações dele: login do Nous, Metricool, rotina).
+2. Extraia este pacote numa pasta nova e siga os passos acima (Iniciar Jarvis Ultron → Instalar Hermes).
+3. A pasta antiga do Jarvis pode ser apagada depois que a nova estiver funcionando.
 
 ## Trocar a chave do Gemini
 

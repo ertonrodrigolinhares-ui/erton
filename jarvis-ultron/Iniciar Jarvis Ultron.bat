@@ -47,14 +47,13 @@ if "%CHAVE%"=="" goto chave
     echo GEMINI_API_KEY="%CHAVE%"
     echo GEMINI_VOICE_NAME="charon"
     echo JARVIS_EFEITO_ULTRON=1
-    echo JARVIS_SKIP_CLAP_GATE=1
     echo JARVIS_PALAVRA_ATIVACAO=1
 ) > .env
 echo Chave salva.
 
 :groq
 rem ---- Uma vez so: pergunta a chave do Groq (reserva gratis, opcional) ----
-findstr /c:"GROQ_API_KEY" .env >nul 2>nul && goto iniciar
+findstr /c:"GROQ_API_KEY" .env >nul 2>nul && goto cidade
 echo.
 echo ============================================================
 echo  OPCIONAL: chave do Groq, a IA reserva gratis.
@@ -70,6 +69,15 @@ set /p "GROQ=Chave do Groq (ou Enter para pular): "
 >> .env echo.
 >> .env echo GROQ_API_KEY="%GROQ%"
 if "%GROQ%"=="" (echo Sem reserva por enquanto. Para colocar depois, veja o LEIA-ME.) else (echo Chave do Groq salva.)
+
+:cidade
+rem ---- Uma vez so: cidade do painel de clima ----
+findstr /c:"JARVIS_CIDADE" .env >nul 2>nul && goto iniciar
+echo.
+set "CIDADE="
+set /p "CIDADE=Sua cidade para o clima (Enter = Campina Grande): "
+if "%CIDADE%"=="" set "CIDADE=Campina Grande"
+>> .env echo JARVIS_CIDADE="%CIDADE%"
 
 :iniciar
 echo.

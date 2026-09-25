@@ -70,10 +70,26 @@ def _load_dotenv():
     """Load .env file if it exists. Silently skip if not found."""
     try:
         from dotenv import load_dotenv
-        load_dotenv(BASE_DIR / ".env")
     except ImportError:
         # python-dotenv not installed — rely on already-set env vars
-        pass
+        return
+    # Jarvis Ultron: o iniciador do Windows grava o .env na página de código do console (ex.: a cidade
+    # "João Pessoa"); o Bloco de Notas grava em UTF-8. Aceita os dois em vez de travar na abertura.
+    import io
+
+    try:
+        bruto = (BASE_DIR / ".env").read_bytes()
+    except OSError:
+        return
+    for codificacao in ("utf-8-sig", "cp850", "cp1252"):
+        try:
+            texto = bruto.decode(codificacao)
+            break
+        except UnicodeDecodeError:
+            continue
+    else:
+        texto = bruto.decode("utf-8", errors="replace")
+    load_dotenv(stream=io.StringIO(texto))
 
 
 BASE_DIR        = get_base_dir()

@@ -18,5 +18,7 @@ Novidades desta versão:
 - Botão "Ligar Hermes": liga o Hermes e testa a ligação com o Jarvis (Hermes novo: perfil em /p/jarvis).
 - Chave do Gemini aceita na tela vai sozinha para o .env.
 - Se o Google recusar a chave (defeito das chaves "AQ."), botão "Continuar com a reserva (Groq)".
+- Reserva (Groq) sempre fala: se a voz da internet falhar, usa a voz do Windows.
+- Instalação do zero: pergunta a cidade do clima; botão "Desinstalar Hermes" para recomeçar.
 
 Como conferir que atualizou: a tela mostra o selo embaixo do título "JARVIS ULTRON".
