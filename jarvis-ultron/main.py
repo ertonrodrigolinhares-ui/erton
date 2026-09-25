@@ -1729,7 +1729,17 @@ class JarvisLive:
             on_speaking_stop=lambda: self.set_speaking(False),
         )
         motor.on_level = self._mostrar_volume
-        motor.speak_sync(texto)
+        if motor.speak_sync(texto):
+            return
+        # Jarvis Ultron: a voz da internet (Microsoft Edge) falhou; usa a voz que vem no Windows.
+        from actions.tts_engine import falar_com_voz_do_windows
+
+        print("[Reserva] Voz da internet falhou; usando a voz do Windows.")
+        self.set_speaking(True)
+        try:
+            falar_com_voz_do_windows(texto)
+        finally:
+            self.set_speaking(False)
 
     def _escutar_reserva(self) -> None:
         """No modo reserva: ouve (depois do "Hey Jarvis"), transcreve e responde pelo Groq."""

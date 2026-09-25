@@ -113,11 +113,11 @@ class TTSEngine:
             return
         threading.Thread(target=self._speak_sync, args=(text,), daemon=True).start()
 
-    def speak_sync(self, text: str) -> None:
-        """Synthesize text and play audio (blocking)."""
-        self._speak_sync(text)
+    def speak_sync(self, text: str) -> bool:
+        """Synthesize text and play audio (blocking). Jarvis Ultron: True se tocou algum áudio."""
+        return self._speak_sync(text)
 
-    def _speak_sync(self, text: str) -> None:
+    def _speak_sync(self, text: str) -> bool:
         with self._lock:
             try:
                 print(f"[TTS] Synthesizing with {self.provider} / {self.voice_id}, text={text[:60]}...")
@@ -131,16 +131,20 @@ class TTSEngine:
                     efeito = criar_efeito(RECEIVE_SAMPLE_RATE)
                     if efeito is not None and pcm.size:
                         pcm = np.frombuffer(efeito.processar(pcm.tobytes()), dtype=np.int16)
+                    if not pcm.size:
+                        return False
                     _play_pcm(pcm, self.on_speaking_start, self.on_speaking_stop,
                               getattr(self, "on_level", None))
                     print(f"[TTS] Playback complete")
-                else:
-                    print(f"[TTS] No audio returned from {self.provider}")
+                    return True
+                print(f"[TTS] No audio returned from {self.provider}")
+                return False
             except Exception as e:
                 print(f"[TTS] ❌ {self.provider} error: {e}")
                 import traceback; traceback.print_exc()
                 if self.on_speaking_stop:
                     self.on_speaking_stop()
+                return False
 
     def _synthesize(self, text: str) -> bytes | None:
         if self.provider == "elevenlabs":
@@ -207,3 +211,30 @@ class TTSEngine:
         except Exception as e:
             print(f"[TTS] ❌ OpenAI TTS: {e}")
             return None
+
+
+def falar_com_voz_do_windows(texto: str) -> bool:
+    """Jarvis Ultron: voz que já vem no Windows (funciona sem internet). Usa uma voz em português
+    se houver (ex.: Microsoft Maria). Devolve True se conseguiu falar."""
+    import base64
+    import os
+    import subprocess
+
+    if os.name != "nt" or not (texto or "").strip():
+        return False
+    codificado = base64.b64encode(texto.encode("utf-16-le")).decode("ascii")
+    script = (
+        "Add-Type -AssemblyName System.Speech;"
+        "$s = New-Object System.Speech.Synthesis.SpeechSynthesizer;"
+        "$v = $s.GetInstalledVoices() | Where-Object { $_.VoiceInfo.Culture.Name -like 'pt*' } | Select-Object -First 1;"
+        "if ($v) { $s.SelectVoice($v.VoiceInfo.Name) };"
+        f"$s.Speak([Text.Encoding]::Unicode.GetString([Convert]::FromBase64String('{codificado}')))"
+    )
+    try:
+        resultado = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+                                   capture_output=True, timeout=120,
+                                   creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        return resultado.returncode == 0
+    except Exception as erro:
+        print(f"[TTS] Voz do Windows indisponível: {erro}")
+        return False

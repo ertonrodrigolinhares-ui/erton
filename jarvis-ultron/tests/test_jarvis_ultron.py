@@ -927,3 +927,34 @@ class ReservaNaTelaDaChaveTests(unittest.TestCase):
             tela = ui.SetupOverlay()
             tela._on_validation_finished(False, "API key was rejected by Gemini.", "AQ.x" * 6, False)
             self.assertTrue(tela._reserva_btn.isHidden())
+
+
+class VozDaReservaTests(unittest.TestCase):
+    def _jarvis(self):
+        import main
+        jarvis = object.__new__(main.JarvisLive)
+        jarvis.ui = UIFalsa()
+        jarvis._speaking_lock = __import__("threading").Lock()
+        jarvis._is_speaking = False
+        jarvis.set_speaking = lambda valor: None
+        jarvis._mostrar_volume = lambda pcm: None
+        return jarvis
+
+    def test_se_a_voz_da_internet_falha_usa_a_do_windows(self):
+        jarvis = self._jarvis()
+        with patch("actions.tts_engine.TTSEngine.speak_sync", return_value=False), \
+                patch("actions.tts_engine.falar_com_voz_do_windows", return_value=True) as windows:
+            jarvis._falar_reserva("Bom dia, senhor.")
+        windows.assert_called_once_with("Bom dia, senhor.")
+
+    def test_voz_da_internet_ok_nao_chama_a_do_windows(self):
+        jarvis = self._jarvis()
+        with patch("actions.tts_engine.TTSEngine.speak_sync", return_value=True), \
+                patch("actions.tts_engine.falar_com_voz_do_windows") as windows:
+            jarvis._falar_reserva("Bom dia.")
+        windows.assert_not_called()
+
+    def test_voz_do_windows_fora_do_windows_nao_quebra(self):
+        from actions.tts_engine import falar_com_voz_do_windows
+        with patch("os.name", "posix"):
+            self.assertFalse(falar_com_voz_do_windows("oi"))
