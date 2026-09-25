@@ -30,6 +30,7 @@ Novidades desta versão:
 - Rotinas salvas (automacoes/rotinas.py): "Jarvis, rotina bom dia" — seus agentes para tarefas repetidas.
 - Voz: usa o Gemini 3.x (3.5, depois 3.1) antes do 2.5; se um modelo não pegar, troca sozinho
   para o próximo (a tela mostra "Modelo de voz: ...").
+- Memória no HD externo (automacoes/memoria_hd.py): "Jarvis, use o HD E como memória".
 - Central de missões na tela Stark (automacoes/painel_stark.py): próximo lembrete, Geekie, agentes e
   botões das rotinas.
 

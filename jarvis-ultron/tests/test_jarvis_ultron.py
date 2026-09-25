@@ -1312,8 +1312,8 @@ class AutomacoesQueIniciamTests(unittest.TestCase):
         from core.automacoes import carregar_ferramentas
         carga = carregar_ferramentas(Path(__file__).resolve().parent.parent / "automacoes")
         self.assertEqual(carga.erros, [])
-        self.assertTrue({"spoken_reminders", "saved_routines", "self_repair"} <= set(carga.ferramentas))
-        self.assertEqual(sorted(a for a, _ in carga.inicios), ["lembretes.py", "painel_stark.py"])
+        self.assertTrue({"spoken_reminders", "saved_routines", "self_repair", "external_memory_drive"} <= set(carga.ferramentas))
+        self.assertEqual(sorted(a for a, _ in carga.inicios), ["lembretes.py", "memoria_hd.py", "painel_stark.py"])
 
 
 class AvisosFaladosTests(unittest.TestCase):
@@ -1487,3 +1487,66 @@ class PainelStarkTests(unittest.TestCase):
         self.assertEqual(self.m.texto_voz(J()), ("Voz: Gemini ao vivo", True))
         J._modo_reserva = True
         self.assertEqual(self.m.texto_voz(J()), ("Voz: reserva (Groq)", False))
+
+
+class MemoriaNoHDTests(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+        from pathlib import Path
+        self.m = _plugin_da_pasta("memoria_hd.py")
+        self.base = Path(tempfile.mkdtemp())
+        self.memoria = self.base / "jarvis" / "memory"
+        self.docs = self.base / "docs"
+        self.hermes = self.base / "hermes"
+        for pasta in (self.memoria, self.docs, self.hermes / "memories"):
+            pasta.mkdir(parents=True)
+        (self.memoria / "long_term.json").write_text('{"nome": "Erton"}', encoding="utf-8")
+        (self.memoria / "answer_cache.py").write_text("codigo", encoding="utf-8")  # não é memória
+        (self.docs / "lembretes.json").write_text("{}", encoding="utf-8")
+        (self.docs / ".env").write_text("GEMINI_API_KEY=segredo", encoding="utf-8")
+        (self.docs / "api_keys.json").write_text("{}", encoding="utf-8")
+        (self.hermes / "memories" / "MEMORY.md").write_text("gosta de triathlon", encoding="utf-8")
+        (self.hermes / "auth.json").write_text("{}", encoding="utf-8")
+        self.config = self.base / "config.json"
+        self.m.fontes = lambda: [("memoria-jarvis", self.memoria, ["*.json", "*.md"]),
+                                 ("documentos", self.docs, None),
+                                 ("hermes/memories", self.hermes / "memories", None)]
+        self.m.arquivo_config = lambda: self.config
+        self.hd = self.base / "HD"
+
+    def test_copia_o_que_aprendeu_sem_chaves_e_guarda_historico(self):
+        from datetime import datetime
+        pasta = self.m.preparar_hd(self.hd / self.m.PASTA_NO_HD)
+        copiados, total = self.m.salvar(pasta, datetime(2026, 9, 25, 10, 0))
+        self.assertEqual((copiados, total), (3, 3))
+        atual = pasta / "atual"
+        self.assertTrue((atual / "memoria-jarvis" / "long_term.json").exists())
+        self.assertTrue((atual / "hermes" / "memories" / "MEMORY.md").exists())
+        self.assertFalse((atual / "documentos" / ".env").exists())
+        self.assertFalse((atual / "documentos" / "api_keys.json").exists())
+        self.assertFalse((atual / "memoria-jarvis" / "answer_cache.py").exists())
+        self.assertTrue((pasta / "historico" / "2026-09-25" / "memoria-jarvis" / "long_term.json").exists())
+        self.assertEqual(self.m.salvar(pasta)[0], 0)  # nada mudou: não copia de novo
+        self.assertIn("ultima_copia", self.m.ler_config())
+
+    def test_reconhece_o_hd_pela_marca_mesmo_se_a_letra_mudar(self):
+        pasta = self.m.preparar_hd(self.hd / self.m.PASTA_NO_HD)
+        outro = self.base / "OutroHD" / self.m.PASTA_NO_HD
+        outro.mkdir(parents=True)
+        (outro / self.m.MARCADOR).write_text("de-outro-computador", encoding="utf-8")
+        self.assertEqual(self.m.achar_hd(discos=[self.base / "OutroHD", self.hd]), pasta)
+        self.assertIsNone(self.m.achar_hd(discos=[self.base / "OutroHD"]))
+        manual = self.base / "Novo" / self.m.PASTA_NO_HD
+        manual.mkdir(parents=True)  # pasta criada à mão pelo usuário
+        self.assertEqual(self.m.achar_hd({}, discos=[self.base / "Novo"]), manual)
+
+    def test_recuperar_so_com_confirmacao_e_guarda_a_atual(self):
+        pasta = self.m.preparar_hd(self.hd / self.m.PASTA_NO_HD)
+        self.m.salvar(pasta)
+        (self.memoria / "long_term.json").write_text("{}", encoding="utf-8")  # memória perdida
+        self.m.achar_hd = lambda *a, **k: pasta
+        self.assertIn("confirm", self.m.executar({"action": "restore"}, None))
+        self.assertIn("Recuperei", self.m.executar({"action": "restore", "confirm": True}, None))
+        self.assertEqual((self.memoria / "long_term.json").read_text(encoding="utf-8"), '{"nome": "Erton"}')
+        self.assertEqual((self.memoria / "long_term.json.antes-de-restaurar").read_text(encoding="utf-8"), "{}")
+        self.assertFalse((self.hermes / "memories" / "MEMORY.md.antes-de-restaurar").exists())
