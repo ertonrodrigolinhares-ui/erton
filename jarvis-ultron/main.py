@@ -2096,6 +2096,11 @@ class JarvisLive:
 
                     response_audio = _live_response_audio_bytes(response)
                     if response_audio:
+                        # Jarvis Ultron: quanto tempo levou da sua fala até a voz dele começar
+                        falou_em = getattr(self, "_ultima_fala_em", None)
+                        if falou_em is not None and not turn_had_audio:
+                            print(f"[Tempo] Resposta começou {time.monotonic() - falou_em:.1f}s depois da sua fala")
+                            self._ultima_fala_em = None
                         turn_had_audio = True
                         if self._turn_done_event and self._turn_done_event.is_set():
                             self._turn_done_event.clear()
@@ -2117,6 +2122,7 @@ class JarvisLive:
 
                         if sc.input_transcription and sc.input_transcription.text:
                             self._portao.estender()
+                            self._ultima_fala_em = time.monotonic()
                             txt = _clean_transcript(sc.input_transcription.text)
                             if txt:
                                 if not in_buf:
@@ -2165,7 +2171,12 @@ class JarvisLive:
                         function_calls = list(response.tool_call.function_calls)
                         for fc in function_calls:
                             print(f"[JARVIS] 📞 {fc.name}")
+                        inicio_ferramenta = time.monotonic()
                         fn_responses = await self._execute_tool_batch(function_calls)
+                        print(f"[Tempo] {', '.join(fc.name for fc in function_calls)} levou "
+                              f"{time.monotonic() - inicio_ferramenta:.1f}s")
+                        if getattr(self, "_ultima_fala_em", None) is not None:
+                            self._ultima_fala_em = time.monotonic()  # conta a resposta a partir daqui
                         await self.session.send_tool_response(
                             function_responses=fn_responses
                         )
