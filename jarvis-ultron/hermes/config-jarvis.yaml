@@ -21,14 +21,17 @@ delegation:
 
 # Conectores (MCP). Depois de instalar, autorize cada um uma vez:
 #   hermes -p jarvis mcp login metricool
-#   hermes -p jarvis mcp login meta_ads
+#   (anúncios do Meta: veja a observação em mcp_servers)
 mcp_servers:
   metricool:
     url: "https://ai.metricool.com/mcp"
     auth: oauth
-  meta_ads:
-    url: "https://mcp.facebook.com/ads"
-    auth: oauth
+  # Anúncios do Meta: o MCP oficial (mcp.facebook.com/ads) ainda não aceita login de programas como
+  # o Hermes ("Dynamic registration is not available for this client"). Quando o Meta liberar,
+  # é só tirar o "#" das 3 linhas abaixo e rodar: hermes -p jarvis mcp login meta_ads
+  # meta_ads:
+  #   url: "https://mcp.facebook.com/ads"
+  #   auth: oauth
 
 # Voz ElevenLabs para as respostas faladas do Hermes (a chave fica no .env).
 tts:

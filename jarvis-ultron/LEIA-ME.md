@@ -42,7 +42,7 @@ Cópia do projeto **JARVIS-OS V.2** (licença MIT, veja `LICENSE`), com ajustes 
   (com o efeito Ultron por cima, se ligado). Correção: no original, escolher a ElevenLabs deixava o
   Jarvis mudo, e a escolha não voltava ao reabrir.
 - **Hermes Agent** (pasta `hermes`): orquestrador com sub-agentes, rotina diária das 8h, redes sociais
-  pelo Metricool, anúncios pelo Meta e navegador próprio. Veja a seção "Hermes" abaixo.
+  pelo Metricool e navegador próprio. Veja a seção "Hermes" abaixo.
 
 - **Tela Stark** (`ui_stark.py`): painéis no estilo do HUD do Homem de Ferro em volta da esfera —
   régua dos dias do mês, relógio em anel, disco, energia, internet, atalhos, STARK INDUSTRIES,
@@ -143,7 +143,7 @@ Deixe essas linhas de fora para o Jarvis escolher sozinho. Esse é o recomendado
 
 O Hermes Agent (Nous Research, código aberto) é o "orquestrador" do Jarvis. Ele divide tarefas
 entre sub-agentes, usa os **modelos grátis do Nous Portal** como cérebro e se conecta ao **Metricool** (posts em todas as
-redes) e ao **MCP oficial do Meta** (anúncios do Facebook e Instagram).
+redes). Os **anúncios do Meta** ficam pelo app do Claude (veja "Limitações conhecidas").
 
 ### Instalar (uma vez)
 1. Dê dois cliques em **`Instalar Hermes`** (nesta pasta). Ele:
@@ -151,7 +151,7 @@ redes) e ao **MCP oficial do Meta** (anúncios do Facebook e Instagram).
    - cria o perfil **"jarvis"** com as habilidades, a personalidade e a trava de aprovação;
    - usa o login do **Nous Portal** feito na instalação (se não tiver, abre o navegador para entrar)
      e pede a chave da **ElevenLabs** (opcional);
-   - abre o navegador para você autorizar o **Metricool** e, se quiser, o **Meta**;
+   - abre o navegador para você autorizar o **Metricool**;
    - cria a **rotina diária das 8h** e faz o Hermes ligar sozinho com o Windows.
 2. Abra o Jarvis Ultron normalmente.
 
@@ -165,7 +165,6 @@ o que já existe e só pergunta do Metricool se você quiser reconectar.
 ### Como usar
 - **"Hey Jarvis, quais são os posts de hoje?"**: ele lê as propostas que a rotina das 8h preparou.
 - **"Ok, pode publicar os posts 1 e 3"**: ele registra o seu ok e manda publicar pelo Metricool.
-- **"Como estão meus anúncios?"**: relatório do Meta Ads.
 - **"Entre no painel do Metricool e veja os seguidores desta semana"**: o Hermes usa o navegador sozinho.
 - Tarefas longas não travam a conversa: se o Hermes demorar mais de ~25 segundos, o Jarvis avisa e
   traz a resposta quando ficar pronta (com o modo chamada esperando, ela aparece só na tela).
@@ -187,4 +186,7 @@ o que já existe e só pergunta do Metricool se você quiser reconectar.
 ### Limitações conhecidas
 - Os sub-agentes compartilham os mesmos conectores do agente principal (o Hermes ainda não separa
   ferramentas por sub-agente); a trava de aprovação vale para todos.
-- O MCP oficial do Meta é para **anúncios**. Posts normais saem pelo Metricool.
+- **Anúncios do Meta:** o conector oficial do Meta (mcp.facebook.com/ads) ainda não aceita login de
+  programas como o Hermes (erro "Dynamic registration is not available for this client"). Use os
+  anúncios pelo **app do Claude**: Configurações → Conectores → adicionar **Meta Ads**. Quando o Meta
+  liberar, basta reativar as linhas `meta_ads` em `hermes/config-jarvis.yaml`.

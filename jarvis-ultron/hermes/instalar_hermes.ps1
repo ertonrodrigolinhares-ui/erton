@@ -196,7 +196,7 @@ Gravar-Env $envUltron $ultronEnv
 Write-Host "Configuracao aplicada e Jarvis Ultron ligado ao Hermes." -ForegroundColor Green
 
 # ---------------------------------------------------------------- 6. Conectores (login uma vez)
-Titulo "6/7  Conectar Metricool e Meta (uma vez so)"
+Titulo "6/7  Conectar o Metricool (uma vez so)"
 $marcaConectores = Join-Path $pastaJarvis "conectores-feitos.txt"
 $conectar = $true
 if (Test-Path $marcaConectores) {
@@ -207,8 +207,8 @@ if ($conectar) {
     Write-Host "Vai abrir o navegador para voce autorizar o Metricool (entre na sua conta e clique em Permitir)."
     Read-Host "Aperte Enter para conectar o Metricool"
     & $hermes -p jarvis mcp login metricool
-    $meta = Read-Host "Conectar tambem os anuncios do Meta (Facebook/Instagram Ads)? Digite S ou N"
-    if ($meta -match '^[sS]') { & $hermes -p jarvis mcp login meta_ads }
+    # Anuncios do Meta: o conector oficial ainda nao aceita o Hermes (veja config-jarvis.yaml).
+    # Por enquanto, use os anuncios pelo app do Claude: Configuracoes > Conectores > Meta Ads.
     Gravar $marcaConectores (Get-Date -Format "yyyy-MM-dd HH:mm")
 }
 

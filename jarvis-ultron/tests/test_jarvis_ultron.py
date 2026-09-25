@@ -511,7 +511,7 @@ class KitHermesTests(unittest.TestCase):
         self.assertTrue(config["model"]["default"].endswith(":free"))
         self.assertTrue(all(r["model"].endswith(":free") for r in config["fallback_providers"]))
         self.assertNotIn("provider", config["delegation"])  # sub-agentes herdam o cérebro grátis
-        self.assertEqual(set(config["mcp_servers"]), {"metricool", "meta_ads"})
+        self.assertEqual(set(config["mcp_servers"]), {"metricool"})  # Meta Ads: conector oficial não aceita o Hermes
         gancho = config["hooks"]["pre_tool_call"][0]
         self.assertTrue(gancho["fail_closed"])
         self.assertRegex("mcp__metricool__create_post", gancho["matcher"])
