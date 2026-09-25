@@ -458,6 +458,20 @@ TOOL_DECLARATIONS = [
         }
     },
     {
+        "name": "school_tasks",
+        "description": (
+            "Lists the student's pending school activities and deadlines from Geekie One (read-only, via "
+            "Hermes). Use when the user asks what is pending/due on Geekie or at school. Never answer, submit "
+            "or mark school activities as done."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "refresh": {"type": "BOOLEAN", "description": "true to read Geekie One again now instead of the saved list"}
+            }
+        }
+    },
+    {
         "name": "self_diagnosis",
         "description": (
             "Runs JARVIS's self-diagnosis: checks internet, the Gemini key and models, the Groq backup, "
@@ -1319,6 +1333,8 @@ class JarvisLive:
         self._reserva = None if self.cloud_safe else ReservaGroq.da_configuracao()
         self._modo_reserva = False
         self._falhas_seguidas = 0
+        if not self.cloud_safe:
+            self._iniciar_lembretes_geekie()
 
     def _on_text_command(self, text: str):
         # Jarvis Ultron: "modo chamada" / "modo mãos livres" (botões ou digitado) trocam na hora,
@@ -1579,6 +1595,52 @@ class JarvisLive:
         if falar:
             self._falar_reserva(autodiagnostico.resumo_falado(itens))
         return texto + "\n\nSummarize for the user in Portuguese: only the problems (DEFEITO/ATENÇÃO) and how to fix them."
+
+    async def _geekie_pendencias(self, atualizar: bool = False) -> str:
+        """Jarvis Ultron: pendências do Geekie One (lista salva pelo Hermes; lê de novo se velha)."""
+        from core import geekie, hermes_ponte
+
+        atividades, atualizado = geekie.ler()
+        if (atualizar or geekie.desatualizada(atualizado)) and hermes_ponte.configurado():
+            return await self._hermes_sem_travar(
+                "Use a skill geekie-pendencias agora: leia (somente leitura) as atividades pendentes do "
+                "Geekie One, salve a lista e responda o resumo falado.")
+        if not atividades and atualizado is None:
+            return ("There is no Geekie list yet. Tell the user in Portuguese that Hermes reads Geekie One at 7h "
+                    "and 18h, and that he must log in once on Geekie One in Hermes' browser.")
+        return geekie.resumo(atividades) + " (Say this to the user in Portuguese.)"
+
+    def _verificar_lembretes_geekie(self) -> list[str]:
+        """Uma passada: lembra (uma vez por dia) das atividades que vencem em até 2 dias."""
+        from core import geekie
+
+        atividades, _ = geekie.ler()
+        devidas = geekie.lembretes_do_dia(atividades, geekie.carregar_avisados())
+        if not devidas:
+            return []
+        frases = [geekie.frase_lembrete(a) for a in devidas]
+        for frase in frases:
+            self.ui.write_log(f"SYS: {frase}")
+        session, loop = getattr(self, "session", None), getattr(self, "_loop", None)
+        if session is not None and loop is not None and not self._chamada_fechada():
+            aviso = ("[Lembretes do Geekie] " + " ".join(frases) +
+                     "\nDiga isso ao usuário agora, em português do Brasil, em uma ou duas frases.")
+            asyncio.run_coroutine_threadsafe(
+                session.send_client_content(turns={"parts": [{"text": aviso}]}, turn_complete=True), loop)
+        geekie.marcar_avisados(devidas)
+        return frases
+
+    def _iniciar_lembretes_geekie(self) -> None:
+        def laco():
+            time.sleep(90)  # deixa o Jarvis conectar primeiro
+            while not self._shutdown_requested.is_set():
+                try:
+                    self._verificar_lembretes_geekie()
+                except Exception as erro:
+                    print(f"[Geekie] Lembretes: {erro}")
+                self._shutdown_requested.wait(30 * 60)
+
+        threading.Thread(target=laco, daemon=True, name="LembretesGeekie").start()
 
     HERMES_ESPERA = 25  # segundos que a conversa espera o Hermes; depois ele termina em segundo plano
 
@@ -1920,6 +1982,9 @@ class JarvisLive:
 
             elif name == "hermes_agent":
                 result = await self._hermes_sem_travar(args.get("request", ""))
+
+            elif name == "school_tasks":
+                result = await self._geekie_pendencias(bool(args.get("refresh", False)))
 
             elif name == "self_diagnosis":
                 result = await asyncio.to_thread(self._autodiagnostico, False)

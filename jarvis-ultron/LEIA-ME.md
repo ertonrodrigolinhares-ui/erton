@@ -88,6 +88,16 @@ Cópia do projeto **JARVIS-OS V.2** (licença MIT, veja `LICENSE`), com ajustes 
 - **Prefere que ele ouça sempre:** aperte **⛭ MÃOS LIVRES** (ou coloque `JARVIS_PALAVRA_ATIVACAO=0`
   para ele já abrir assim).
 
+## Escola: Geekie One (pendências, tutor e lembretes)
+
+- **Pendências:** "Jarvis, o que tem pendente no Geekie?". O Hermes lê o **Geekie One**
+  (one.geekie.com.br) às **7h e às 18h**, **só lendo**: nunca responde, entrega ou marca atividades.
+  Na primeira vez, entre uma vez no Geekie One no navegador do Hermes (ele não digita senhas).
+- **Lembretes:** quando faltam **2 dias ou menos** (ou atrasou), o Jarvis lembra uma vez por dia.
+  Com o modo chamada esperando o "Hey Jarvis", o lembrete aparece só na tela.
+- **Modo tutor:** "Jarvis, me explica esse exercício". Ele explica passo a passo, dá dicas e confere
+  a resposta do aluno, mas não entrega a resposta pronta de atividades avaliadas.
+
 ## Autodiagnóstico (o Jarvis confere a si mesmo)
 
 Diga **"Jarvis, faça um autodiagnóstico"** (ou "o que está com defeito?"), ou aperte o botão **✚** na

@@ -1041,3 +1041,75 @@ class AutodiagnosticoTests(unittest.TestCase):
             import time as _t
             _t.sleep(0.2)
         auto.assert_called_once()
+
+
+class GeekieTests(unittest.TestCase):
+    def _base(self, atividades, atualizado="2026-09-25T18:00"):
+        import json, tempfile
+        from pathlib import Path
+        base = Path(tempfile.mkdtemp())
+        (base / "jarvis" / "geekie").mkdir(parents=True)
+        (base / "jarvis" / "geekie" / "pendencias.json").write_text(
+            json.dumps({"atualizado_em": atualizado, "atividades": atividades}), encoding="utf-8")
+        return base
+
+    def test_resumo_ordena_por_prazo_e_ignora_feitas(self):
+        from datetime import date
+        from core import geekie
+        base = self._base([
+            {"disciplina": "História", "titulo": "Resumo cap. 4", "prazo": "2026-09-30", "status": "pendente"},
+            {"disciplina": "Matemática", "titulo": "Lista 3", "prazo": "2026-09-26", "status": "pendente"},
+            {"disciplina": "Inglês", "titulo": "Quiz", "prazo": "2026-09-20", "status": "feita"},
+            {"disciplina": "Ciências", "titulo": "Relatório", "prazo": "2026-09-24", "status": "atrasada"},
+        ])
+        atividades, atualizado = geekie.ler(base)
+        self.assertEqual(len(atividades), 4)
+        texto = geekie.resumo(atividades, hoje=date(2026, 9, 25))
+        self.assertTrue(texto.startswith("No Geekie há 3 atividades pendentes"))
+        self.assertLess(texto.index("Ciências"), texto.index("Matemática"))
+        self.assertLess(texto.index("Matemática"), texto.index("História"))
+        self.assertIn("vence amanhã", texto)
+        self.assertNotIn("Inglês", texto)
+
+    def test_lembra_uma_vez_por_dia_so_o_que_vence_em_ate_2_dias(self):
+        from datetime import date
+        from core import geekie
+        base = self._base([
+            {"disciplina": "Matemática", "titulo": "Lista 3", "prazo": "2026-09-27", "status": "pendente"},
+            {"disciplina": "História", "titulo": "Resumo", "prazo": "2026-10-10", "status": "pendente"},
+        ])
+        atividades, _ = geekie.ler(base)
+        hoje = date(2026, 9, 25)
+        devidas = geekie.lembretes_do_dia(atividades, geekie.carregar_avisados(base), hoje)
+        self.assertEqual([a.titulo for a in devidas], ["Lista 3"])
+        self.assertIn("faltam 2 dias", geekie.frase_lembrete(devidas[0], hoje))
+        geekie.marcar_avisados(devidas, base, hoje)
+        self.assertEqual(geekie.lembretes_do_dia(atividades, geekie.carregar_avisados(base), hoje), [])
+        self.assertEqual(len(geekie.lembretes_do_dia(atividades, geekie.carregar_avisados(base), date(2026, 9, 26))), 1)
+
+    def test_lista_velha_pede_ao_hermes(self):
+        from datetime import datetime
+        from core import geekie
+        self.assertTrue(geekie.desatualizada(None))
+        self.assertTrue(geekie.desatualizada(datetime(2026, 9, 24, 7), agora=datetime(2026, 9, 25, 12)))
+        self.assertFalse(geekie.desatualizada(datetime(2026, 9, 25, 7), agora=datetime(2026, 9, 25, 12)))
+
+    def test_lembrete_com_modo_chamada_fica_so_na_tela(self):
+        import main
+        base = self._base([{"disciplina": "Matemática", "titulo": "Lista 3", "prazo": "2026-01-01", "status": "atrasada"}])
+        jarvis = object.__new__(main.JarvisLive)
+        jarvis.ui = UIFalsa()
+        jarvis._portao = PortaoDeVoz(object())  # modo chamada, esperando o Hey Jarvis
+        jarvis.session, jarvis._loop = object(), None
+        with patch.dict("os.environ", {"HERMES_JARVIS_HOME": str(base)}):
+            frases = jarvis._verificar_lembretes_geekie()
+            self.assertEqual(len(frases), 1)
+            self.assertIn("atrasada", frases[0])
+            self.assertTrue(any("atrasada" in l for l in jarvis.ui.logs))
+            self.assertEqual(jarvis._verificar_lembretes_geekie(), [])  # já lembrou hoje
+
+    def test_skill_e_somente_leitura(self):
+        texto = (KIT / "skills" / "jarvis" / "geekie-pendencias" / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("SOMENTE LEITURA", texto)
+        self.assertIn("Nunca digite senhas", texto)
+        self.assertIn("__PASTA_JARVIS__/geekie/pendencias.json", texto)

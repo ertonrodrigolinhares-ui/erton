@@ -22,5 +22,7 @@ Novidades desta versão:
 - Instalação do zero: pergunta a cidade do clima; botão "Desinstalar Hermes" para recomeçar.
 - Autodiagnóstico: "Jarvis, faça um autodiagnóstico" ou botão ✚ — diz o que está com defeito e como resolver.
 - Gemini 2.5 (aposentando) só como última reserva; usa os modelos 3.x primeiro.
+- Geekie One: pendências (somente leitura), lembretes de prazo e modo tutor.
+- Voz com menos atraso (áudio em latência baixa e efeito metálico sem eco).
 
 Como conferir que atualizou: a tela mostra o selo embaixo do título "JARVIS ULTRON".

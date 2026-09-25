@@ -127,7 +127,7 @@ $pastaGancho = Join-Path $perfil "hooks-jarvis"
 New-Item -ItemType Directory -Force $pastaGancho | Out-Null
 Copy-Item (Join-Path $kit "hooks\aprovacao_jarvis.py") $pastaGancho -Force
 $gancho = (Join-Path $pastaGancho "aprovacao_jarvis.py") -replace '\\', '/'
-Write-Host "5 habilidades instaladas e trava de aprovacao ligada." -ForegroundColor Green
+Write-Host "6 habilidades instaladas e trava de aprovacao ligada." -ForegroundColor Green
 
 # ---------------------------------------------------------------- 4. Chaves
 Titulo "4/7  Cerebro gratis (Nous) e chave da ElevenLabs"
@@ -213,10 +213,13 @@ if ($conectar) {
 }
 
 # ---------------------------------------------------------------- 7. Rotina das 8h e inicio automatico
-Titulo "7/7  Rotina diaria das 8h e inicio automatico"
+Titulo "7/7  Rotinas (8h e Geekie 7h/18h) e inicio automatico"
 $rotinas = (& $hermes -p jarvis cron list 2>&1 | Out-String)
 if ($rotinas -notmatch "Rotina do atleta 8h") {
     & $hermes -p jarvis cron create "0 8 * * *" "Execute a rotina diaria do perfil de atleta do Erton." --skill rotina-atleta-8h --name "Rotina do atleta 8h" --deliver local
+}
+if ($rotinas -notmatch "Geekie pendencias") {
+    & $hermes -p jarvis cron create "0 7,18 * * *" "Leia as atividades pendentes do Geekie One (somente leitura)." --skill geekie-pendencias --name "Geekie pendencias" --deliver local
 }
 # Um servico so (do perfil principal) atende o perfil jarvis e a rotina das 8h.
 & $hermes gateway restart  # para o Hermes ja usar a configuracao nova
