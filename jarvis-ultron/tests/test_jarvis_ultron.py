@@ -26,9 +26,10 @@ class CentralDeModelosTests(unittest.TestCase):
         modelos._cache = None
 
     def test_mais_novo_estavel_primeiro_preview_e_antigo_por_ultimo(self):
+        # 2.5 está sendo aposentado: fica na reserva, depois dos 3.x (inclusive preview)
         self.assertEqual(modelos.candidatos("gemini-2.5-flash"), [
-            "gemini-3.1-flash", "gemini-2.5-flash", "gemini-flash-latest",
-            "gemini-3.5-flash-preview", "gemini-2.0-flash"])
+            "gemini-3.1-flash", "gemini-flash-latest", "gemini-3.5-flash-preview",
+            "gemini-2.5-flash", "gemini-2.0-flash"])
 
     def test_categorias(self):
         self.assertEqual(modelos.resolver("gemini-2.5-flash-lite"), "gemini-3.1-flash-lite")
@@ -60,8 +61,9 @@ class CentralDeModelosTests(unittest.TestCase):
         self.assertEqual(modelos.prioridade(), "rapidez")
         vivos = modelos.candidatos("gemini-live-native-audio")
         self.assertEqual(vivos[0], "gemini-3.1-flash-native-audio")  # estável e mais novo
-        self.assertLess(vivos.index("gemini-2.5-flash-native-audio"),
-                        vivos.index("gemini-3.5-flash-native-audio-preview"))
+        # o 2.5 (aposentando) fica depois até do 3.5 preview
+        self.assertLess(vivos.index("gemini-3.5-flash-native-audio-preview"),
+                        vivos.index("gemini-2.5-flash-native-audio"))
 
     def test_escolha_manual_no_env(self):
         with patch.dict("os.environ", {"JARVIS_MODELO_TEXTO": "gemini-2.5-flash"}):
@@ -83,8 +85,8 @@ class CentralDeModelosTests(unittest.TestCase):
                 raise errors.ClientError(429, {"error": {"message": "quota"}})
             return f"ok {model}"
 
-        self.assertEqual(modelos._com_reserva(chamar, "gemini-2.5-flash", contents="oi"), "ok gemini-2.5-flash")
-        self.assertEqual(tentados, ["gemini-3.1-flash", "gemini-2.5-flash"])
+        self.assertEqual(modelos._com_reserva(chamar, "gemini-2.5-flash", contents="oi"), "ok gemini-flash-latest")
+        self.assertEqual(tentados, ["gemini-3.1-flash", "gemini-flash-latest"])
 
     def test_erro_de_outro_tipo_nao_troca_de_modelo(self):
         def chamar(model, **_):

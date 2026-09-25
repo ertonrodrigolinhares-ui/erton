@@ -118,6 +118,7 @@ Abra com o Bloco de Notas para mudar:
 | `JARVIS_EFEITO_ULTRON=1` | Efeito metálico. `0` desliga, `robo` deixa com voz de robô |
 | `JARVIS_TEMA_STARK=1` | Tela Stark ligada. `0` = volta para a tela original |
 | `JARVIS_CIDADE=Campina Grande` | Cidade do painel de clima |
+| `JARVIS_VERSAO_MINIMA=3.0` | Modelos mais antigos que isso (ex.: Gemini 2.5, que o Google está aposentando) só são usados como última reserva |
 | `JARVIS_PRIORIDADE=rapidez` | Padrão: modelos estáveis, mais rápidos e que travam menos. `versao` + `JARVIS_GEMINI_VERSAO=3.5` = usar a versão 3.5 mesmo em teste (preview) |
 | `JARVIS_PALAVRA_ATIVACAO=1` | Começa no modo chamada (esperando o "Hey Jarvis"). `0` = começa em mãos livres |
 | `JARVIS_SENSIBILIDADE=0.5` | Menor (ex.: `0.3`) = aceita o "Hey Jarvis" com mais facilidade; maior = mais rigoroso |

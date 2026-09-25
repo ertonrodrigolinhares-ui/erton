@@ -80,7 +80,12 @@ def _versao(nome: str) -> float:
     return float(achado.group(1)) if achado else 0.0
 
 
-VERSAO_MINIMA = 2.5  # modelos mais antigos que isso ficam só como última reserva
+# Modelos mais antigos que isso ficam só como última reserva. O Gemini 2.5 está sendo aposentado
+# pelo Google; JARVIS_VERSAO_MINIMA no .env muda esse limite.
+try:
+    VERSAO_MINIMA = float(os.environ.get("JARVIS_VERSAO_MINIMA", "3.0").replace(",", "."))
+except ValueError:
+    VERSAO_MINIMA = 3.0
 
 
 def _grupo(nome: str) -> int:
@@ -142,6 +147,7 @@ def _da_categoria(cat: str, modelos: list[tuple[str, set[str]]]) -> list[str]:
         vivos = [n for n, acoes in modelos if "bidigeneratecontent" in acoes]
         # Voz: áudio nativo (mais rápido), estável antes de preview/experimental, depois o mais novo.
         return sorted(vivos, key=lambda n: ("native-audio" not in n, _fora_da_preferida(n),
+                                            _versao(n) < VERSAO_MINIMA,  # 2.5: aposentando
                                             _grupo(n) == 2 and prioridade() == "rapidez", -_versao(n), n))
     if cat == "imagem":
         return _ordenar([n for n in gerar if "image" in n and "imagen" not in n])
