@@ -896,7 +896,7 @@ class EnvArquivoTests(unittest.TestCase):
 
     def test_chave_nova_do_google_passa_na_conferencia_basica(self):
         from core.api_key_validator import _basic_key_check, normalize_gemini_api_key
-        chave = "AQ.Ab8RN6KEj8a3O9m5KDhiGMLUxxxxxxxxxxxxxxxx"
+        chave = "AQ.ExemploFalso0000000000000000000000"
         self.assertEqual(normalize_gemini_api_key(f'GEMINI_API_KEY="{chave}"'), chave)
         self.assertIsNone(_basic_key_check(chave))
 
