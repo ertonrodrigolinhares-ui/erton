@@ -230,7 +230,7 @@ class PalavraDeAtivacaoTests(unittest.TestCase):
         with patch.dict("os.environ", {"JARVIS_PALAVRA_ATIVACAO": "0"}):
             self.assertFalse(PortaoDeVoz.da_configuracao().ativo)
         with patch.dict("os.environ", {"JARVIS_PALAVRA_ATIVACAO": "1", "JARVIS_SENSIBILIDADE": "0.7",
-                                       "JARVIS_JANELA_CONVERSA": "12"}):
+                                       "JARVIS_JANELA_CONVERSA": "12", "JARVIS_ATIVACAO": "voz"}):
             portao = PortaoDeVoz.da_configuracao()
             self.assertTrue(portao.ativo)
             self.assertEqual((portao.limiar, portao.janela), (0.7, 12.0))
@@ -655,3 +655,94 @@ class NavegadorPlanoBTests(unittest.TestCase):
         abrir.assert_not_called()
         self.assertIn("Browser error (click)", resultado)
         bc._registry._sessions.pop("chrome", None)
+
+
+# ---------- palmas ----------
+
+def _palma(amplitude=0.8, ms=40, semente=7):
+    """Uma palma: estalo agudo que começa de repente e some em poucos centésimos de segundo."""
+    rng = np.random.default_rng(semente)
+    n = int(16000 * ms / 1000)
+    som = rng.uniform(-1, 1, n) * np.exp(-np.linspace(0, 9, n)) * amplitude
+    return (som * 32767).astype(np.int16)
+
+
+def _silencio(segundos, nivel=40):
+    rng = np.random.default_rng(3)
+    return rng.integers(-nivel, nivel, int(16000 * segundos)).astype(np.int16)
+
+
+def _em_blocos(audio, tamanho=1024):
+    return [audio[i:i + tamanho] for i in range(0, len(audio), tamanho)]
+
+
+class PalmasTests(unittest.TestCase):
+    def _portao(self):
+        from core.palavra_ativacao import DetectorDePalmas
+        avisos = []
+        return PortaoDeVoz(None, palmas=DetectorDePalmas(), avisar=avisos.append), avisos
+
+    def _tocar(self, portao, audio):
+        return [portao.processar(b) for b in _em_blocos(audio)]
+
+    def test_duas_palmas_abrem_e_mais_duas_fecham_a_chamada(self):
+        portao, avisos = self._portao()
+        duas = np.concatenate([_palma(), _silencio(0.45), _palma(), _silencio(0.6)])
+        self.assertTrue(all(r is None for r in self._tocar(portao, _silencio(1.0))))
+        self._tocar(portao, duas)
+        self.assertTrue(portao.acordado)
+        self.assertIn("Estou ouvindo", avisos[-1])
+        fala = self._tocar(portao, _silencio(30.0))  # sem tempo limite: continua ouvindo
+        self.assertTrue(all(r is not None for r in fala))
+        self._tocar(portao, duas)
+        self.assertFalse(portao.acordado)
+        self.assertIn("Chamada encerrada", avisos[-1])
+        self.assertTrue(all(r is None for r in self._tocar(portao, _silencio(1.0))))
+
+    def test_palmas_abafadas_de_microfone_de_notebook(self):
+        from scipy.signal import butter, lfilter
+        b, a = butter(2, [800, 3000], btype="band", fs=16000)  # palma real: mais forte entre 1 e 3 kHz
+        def abafada(semente):
+            return (lfilter(b, a, _palma(0.6, semente=semente) / 32767) * 32767 * 1.5).astype(np.int16)
+        portao, _ = self._portao()
+        self._tocar(portao, np.concatenate([_silencio(1.0), abafada(1), _silencio(0.5), abafada(2), _silencio(0.6)]))
+        self.assertTrue(portao.acordado)
+
+    def test_uma_palma_so_ou_palmas_muito_separadas_nao_contam(self):
+        portao, _ = self._portao()
+        self._tocar(portao, np.concatenate([_silencio(0.5), _palma(), _silencio(3.0), _palma(), _silencio(3.0)]))
+        self.assertFalse(portao.acordado)
+
+    def test_fala_normal_nao_dispara(self):
+        import soundfile as sf
+        from pathlib import Path
+        for nome in ("frase_comum.wav", "hey_jarvis.wav"):
+            audio, taxa = sf.read(Path(__file__).parent / "dados" / nome, dtype="int16")
+            self.assertEqual(taxa, 16000)
+            portao, _ = self._portao()
+            self._tocar(portao, np.concatenate([audio, audio, audio]))
+            self.assertFalse(portao.acordado, nome)
+
+    def test_digitacao_varios_estalos_seguidos_nao_conta(self):
+        portao, _ = self._portao()
+        estalos = [np.concatenate([_palma(0.5, semente=i), _silencio(0.22)]) for i in range(12)]
+        self._tocar(portao, np.concatenate([_silencio(0.5)] + estalos + [_silencio(1.0)]))
+        self.assertFalse(portao.acordado)
+
+    def test_modo_maos_livres_e_volta_para_as_palmas(self):
+        portao, _ = self._portao()
+        self.assertTrue(portao.definir_modo("maos_livres"))
+        self.assertIsNotNone(portao.processar(_silencio(0.1)))
+        self.assertTrue(portao.definir_modo("chamada"))
+        self.assertIsNone(portao.processar(_silencio(0.1)))
+        self.assertEqual(portao.como_chamar, "bata 2 palmas")
+
+    def test_padrao_e_palmas_sem_carregar_o_hey_jarvis(self):
+        with patch.dict("os.environ", {"JARVIS_PALAVRA_ATIVACAO": "1"}), \
+                patch("core.palavra_ativacao.carregar_detector") as carregar:
+            import os
+            os.environ.pop("JARVIS_ATIVACAO", None)
+            portao = PortaoDeVoz.da_configuracao()
+        carregar.assert_not_called()
+        self.assertTrue(portao.ativo)
+        self.assertIsNotNone(portao.palmas)

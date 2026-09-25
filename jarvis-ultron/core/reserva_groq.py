@@ -2,7 +2,7 @@
 
 Quando o Gemini ao vivo não consegue conectar (cota esgotada, sobrecarga, fora do ar),
 o Jarvis continua funcionando pelo Groq:
-- ouve você (depois do "Hey Jarvis") e transcreve com o Whisper do Groq;
+- ouve você (depois das palmas ou do "Hey Jarvis") e transcreve com o Whisper do Groq;
 - responde com um modelo de texto do Groq;
 - fala a resposta com a voz grátis da Microsoft.
 

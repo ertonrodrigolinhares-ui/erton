@@ -5,7 +5,7 @@ Cópia do projeto **JARVIS-OS V.2** (licença MIT, veja `LICENSE`), com ajustes 
 - **Voz Ultron**: a voz do Gemini ao vivo passa por um efeito metálico (`core/efeito_ultron.py`).
 - **Voz grave "Charon"** como padrão.
 - **Português do Brasil** como idioma padrão e saudação em português.
-- **Sem palmas para ligar**: o original exige bater palmas duas vezes; aqui já vem desligado.
+- **Palmas para conversar**: no original, 2 palmas só ligavam o programa; aqui 2 palmas abrem a conversa e mais 2 fecham.
 - **Iniciador para Windows** (`Iniciar Jarvis Ultron.bat`) que instala tudo e pede a chave.
 - Correção: o iniciador original do Windows não abria o programa (faltava `JARVIS_CLI=1`).
 - **Central de modelos** (`core/modelos.py`): o Jarvis pergunta ao Google quais modelos a sua chave
@@ -17,18 +17,20 @@ Cópia do projeto **JARVIS-OS V.2** (licença MIT, veja `LICENSE`), com ajustes 
 - **Gerar imagens (Nano Banana)**: "Jarvis, crie uma imagem de um leão de armadura".
   A imagem abre na hora e fica salva em **Documentos\Jarvis Ultron\Imagens**.
   Atenção: o Google pode não liberar cota grátis de imagens para a sua chave; nesse caso o Jarvis avisa.
-- **Palavra de ativação "Hey Jarvis"** (`core/palavra_ativacao.py`): o Jarvis só começa a ouvir
-  depois que você diz **"Hey Jarvis"** (pronúncia em inglês funciona melhor). A detecção roda no
-  seu computador, sem internet: **nada do que você fala antes disso vai para o Google**.
-  Depois de ativado, ele continua ouvindo durante a conversa e volta a dormir após ~20 segundos
-  de silêncio. A tela mostra "Estou ouvindo" e "Aguardando Hey Jarvis".
-- **Trocar o modo falando**:
-  - **"Hey Jarvis, modo mãos livres"**: ele passa a responder a **tudo** o que você falar, sem precisar
-    do "Hey Jarvis".
-  - **"Jarvis, modo chamada"**: ele volta a responder **só depois de "Hey Jarvis"**.
+- **Chamar o Jarvis com palmas** (`core/palavra_ativacao.py`):
+  - **Bata 2 palmas** 👏👏: ele começa a ouvir. A tela mostra "Estou ouvindo".
+  - **Bata mais 2 palmas** 👏👏: ele para de ouvir. A tela mostra "Chamada encerrada".
+  - Enquanto a chamada está desligada, **nada do que você fala vai para o Google**: as palmas são
+    reconhecidas no seu computador, sem internet.
+  - Não tem tempo limite: ele fica ouvindo até você bater as 2 palmas de novo.
+  - Dica: palmas firmes, com meio segundo entre elas, e depois fique um instante em silêncio.
+  - Prefere o "Hey Jarvis"? Coloque `JARVIS_ATIVACAO=voz` no `.env`.
+- **Trocar o modo falando** (com a chamada ligada):
+  - **"Jarvis, modo mãos livres"**: ele passa a responder a **tudo**, sem precisar das palmas.
+  - **"Jarvis, modo chamada"**: ele volta a esperar as **palmas**.
   - Ao abrir, ele começa no modo chamada (mude com `JARVIS_PALAVRA_ATIVACAO=0` para começar em mãos livres).
 - **IA reserva Groq** (`core/reserva_groq.py`): se o Gemini cair ou atingir o limite, o Jarvis
-  entra no **modo reserva**: continua ouvindo (depois do "Hey Jarvis"), entende com o Whisper do
+  entra no **modo reserva**: continua ouvindo (depois das palmas), entende com o Whisper do
   Groq, responde pelo Groq e fala com a voz grátis da Microsoft. No modo reserva ele **conversa,
   mas não usa as ferramentas** (abrir apps, e-mail...). Quando o Gemini volta, tudo volta ao normal.
 - Correção: quando a conexão falhava, o original tentava reconectar sem parar, várias vezes por
@@ -68,13 +70,17 @@ Cópia do projeto **JARVIS-OS V.2** (licença MIT, veja `LICENSE`), com ajustes 
 - **Chave do Groq:** o iniciador pergunta uma vez. Para colocar ou trocar depois, abra o `.env`
   no Bloco de Notas e edite a linha `GROQ_API_KEY="..."` (chave grátis em https://console.groq.com/keys).
 
-## Se o "Hey Jarvis" não funcionar bem
+## Se as palmas não funcionarem bem
 
-- **Ele não acorda:** fale "Hey Jarvis" com pronúncia em inglês, perto do microfone. Se ainda
-  falhar, coloque `JARVIS_SENSIBILIDADE=0.3` no `.env`.
-- **Ele acorda sozinho:** aumente para `JARVIS_SENSIBILIDADE=0.7`.
-- **Prefere que ele ouça sempre:** diga "Hey Jarvis, modo mãos livres" (ou coloque
+- **Ele não acorda:** bata palmas mais **firmes** e mais perto do computador, com **meio segundo**
+  entre elas, e fique um instante em silêncio depois. Três palmas ou mais seguidas não contam
+  (é assim que ele ignora a digitação).
+- **Ele acorda sozinho:** avise o suporte; enquanto isso, use `JARVIS_ATIVACAO=voz` no `.env`
+  para voltar ao "Hey Jarvis".
+- **Prefere que ele ouça sempre:** diga "Jarvis, modo mãos livres" (ou coloque
   `JARVIS_PALAVRA_ATIVACAO=0` para ele já abrir assim).
+- **Com o "Hey Jarvis"** (`JARVIS_ATIVACAO=voz`): fale com pronúncia em inglês; se não acordar,
+  `JARVIS_SENSIBILIDADE=0.3`; se acordar sozinho, `0.7`.
 
 ## Se o Jarvis não conseguir abrir um site
 
@@ -106,8 +112,8 @@ Abra com o Bloco de Notas para mudar:
 | `JARVIS_EFEITO_ULTRON=1` | Efeito metálico. `0` desliga, `robo` deixa com voz de robô |
 | `JARVIS_TEMA_STARK=1` | Tela Stark ligada. `0` = volta para a tela original |
 | `JARVIS_CIDADE=Campina Grande` | Cidade do painel de clima |
-| `JARVIS_SKIP_CLAP_GATE=1` | Mude para `0` para ligar o Jarvis batendo **duas palmas** 👏👏 |
-| `JARVIS_PALAVRA_ATIVACAO=1` | Começa no modo chamada ("Hey Jarvis"). `0` = começa em mãos livres |
+| `JARVIS_ATIVACAO=palmas` | Como chamar o Jarvis: `palmas` (2 palmas liga, 2 desliga) ou `voz` ("Hey Jarvis") |
+| `JARVIS_PALAVRA_ATIVACAO=1` | Começa no modo chamada (esperando as palmas). `0` = começa em mãos livres |
 | `JARVIS_SENSIBILIDADE=0.5` | Menor (ex.: `0.3`) = aceita o "Hey Jarvis" com mais facilidade; maior = mais rigoroso |
 | `JARVIS_JANELA_CONVERSA=20` | Segundos que ele continua ouvindo depois da última fala |
 | `GROQ_API_KEY="gsk_..."` | Chave do Groq (reserva grátis). O iniciador pergunta uma vez |
@@ -143,7 +149,7 @@ redes) e ao **MCP oficial do Meta** (anúncios do Facebook e Instagram).
 2. Abra o Jarvis Ultron normalmente.
 
 ### Como usar
-- **"Hey Jarvis, quais são os posts de hoje?"**: ele lê as propostas que a rotina das 8h preparou.
+- 👏👏 e depois **"Jarvis, quais são os posts de hoje?"**: ele lê as propostas que a rotina das 8h preparou.
 - **"Ok, pode publicar os posts 1 e 3"**: ele registra o seu ok e manda publicar pelo Metricool.
 - **"Como estão meus anúncios?"**: relatório do Meta Ads.
 - **"Entre no painel do Metricool e veja os seguidores desta semana"**: o Hermes usa o navegador sozinho.

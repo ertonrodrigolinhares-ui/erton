@@ -407,7 +407,7 @@ TOOL_DECLARATIONS = [
         "name": "listening_mode",
         "description": (
             "Switches how JARVIS listens. 'maos_livres' (hands-free): answers everything the user says, "
-            "no wake word needed. 'chamada' (call mode): answers only after the user says 'Hey Jarvis'. "
+            "no wake word needed. 'chamada' (call mode): answers only after the user claps twice (or says 'Hey Jarvis' if configured). "
             "Use when the user says 'modo mãos livres' or 'modo chamada'."
         ),
         "parameters": {
@@ -1569,20 +1569,23 @@ class JarvisLive:
         )
 
     def _definir_modo_escuta(self, modo: str) -> str:
-        """Jarvis Ultron: 'maos_livres' (ouve tudo) ou 'chamada' (só depois de "Hey Jarvis")."""
+        """Jarvis Ultron: 'maos_livres' (ouve tudo) ou 'chamada' (só depois das palmas / "Hey Jarvis")."""
         portao = getattr(self, "_portao", None)
         if modo not in ("maos_livres", "chamada") or portao is None:
             return "Invalid mode. Use 'maos_livres' or 'chamada'."
         if portao.modo == modo:
             return f"Already in {modo} mode. Confirm it to the user in one short sentence in Portuguese."
         if not portao.definir_modo(modo):
-            return ("Call mode is unavailable because the 'Hey Jarvis' detector did not load. "
+            return ("Call mode is unavailable because the activation detector did not load. "
                     "Tell the user, in Portuguese, that you will keep listening to everything.")
         if modo == "maos_livres":
             self.ui.write_log("SYS: Modo mãos livres: estou ouvindo tudo.")
             return ("Hands-free mode on. Tell the user, in one short sentence in Portuguese, that you will "
                     "now answer everything they say, and that saying 'Jarvis, modo chamada' turns it off.")
-        self.ui.write_log('SYS: Modo chamada: diga "Hey Jarvis" para falar comigo.')
+        self.ui.write_log(f"SYS: Modo chamada: {portao.como_chamar} para falar comigo.")
+        if portao.palmas is not None:
+            return ("Call mode on. Tell the user, in one short sentence in Portuguese, that from now on they "
+                    "clap twice to start talking to you and clap twice again to end.")
         return ("Call mode on. Tell the user, in one short sentence in Portuguese, that from now on you only "
                 "answer after they say 'Hey Jarvis'.")
 
@@ -1646,7 +1649,7 @@ class JarvisLive:
         motor.speak_sync(texto)
 
     def _escutar_reserva(self) -> None:
-        """No modo reserva: ouve (depois do "Hey Jarvis"), transcreve e responde pelo Groq."""
+        """No modo reserva: ouve (depois das palmas / "Hey Jarvis"), transcreve e responde pelo Groq."""
         from core.reserva_groq import capturar_falas
 
         try:
@@ -2320,7 +2323,9 @@ def main():
     if os.environ.get("JARVIS_CLI") != "1" and not running_as_app:
         print("[JARVIS] Please launch with the JARVIS CLI: jarvis")
         return
-    if not wait_for_startup_claps():
+    # Jarvis Ultron: com as palmas chamando o Jarvis, elas não são mais exigidas para ligar.
+    from core.palavra_ativacao import gatilho_configurado
+    if gatilho_configurado() != "palmas" and not wait_for_startup_claps():
         return
     print("[JARVIS] ⚡ Powering up the interface...")
     try:

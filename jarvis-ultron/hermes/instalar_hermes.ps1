@@ -200,5 +200,5 @@ if ($rotinas -notmatch "Rotina do atleta 8h") {
 & $hermes -p jarvis gateway install
 Write-Host ""
 Write-Host "Pronto! O Hermes do Jarvis liga sozinho com o Windows e roda a rotina todo dia as 8h." -ForegroundColor Green
-Write-Host "Abra o Jarvis Ultron e diga: 'Hey Jarvis, quais sao os posts de hoje?'"
+Write-Host "Abra o Jarvis Ultron, bata 2 palmas e diga: 'Jarvis, quais sao os posts de hoje?'"
 Read-Host "Aperte Enter para fechar"
