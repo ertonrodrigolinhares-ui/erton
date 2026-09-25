@@ -1,0 +1,26 @@
+"""Exemplo de automação do Jarvis Ultron (para ativar, tire o ".exemplo" do nome do arquivo).
+
+Pergunte: "Jarvis, quantos dias faltam para 15 de novembro?"
+"""
+
+from datetime import date
+
+FERRAMENTA = {
+    "name": "days_until_date",
+    "description": "Counts how many days are left until a date the user mentions (e.g. a race or an exam).",
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "date": {"type": "STRING", "description": "Target date in YYYY-MM-DD format"},
+        },
+        "required": ["date"],
+    },
+}
+
+
+def executar(args: dict, jarvis) -> str:
+    alvo = date.fromisoformat(str(args.get("date", ""))[:10])
+    dias = (alvo - date.today()).days
+    if dias < 0:
+        return f"Essa data já passou há {-dias} dias."
+    return f"Faltam {dias} dias para {alvo:%d/%m/%Y}."

@@ -207,6 +207,21 @@ def verificar_escuta(portao) -> Item:
     return Item("Escuta", "ok", modo)
 
 
+def verificar_automacoes() -> Item:
+    from core.automacoes import carregar_ferramentas, pasta_padrao
+
+    carga = carregar_ferramentas()
+    pasta = pasta_padrao()
+    extras = [p.name for p in pasta.glob("*.md") if p.name.lower() not in {"leia-me.md", "readme.md"}] \
+        if pasta.is_dir() else []
+    total = len(carga.ferramentas) + len(extras)
+    if carga.erros:
+        arquivo, motivo = carga.erros[0]
+        return Item("Automações", "defeito", f"{arquivo}: {motivo}",
+                    "Confira esse arquivo na pasta 'automacoes' ou tire ele de lá.")
+    return Item("Automações", "ok", f"{total} na pasta 'automacoes'" if total else "nenhuma instalada")
+
+
 # ---------------------------------------------------------------- relatório
 
 def diagnosticar(portao=None, conferir_internet: bool = True) -> list[Item]:
@@ -225,6 +240,7 @@ def diagnosticar(portao=None, conferir_internet: bool = True) -> list[Item]:
         _seguro("Computador", verificar_computador),
         _seguro("Navegador automático", verificar_navegador),
         _seguro("Escuta", lambda: verificar_escuta(portao)),
+        _seguro("Automações", verificar_automacoes),
     ]
     return itens
 

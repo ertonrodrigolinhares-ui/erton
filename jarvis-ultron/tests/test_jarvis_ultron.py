@@ -1113,3 +1113,72 @@ class GeekieTests(unittest.TestCase):
         self.assertIn("SOMENTE LEITURA", texto)
         self.assertIn("Nunca digite senhas", texto)
         self.assertIn("__PASTA_JARVIS__/geekie/pendencias.json", texto)
+
+
+class AutomacoesTests(unittest.TestCase):
+    def _pasta(self):
+        import tempfile
+        from pathlib import Path
+        return Path(tempfile.mkdtemp())
+
+    def test_arquivo_py_vira_ferramenta_e_com_erro_nao_derruba(self):
+        from core.automacoes import carregar_ferramentas
+        pasta = self._pasta()
+        (pasta / "boa.py").write_text(
+            'FERRAMENTA = {"name": "say_hi", "description": "Says hi."}\n'
+            'def executar(args, jarvis):\n    return "oi " + args.get("nome", "")\n', encoding="utf-8")
+        (pasta / "quebrada.py").write_text("isto nao e python (", encoding="utf-8")
+        (pasta / "repetida.py").write_text(
+            'FERRAMENTA = {"name": "web_search", "description": "x"}\ndef executar(a, j): return ""\n',
+            encoding="utf-8")
+        (pasta / "_desligada.py").write_text("raise SystemExit", encoding="utf-8")
+        carga = carregar_ferramentas(pasta, reservados={"web_search"})
+        self.assertEqual(list(carga.ferramentas), ["say_hi"])
+        self.assertEqual(carga.ferramentas["say_hi"].executar({"nome": "Erton"}, None), "oi Erton")
+        self.assertEqual(carga.ferramentas["say_hi"].declaracao["parameters"]["type"], "OBJECT")
+        self.assertEqual(sorted(a for a, _ in carga.erros), ["quebrada.py", "repetida.py"])
+
+    def test_exemplo_da_pasta_funciona_quando_ativado(self):
+        import shutil
+        from pathlib import Path
+        from core.automacoes import carregar_ferramentas
+        pasta = self._pasta()
+        exemplo = Path(__file__).resolve().parent.parent / "automacoes" / "dias_ate_a_data.py.exemplo"
+        self.assertEqual(carregar_ferramentas(exemplo.parent).ferramentas, {})  # .exemplo não carrega
+        shutil.copy(exemplo, pasta / "dias_ate_a_data.py")
+        carga = carregar_ferramentas(pasta)
+        self.assertIn("Faltam", carga.ferramentas["days_until_date"].executar({"date": "2999-01-01"}, None))
+
+    def test_arquivo_md_vira_habilidade_do_hermes(self):
+        from core.automacoes import sincronizar_habilidades
+        pasta, perfil = self._pasta(), self._pasta()
+        (pasta / "resumo.md").write_text(
+            "---\nname: resumo-noticias\ndescription: teste\n---\nSalve em __PASTA_JARVIS__/x.txt\n",
+            encoding="utf-8")
+        (pasta / "LEIA-ME.md").write_text("# guia", encoding="utf-8")
+        carga = sincronizar_habilidades(pasta, perfil, criar_rotinas=False)
+        self.assertEqual(carga.habilidades, ["resumo-noticias"])
+        copia = (perfil / "skills" / "jarvis" / "resumo-noticias" / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn((perfil / "jarvis").as_posix() + "/x.txt", copia)
+
+    def test_jarvis_oferece_e_executa_a_automacao(self):
+        import main
+        from core.automacoes import Automacao, Carga
+        from pathlib import Path
+        carga = Carga(ferramentas={"say_hi": Automacao(
+            "say_hi", {"name": "say_hi", "description": "Says hi.", "parameters": {"type": "OBJECT", "properties": {}}},
+            lambda args, jarvis: "oi!", Path("x.py"))})
+        with patch.object(main, "_AUTOMACOES", carga):
+            nomes = [d["name"] for d in main.get_tool_declarations()]
+            self.assertIn("say_hi", nomes)
+            self.assertNotIn("say_hi", [d["name"] for d in main.get_tool_declarations(cloud_safe=True)])
+            jarvis = object.__new__(main.JarvisLive)
+            jarvis.ui = UIFalsa()
+            jarvis.ui.set_state = lambda *a: None
+            jarvis.cloud_safe = False
+
+            class Chamada:
+                name, args, id = "say_hi", {}, "1"
+
+            resposta = asyncio.run(jarvis._execute_tool(Chamada()))
+        self.assertEqual(resposta.response["result"], "oi!")

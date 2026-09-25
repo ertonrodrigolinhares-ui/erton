@@ -88,6 +88,12 @@ Cópia do projeto **JARVIS-OS V.2** (licença MIT, veja `LICENSE`), com ajustes 
 - **Prefere que ele ouça sempre:** aperte **⛭ MÃOS LIVRES** (ou coloque `JARVIS_PALAVRA_ATIVACAO=0`
   para ele já abrir assim).
 
+## Automações novas: um arquivo só
+
+Toda automação nova vem em **um arquivo**: salve na pasta **`automacoes`** (dentro da pasta do
+Jarvis) e abra o Jarvis de novo. Não precisa atualizar o resto do projeto. Veja
+`automacoes/LEIA-ME.md`. Para desligar, apague o arquivo da pasta.
+
 ## Escola: Geekie One (pendências, tutor e lembretes)
 
 - **Pendências:** "Jarvis, o que tem pendente no Geekie?". O Hermes lê o **Geekie One**

@@ -1263,10 +1263,24 @@ LOCAL_MACHINE_ONLY_ACTIONS = frozenset({
 })
 
 
+_AUTOMACOES = None
+
+
+def carregar_automacoes(recarregar: bool = False):
+    """Jarvis Ultron: ferramentas da pasta 'automacoes' (um arquivo .py por automação)."""
+    global _AUTOMACOES
+    if _AUTOMACOES is None or recarregar:
+        from core.automacoes import carregar_ferramentas
+
+        _AUTOMACOES = carregar_ferramentas(reservados={d.get("name") for d in TOOL_DECLARATIONS})
+    return _AUTOMACOES
+
+
 def get_tool_declarations(*, cloud_safe: bool = False) -> list[dict]:
     """Return the Gemini tools available for the requested runtime."""
     if not cloud_safe:
-        return list(TOOL_DECLARATIONS)
+        extras = [a.declaracao for a in carregar_automacoes().ferramentas.values()]
+        return list(TOOL_DECLARATIONS) + extras
     return [
         declaration
         for declaration in TOOL_DECLARATIONS
@@ -1335,6 +1349,7 @@ class JarvisLive:
         self._falhas_seguidas = 0
         if not self.cloud_safe:
             self._iniciar_lembretes_geekie()
+            threading.Thread(target=self._preparar_automacoes, daemon=True, name="Automacoes").start()
 
     def _on_text_command(self, text: str):
         # Jarvis Ultron: "modo chamada" / "modo mãos livres" (botões ou digitado) trocam na hora,
@@ -1629,6 +1644,19 @@ class JarvisLive:
                 session.send_client_content(turns={"parts": [{"text": aviso}]}, turn_complete=True), loop)
         geekie.marcar_avisados(devidas)
         return frases
+
+    def _preparar_automacoes(self) -> None:
+        """Mostra as automações da pasta 'automacoes' e copia as do Hermes (.md) para o perfil dele."""
+        from core.automacoes import sincronizar_habilidades
+
+        carga = carregar_automacoes()
+        habilidades = sincronizar_habilidades()
+        nomes = list(carga.ferramentas) + [f"{n} (Hermes)" for n in habilidades.habilidades]
+        if nomes:
+            self.ui.write_log("SYS: Automações: " + ", ".join(nomes))
+        for arquivo, motivo in carga.erros + habilidades.erros:
+            self.ui.write_log(f"SYS: Automação com problema: {arquivo}: {motivo}")
+            print(f"[Automações] {arquivo}: {motivo}")
 
     def _iniciar_lembretes_geekie(self) -> None:
         def laco():
@@ -2181,6 +2209,10 @@ class JarvisLive:
                 else:
                     status = queue.get_status(task_id)
                     result = json.dumps(status, ensure_ascii=False) if status else f"Task {task_id} was not found."
+
+            elif name in carregar_automacoes().ferramentas:
+                automacao = carregar_automacoes().ferramentas[name]
+                result = str(await asyncio.to_thread(automacao.executar, args, self))
 
             else:
                 result = f"Unknown tool: {name}"
