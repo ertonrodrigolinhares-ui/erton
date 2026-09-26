@@ -133,6 +133,23 @@ if ($esperando -gt 0) {
     Start-Sleep -Seconds 25
     $esperando = Testar-Recebimento
 }
+if ($esperando -gt 0) {
+    # Um Hermes antigo (ligado antes do Telegram) pode ter ficado aberto e segurando a porta 8642:
+    # o novo, que tem o Telegram, nao consegue ficar de pe. Fecha todos os Hermes e liga um so.
+    Aviso "Ainda nao pegou. Vou fechar todos os Hermes que ficaram abertos e ligar um so, do zero..."
+    & $hermes gateway stop
+    Start-Sleep -Seconds 5
+    $restos = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -and $_.CommandLine -match '(?i)hermes' -and $_.CommandLine -match '(?i)gateway' }
+    foreach ($processo in $restos) {
+        Stop-Process -Id $processo.ProcessId -Force -ErrorAction SilentlyContinue
+    }
+    if ($restos) { Aviso "Fechei $(@($restos).Count) Hermes que tinham ficado abertos." }
+    Start-Sleep -Seconds 5
+    & $hermes gateway start
+    Start-Sleep -Seconds 30
+    $esperando = Testar-Recebimento
+}
 if ($esperando -eq 0) {
     Ok "O Hermes pegou a sua mensagem. A resposta chega no Telegram em alguns segundos."
 } elseif ($esperando -gt 0) {
