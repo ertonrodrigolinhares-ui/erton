@@ -1822,7 +1822,7 @@ class JarvisLive:
         except Exception as e:
             print(f"[JARVIS] ⚠️ Greeting failed: {e}")
 
-    def _build_config(self) -> types.LiveConnectConfig:
+    def _build_config(self, modelo: str = "") -> types.LiveConnectConfig:
         from datetime import datetime
 
         memory     = load_memory()
@@ -1862,7 +1862,7 @@ class JarvisLive:
                     silence_duration_ms=LIVE_VAD_SILENCE_MS,
                 )
             ),
-            thinking_config=types.ThinkingConfig(thinking_budget=0),
+            thinking_config=_pensamento_da_voz(modelo),
             session_resumption=types.SessionResumptionConfig(),
             speech_config=types.SpeechConfig(
                 voice_config=types.VoiceConfig(
@@ -2608,7 +2608,7 @@ class JarvisLive:
                 print(f"[JARVIS] 🔌 Connecting ({modelo_voz})...")
                 self.ui.write_log(f"SYS: Modelo de voz: {modelo_voz}")
                 self.ui.set_state("THINKING")
-                config = self._build_config()
+                config = self._build_config(modelo_voz)
 
                 async with (
                     client.aio.live.connect(model=live_model_id, config=config) as session,
@@ -2651,12 +2651,23 @@ class JarvisLive:
                 if isinstance(e, ExceptionGroup) and len(e.exceptions) == 1:
                     actual = e.exceptions[0]
 
+                actual = _erro_da_api(e) or actual  # Jarvis Ultron: acha o erro do Google dentro do grupo
+                argumento_invalido = "1007" in str(actual) or "invalid argument" in str(actual).lower()
                 if (self._idioma_voz() and isinstance(actual, genai.errors.APIError)
-                        and "language" in str(actual).lower()):
+                        and ("language" in str(actual).lower() or argumento_invalido)):
                     # Jarvis Ultron: este modelo de voz não aceita escolher o idioma; segue só com a regra
                     print(f"[JARVIS] ⚠️ O modelo de voz não aceitou language_code ({str(actual)[:120]}); "
                           "seguindo sem ele.")
                     self._idioma_recusado = True
+                elif argumento_invalido and not self._shutdown_requested.is_set():
+                    # Jarvis Ultron: este modelo de voz recusou a configuração mesmo sem o idioma:
+                    # deixa ele de lado e tenta o próximo modelo do Gemini.
+                    central_de_modelos.pular(modelo_voz)
+                    proximo = central_de_modelos.resolver(live_model_id)
+                    self.ui.write_log(f"SYS: A voz {modelo_voz} recusou a configuração. Tentando {proximo}...")
+                    print(f"[Modelos] Voz: {modelo_voz} recusou a configuração (1007); trocando para {proximo}.")
+                    self._idioma_recusado = False  # o próximo modelo pode aceitar o idioma
+                    await self._wait_before_reconnect(2)
                 elif _is_unsupported_voice_error(actual) and self.voice_name != DEFAULT_VOICE_NAME:
                     old_voice = self.voice_name
                     self.voice_name = DEFAULT_VOICE_NAME
@@ -2695,6 +2706,32 @@ class JarvisLive:
                         await self._wait_before_reconnect(2)
                     else:
                         await self._wait_before_reconnect(min(60, 2 ** min(self._falhas_seguidas, 6)))
+
+def _pensamento_da_voz(modelo: str) -> types.ThinkingConfig:
+    """Gemini 3.x não aceita desligar o raciocínio (thinking_budget=0 dá erro 1007 "invalid argument"):
+    usa o nível mais baixo, que responde rápido. O 2.5 continua sem raciocínio.
+    JARVIS_PENSAMENTO no .env: low (padrão), medium ou high."""
+    from core.modelos import _versao
+
+    if _versao(str(modelo or "")) >= 3:
+        nivel = os.environ.get("JARVIS_PENSAMENTO", "low").strip().upper()
+        if nivel not in ("LOW", "MEDIUM", "HIGH"):
+            nivel = "LOW"
+        return types.ThinkingConfig(thinking_level=nivel)
+    return types.ThinkingConfig(thinking_budget=0)
+
+
+def _erro_da_api(erro: BaseException):
+    """O primeiro erro do Google (APIError) dentro de um grupo de erros (TaskGroup), se houver."""
+    if isinstance(erro, genai.errors.APIError):
+        return erro
+    for filho in getattr(erro, "exceptions", ()) or ():
+        achado = _erro_da_api(filho)
+        if achado is not None:
+            return achado
+    causa = erro.__cause__ or erro.__context__
+    return _erro_da_api(causa) if isinstance(causa, BaseException) and causa is not erro else None
+
 
 def _modelo_indisponivel(erro: Exception) -> bool:
     """Erro que é do modelo (aposentado, sem cota, não suporta voz ao vivo), não da internet."""

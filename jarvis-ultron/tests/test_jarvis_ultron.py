@@ -794,6 +794,25 @@ class IdiomaTests(unittest.TestCase):
         with patch("main.load_memory", return_value={}), patch.object(main.JarvisLive, "_get_current_voice", return_value="charon"):
             self.assertIsNone(jarvis._build_config().speech_config.language_code)
 
+    def test_raciocinio_da_voz_por_modelo(self):
+        import main
+        tres = main._pensamento_da_voz("gemini-3.1-flash-live-preview")
+        self.assertIsNone(tres.thinking_budget)  # 3.x recusa thinking_budget=0 (erro 1007)
+        self.assertEqual(str(getattr(tres.thinking_level, "value", tres.thinking_level)), "LOW")
+        self.assertEqual(main._pensamento_da_voz("gemini-2.5-flash-native-audio-preview-12-2025").thinking_budget, 0)
+        jarvis = object.__new__(main.JarvisLive)
+        jarvis.voice_name = "charon"
+        with patch("main.load_memory", return_value={}), patch.object(main.JarvisLive, "_get_current_voice", return_value="charon"):
+            self.assertIsNone(jarvis._build_config("gemini-3.5-flash-live-preview").thinking_config.thinking_budget)
+
+    def test_acha_o_erro_1007_dentro_do_grupo(self):
+        import main
+        from google.genai import errors
+        erro = errors.APIError(1007, {"error": {"message": "Request contains an invalid argument."}})
+        grupo = ExceptionGroup("tarefas", [RuntimeError("outra"), ExceptionGroup("dentro", [erro])])
+        self.assertIs(main._erro_da_api(grupo), erro)
+        self.assertIsNone(main._erro_da_api(RuntimeError("sem internet")))
+
     def test_desligar_em_portugues(self):
         import main
         jarvis = object.__new__(main.JarvisLive)
