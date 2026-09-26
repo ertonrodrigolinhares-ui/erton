@@ -88,6 +88,18 @@ Cópia do projeto **JARVIS-OS V.2** (licença MIT, veja `LICENSE`), com ajustes 
 - **Prefere que ele ouça sempre:** aperte **⛭ MÃOS LIVRES** (ou coloque `JARVIS_PALAVRA_ATIVACAO=0`
   para ele já abrir assim).
 
+## Hermes pelo Telegram (celular, de qualquer lugar)
+
+Dê dois cliques em **`Ligar Telegram`** (na pasta do Jarvis). Ele abre o @BotFather para você criar
+o seu robô, pede o código do robô e o seu número de usuário (@userinfobot) e liga tudo ao Hermes.
+Depois é só mandar mensagens para o robô no Telegram. Só o **seu** usuário consegue usar o robô.
+
+- Funciona enquanto o **PC estiver ligado** (o instalador oferece deixar o PC sem dormir na tomada).
+- Mensagens mandadas com o PC desligado podem se perder: mande de novo quando ele ligar.
+- Publicar, agendar ou mexer em anúncios continua precisando do seu "ok" dado ao Jarvis.
+- Nunca mande o código do robô para ninguém. Se vazar, mande `/revoke` para o @BotFather e rode o
+  `Ligar Telegram` de novo com o código novo.
+
 ## Automações novas: um arquivo só
 
 Toda automação nova vem em **um arquivo**: salve na pasta **`automacoes`** (dentro da pasta do
