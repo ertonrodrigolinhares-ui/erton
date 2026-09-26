@@ -72,7 +72,9 @@ Start-Process "https://t.me/BotFather"
 $token = ""
 $nomeRobo = ""
 while (-not $nomeRobo) {
-    $token = (Read-Host "Cole aqui o codigo (token) que o BotFather mandou").Trim().Trim('"')
+    # O codigo nao aparece na tela enquanto voce cola (para nao vazar em prints).
+    $segredo = Read-Host "Cole aqui o codigo (token) que o BotFather mandou (ele fica escondido) e aperte Enter" -AsSecureString
+    $token = ([System.Net.NetworkCredential]::new("", $segredo).Password).Trim().Trim('"')
     if ($token -notmatch '^\d{5,}:[A-Za-z0-9_-]{30,}$') {
         Write-Host "Esse codigo nao parece certo. Copie a linha inteira depois de 'Use this token'." -ForegroundColor Yellow
         continue
