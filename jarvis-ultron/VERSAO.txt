@@ -33,6 +33,7 @@ Novidades desta versão:
 - Gemini 3.x na voz: raciocínio no nível baixo (o 3.x recusa desligar e dava erro 1007); se um modelo
   recusar a configuração, tenta sem o idioma e depois o próximo modelo.
 - Botão "Ligar Telegram": fale com o Hermes pelo Telegram do celular (com o PC ligado).
+- Botão "Testar Telegram": descobre por que o robô não responde e conserta o que der.
 - Memória no HD externo (automacoes/memoria_hd.py): "Jarvis, use o HD E como memória".
 - Central de missões na tela Stark (automacoes/painel_stark.py): próximo lembrete, Geekie, agentes e
   botões das rotinas.

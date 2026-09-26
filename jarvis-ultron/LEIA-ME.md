@@ -97,6 +97,9 @@ Depois é só mandar mensagens para o robô no Telegram. Só o **seu** usuário 
 - Funciona enquanto o **PC estiver ligado** (o instalador oferece deixar o PC sem dormir na tomada).
 - Mensagens mandadas com o PC desligado podem se perder: mande de novo quando ele ligar.
 - Publicar, agendar ou mexer em anúncios continua precisando do seu "ok" dado ao Jarvis.
+- **O robô não responde?** Dê dois cliques em **`Testar Telegram`**: ele confere o código, o seu
+  número de usuário e se o Hermes está recebendo as mensagens, conserta o que der e salva um relatório
+  em `Documentos/Jarvis Ultron/teste-telegram.txt`.
 - Nunca mande o código do robô para ninguém. Se vazar, mande `/revoke` para o @BotFather e rode o
   `Ligar Telegram` de novo com o código novo.
 
