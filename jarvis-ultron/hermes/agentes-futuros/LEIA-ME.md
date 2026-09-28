@@ -18,6 +18,14 @@ os números. Precisa ter rodado o `Instalar Hermes` antes.
 | `relatorio-mensal` | Relatório de crescimento das redes | Metricool (já no kit) |
 | `legislacao` | Mudanças em reforma tributária, holdings e sucessão | Nada |
 | `briefing-diario` | Agenda, e-mails e notícias logo cedo | Google Agenda e Gmail conectados |
+| `prazos-fiscais` | Calendário de obrigações do mês e lembretes de prazo | Nada (melhor com lista de clientes) |
+| `clientes-grupos` | Panorama dos clientes/grupos familiares e pendências | Lista em Documentos\Jarvis Ultron\clientes.txt |
+| `holding-sucessao` | Checklist e perguntas para holding e sucessão | Nada |
+| `proposta-comercial` | Rascunho de proposta de serviços | Nada |
+| `noticias-setor` | Briefing de contabilidade, tributário e economia | Nada |
+| `resumo-reuniao` | Vira anotações em ata com tarefas | Texto da reunião |
+| `email-triagem` | Separa e-mails e sugere respostas (não envia) | Gmail conectado |
+| `treino-semana` | Plano de treino de triathlon da semana | Nada |
 
 Todos seguem a mesma regra dos agentes atuais: **nada é publicado, enviado, comprado ou alterado
 sem o seu "ok"**.
