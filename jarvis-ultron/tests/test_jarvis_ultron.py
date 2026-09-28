@@ -1331,7 +1331,7 @@ class AutomacoesQueIniciamTests(unittest.TestCase):
         from core.automacoes import carregar_ferramentas
         carga = carregar_ferramentas(Path(__file__).resolve().parent.parent / "automacoes")
         self.assertEqual(carga.erros, [])
-        self.assertTrue({"spoken_reminders", "saved_routines", "self_repair", "external_memory_drive", "website_security_check", "website_reputation_check"} <= set(carga.ferramentas))
+        self.assertTrue({"spoken_reminders", "saved_routines", "self_repair", "external_memory_drive", "website_security_check", "website_reputation_check", "pc_protection"} <= set(carga.ferramentas))
         self.assertEqual(sorted(a for a, _ in carga.inicios), ["lembretes.py", "memoria_hd.py", "painel_stark.py"])
 
 
@@ -1698,3 +1698,38 @@ class ReservaComFerramentasTests(unittest.TestCase):
             raise RuntimeError("boom")
         self.assertIn("falhou", reserva_groq._rodar_ferramenta(
             type("C", (), {"function": type("F", (), {"name": "x", "arguments": "{}"})()})(), explode))
+
+
+class ProtecaoPCTests(unittest.TestCase):
+    def setUp(self):
+        self.m = _plugin_da_pasta("protecao_pc.py")
+        from datetime import date
+        self.hoje = date(2026, 9, 28)
+
+    def test_tudo_seguro(self):
+        dados = {"defender": {"antivirus": True, "realtime": True, "sigAgeDays": 1},
+                 "firewall": [{"name": "Public", "enabled": True}], "lastUpdate": "2026-09-25",
+                 "rdpDenied": 1, "bitlocker": [{"drive": "C:", "status": "On"}], "startup": []}
+        r = self.m.avaliar(dados, self.hoje)
+        self.assertEqual(r["nivel"], "bom")
+        self.assertEqual(r["grave"], [])
+
+    def test_problemas_viram_grave_e_alerta(self):
+        dados = {"defender": {"antivirus": True, "realtime": False, "sigAgeDays": 9},
+                 "firewall": [{"name": "Public", "enabled": False}], "lastUpdate": "2026-05-01",
+                 "rdpDenied": 0, "bitlocker": [{"drive": "C:", "status": "Off"}]}
+        r = self.m.avaliar(dados, self.hoje)
+        self.assertEqual(r["nivel"], "precisa de ajuste")
+        self.assertTrue(any("DESLIGADA" in g for g in r["grave"]))       # defender
+        self.assertTrue(any("firewall" in g.lower() for g in r["grave"]))
+        self.assertTrue(any("Remota" in g for g in r["grave"]))          # rdp ligado
+        self.assertTrue(any("dias" in a for a in r["alerta"]))           # update velho
+        self.assertTrue(any("BitLocker" in i for i in r["info"]))
+
+    def test_sem_dados_fala_que_e_windows(self):
+        self.assertIn("Windows", self.m._frase(self.m.avaliar({}), False))
+
+    def test_nao_roda_fora_do_windows(self):
+        import os
+        if os.name != "nt":
+            self.assertEqual(self.m._coletar(), {})
