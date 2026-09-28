@@ -125,30 +125,69 @@ function Testar-Recebimento {
     return (Mensagens-Esperando)
 }
 
+function Fechar-Todos-Os-Hermes {
+    # Fecha o servico, a tarefa agendada e QUALQUER processo do Hermes que tenha ficado aberto.
+    & $hermes gateway stop 2>&1 | Out-Null
+    schtasks /End /TN "Hermes_Gateway" 2>&1 | Out-Null
+    Start-Sleep -Seconds 4
+    $fechados = 0
+    # Por caminho do executavel (pega ate o python que roda o Hermes).
+    foreach ($processo in (Get-Process -ErrorAction SilentlyContinue)) {
+        $caminho = $null
+        try { $caminho = $processo.Path } catch { }
+        if ($caminho -and $caminho -match '(?i)hermes') {
+            Stop-Process -Id $processo.Id -Force -ErrorAction SilentlyContinue
+            $fechados++
+        }
+    }
+    # Por linha de comando (caso o caminho nao apareca).
+    foreach ($p in (Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+                    Where-Object { $_.CommandLine -and $_.CommandLine -match '(?i)hermes' -and $_.CommandLine -match '(?i)gateway' })) {
+        Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue
+        $fechados++
+    }
+    Start-Sleep -Seconds 3
+    return $fechados
+}
+
+function Apagar-Travas {
+    # A trava presa (telegram-bot-token-*.lock) impede o novo Hermes de falar com o robo.
+    $apagadas = 0
+    $pastas = @(
+        (Join-Path $env:USERPROFILE ".local\state\hermes\gateway-locks"),
+        (Join-Path $raizHermes "gateway-locks"),
+        (Join-Path $perfil "gateway-locks")
+    )
+    foreach ($pasta in $pastas) {
+        if (Test-Path $pasta) {
+            foreach ($lock in (Get-ChildItem $pasta -Filter "*.lock" -ErrorAction SilentlyContinue)) {
+                try { Remove-Item $lock.FullName -Force -ErrorAction Stop; $apagadas++ } catch { }
+            }
+        }
+    }
+    return $apagadas
+}
+
 $esperando = Testar-Recebimento
 if ($esperando -gt 0) {
-    Aviso "A mensagem nao foi pega pelo Hermes. Vou reiniciar o Hermes (se o Windows pedir permissao, clique em Sim)..."
-    & $hermes gateway restart
-    if ($LASTEXITCODE -ne 0) { & $hermes gateway start }
-    Start-Sleep -Seconds 25
-    $esperando = Testar-Recebimento
-}
-if ($esperando -gt 0) {
-    # Um Hermes antigo (ligado antes do Telegram) pode ter ficado aberto e segurando a porta 8642:
-    # o novo, que tem o Telegram, nao consegue ficar de pe. Fecha todos os Hermes e liga um so.
-    Aviso "Ainda nao pegou. Vou fechar todos os Hermes que ficaram abertos e ligar um so, do zero..."
-    & $hermes gateway stop
-    Start-Sleep -Seconds 5
-    $restos = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
-        Where-Object { $_.CommandLine -and $_.CommandLine -match '(?i)hermes' -and $_.CommandLine -match '(?i)gateway' }
-    foreach ($processo in $restos) {
-        Stop-Process -Id $processo.ProcessId -Force -ErrorAction SilentlyContinue
-    }
-    if ($restos) { Aviso "Fechei $(@($restos).Count) Hermes que tinham ficado abertos." }
-    Start-Sleep -Seconds 5
+    Aviso "A mensagem nao foi pega. Vou fechar TODOS os Hermes, apagar a trava presa e ligar um so, do zero..."
+    Aviso "(Se o Windows pedir permissao, clique em Sim.)"
+    $fechados = Fechar-Todos-Os-Hermes
+    if ($fechados) { Ok "Fechei $fechados processo(s) do Hermes que estavam abertos ao mesmo tempo." }
+    $apagadas = Apagar-Travas
+    if ($apagadas) { Ok "Apaguei $apagadas trava(s) presa(s) do Telegram." }
+    else { Aviso "Nao achei trava presa para apagar (pode ja ter sido liberada)." }
+    Start-Sleep -Seconds 3
     & $hermes gateway start
-    Start-Sleep -Seconds 30
-    $esperando = Testar-Recebimento
+    Write-Host "Esperando o Hermes ligar e se conectar ao robo (pode levar ate 1 minuto)..." -ForegroundColor Cyan
+    Start-Sleep -Seconds 45
+    $esperando = Mensagens-Esperando
+    if ($esperando -gt 0) {
+        Aviso "Ainda esperando. Mande 'oi' de novo para o robo e aperte Enter."
+        Read-Host "Depois de mandar 'oi', aperte Enter"
+        Start-Sleep -Seconds 10
+        $esperando = Mensagens-Esperando
+    }
 }
 if ($esperando -eq 0) {
     Ok "O Hermes pegou a sua mensagem. A resposta chega no Telegram em alguns segundos."
