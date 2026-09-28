@@ -1331,7 +1331,7 @@ class AutomacoesQueIniciamTests(unittest.TestCase):
         from core.automacoes import carregar_ferramentas
         carga = carregar_ferramentas(Path(__file__).resolve().parent.parent / "automacoes")
         self.assertEqual(carga.erros, [])
-        self.assertTrue({"spoken_reminders", "saved_routines", "self_repair", "external_memory_drive", "website_security_check", "website_reputation_check", "pc_protection"} <= set(carga.ferramentas))
+        self.assertTrue({"spoken_reminders", "saved_routines", "self_repair", "external_memory_drive", "website_security_check", "website_reputation_check", "pc_protection", "wifi_watch"} <= set(carga.ferramentas))
         self.assertEqual(sorted(a for a, _ in carga.inicios), ["lembretes.py", "memoria_hd.py", "painel_stark.py"])
 
 
@@ -1733,3 +1733,47 @@ class ProtecaoPCTests(unittest.TestCase):
         import os
         if os.name != "nt":
             self.assertEqual(self.m._coletar(), {})
+
+
+class VigiaWifiTests(unittest.TestCase):
+    def setUp(self):
+        self.m = _plugin_da_pasta("vigia_wifi.py")
+
+    ARP = ("Interface: 192.168.0.10 --- 0x5\n"
+           "  Internet Address      Physical Address      Type\n"
+           "  192.168.0.1           a4-2b-8c-11-22-33     dynamic\n"
+           "  192.168.0.15          de-ad-be-ef-00-01     dynamic\n"
+           "  192.168.0.255         ff-ff-ff-ff-ff-ff     static\n"
+           "  224.0.0.22            01-00-5e-00-00-16     static\n")
+
+    def test_lista_aparelhos_sem_broadcast(self):
+        ap = self.m.analisar_arp(self.ARP)
+        self.assertEqual([a["mac"] for a in ap], ["a4:2b:8c:11:22:33", "de:ad:be:ef:00:01"])
+
+    def test_marca_aparelho_novo(self):
+        from datetime import date
+        ap = self.m.analisar_arp(self.ARP)
+        conhecidos = {"a4:2b:8c:11:22:33": {"nome": "roteador", "primeiro": "2026-09-01", "ip": "192.168.0.1"}}
+        novos, atual = self.m.conferir_dispositivos(ap, conhecidos, date(2026, 9, 28))
+        self.assertEqual([n["mac"] for n in novos], ["de:ad:be:ef:00:01"])
+        self.assertIn("de:ad:be:ef:00:01", atual)
+        # rodar de novo: já não é novo
+        novos2, _ = self.m.conferir_dispositivos(ap, atual, date(2026, 9, 29))
+        self.assertEqual(novos2, [])
+
+    def test_wifi_seguro_e_inseguro(self):
+        wpa2 = self.m.analisar_wifi("    SSID                : Casa\n    Autenticação        : WPA2-Personal\n")
+        self.assertEqual(wpa2["ssid"], "Casa")
+        self.assertTrue(self.m._seguranca_do_wifi(wpa2)["bom"])
+        aberta = self.m._seguranca_do_wifi(self.m.analisar_wifi("    SSID : Livre\n    Authentication : Open\n"))
+        self.assertTrue(aberta["grave"])
+        wep = self.m._seguranca_do_wifi(self.m.analisar_wifi("    SSID : X\n    Autenticação : WEP\n"))
+        self.assertTrue(wep["grave"])
+
+    def test_frase_avisa_do_novo_e_diz_que_e_passivo(self):
+        from datetime import date
+        ap = self.m.analisar_arp(self.ARP)
+        novos, _ = self.m.conferir_dispositivos(ap, {}, date(2026, 9, 28))
+        frase = self.m._frase("both", ap, novos, {"bom": ["ok"], "alerta": [], "grave": []}, True)
+        self.assertIn("NOVO", frase)
+        self.assertIn("não mexe em nada", frase)
