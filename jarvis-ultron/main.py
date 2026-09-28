@@ -6,6 +6,7 @@ import json
 import sys
 import traceback
 from pathlib import Path
+from types import SimpleNamespace
 
 import sounddevice as sd
 from google import genai
@@ -1944,20 +1945,48 @@ class JarvisLive:
         if self._modo_reserva:
             return
         self._modo_reserva = True
-        self.ui.write_log("SYS: Gemini indisponível. Modo reserva (Groq) ligado: converso, mas sem ferramentas.")
+        com_ferramentas = not getattr(self, "cloud_safe", False)
+        self.ui.write_log("SYS: Gemini indisponível. Modo reserva (Groq) ligado: "
+                          + ("converso e executo as tarefas." if com_ferramentas else "converso, mas sem ferramentas."))
         threading.Thread(target=self._escutar_reserva, daemon=True).start()
-        threading.Thread(target=self._falar_reserva, daemon=True, args=(
-            "A conexão principal caiu. Estou no modo reserva: posso conversar, "
-            "mas sem usar as ferramentas até ela voltar.",)).start()
+        aviso = ("A conexão principal caiu. Estou no modo reserva, mas continuo executando suas tarefas."
+                 if com_ferramentas else
+                 "A conexão principal caiu. Estou no modo reserva: posso conversar, mas sem as ferramentas até ela voltar.")
+        threading.Thread(target=self._falar_reserva, daemon=True, args=(aviso,)).start()
 
     def _desativar_modo_reserva(self) -> None:
         self._modo_reserva = False
         self.ui.write_log("SYS: Conexão principal de volta. Modo reserva desligado.")
 
     def _responder_pela_reserva(self, texto: str) -> None:
-        resposta = self._reserva.responder(texto)
+        ferramentas, executar = self._ferramentas_da_reserva()
+        resposta = self._reserva.responder(texto, ferramentas=ferramentas, executar=executar)
         self.ui.write_log(f"Jarvis: {resposta}")
         self._falar_reserva(resposta)
+
+    def _ferramentas_da_reserva(self):
+        """Ferramentas do Jarvis no formato do Groq + a função que as executa (modo reserva).
+        No modo nuvem (cloud_safe) a reserva fica só na conversa, sem ferramentas."""
+        if getattr(self, "cloud_safe", False):
+            return None, None
+        if getattr(self, "_reserva_ferramentas", None) is None:
+            from core.reserva_groq import gemini_para_groq
+            self._reserva_ferramentas = gemini_para_groq(get_tool_declarations())
+        return self._reserva_ferramentas, self._executar_ferramenta_reserva
+
+    def _executar_ferramenta_reserva(self, nome: str, args: dict) -> str:
+        """Roda uma ferramenta do Jarvis (a mesma _execute_tool do Gemini) e devolve só o texto."""
+        laco = getattr(self, "_loop_reserva", None)
+        if laco is None or laco.is_closed():
+            laco = asyncio.new_event_loop()
+            self._loop_reserva = laco
+        chamada = SimpleNamespace(name=nome, args=dict(args or {}), id="reserva")
+        try:
+            resposta = laco.run_until_complete(self._execute_tool(chamada))
+        except Exception as erro:
+            return f"A ferramenta {nome} falhou: {str(erro)[:150]}"
+        dados = getattr(resposta, "response", None) or {}
+        return str(dados.get("result", "")) if isinstance(dados, dict) else str(dados)
 
     def _falar_reserva(self, texto: str) -> None:
         from actions.tts_engine import TTSEngine

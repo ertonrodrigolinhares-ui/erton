@@ -1654,3 +1654,47 @@ class ReputacaoSiteTests(unittest.TestCase):
     def test_endereco_invalido(self):
         r = self.m.reputacao("nao e site")
         self.assertIn("Não consegui", self.m._frase(r))
+
+
+class ReservaComFerramentasTests(unittest.TestCase):
+    def _cliente(self, roteiro):
+        from types import SimpleNamespace as NS
+        class Chat:
+            def __init__(s): s.n = 0
+            def create(s, model, messages, **kw):
+                r = roteiro[min(s.n, len(roteiro) - 1)]; s.n += 1
+                return NS(choices=[NS(message=r)])
+        class Cli:
+            models = NS(list=lambda: NS(data=[NS(id="llama-3.3-70b-versatile")]))
+            def __init__(s): s.chat = NS(completions=Chat())
+        return Cli()
+
+    def test_reserva_chama_ferramenta_e_resume(self):
+        from types import SimpleNamespace as NS
+        chamada = NS(id="1", function=NS(name="open_site", arguments='{"url":"exemplo.com"}'))
+        roteiro = [NS(content="", tool_calls=[chamada]), NS(content="Abri o site.", tool_calls=None)]
+        reserva = reserva_groq.ReservaGroq("gsk", cliente=self._cliente(roteiro))
+        feitos = []
+        out = reserva.responder("abra exemplo.com",
+                                ferramentas=[{"type": "function", "function": {"name": "open_site"}}],
+                                executar=lambda n, a: feitos.append((n, a)) or "aberto")
+        self.assertEqual(out, "Abri o site.")
+        self.assertEqual(feitos, [("open_site", {"url": "exemplo.com"})])
+        self.assertEqual([m["role"] for m in reserva.mensagens], ["system", "user", "assistant", "tool", "assistant"])
+
+    def test_argumentos_quebrados_nao_derrubam(self):
+        from types import SimpleNamespace as NS
+        chamada = NS(id="1", function=NS(name="x", arguments="{isso nao e json"))
+        roteiro = [NS(content="", tool_calls=[chamada]), NS(content="Feito.", tool_calls=None)]
+        reserva = reserva_groq.ReservaGroq("gsk", cliente=self._cliente(roteiro))
+        recebidos = []
+        out = reserva.responder("faz", ferramentas=[{"type": "function", "function": {"name": "x"}}],
+                                executar=lambda n, a: recebidos.append(a) or "ok")
+        self.assertEqual(out, "Feito.")
+        self.assertEqual(recebidos, [{}])  # args inválidos viram {}
+
+    def test_ferramenta_que_falha_vira_texto(self):
+        def explode(n, a):
+            raise RuntimeError("boom")
+        self.assertIn("falhou", reserva_groq._rodar_ferramenta(
+            type("C", (), {"function": type("F", (), {"name": "x", "arguments": "{}"})()})(), explode))
