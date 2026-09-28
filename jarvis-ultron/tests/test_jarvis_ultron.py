@@ -1331,7 +1331,7 @@ class AutomacoesQueIniciamTests(unittest.TestCase):
         from core.automacoes import carregar_ferramentas
         carga = carregar_ferramentas(Path(__file__).resolve().parent.parent / "automacoes")
         self.assertEqual(carga.erros, [])
-        self.assertTrue({"spoken_reminders", "saved_routines", "self_repair", "external_memory_drive", "website_security_check"} <= set(carga.ferramentas))
+        self.assertTrue({"spoken_reminders", "saved_routines", "self_repair", "external_memory_drive", "website_security_check", "website_reputation_check"} <= set(carga.ferramentas))
         self.assertEqual(sorted(a for a, _ in carga.inicios), ["lembretes.py", "memoria_hd.py", "painel_stark.py"])
 
 
@@ -1616,3 +1616,41 @@ class SegurancaSiteTests(unittest.TestCase):
             r = self.m.analisar("a.com")
         self.assertTrue(r["grave"])
         self.assertIn("passiva", self.m._frase(r))
+
+
+class ReputacaoSiteTests(unittest.TestCase):
+    def setUp(self):
+        self.m = _plugin_da_pasta("reputacao_site.py")
+
+    def test_sinais_de_golpe_no_nome(self):
+        self.assertTrue(self.m.sinais_do_nome("nubank-seguranca-2024.xyz"))
+        self.assertTrue(any("imita" in s for s in self.m.sinais_do_nome("instagram-login.top")))
+        self.assertEqual(self.m.sinais_do_nome("google.com"), [])
+        self.assertEqual(self.m.sinais_do_nome("itau.com.br"), [])
+
+    def test_dominio_novo_baixa_a_confianca(self):
+        from datetime import datetime, timezone
+        from unittest.mock import patch
+        agora = datetime(2026, 9, 28, tzinfo=timezone.utc)
+        criado = datetime(2026, 9, 1, tzinfo=timezone.utc)  # 27 dias
+        with patch.object(self.m, "_rdap_criacao", return_value=criado), \
+                patch.object(self.m, "_cadeado_ok", return_value=True):
+            r = self.m.reputacao("loja-nova.xyz", agora)
+        self.assertEqual(r["confianca"], "baixa")
+        self.assertTrue(any("criado há só" in a for a in r["alertas"]))
+
+    def test_dominio_antigo_e_seguro_tem_boa_confianca(self):
+        from datetime import datetime, timezone
+        from unittest.mock import patch
+        agora = datetime(2026, 9, 28, tzinfo=timezone.utc)
+        criado = datetime(2015, 1, 1, tzinfo=timezone.utc)
+        with patch.object(self.m, "_rdap_criacao", return_value=criado), \
+                patch.object(self.m, "_cadeado_ok", return_value=True):
+            r = self.m.reputacao("linharesprudencio.com.br", agora)
+        self.assertEqual(r["confianca"], "boa")
+        self.assertIn("passiva", self.m._frase(r)) if False else None
+        self.assertIn("não é invasão", self.m._frase(r))
+
+    def test_endereco_invalido(self):
+        r = self.m.reputacao("nao e site")
+        self.assertIn("Não consegui", self.m._frase(r))

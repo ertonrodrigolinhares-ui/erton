@@ -35,6 +35,7 @@ Novidades desta versão:
 - Botão "Ligar Telegram": fale com o Hermes pelo Telegram do celular (com o PC ligado).
 - Botão "Testar Telegram": descobre por que o robô não responde e conserta o que der.
 - Análise de segurança de sites (automacoes/seguranca_site.py): nota de A a F, só leitura (passivo).
+- Reputação de sites (automacoes/reputacao_site.py): diz se um site é confiável ou golpe (dados públicos).
 - Memória no HD externo (automacoes/memoria_hd.py): "Jarvis, use o HD E como memória".
 - Central de missões na tela Stark (automacoes/painel_stark.py): próximo lembrete, Geekie, agentes e
   botões das rotinas.
