@@ -1331,7 +1331,7 @@ class AutomacoesQueIniciamTests(unittest.TestCase):
         from core.automacoes import carregar_ferramentas
         carga = carregar_ferramentas(Path(__file__).resolve().parent.parent / "automacoes")
         self.assertEqual(carga.erros, [])
-        self.assertTrue({"spoken_reminders", "saved_routines", "self_repair", "external_memory_drive"} <= set(carga.ferramentas))
+        self.assertTrue({"spoken_reminders", "saved_routines", "self_repair", "external_memory_drive", "website_security_check"} <= set(carga.ferramentas))
         self.assertEqual(sorted(a for a, _ in carga.inicios), ["lembretes.py", "memoria_hd.py", "painel_stark.py"])
 
 
@@ -1569,3 +1569,50 @@ class MemoriaNoHDTests(unittest.TestCase):
         self.assertEqual((self.memoria / "long_term.json").read_text(encoding="utf-8"), '{"nome": "Erton"}')
         self.assertEqual((self.memoria / "long_term.json.antes-de-restaurar").read_text(encoding="utf-8"), "{}")
         self.assertFalse((self.hermes / "memories" / "MEMORY.md.antes-de-restaurar").exists())
+
+
+class SegurancaSiteTests(unittest.TestCase):
+    def setUp(self):
+        self.m = _plugin_da_pasta("seguranca_site.py")
+
+    def test_normaliza_e_recusa_invalido(self):
+        self.assertEqual(self.m._normalizar("exemplo.com.br")[1], "exemplo.com.br")
+        self.assertEqual(self.m._normalizar("https://a.com/pagina")[1], "a.com")
+        with self.assertRaises(ValueError):
+            self.m._normalizar("nao e um site")
+        with self.assertRaises(ValueError):
+            self.m._normalizar("")
+
+    def test_nota_boa_com_cadeado_e_protecoes(self):
+        from unittest.mock import patch
+        cert = {"ok": True, "dias": 200, "emissor": "Let's Encrypt"}
+        pagina = {"status": 200, "url_final": "https://a.com", "cabecalhos": {
+            "strict-transport-security": "max-age=31536000", "content-security-policy": "default-src 'self'",
+            "x-frame-options": "DENY", "x-content-type-options": "nosniff",
+            "referrer-policy": "no-referrer", "permissions-policy": "geolocation=()"}}
+        with patch.object(self.m, "_certificado", return_value=cert), \
+                patch.object(self.m, "_buscar", return_value=pagina), \
+                patch.object(self.m, "_http_vira_https", return_value=True):
+            r = self.m.analisar("a.com")
+        self.assertEqual(r["nota"], "A")
+        self.assertEqual(r["grave"], [])
+        self.assertTrue(any("HSTS" in b for b in r["bom"]))
+
+    def test_certificado_vencido_derruba_a_nota(self):
+        from unittest.mock import patch
+        with patch.object(self.m, "_certificado", return_value={"ok": True, "dias": -3, "emissor": "X"}), \
+                patch.object(self.m, "_buscar", return_value={"status": 200, "url_final": "https://a.com", "cabecalhos": {}}), \
+                patch.object(self.m, "_http_vira_https", return_value=False):
+            r = self.m.analisar("a.com")
+        self.assertIn(r["nota"], ("D", "E", "F"))
+        self.assertTrue(any("VENCIDO" in g for g in r["grave"]))
+        self.assertTrue(any("http" in g.lower() for g in r["grave"]))
+
+    def test_sem_cadeado_e_grave(self):
+        from unittest.mock import patch
+        with patch.object(self.m, "_certificado", return_value={"ok": False, "erro": "certificado inválido"}), \
+                patch.object(self.m, "_buscar", side_effect=OSError("sem rota")), \
+                patch.object(self.m, "_http_vira_https", return_value=None):
+            r = self.m.analisar("a.com")
+        self.assertTrue(r["grave"])
+        self.assertIn("passiva", self.m._frase(r))

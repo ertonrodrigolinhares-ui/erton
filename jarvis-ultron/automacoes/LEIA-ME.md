@@ -29,6 +29,7 @@ Arquivos terminados em `.exemplo` são só modelos e não são carregados.
 | `lembretes.py` | Lembretes falados (no modo chamada, esperam o "Hey Jarvis") | "Jarvis, me lembra às 15h de ligar para o contador" · "quais são meus lembretes?" · "cancela o lembrete 2" |
 | `rotinas.py` | Rotinas salvas: seus agentes para tarefas repetidas | "Jarvis, rotina bom dia" · "salve a rotina treino: ..." · "quais rotinas eu tenho?" |
 | `memoria_hd.py` | Salva tudo o que o Jarvis aprende no seu HD externo (a cada 30 min, com histórico de 30 dias; nunca copia chaves) | "Jarvis, use o HD E como memória" · "salve sua memória no HD agora" |
+| `seguranca_site.py` | Nota de segurança de um site (HTTPS, certificado, proteções) — só leitura, passivo | "Jarvis, verifique a segurança do site exemplo.com" |
 | `painel_stark.py` | Central de missões na tela Stark (lembrete, Geekie, agentes, botões das rotinas) | Aparece sozinha na coluna da direita |
 
 Lembretes e rotinas ficam salvos em `Documentos/Jarvis Ultron` (`lembretes.json` e `rotinas.json`).
