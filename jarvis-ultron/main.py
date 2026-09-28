@@ -1964,14 +1964,28 @@ class JarvisLive:
         self.ui.write_log(f"Jarvis: {resposta}")
         self._falar_reserva(resposta)
 
+    # Ferramentas essenciais no modo reserva. Mandar TODAS ao Groq gasta muito do limite grátis, então
+    # só as mais usadas por voz vão para a reserva (as automações da pasta entram sempre).
+    RESERVA_FERRAMENTAS_ESSENCIAIS = {
+        "open_app", "browser_control", "weather_report", "reminder", "media_control", "youtube_video",
+        "web_search", "email_control", "check_messages", "hermes_agent", "agent_task", "school_tasks",
+        "self_diagnosis", "save_memory", "generate_image", "listening_mode",
+    }
+
     def _ferramentas_da_reserva(self):
         """Ferramentas do Jarvis no formato do Groq + a função que as executa (modo reserva).
-        No modo nuvem (cloud_safe) a reserva fica só na conversa, sem ferramentas."""
+        No modo nuvem (cloud_safe) a reserva fica só na conversa, sem ferramentas.
+        JARVIS_RESERVA_FERRAMENTAS=0 no .env desliga as ferramentas (fica só conversa, mais leve)."""
         if getattr(self, "cloud_safe", False):
+            return None, None
+        if os.environ.get("JARVIS_RESERVA_FERRAMENTAS", "1").strip() in ("0", "nao", "não", "false"):
             return None, None
         if getattr(self, "_reserva_ferramentas", None) is None:
             from core.reserva_groq import gemini_para_groq
-            self._reserva_ferramentas = gemini_para_groq(get_tool_declarations())
+            plugins = set(carregar_automacoes().ferramentas)  # as automações da pasta entram sempre
+            escolhidas = [d for d in get_tool_declarations()
+                          if d.get("name") in self.RESERVA_FERRAMENTAS_ESSENCIAIS or d.get("name") in plugins]
+            self._reserva_ferramentas = gemini_para_groq(escolhidas)
         return self._reserva_ferramentas, self._executar_ferramenta_reserva
 
     def _executar_ferramenta_reserva(self, nome: str, args: dict) -> str:

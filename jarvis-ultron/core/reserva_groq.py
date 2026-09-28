@@ -37,7 +37,7 @@ INSTRUCOES = (
     "de dizer que não consegue. Nunca publique, envie mensagens, compre ou apague nada sem o 'ok' do "
     "Erton na hora. Depois que a ferramenta responder, resuma o resultado em uma ou duas frases."
 )
-MAX_VOLTAS_FERRAMENTA = 5  # quantas vezes seguidas o Groq pode chamar ferramentas em um pedido
+MAX_VOLTAS_FERRAMENTA = 3  # menos idas e vindas = menos gasto do limite grátis do Groq
 
 
 def gemini_para_groq(declaracoes: list[dict]) -> list[dict]:
