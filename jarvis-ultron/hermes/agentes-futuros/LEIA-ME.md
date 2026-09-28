@@ -24,7 +24,7 @@ os números. Precisa ter rodado o `Instalar Hermes` antes.
 | `proposta-comercial` | Rascunho de proposta de serviços | Nada |
 | `noticias-setor` | Briefing de contabilidade, tributário e economia | Nada |
 | `resumo-reuniao` | Vira anotações em ata com tarefas | Texto da reunião |
-| `email-triagem` | Separa e-mails e sugere respostas (não envia) | Gmail conectado |
+| `email-triagem` | Separa e-mails e sugere respostas (não envia) | Rode o 'Ligar Gmail' |
 | `treino-semana` | Plano de treino de triathlon da semana | Nada |
 
 Todos seguem a mesma regra dos agentes atuais: **nada é publicado, enviado, comprado ou alterado

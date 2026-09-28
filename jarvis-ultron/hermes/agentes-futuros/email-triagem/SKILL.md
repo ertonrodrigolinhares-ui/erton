@@ -12,7 +12,7 @@ metadata:
 Triagem de e-mails: separa a caixa em urgente, clientes e o resto, e sugere respostas prontas (sem enviar).
 
 ## Requisitos
-- Gmail conectado (MCP do Gmail).
+- Gmail conectado ao Hermes: rode o 'Ligar Gmail' na pasta do Jarvis (usa uma senha de app do Google).
 
 ## Procedimento
 1. Leia os e-mails não lidos e separe em: urgente, de cliente, financeiro, e outros.

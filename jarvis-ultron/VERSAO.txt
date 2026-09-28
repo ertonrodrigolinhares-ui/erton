@@ -36,6 +36,7 @@ Novidades desta versão:
   para o próximo (a tela mostra "Modelo de voz: ...").
 - Gemini 3.x na voz: raciocínio no nível baixo (o 3.x recusa desligar e dava erro 1007); se um modelo
   recusar a configuração, tenta sem o idioma e depois o próximo modelo.
+- Botão "Ligar Gmail": conecta um Gmail ao Hermes (senha de app do Google) para o agente de e-mail.
 - Botão "Ligar Telegram": fale com o Hermes pelo Telegram do celular (com o PC ligado).
 - Botão "Testar Telegram": descobre por que o robô não responde e conserta o que der.
 - Vigia do Wi-Fi (automacoes/vigia_wifi.py): aparelhos da SUA rede, aviso de aparelho novo e checagem da sua senha de Wi-Fi (só leitura, só a sua rede).
