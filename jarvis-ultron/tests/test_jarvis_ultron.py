@@ -1789,3 +1789,54 @@ class VigiaWifiTests(unittest.TestCase):
         frase = self.m._frase("both", ap, novos, {"bom": ["ok"], "alerta": [], "grave": []}, True)
         self.assertIn("NOVO", frase)
         self.assertIn("não mexe em nada", frase)
+
+
+class RevisaoDoisTests(unittest.TestCase):
+    def test_env_nao_quebra_com_caractere_estranho(self):
+        import tempfile
+        from pathlib import Path
+        from core.env_arquivo import atualizar_env
+        arq = Path(tempfile.mkdtemp()) / ".env"
+        atualizar_env(arq, "GEMINI_API_KEY", 'ab"c\nDROP\\x')
+        txt = arq.read_text(encoding="utf-8")
+        self.assertEqual(txt.count("\n"), 1)  # continua uma linha só
+        atualizar_env(arq, "GROQ_API_KEY", "gsk_ok")
+        depois = arq.read_text(encoding="utf-8")
+        self.assertIn("GROQ_API_KEY", depois)
+        self.assertIn("GEMINI_API_KEY", depois)  # não perdeu a chave antiga
+
+    def test_site_recusa_endereco_interno(self):
+        from unittest.mock import patch
+        for arquivo in ("seguranca_site.py", "reputacao_site.py"):
+            m = _plugin_da_pasta(arquivo)
+            with patch("socket.getaddrinfo", return_value=[(2, 1, 6, "", ("192.168.0.5", 0))]):
+                with self.assertRaises(ValueError):
+                    m._recusar_endereco_interno("interno.local")
+            with patch("socket.getaddrinfo", return_value=[(2, 1, 6, "", ("8.8.8.8", 0))]):
+                m._recusar_endereco_interno("publico.com")  # público: não levanta
+
+    def test_lembretes_ignora_item_quebrado(self):
+        import json
+        import tempfile
+        from pathlib import Path
+        m = _plugin_da_pasta("lembretes.py")
+        arq = Path(tempfile.mkdtemp()) / "l.json"
+        arq.write_text(json.dumps({"lembretes": [
+            {"texto": "ok", "quando": "2030-01-01T10:00"}, {"texto": "sem quando"}, {"quando": "x"}]}),
+            encoding="utf-8")
+        self.assertEqual(len(m.ler(arq)["lembretes"]), 1)
+
+    def test_autoconserto_nao_sobrescreve_ao_desligar(self):
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        from core.automacoes import Carga
+        m = _plugin_da_pasta("autoconserto.py")
+        pasta = Path(tempfile.mkdtemp())
+        (pasta / "ruim.py").write_text("x", encoding="utf-8")
+        (pasta / "_ruim.py").write_text("ja existia", encoding="utf-8")  # não pode ser sobrescrito
+        with patch("core.automacoes.carregar_ferramentas", return_value=Carga(erros=[("ruim.py", "erro")])), \
+                patch("core.automacoes.pasta_padrao", return_value=pasta):
+            m._desligar_automacao_com_defeito()
+        self.assertEqual((pasta / "_ruim.py").read_text(encoding="utf-8"), "ja existia")  # intacto
+        self.assertTrue((pasta / "_ruim_2.py").exists())  # o novo foi para outro nome

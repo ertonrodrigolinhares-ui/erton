@@ -1,6 +1,10 @@
 Jarvis Ultron - versão 2026-09-25
 
 Novidades desta versão:
+- Segunda revisão: .env protegido contra caractere estranho colado; busca de modelos não prende
+  os outros pedidos; Hermes falha rápido (5s) e tenta outro endereço; análise de site recusa
+  endereços internos da rede; lembretes ignoram itens estragados; autoconserto não sobrescreve
+  arquivos ao desligar uma automação.
 - Revisão geral (mais rápido e sem defeitos): leitura do log agora roll no fio da tela (sem travadas);
   medidor de GPU/temperatura só de vez em quando e para de tentar se não houver placa (menos processador);
   painel Stark não gasta CPU quando minimizado; efeito de digitação do log mais leve; reputação de

@@ -56,7 +56,26 @@ def _normalizar(url: str) -> str:
     dominio = re.sub(r"^\w+://", "", url).split("/")[0].split("@")[-1].split(":")[0].lower()
     if not re.match(r"^[a-z0-9.-]+\.[a-z]{2,}$", dominio):
         raise ValueError(f"'{dominio}' não parece um endereço de site válido")
+    _recusar_endereco_interno(dominio)
     return dominio
+
+
+def _recusar_endereco_interno(dominio: str) -> None:
+    """Não deixa checar endereços internos da rede/computador (evita bisbilhotar rede interna)."""
+    import ipaddress
+    import socket
+
+    try:
+        infos = socket.getaddrinfo(dominio, None)
+    except OSError:
+        return
+    for info in infos:
+        try:
+            ip = ipaddress.ip_address(info[4][0])
+        except ValueError:
+            continue
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+            raise ValueError("esse endereço é interno da rede; só analiso sites da internet")
 
 
 def _cadeado_ok(dominio: str) -> bool:

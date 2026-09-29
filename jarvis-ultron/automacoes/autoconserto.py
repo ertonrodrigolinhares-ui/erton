@@ -63,7 +63,12 @@ def _desligar_automacao_com_defeito() -> str:
     for arquivo, _motivo in carregar_ferramentas().erros:
         caminho = pasta_padrao() / arquivo
         if caminho.exists() and caminho.name != Path(__file__).name:
-            caminho.rename(caminho.with_name("_" + caminho.name))
+            destino = caminho.with_name("_" + caminho.name)
+            n = 2
+            while destino.exists():  # não sobrescreve um "_nome.py" que já existia
+                destino = caminho.with_name(f"_{caminho.stem}_{n}{caminho.suffix}")
+                n += 1
+            caminho.rename(destino)
             desligadas.append(arquivo)
     return f"desliguei a automação com defeito {', '.join(desligadas)}" if desligadas else ""
 

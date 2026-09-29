@@ -42,23 +42,27 @@ def listar(forcar: bool = False) -> list[tuple[str, set[str]]]:
         # Lista boa vale a sessão toda; lista vazia (falha) é tentada de novo a cada 5 minutos.
         if _cache and not forcar or (_cache == [] and time.time() - _cache_momento < 300 and not forcar):
             return _cache
-        chave = _chave()
-        if not chave:
-            return []
-        try:
-            from google import genai
+    # A busca na internet fica FORA da trava, para uma resposta lenta do Google não prender todos os
+    # outros pedidos de modelo (que também usam a trava).
+    chave = _chave()
+    if not chave:
+        return []
+    modelos = None
+    try:
+        from google import genai
 
-            cliente = genai.Client(api_key=chave, http_options={"api_version": "v1beta"})
-            modelos = []
-            for modelo in _metodo_original(cliente.models, "list")():
-                nome = str(getattr(modelo, "name", "") or "").removeprefix("models/")
-                acoes = {str(a).lower() for a in (getattr(modelo, "supported_actions", None) or [])}
-                if nome:
-                    modelos.append((nome, acoes))
-            _cache = modelos
-        except Exception as erro:
-            print(f"[Modelos] Não consegui listar os modelos da chave: {erro}")
-            _cache = []
+        cliente = genai.Client(api_key=chave, http_options={"api_version": "v1beta"})
+        modelos = []
+        for modelo in _metodo_original(cliente.models, "list")():
+            nome = str(getattr(modelo, "name", "") or "").removeprefix("models/")
+            acoes = {str(a).lower() for a in (getattr(modelo, "supported_actions", None) or [])}
+            if nome:
+                modelos.append((nome, acoes))
+    except Exception as erro:
+        print(f"[Modelos] Não consegui listar os modelos da chave: {erro}")
+        modelos = []
+    with _trava:
+        _cache = modelos
         _cache_momento = time.time()
         return _cache
 
