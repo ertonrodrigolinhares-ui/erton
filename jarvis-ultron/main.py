@@ -1988,15 +1988,25 @@ class JarvisLive:
             self._reserva_ferramentas = gemini_para_groq(escolhidas)
         return self._reserva_ferramentas, self._executar_ferramenta_reserva
 
+    def _garantir_loop_reserva(self):
+        """Um event loop que fica SEMPRE rodando num fio próprio, para o modo reserva. Assim as
+        tarefas longas (Hermes em segundo plano) terminam e entregam o resultado depois, em vez de
+        ficarem paradas (antes o loop só vivia durante uma chamada)."""
+        laco = getattr(self, "_loop_reserva", None)
+        if laco is not None and not laco.is_closed():
+            return laco
+        laco = asyncio.new_event_loop()
+        self._loop_reserva = laco
+        threading.Thread(target=laco.run_forever, daemon=True, name="LoopReserva").start()
+        return laco
+
     def _executar_ferramenta_reserva(self, nome: str, args: dict) -> str:
         """Roda uma ferramenta do Jarvis (a mesma _execute_tool do Gemini) e devolve só o texto."""
-        laco = getattr(self, "_loop_reserva", None)
-        if laco is None or laco.is_closed():
-            laco = asyncio.new_event_loop()
-            self._loop_reserva = laco
+        laco = self._garantir_loop_reserva()
         chamada = SimpleNamespace(name=nome, args=dict(args or {}), id="reserva")
         try:
-            resposta = laco.run_until_complete(self._execute_tool(chamada))
+            futuro = asyncio.run_coroutine_threadsafe(self._execute_tool(chamada), laco)
+            resposta = futuro.result(timeout=self.HERMES_ESPERA + 30)
         except Exception as erro:
             return f"A ferramenta {nome} falhou: {str(erro)[:150]}"
         dados = getattr(resposta, "response", None) or {}

@@ -1,6 +1,10 @@
 Jarvis Ultron - versão 2026-09-25
 
 Novidades desta versão:
+- Revisão geral (mais rápido e sem defeitos): leitura do log agora roll no fio da tela (sem travadas);
+  medidor de GPU/temperatura só de vez em quando e para de tentar se não houver placa (menos processador);
+  painel Stark não gasta CPU quando minimizado; efeito de digitação do log mais leve; reputação de
+  site não quebra com data sem fuso; modo reserva entrega as tarefas longas do Hermes corretamente.
 - Navegador: se o automático não abrir, o site abre no navegador normal (Firefox ou o padrão).
 - Tela mais leve: bem menos processador (esfera parada desenha menos; minimizado não desenha).
 - Sem palmas: o Jarvis abre direto e você chama com "Hey Jarvis".

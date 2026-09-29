@@ -117,6 +117,8 @@ def reputacao(url_bruta: str, agora: datetime | None = None) -> dict:
     criado = _rdap_criacao(dominio)
     r["idade"] = None
     if criado is not None:
+        if criado.tzinfo is None:  # RDAP às vezes devolve data sem fuso; evita erro ao subtrair
+            criado = criado.replace(tzinfo=timezone.utc)
         dias = (agora - criado).days
         r["idade"] = dias
         if dias < 90:

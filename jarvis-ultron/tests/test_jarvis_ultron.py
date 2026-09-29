@@ -615,6 +615,7 @@ class TelaStarkTests(unittest.TestCase):
         comandos = []
         with patch.object(ui_stark.TelaStark, "_buscar_da_internet", lambda self: None):
             tela = ui_stark.TelaStark(QWidget(), comandos.append, pasta_dados=Path(tempfile.mkdtemp()))
+        tela.show()  # _a_cada_segundo só atualiza com a janela visível (economia quando minimizada)
         tela._a_cada_segundo()
         self.assertIn("Tempo ligado", tela.ligado.text())
         self.assertTrue(tela.cpu.texto.endswith("%"))
@@ -1650,6 +1651,17 @@ class ReputacaoSiteTests(unittest.TestCase):
         self.assertEqual(r["confianca"], "boa")
         self.assertIn("passiva", self.m._frase(r)) if False else None
         self.assertIn("não é invasão", self.m._frase(r))
+
+    def test_data_sem_fuso_nao_quebra(self):
+        from datetime import datetime, timezone
+        from unittest.mock import patch
+        agora = datetime(2026, 9, 29, tzinfo=timezone.utc)
+        naive = datetime(2020, 1, 1)  # RDAP às vezes devolve data sem fuso
+        with patch.object(self.m, "_rdap_criacao", return_value=naive), \
+                patch.object(self.m, "_cadeado_ok", return_value=True):
+            r = self.m.reputacao("exemplo.com", agora)
+        self.assertGreater(r["idade"], 2000)
+        self.assertEqual(r["confianca"], "boa")
 
     def test_endereco_invalido(self):
         r = self.m.reputacao("nao e site")
