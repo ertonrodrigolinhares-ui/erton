@@ -158,7 +158,8 @@ Abra com o Bloco de Notas para mudar:
 | `JARVIS_LATENCIA_AUDIO=low` | Som com menos atraso (padrão). Se picotar, use `high` |
 | `JARVIS_TEMA_STARK=1` | Tela Stark ligada. `0` = volta para a tela original |
 | `JARVIS_CIDADE=Campina Grande` | Cidade do painel de clima |
-| `JARVIS_VISUAL=orbe` | Anel de energia no centro (padrão). `classico` = volta para a esfera antiga |
+| `JARVIS_VISUAL=orbe` | Tela azul com anel de energia e painéis de vidro (padrão). `classico` = volta para a esfera antiga |
+| `JARVIS_CENA=1` | A tela azul ocupa a janela toda (padrão). `0` = anel dentro da tela antiga. A tecla **F2** também alterna |
 | `JARVIS_BIOMETRIA=1` | No "bom dia", abre a câmera dentro do anel antes do resumo. `0` = pula a câmera |
 | `JARVIS_NOME=Erton` | Nome usado no "Bom dia, ..." dos cartões do resumo |
 | `JARVIS_VERSAO_MINIMA=3.0` | Modelos mais antigos que isso (ex.: Gemini 2.5, que o Google está aposentando) só são usados como última reserva |
