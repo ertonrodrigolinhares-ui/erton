@@ -1363,6 +1363,13 @@ class JarvisLive:
         if modo and len(str(text).split()) <= 6:
             self._definir_modo_escuta(modo)  # o som e o selo confirmam
             return
+        # Jarvis Ultron: "modo ultron" abre o painel de automações; "modo jarvis" fecha.
+        baixo = " ".join(str(text or "").lower().split())
+        if len(baixo.split()) <= 4 and ("modo ultron" in baixo or "modo jarvis" in baixo or baixo == "ultron"):
+            abrir = getattr(self, "_abrir_ultron", None)
+            if callable(abrir):
+                abrir(fechar="jarvis" in baixo)
+            return
         # Autodiagnóstico sem depender do Gemini (é justamente quando ele falha que mais precisa)
         from core.autodiagnostico import pediu_diagnostico
         if pediu_diagnostico(text) and (not self.session or getattr(self, "_modo_reserva", False)):
@@ -1999,6 +2006,34 @@ class JarvisLive:
         self._loop_reserva = laco
         threading.Thread(target=laco.run_forever, daemon=True, name="LoopReserva").start()
         return laco
+
+    def rodar_automacao_ultron(self, nome: str, args: dict | None = None) -> None:
+        """Painel Ultron: roda uma automação DIRETO (sem passar pela IA) e fala/mostra o resultado.
+        Funciona mesmo sem Gemini/Groq, porque chama a ferramenta na hora."""
+        def trabalhar():
+            self.ui.write_log(f"SYS: ⚙ Ultron: {nome}...")
+            try:
+                bruto = self._executar_ferramenta_reserva(nome, dict(args or {}))
+            except Exception as erro:
+                bruto = f"Não consegui rodar {nome}: {str(erro)[:150]}"
+            texto = _limpar_para_falar(bruto)
+            self.ui.write_log(f"Jarvis: {texto}")
+            self._falar_resultado_ultron(texto)
+        threading.Thread(target=trabalhar, daemon=True, name=f"Ultron-{nome}").start()
+
+    def _falar_resultado_ultron(self, texto: str) -> None:
+        """Fala o resultado pela voz que estiver disponível (Gemini ao vivo ou reserva)."""
+        if not texto:
+            return
+        session, loop = getattr(self, "session", None), getattr(self, "_loop", None)
+        if session is not None and loop is not None and not getattr(self, "_modo_reserva", False) \
+                and not self._chamada_fechada():
+            directiva = (f"[Resultado de automação] {texto}\nLeia isso ao usuário em português, "
+                         "sem acrescentar nada.")
+            asyncio.run_coroutine_threadsafe(
+                session.send_client_content(turns={"parts": [{"text": directiva}]}, turn_complete=True), loop)
+        else:
+            self._falar_reserva(texto)
 
     def _executar_ferramenta_reserva(self, nome: str, args: dict) -> str:
         """Roda uma ferramenta do Jarvis (a mesma _execute_tool do Gemini) e devolve só o texto."""
@@ -2759,6 +2794,21 @@ class JarvisLive:
                         await self._wait_before_reconnect(2)
                     else:
                         await self._wait_before_reconnect(min(60, 2 ** min(self._falhas_seguidas, 6)))
+
+def _limpar_para_falar(texto: str) -> str:
+    """Tira as instruções em inglês que as ferramentas deixam para a IA (ex.: 'Tell the user...'),
+    para o painel Ultron falar só a parte em português quando roda a automação direto."""
+    texto = str(texto or "").strip()
+    marcas = ["Tell the user", "Explique ao usuário", "Explique isso", "Answer the user", "Answer in",
+              "Confirm to the user", "Confirm in", "Say this to the user", "Oriente o usuário",
+              "\nTell the user", "Then tell the user"]
+    corte = len(texto)
+    for m in marcas:
+        i = texto.find(m)
+        if i != -1:
+            corte = min(corte, i)
+    return texto[:corte].strip() or texto
+
 
 def _pensamento_da_voz(modelo: str) -> types.ThinkingConfig:
     """Gemini 3.x não aceita desligar o raciocínio (thinking_budget=0 dá erro 1007 "invalid argument"):

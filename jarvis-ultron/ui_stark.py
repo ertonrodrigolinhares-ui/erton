@@ -533,6 +533,11 @@ class TelaStark(QWidget):
         self.botao_maos_livres.clicked.connect(lambda: self._acionar("modo mãos livres"))
         linha_modos.addWidget(self.botao_chamada)
         linha_modos.addWidget(self.botao_maos_livres)
+        # Jarvis Ultron: abre o painel de automações "ULTRON" (a automação painel_ultron instala o painel;
+        # sem ele, cai no comando de voz "modo ultron").
+        self.botao_ultron = BotaoModo("⚙  ULTRON", "Painel de automações")
+        self.botao_ultron.clicked.connect(self._abrir_ultron)
+        linha_modos.addWidget(self.botao_ultron)
         linha_modos.addStretch(1)
         centro_coluna.addLayout(linha_modos)
         centro_coluna.addWidget(centro, stretch=1)
@@ -642,6 +647,14 @@ class TelaStark(QWidget):
         noticias.corpo.addLayout(self.noticias)
         lay.addWidget(noticias, stretch=1)
         return coluna
+
+    def _abrir_ultron(self) -> None:
+        """Abre o painel Ultron se a automação painel_ultron o instalou; senão, usa o comando de voz."""
+        callback = getattr(self, "ao_abrir_ultron", None)
+        if callable(callback):
+            callback()
+        else:
+            self.enviar_comando("modo ultron")
 
     # ---- ações
     def _acionar(self, comando: str) -> None:

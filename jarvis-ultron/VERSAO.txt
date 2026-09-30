@@ -1,6 +1,8 @@
 Jarvis Ultron - versão 2026-09-25
 
 Novidades desta versão:
+- Interface ULTRON: botão ⚙ ULTRON (ou "Jarvis, modo Ultron") abre um painel só de automações;
+  cada botão RODA a automação na hora, direto, sem depender do Gemini/Groq. "Modo Jarvis" fecha.
 - Segunda revisão: .env protegido contra caractere estranho colado; busca de modelos não prende
   os outros pedidos; Hermes falha rápido (5s) e tenta outro endereço; análise de site recusa
   endereços internos da rede; lembretes ignoram itens estragados; autoconserto não sobrescreve

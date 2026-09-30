@@ -1333,7 +1333,8 @@ class AutomacoesQueIniciamTests(unittest.TestCase):
         carga = carregar_ferramentas(Path(__file__).resolve().parent.parent / "automacoes")
         self.assertEqual(carga.erros, [])
         self.assertTrue({"spoken_reminders", "saved_routines", "self_repair", "external_memory_drive", "website_security_check", "website_reputation_check", "pc_protection", "wifi_watch"} <= set(carga.ferramentas))
-        self.assertEqual(sorted(a for a, _ in carga.inicios), ["lembretes.py", "memoria_hd.py", "painel_stark.py"])
+        self.assertEqual(sorted(a for a, _ in carga.inicios),
+                         ["lembretes.py", "memoria_hd.py", "painel_stark.py", "painel_ultron.py"])
 
 
 class AvisosFaladosTests(unittest.TestCase):
@@ -1840,3 +1841,46 @@ class RevisaoDoisTests(unittest.TestCase):
             m._desligar_automacao_com_defeito()
         self.assertEqual((pasta / "_ruim.py").read_text(encoding="utf-8"), "ja existia")  # intacto
         self.assertTrue((pasta / "_ruim_2.py").exists())  # o novo foi para outro nome
+
+
+class PainelUltronTests(unittest.TestCase):
+    def test_botao_roda_automacao_direto_e_fecha(self):
+        import importlib.util
+        from pathlib import Path
+        from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget
+        import ui_stark
+        app = QApplication.instance() or QApplication([])
+        from core import na_tela
+        na_tela.preparar()
+        win = QMainWindow()
+        tela = ui_stark.TelaStark(QWidget(), enviar_comando=lambda c: None)
+        win.setCentralWidget(tela)
+        win._tela_stark = tela
+        win.show()
+        chamadas = []
+
+        class J:
+            ui = type("U", (), {"_win": win})()
+            def rodar_automacao_ultron(self, nome, args=None):
+                chamadas.append((nome, args))
+
+        spec = importlib.util.spec_from_file_location("pu", "automacoes/painel_ultron.py")
+        m = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(m)
+        m._construir(J())  # instala direto (sem o na_tela assíncrono)
+        painel = tela._painel_ultron
+        self.assertTrue(callable(tela.ao_abrir_ultron))
+        tela.ao_abrir_ultron()  # abre
+        self.assertTrue(painel.isVisible())
+        # acha o botão "Autodiagnóstico" e clica
+        from PyQt6.QtWidgets import QPushButton
+        alvo = next(b for b in painel.findChildren(QPushButton) if "Autodiagnóstico" in b.text())
+        alvo.click()
+        self.assertIn(("self_diagnosis", {}), chamadas)
+        self.assertFalse(painel.isVisible())  # fecha depois de rodar
+
+    def test_limpar_para_falar_remove_instrucoes_em_ingles(self):
+        import main
+        self.assertEqual(main._limpar_para_falar("Nota B. Tell the user this in Portuguese."), "Nota B.")
+        self.assertEqual(main._limpar_para_falar("Feito. Confirm in Portuguese."), "Feito.")
+        self.assertEqual(main._limpar_para_falar("Só português."), "Só português.")
