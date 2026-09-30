@@ -109,6 +109,12 @@ def _construir(jarvis):
                 self.setGeometry(self.parent().rect())
                 self.raise_()
             self.setVisible(bool(mostrar))
+            # Ultron ligado = a interface inteira fica LARANJA; Jarvis = volta ao azul.
+            try:
+                import ui_orbe
+                ui_orbe.definir_ultron(janela, bool(mostrar))
+            except Exception as erro:
+                print(f"[Ultron] Não consegui trocar a cor: {erro}")
 
     painel = PainelUltron(tela)
     tela._painel_ultron = painel

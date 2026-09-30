@@ -70,10 +70,38 @@ def cena_ligada() -> bool:
     return os.environ.get("JARVIS_CENA", "1").strip().lower() not in ("0", "nao", "não", "off")
 
 
+# Modo Ultron: gira o tom de todas as cores (azul -> laranja) sem mexer no brilho, para a interface
+# inteira ficar laranja quando o Ultron está ligado. Preto/branco/cinza (sem tom) ficam como estão.
+_ULTRON = False
+
+
 def cor(h: str, a: float = 255) -> QColor:
     c = QColor(h)
+    if _ULTRON:
+        matiz, sat, val, _alfa = c.getHsv()
+        if matiz >= 0:  # -1 = sem cor (preto/branco/cinza): não mexe
+            # gira o azul (~217°) para um laranja limpo (~28°) e realça a cor para não ficar "mostarda"
+            c.setHsv((matiz + 171) % 360, min(255, int(sat * 1.15) + 25), val)
     c.setAlpha(max(0, min(255, int(a))))
     return c
+
+
+def definir_ultron(win, ligado: bool) -> None:
+    """Liga/desliga o laranja do Ultron e manda a tela redesenhar."""
+    global _ULTRON
+    _ULTRON = bool(ligado)
+    try:
+        hud = getattr(win, "hud", None)
+        if hud is not None:
+            hud.update()
+        orbe = getattr(win, "_orbe", None)
+        cena = getattr(orbe, "cena", None) if orbe is not None else None
+        if cena is not None:
+            cena.update()
+            for w in cena.findChildren(QWidget):
+                w.update()
+    except Exception as erro:  # nunca deixa a troca de cor derrubar o Jarvis
+        print(f"[Ultron] Não consegui repintar: {erro}")
 
 
 def fonte(familia: str, pt: float, peso=QFont.Weight.Normal, espaco: float = 0) -> QFont:
