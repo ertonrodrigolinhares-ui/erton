@@ -1,6 +1,14 @@
 Jarvis Ultron - versão 2026-09-25
 
 Novidades desta versão:
+- Segunda revisão: .env protegido contra caractere estranho colado; busca de modelos não prende
+  os outros pedidos; Hermes falha rápido (5s) e tenta outro endereço; análise de site recusa
+  endereços internos da rede; lembretes ignoram itens estragados; autoconserto não sobrescreve
+  arquivos ao desligar uma automação.
+- Revisão geral (mais rápido e sem defeitos): leitura do log agora roll no fio da tela (sem travadas);
+  medidor de GPU/temperatura só de vez em quando e para de tentar se não houver placa (menos processador);
+  painel Stark não gasta CPU quando minimizado; efeito de digitação do log mais leve; reputação de
+  site não quebra com data sem fuso; modo reserva entrega as tarefas longas do Hermes corretamente.
 - Navegador: se o automático não abrir, o site abre no navegador normal (Firefox ou o padrão).
 - Tela mais leve: bem menos processador (esfera parada desenha menos; minimizado não desenha).
 - Sem palmas: o Jarvis abre direto e você chama com "Hey Jarvis".
@@ -19,6 +27,10 @@ Novidades desta versão:
 - Chave do Gemini aceita na tela vai sozinha para o .env.
 - Se o Google recusar a chave (defeito das chaves "AQ."), botão "Continuar com a reserva (Groq)".
 - Reserva (Groq) sempre fala: se a voz da internet falhar, usa a voz do Windows.
+- Reserva (Groq) mais leve: manda ao Groq só as ferramentas essenciais (+ as automações), para
+  gastar menos do limite grátis. JARVIS_RESERVA_FERRAMENTAS=0 no .env deixa a reserva só na conversa.
+- Reserva (Groq) agora EXECUTA as tarefas também (abrir sites, Metricool, lembretes, análise de
+  sites, autodiagnóstico...), com chamada de função do Groq. O Jarvis funciona completo sem o Gemini.
 - Instalação do zero: pergunta a cidade do clima; botão "Desinstalar Hermes" para recomeçar.
 - Autodiagnóstico: "Jarvis, faça um autodiagnóstico" ou botão ✚ — diz o que está com defeito e como resolver.
 - Gemini 2.5 (aposentando) só como última reserva; usa os modelos 3.x primeiro.
@@ -32,8 +44,11 @@ Novidades desta versão:
   para o próximo (a tela mostra "Modelo de voz: ...").
 - Gemini 3.x na voz: raciocínio no nível baixo (o 3.x recusa desligar e dava erro 1007); se um modelo
   recusar a configuração, tenta sem o idioma e depois o próximo modelo.
+- Botão "Ligar Gmail": conecta um Gmail ao Hermes (senha de app do Google) para o agente de e-mail.
 - Botão "Ligar Telegram": fale com o Hermes pelo Telegram do celular (com o PC ligado).
 - Botão "Testar Telegram": descobre por que o robô não responde e conserta o que der.
+- Vigia do Wi-Fi (automacoes/vigia_wifi.py): aparelhos da SUA rede, aviso de aparelho novo e checagem da sua senha de Wi-Fi (só leitura, só a sua rede).
+- Proteção do PC (automacoes/protecao_pc.py): confere antivírus, firewall, updates e acesso remoto do seu Windows (só leitura).
 - Análise de segurança de sites (automacoes/seguranca_site.py): nota de A a F, só leitura (passivo).
 - Reputação de sites (automacoes/reputacao_site.py): diz se um site é confiável ou golpe (dados públicos).
 - Memória no HD externo (automacoes/memoria_hd.py): "Jarvis, use o HD E como memória".

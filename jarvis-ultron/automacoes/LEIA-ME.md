@@ -30,6 +30,8 @@ Arquivos terminados em `.exemplo` são só modelos e não são carregados.
 | `rotinas.py` | Rotinas salvas: seus agentes para tarefas repetidas | "Jarvis, rotina bom dia" · "salve a rotina treino: ..." · "quais rotinas eu tenho?" |
 | `memoria_hd.py` | Salva tudo o que o Jarvis aprende no seu HD externo (a cada 30 min, com histórico de 30 dias; nunca copia chaves) | "Jarvis, use o HD E como memória" · "salve sua memória no HD agora" |
 | `reputacao_site.py` | Diz se um site é confiável ou golpe (idade do domínio, disfarces, cadeado) — só dados públicos | "Jarvis, esse site é golpe? loja-oferta.xyz" |
+| `vigia_wifi.py` | Mostra os aparelhos da SUA rede, avisa aparelho novo e checa sua senha de Wi-Fi — só leitura | "Jarvis, quem está no meu Wi-Fi?" |
+| `protecao_pc.py` | Confere se o SEU Windows está seguro (antivírus, firewall, updates, acesso remoto) — só leitura | "Jarvis, meu computador está protegido?" |
 | `seguranca_site.py` | Nota de segurança de um site (HTTPS, certificado, proteções) — só leitura, passivo | "Jarvis, verifique a segurança do site exemplo.com" |
 | `painel_stark.py` | Central de missões na tela Stark (lembrete, Geekie, agentes, botões das rotinas) | Aparece sozinha na coluna da direita |
 

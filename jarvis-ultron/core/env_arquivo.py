@@ -12,6 +12,9 @@ def atualizar_env(caminho: Path | str, chave: str, valor: str) -> None:
         linhas = caminho.read_text(encoding="utf-8-sig").splitlines()
     except FileNotFoundError:
         linhas = []
+    # Protege o .env: tira quebras de linha e escapa aspas/barra, para um caractere estranho colado
+    # não quebrar o arquivo nem inventar linhas.
+    valor = str(valor).replace("\r", " ").replace("\n", " ").replace("\\", "\\\\").replace('"', '\\"')
     nova = f'{chave}="{valor}"'
     padrao = re.compile(rf"^\s*{re.escape(chave)}\s*=")
     trocou = False

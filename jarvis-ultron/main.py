@@ -6,6 +6,7 @@ import json
 import sys
 import traceback
 from pathlib import Path
+from types import SimpleNamespace
 
 import sounddevice as sd
 from google import genai
@@ -1944,20 +1945,72 @@ class JarvisLive:
         if self._modo_reserva:
             return
         self._modo_reserva = True
-        self.ui.write_log("SYS: Gemini indisponível. Modo reserva (Groq) ligado: converso, mas sem ferramentas.")
+        com_ferramentas = not getattr(self, "cloud_safe", False)
+        self.ui.write_log("SYS: Gemini indisponível. Modo reserva (Groq) ligado: "
+                          + ("converso e executo as tarefas." if com_ferramentas else "converso, mas sem ferramentas."))
         threading.Thread(target=self._escutar_reserva, daemon=True).start()
-        threading.Thread(target=self._falar_reserva, daemon=True, args=(
-            "A conexão principal caiu. Estou no modo reserva: posso conversar, "
-            "mas sem usar as ferramentas até ela voltar.",)).start()
+        aviso = ("A conexão principal caiu. Estou no modo reserva, mas continuo executando suas tarefas."
+                 if com_ferramentas else
+                 "A conexão principal caiu. Estou no modo reserva: posso conversar, mas sem as ferramentas até ela voltar.")
+        threading.Thread(target=self._falar_reserva, daemon=True, args=(aviso,)).start()
 
     def _desativar_modo_reserva(self) -> None:
         self._modo_reserva = False
         self.ui.write_log("SYS: Conexão principal de volta. Modo reserva desligado.")
 
     def _responder_pela_reserva(self, texto: str) -> None:
-        resposta = self._reserva.responder(texto)
+        ferramentas, executar = self._ferramentas_da_reserva()
+        resposta = self._reserva.responder(texto, ferramentas=ferramentas, executar=executar)
         self.ui.write_log(f"Jarvis: {resposta}")
         self._falar_reserva(resposta)
+
+    # Ferramentas essenciais no modo reserva. Mandar TODAS ao Groq gasta muito do limite grátis, então
+    # só as mais usadas por voz vão para a reserva (as automações da pasta entram sempre).
+    RESERVA_FERRAMENTAS_ESSENCIAIS = {
+        "open_app", "browser_control", "weather_report", "reminder", "media_control", "youtube_video",
+        "web_search", "email_control", "check_messages", "hermes_agent", "agent_task", "school_tasks",
+        "self_diagnosis", "save_memory", "generate_image", "listening_mode",
+    }
+
+    def _ferramentas_da_reserva(self):
+        """Ferramentas do Jarvis no formato do Groq + a função que as executa (modo reserva).
+        No modo nuvem (cloud_safe) a reserva fica só na conversa, sem ferramentas.
+        JARVIS_RESERVA_FERRAMENTAS=0 no .env desliga as ferramentas (fica só conversa, mais leve)."""
+        if getattr(self, "cloud_safe", False):
+            return None, None
+        if os.environ.get("JARVIS_RESERVA_FERRAMENTAS", "1").strip() in ("0", "nao", "não", "false"):
+            return None, None
+        if getattr(self, "_reserva_ferramentas", None) is None:
+            from core.reserva_groq import gemini_para_groq
+            plugins = set(carregar_automacoes().ferramentas)  # as automações da pasta entram sempre
+            escolhidas = [d for d in get_tool_declarations()
+                          if d.get("name") in self.RESERVA_FERRAMENTAS_ESSENCIAIS or d.get("name") in plugins]
+            self._reserva_ferramentas = gemini_para_groq(escolhidas)
+        return self._reserva_ferramentas, self._executar_ferramenta_reserva
+
+    def _garantir_loop_reserva(self):
+        """Um event loop que fica SEMPRE rodando num fio próprio, para o modo reserva. Assim as
+        tarefas longas (Hermes em segundo plano) terminam e entregam o resultado depois, em vez de
+        ficarem paradas (antes o loop só vivia durante uma chamada)."""
+        laco = getattr(self, "_loop_reserva", None)
+        if laco is not None and not laco.is_closed():
+            return laco
+        laco = asyncio.new_event_loop()
+        self._loop_reserva = laco
+        threading.Thread(target=laco.run_forever, daemon=True, name="LoopReserva").start()
+        return laco
+
+    def _executar_ferramenta_reserva(self, nome: str, args: dict) -> str:
+        """Roda uma ferramenta do Jarvis (a mesma _execute_tool do Gemini) e devolve só o texto."""
+        laco = self._garantir_loop_reserva()
+        chamada = SimpleNamespace(name=nome, args=dict(args or {}), id="reserva")
+        try:
+            futuro = asyncio.run_coroutine_threadsafe(self._execute_tool(chamada), laco)
+            resposta = futuro.result(timeout=self.HERMES_ESPERA + 30)
+        except Exception as erro:
+            return f"A ferramenta {nome} falhou: {str(erro)[:150]}"
+        dados = getattr(resposta, "response", None) or {}
+        return str(dados.get("result", "")) if isinstance(dados, dict) else str(dados)
 
     def _falar_reserva(self, texto: str) -> None:
         from actions.tts_engine import TTSEngine

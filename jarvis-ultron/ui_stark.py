@@ -652,6 +652,9 @@ class TelaStark(QWidget):
         self.enviar_comando(comando)
 
     def _a_cada_segundo(self) -> None:
+        # Minimizado ou escondido: não desenha nem lê o sistema (economia de processador).
+        if not self.isVisible() or self.window().isMinimized():
+            return
         self.relogio.update()
         d = self.sistema.atualizar()
         if not d:

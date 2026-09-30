@@ -1866,6 +1866,11 @@ class _SysMetrics:
         self._last_net = psutil.net_io_counters()
         self._last_net_t = time.time()
         self._running = True
+        # GPU/temperatura abrem programas externos (pesado): só de vez em quando, e param de tentar
+        # se não houver ferramenta disponível (evita processador gasto à toa).
+        self._extra_tick = 0
+        self._gpu_off = False
+        self._temp_off = False
         t = threading.Thread(target=self._loop, daemon=True)
         t.start()
 
@@ -1893,16 +1898,26 @@ class _SysMetrics:
         self._last_net   = nc
         self._last_net_t = now
 
-        gpu = self._get_gpu()
-
-        tmp = self._get_temp()
-
         with self._lock:
             self.cpu = cpu
             self.mem = mem
             self.net = net
-            self.gpu = gpu
-            self.tmp = tmp
+
+        # GPU e temperatura mudam devagar: só a cada ~12 s, e nunca se já sabemos que não dá.
+        self._extra_tick += 1
+        if self._extra_tick % 8 == 1:
+            if not self._gpu_off:
+                gpu = self._get_gpu()
+                if gpu < 0:
+                    self._gpu_off = True  # nenhuma ferramenta de GPU: não tenta mais
+                with self._lock:
+                    self.gpu = gpu
+            if not self._temp_off:
+                tmp = self._get_temp()
+                if tmp < 0:
+                    self._temp_off = True
+                with self._lock:
+                    self.tmp = tmp
 
     def _get_gpu(self) -> float:
         # NVIDIA
@@ -1937,10 +1952,10 @@ class _SysMetrics:
             except Exception:
                 pass
 
-            # Intel GPU (Linux)
+            # Intel GPU (Linux) — uma amostra rápida (sem prender 500 ms toda vez)
             try:
                 r = subprocess.run(
-                    ["intel_gpu_top", "-J", "-s", "500"],
+                    ["intel_gpu_top", "-J", "-s", "100", "-n", "1"],
                     capture_output=True, text=True, timeout=1
                 )
                 if r.returncode == 0 and "Render/3D" in r.stdout:
@@ -4440,11 +4455,13 @@ class LogWidget(QTextEdit):
         elif tl.startswith("file:"):   self._tag = "file"
         elif "err" in tl:              self._tag = "err"
         else:                          self._tag = "sys"
-        self._tmr.start(6)
+        self._tmr.start(16)
 
     def _step(self):
         if self._pos < len(self._text):
-            ch  = self._text[self._pos]
+            # Escreve vários caracteres por vez: mesma sensação de digitação, mas sem redesenhar
+            # a caixa de texto letra por letra (bem menos processador em linhas longas).
+            trecho = self._text[self._pos:self._pos + 3]
             cur = self.textCursor()
             fmt = cur.charFormat()
             col = {
@@ -4456,10 +4473,11 @@ class LogWidget(QTextEdit):
             }.get(self._tag, qcol(C.TEXT))
             fmt.setForeground(QBrush(col))
             cur.movePosition(cur.MoveOperation.End)
-            cur.insertText(ch, fmt)
-            self.setTextCursor(cur)
-            self.ensureCursorVisible()
-            self._pos += 1
+            cur.insertText(trecho, fmt)
+            self._pos += len(trecho)
+            if self._pos >= len(self._text):
+                self.setTextCursor(cur)
+                self.ensureCursorVisible()
         else:
             self._tmr.stop()
             cur = self.textCursor()
@@ -6881,6 +6899,8 @@ class MainWindow(QMainWindow):
         self._update_metrics()
 
         self._log_sig.connect(self._log.append_log)
+        # Jarvis Ultron: a leitura do log (que mexe em widgets) roda no fio da tela, via sinal.
+        self._log_sig.connect(self._parse_log_for_context)
         self._state_sig.connect(self._apply_state)
         self._mute_sig.connect(self._set_muted)
         self._escuta_sig.connect(self._mostrar_escuta)
@@ -9254,8 +9274,11 @@ class JarvisUI:
         self._win._escuta_sig.emit(str(estado))
 
     def write_log(self, text: str):
+        # Emite para a tela (o sinal roda no fio da tela). Não chama _parse_log_for_context aqui,
+        # porque write_log vem de vários fios e essa função mexe em widgets: agora ela roda pelo
+        # sinal, no fio certo (antes dava travadas/erros ao chamar de fora do fio da tela).
         self._win._log_sig.emit(text)
-        self._win._parse_log_for_context(text)
+        # Jarvis Ultron: "bom dia" do usuário dispara a câmera e o resumo (só emite um sinal)
         orbe = getattr(self._win, "_orbe", None)
         if orbe is not None:
             orbe.ver_texto(text)

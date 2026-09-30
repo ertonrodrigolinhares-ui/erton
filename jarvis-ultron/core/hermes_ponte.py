@@ -72,7 +72,7 @@ def perguntar(pedido: str, tempo_maximo: float = TEMPO_MAXIMO) -> str:
                 endereco + "/v1/chat/completions",
                 headers={"Authorization": f"Bearer {os.environ['HERMES_API_KEY'].strip()}"},
                 json={"model": "hermes-agent", "messages": [{"role": "user", "content": pedido}]},
-                timeout=tempo_maximo,
+                timeout=(5, tempo_maximo),  # 5s para conectar (falha rápido e tenta o próximo endereço)
             )
         except requests.exceptions.ConnectionError:
             continue

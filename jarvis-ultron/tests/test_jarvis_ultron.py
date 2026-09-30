@@ -615,6 +615,7 @@ class TelaStarkTests(unittest.TestCase):
         comandos = []
         with patch.object(ui_stark.TelaStark, "_buscar_da_internet", lambda self: None):
             tela = ui_stark.TelaStark(QWidget(), comandos.append, pasta_dados=Path(tempfile.mkdtemp()))
+        tela.show()  # _a_cada_segundo só atualiza com a janela visível (economia quando minimizada)
         tela._a_cada_segundo()
         self.assertIn("Tempo ligado", tela.ligado.text())
         self.assertTrue(tela.cpu.texto.endswith("%"))
@@ -1331,7 +1332,7 @@ class AutomacoesQueIniciamTests(unittest.TestCase):
         from core.automacoes import carregar_ferramentas
         carga = carregar_ferramentas(Path(__file__).resolve().parent.parent / "automacoes")
         self.assertEqual(carga.erros, [])
-        self.assertTrue({"spoken_reminders", "saved_routines", "self_repair", "external_memory_drive", "website_security_check", "website_reputation_check"} <= set(carga.ferramentas))
+        self.assertTrue({"spoken_reminders", "saved_routines", "self_repair", "external_memory_drive", "website_security_check", "website_reputation_check", "pc_protection", "wifi_watch"} <= set(carga.ferramentas))
         self.assertEqual(sorted(a for a, _ in carga.inicios), ["lembretes.py", "memoria_hd.py", "painel_stark.py"])
 
 
@@ -1651,6 +1652,191 @@ class ReputacaoSiteTests(unittest.TestCase):
         self.assertIn("passiva", self.m._frase(r)) if False else None
         self.assertIn("não é invasão", self.m._frase(r))
 
+    def test_data_sem_fuso_nao_quebra(self):
+        from datetime import datetime, timezone
+        from unittest.mock import patch
+        agora = datetime(2026, 9, 29, tzinfo=timezone.utc)
+        naive = datetime(2020, 1, 1)  # RDAP às vezes devolve data sem fuso
+        with patch.object(self.m, "_rdap_criacao", return_value=naive), \
+                patch.object(self.m, "_cadeado_ok", return_value=True):
+            r = self.m.reputacao("exemplo.com", agora)
+        self.assertGreater(r["idade"], 2000)
+        self.assertEqual(r["confianca"], "boa")
+
     def test_endereco_invalido(self):
         r = self.m.reputacao("nao e site")
         self.assertIn("Não consegui", self.m._frase(r))
+
+
+class ReservaComFerramentasTests(unittest.TestCase):
+    def _cliente(self, roteiro):
+        from types import SimpleNamespace as NS
+        class Chat:
+            def __init__(s): s.n = 0
+            def create(s, model, messages, **kw):
+                r = roteiro[min(s.n, len(roteiro) - 1)]; s.n += 1
+                return NS(choices=[NS(message=r)])
+        class Cli:
+            models = NS(list=lambda: NS(data=[NS(id="llama-3.3-70b-versatile")]))
+            def __init__(s): s.chat = NS(completions=Chat())
+        return Cli()
+
+    def test_reserva_chama_ferramenta_e_resume(self):
+        from types import SimpleNamespace as NS
+        chamada = NS(id="1", function=NS(name="open_site", arguments='{"url":"exemplo.com"}'))
+        roteiro = [NS(content="", tool_calls=[chamada]), NS(content="Abri o site.", tool_calls=None)]
+        reserva = reserva_groq.ReservaGroq("gsk", cliente=self._cliente(roteiro))
+        feitos = []
+        out = reserva.responder("abra exemplo.com",
+                                ferramentas=[{"type": "function", "function": {"name": "open_site"}}],
+                                executar=lambda n, a: feitos.append((n, a)) or "aberto")
+        self.assertEqual(out, "Abri o site.")
+        self.assertEqual(feitos, [("open_site", {"url": "exemplo.com"})])
+        self.assertEqual([m["role"] for m in reserva.mensagens], ["system", "user", "assistant", "tool", "assistant"])
+
+    def test_argumentos_quebrados_nao_derrubam(self):
+        from types import SimpleNamespace as NS
+        chamada = NS(id="1", function=NS(name="x", arguments="{isso nao e json"))
+        roteiro = [NS(content="", tool_calls=[chamada]), NS(content="Feito.", tool_calls=None)]
+        reserva = reserva_groq.ReservaGroq("gsk", cliente=self._cliente(roteiro))
+        recebidos = []
+        out = reserva.responder("faz", ferramentas=[{"type": "function", "function": {"name": "x"}}],
+                                executar=lambda n, a: recebidos.append(a) or "ok")
+        self.assertEqual(out, "Feito.")
+        self.assertEqual(recebidos, [{}])  # args inválidos viram {}
+
+    def test_ferramenta_que_falha_vira_texto(self):
+        def explode(n, a):
+            raise RuntimeError("boom")
+        self.assertIn("falhou", reserva_groq._rodar_ferramenta(
+            type("C", (), {"function": type("F", (), {"name": "x", "arguments": "{}"})()})(), explode))
+
+
+class ProtecaoPCTests(unittest.TestCase):
+    def setUp(self):
+        self.m = _plugin_da_pasta("protecao_pc.py")
+        from datetime import date
+        self.hoje = date(2026, 9, 28)
+
+    def test_tudo_seguro(self):
+        dados = {"defender": {"antivirus": True, "realtime": True, "sigAgeDays": 1},
+                 "firewall": [{"name": "Public", "enabled": True}], "lastUpdate": "2026-09-25",
+                 "rdpDenied": 1, "bitlocker": [{"drive": "C:", "status": "On"}], "startup": []}
+        r = self.m.avaliar(dados, self.hoje)
+        self.assertEqual(r["nivel"], "bom")
+        self.assertEqual(r["grave"], [])
+
+    def test_problemas_viram_grave_e_alerta(self):
+        dados = {"defender": {"antivirus": True, "realtime": False, "sigAgeDays": 9},
+                 "firewall": [{"name": "Public", "enabled": False}], "lastUpdate": "2026-05-01",
+                 "rdpDenied": 0, "bitlocker": [{"drive": "C:", "status": "Off"}]}
+        r = self.m.avaliar(dados, self.hoje)
+        self.assertEqual(r["nivel"], "precisa de ajuste")
+        self.assertTrue(any("DESLIGADA" in g for g in r["grave"]))       # defender
+        self.assertTrue(any("firewall" in g.lower() for g in r["grave"]))
+        self.assertTrue(any("Remota" in g for g in r["grave"]))          # rdp ligado
+        self.assertTrue(any("dias" in a for a in r["alerta"]))           # update velho
+        self.assertTrue(any("BitLocker" in i for i in r["info"]))
+
+    def test_sem_dados_fala_que_e_windows(self):
+        self.assertIn("Windows", self.m._frase(self.m.avaliar({}), False))
+
+    def test_nao_roda_fora_do_windows(self):
+        import os
+        if os.name != "nt":
+            self.assertEqual(self.m._coletar(), {})
+
+
+class VigiaWifiTests(unittest.TestCase):
+    def setUp(self):
+        self.m = _plugin_da_pasta("vigia_wifi.py")
+
+    ARP = ("Interface: 192.168.0.10 --- 0x5\n"
+           "  Internet Address      Physical Address      Type\n"
+           "  192.168.0.1           a4-2b-8c-11-22-33     dynamic\n"
+           "  192.168.0.15          de-ad-be-ef-00-01     dynamic\n"
+           "  192.168.0.255         ff-ff-ff-ff-ff-ff     static\n"
+           "  224.0.0.22            01-00-5e-00-00-16     static\n")
+
+    def test_lista_aparelhos_sem_broadcast(self):
+        ap = self.m.analisar_arp(self.ARP)
+        self.assertEqual([a["mac"] for a in ap], ["a4:2b:8c:11:22:33", "de:ad:be:ef:00:01"])
+
+    def test_marca_aparelho_novo(self):
+        from datetime import date
+        ap = self.m.analisar_arp(self.ARP)
+        conhecidos = {"a4:2b:8c:11:22:33": {"nome": "roteador", "primeiro": "2026-09-01", "ip": "192.168.0.1"}}
+        novos, atual = self.m.conferir_dispositivos(ap, conhecidos, date(2026, 9, 28))
+        self.assertEqual([n["mac"] for n in novos], ["de:ad:be:ef:00:01"])
+        self.assertIn("de:ad:be:ef:00:01", atual)
+        # rodar de novo: já não é novo
+        novos2, _ = self.m.conferir_dispositivos(ap, atual, date(2026, 9, 29))
+        self.assertEqual(novos2, [])
+
+    def test_wifi_seguro_e_inseguro(self):
+        wpa2 = self.m.analisar_wifi("    SSID                : Casa\n    Autenticação        : WPA2-Personal\n")
+        self.assertEqual(wpa2["ssid"], "Casa")
+        self.assertTrue(self.m._seguranca_do_wifi(wpa2)["bom"])
+        aberta = self.m._seguranca_do_wifi(self.m.analisar_wifi("    SSID : Livre\n    Authentication : Open\n"))
+        self.assertTrue(aberta["grave"])
+        wep = self.m._seguranca_do_wifi(self.m.analisar_wifi("    SSID : X\n    Autenticação : WEP\n"))
+        self.assertTrue(wep["grave"])
+
+    def test_frase_avisa_do_novo_e_diz_que_e_passivo(self):
+        from datetime import date
+        ap = self.m.analisar_arp(self.ARP)
+        novos, _ = self.m.conferir_dispositivos(ap, {}, date(2026, 9, 28))
+        frase = self.m._frase("both", ap, novos, {"bom": ["ok"], "alerta": [], "grave": []}, True)
+        self.assertIn("NOVO", frase)
+        self.assertIn("não mexe em nada", frase)
+
+
+class RevisaoDoisTests(unittest.TestCase):
+    def test_env_nao_quebra_com_caractere_estranho(self):
+        import tempfile
+        from pathlib import Path
+        from core.env_arquivo import atualizar_env
+        arq = Path(tempfile.mkdtemp()) / ".env"
+        atualizar_env(arq, "GEMINI_API_KEY", 'ab"c\nDROP\\x')
+        txt = arq.read_text(encoding="utf-8")
+        self.assertEqual(txt.count("\n"), 1)  # continua uma linha só
+        atualizar_env(arq, "GROQ_API_KEY", "gsk_ok")
+        depois = arq.read_text(encoding="utf-8")
+        self.assertIn("GROQ_API_KEY", depois)
+        self.assertIn("GEMINI_API_KEY", depois)  # não perdeu a chave antiga
+
+    def test_site_recusa_endereco_interno(self):
+        from unittest.mock import patch
+        for arquivo in ("seguranca_site.py", "reputacao_site.py"):
+            m = _plugin_da_pasta(arquivo)
+            with patch("socket.getaddrinfo", return_value=[(2, 1, 6, "", ("192.168.0.5", 0))]):
+                with self.assertRaises(ValueError):
+                    m._recusar_endereco_interno("interno.local")
+            with patch("socket.getaddrinfo", return_value=[(2, 1, 6, "", ("8.8.8.8", 0))]):
+                m._recusar_endereco_interno("publico.com")  # público: não levanta
+
+    def test_lembretes_ignora_item_quebrado(self):
+        import json
+        import tempfile
+        from pathlib import Path
+        m = _plugin_da_pasta("lembretes.py")
+        arq = Path(tempfile.mkdtemp()) / "l.json"
+        arq.write_text(json.dumps({"lembretes": [
+            {"texto": "ok", "quando": "2030-01-01T10:00"}, {"texto": "sem quando"}, {"quando": "x"}]}),
+            encoding="utf-8")
+        self.assertEqual(len(m.ler(arq)["lembretes"]), 1)
+
+    def test_autoconserto_nao_sobrescreve_ao_desligar(self):
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        from core.automacoes import Carga
+        m = _plugin_da_pasta("autoconserto.py")
+        pasta = Path(tempfile.mkdtemp())
+        (pasta / "ruim.py").write_text("x", encoding="utf-8")
+        (pasta / "_ruim.py").write_text("ja existia", encoding="utf-8")  # não pode ser sobrescrito
+        with patch("core.automacoes.carregar_ferramentas", return_value=Carga(erros=[("ruim.py", "erro")])), \
+                patch("core.automacoes.pasta_padrao", return_value=pasta):
+            m._desligar_automacao_com_defeito()
+        self.assertEqual((pasta / "_ruim.py").read_text(encoding="utf-8"), "ja existia")  # intacto
+        self.assertTrue((pasta / "_ruim_2.py").exists())  # o novo foi para outro nome

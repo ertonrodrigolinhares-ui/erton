@@ -61,6 +61,10 @@ def ler(caminho: Path | None = None) -> dict:
     try:
         dados = json.loads((caminho or arquivo()).read_text(encoding="utf-8"))
         if isinstance(dados, dict) and isinstance(dados.get("lembretes"), list):
+            # Descarta itens estragados (ex.: arquivo editado à mão sem 'quando' ou 'texto'),
+            # para não quebrar depois na hora de listar ou ordenar.
+            dados["lembretes"] = [l for l in dados["lembretes"]
+                                  if isinstance(l, dict) and l.get("quando") and l.get("texto")]
             return dados
     except (OSError, ValueError):
         pass
