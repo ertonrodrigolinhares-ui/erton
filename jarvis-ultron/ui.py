@@ -2449,6 +2449,11 @@ class HudCanvas(QWidget):
     def paintEvent(self, _):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, self._antialias)
+        # Jarvis Ultron: visual "Orbe" (anel de energia) no lugar da esfera antiga
+        if getattr(self, "_orbe", None) is not None:
+            self._orbe.pintar(self, p)
+            p.end()
+            return
         W, H = self.width(), self.height()
         cx, cy = W / 2, H / 2
         fw = min(W, H)
@@ -6863,6 +6868,10 @@ class MainWindow(QMainWindow):
             middle_section2 = ui_stark.montar_tela_stark(self, middle_section2, UI_FONT, TECH_FONT)
             self._tela_stark = middle_section2
 
+        # Jarvis Ultron: anel de energia, câmera e resumo do "bom dia" (JARVIS_VISUAL=classico desliga)
+        import ui_orbe
+        self._orbe = ui_orbe.instalar(self)
+
         # Add middle section to main layout
         root.addWidget(middle_section2, stretch=1)
         # ── Tool progress indicator (above footer) ──────────────────────────
@@ -9269,6 +9278,10 @@ class JarvisUI:
         # porque write_log vem de vários fios e essa função mexe em widgets: agora ela roda pelo
         # sinal, no fio certo (antes dava travadas/erros ao chamar de fora do fio da tela).
         self._win._log_sig.emit(text)
+        # Jarvis Ultron: "bom dia" do usuário dispara a câmera e o resumo (só emite um sinal)
+        orbe = getattr(self._win, "_orbe", None)
+        if orbe is not None:
+            orbe.ver_texto(text)
 
     def wait_for_api_key(self):
         while not self._win._ready:
