@@ -59,5 +59,41 @@ class OrbeTests(unittest.TestCase):
             os.environ.pop("JARVIS_VISUAL", None)
 
 
+class CenaTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_cena_cobre_a_janela_e_alterna_com_f2(self):
+        os.environ.pop("JARVIS_VISUAL", None)
+        os.environ.pop("JARVIS_CENA", None)
+        win = ui.MainWindow("face.png")
+        try:
+            cena = win._orbe.cena
+            self.assertIsNotNone(cena)
+            self.assertIs(win.hud.parentWidget(), cena)
+            cena.alternar()                      # F2: volta para a tela antiga
+            self.assertFalse(cena.isVisible())
+            self.assertIsNot(win.hud.parentWidget(), cena)
+            cena.alternar()                      # F2 de novo: volta para a cena
+            self.assertIs(win.hud.parentWidget(), cena)
+        finally:
+            win.close()
+            win.deleteLater()
+
+    def test_canal_mostra_as_falas(self):
+        win = ui.MainWindow("face.png")
+        try:
+            falas = []
+            win._orbe.cena.fala.connect(lambda quem, txt: falas.append((quem, txt)))
+            win._orbe.ver_texto("You: que horas são?")
+            win._orbe.ver_texto("Jarvis: São dez horas.")
+            win._orbe.ver_texto("SYS: conectado")
+            self.assertEqual(falas, [("VOCÊ", "que horas são?"), ("JARVIS", "São dez horas.")])
+        finally:
+            win.close()
+            win.deleteLater()
+
+
 if __name__ == "__main__":
     unittest.main()
