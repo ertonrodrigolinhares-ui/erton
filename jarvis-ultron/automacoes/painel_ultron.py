@@ -127,6 +127,26 @@ def _construir(jarvis):
         _na_tela(lambda: painel.abrir(not fechar))
 
     jarvis._abrir_ultron = abrir_por_voz
+
+    # Também coloca os botões na lateral da tela do orbe (a tela cheia do vídeo).
+    from PyQt6.QtCore import QTimer
+
+    itens_lateral = [(nome, emoji, titulo, args) for (nome, emoji, titulo, _sub, args) in itens]
+    acao = lambda n, a: jarvis.rodar_automacao_ultron(n, a)
+    tentativas = {"n": 0}
+
+    def encaixar_na_cena():
+        orbe = getattr(janela, "_orbe", None)
+        cena = getattr(orbe, "cena", None) if orbe is not None else None
+        if cena is not None and hasattr(cena, "montar_botoes_ultron"):
+            cena.montar_botoes_ultron(itens_lateral, acao)
+            print("[Ultron] Botões colocados na lateral da tela do orbe.")
+            return
+        tentativas["n"] += 1
+        if tentativas["n"] <= 30:  # a cena pode demorar a montar; tenta por ~15s
+            QTimer.singleShot(500, encaixar_na_cena)
+
+    encaixar_na_cena()
     print(f"[Ultron] Painel de automações pronto ({len(itens)} botões).")
 
 

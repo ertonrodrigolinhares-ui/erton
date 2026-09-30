@@ -36,8 +36,8 @@ from pathlib import Path
 from PyQt6.QtCore import QEasingCurve, QEvent, QObject, QPointF, QPropertyAnimation, QRectF, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import (QBrush, QColor, QFont, QImage, QKeySequence, QLinearGradient, QPainter, QPainterPath, QPen,
                          QPixmap, QRadialGradient, QShortcut)
-from PyQt6.QtWidgets import (QGraphicsOpacityEffect, QHBoxLayout, QLabel, QLineEdit, QPushButton, QVBoxLayout,
-                             QWidget)
+from PyQt6.QtWidgets import (QGraphicsOpacityEffect, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
+                             QVBoxLayout, QWidget)
 
 AZUL = "#2b7fff"        # fio principal
 CIANO = "#29d4ff"       # brilho
@@ -548,6 +548,16 @@ class Cena(QWidget):
             self.st[nome] = chip
             self.p_status.corpo.addLayout(linha)
 
+        # Ultron: botões de automação na própria lateral (preenchidos pelo painel_ultron)
+        self.p_ultron = Vidro("Ultron · automações", self, etiqueta="RÁPIDO")
+        self._acao_ultron = None
+        self._grade_ultron = QGridLayout()
+        self._grade_ultron.setSpacing(6)
+        self.p_ultron.corpo.addLayout(self._grade_ultron)
+        self._dica_ultron = rotulo('Diga "modo Ultron" ou toque num botão.', TEXTO2, 8)
+        self.p_ultron.corpo.addWidget(self._dica_ultron)
+        self.p_ultron.corpo.addStretch(1)
+
         # Coluna da direita
         self.p_ativ = Vidro("Atividade · agora", self)
         self.l_pedidos = rotulo("0", TEXTO, 22, QFont.Weight.Bold, MONO, False)
@@ -572,7 +582,8 @@ class Cena(QWidget):
         self.botao = BotaoNucleo(self.hud, self)
         self.botao.clicked.connect(lambda: getattr(win, "_toggle_mute", lambda: None)())
 
-        self._painel = [self.p_voz, self.p_sistema, self.p_status, self.p_ativ, self.p_hist, self.p_rede, self.canal]
+        self._painel = [self.p_voz, self.p_sistema, self.p_status, self.p_ultron,
+                        self.p_ativ, self.p_hist, self.p_rede, self.canal]
 
         self._t = QTimer(self); self._t.timeout.connect(self._atualizar); self._t.start(1000)
         self._t_voz = QTimer(self); self._t_voz.timeout.connect(self._amostra_voz); self._t_voz.start(1000)
@@ -616,6 +627,10 @@ class Cena(QWidget):
         y = y0
         for w, h in esq:
             w.setGeometry(m, y, L, h); w.setVisible(mostrar_lados); y += h + 12
+        # o painel do Ultron ocupa o espaço que sobra na coluna esquerda
+        alt_ultron = max(150, H - y - 66)
+        self.p_ultron.setGeometry(m, y, L, alt_ultron)
+        self.p_ultron.setVisible(mostrar_lados)
         dir_ = [(self.p_ativ, 92), (self.p_hist, 92), (self.p_rede, 86)]
         y = y0
         for w, h in dir_:
@@ -688,6 +703,34 @@ class Cena(QWidget):
         self.l_lat.setText(lat)
         self.l_rede_sub.setText("Internet ok · voz e IA disponíveis" if nome == "ONLINE"
                                 else ("Sem internet: a IA não responde" if nome == "OFFLINE" else "Testando a conexão..."))
+
+    # ----- botões do Ultron na lateral
+    def montar_botoes_ultron(self, itens, acao):
+        """itens: lista de (nome_ferramenta, emoji, titulo, args). acao(nome, args) roda a automação."""
+        self._acao_ultron = acao
+        # limpa o que já houver
+        while self._grade_ultron.count():
+            it = self._grade_ultron.takeAt(0)
+            w = it.widget()
+            if w is not None:
+                w.setParent(None)
+        for i, (nome, emoji, titulo, args) in enumerate(itens):
+            b = QPushButton(f"{emoji}  {titulo}")
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.setMinimumHeight(38)
+            b.setFont(fonte(SANS, 8.5, QFont.Weight.Bold))
+            b.setStyleSheet(
+                "QPushButton { color:%s; background: rgba(0,200,255,20); text-align:left;"
+                " border:1px solid rgba(58,120,216,120); border-radius:9px; padding:4px 8px; }"
+                " QPushButton:hover { color:%s; border-color:%s; background: rgba(0,229,255,45); }"
+                % (TEXTO, CIANO, CIANO))
+            b.clicked.connect(lambda _=False, n=nome, a=args: self._disparar_ultron(n, a))
+            self._grade_ultron.addWidget(b, i // 2, i % 2)
+        self._dica_ultron.setText('Toque para rodar na hora — sem depender da internet.')
+
+    def _disparar_ultron(self, nome, args):
+        if callable(self._acao_ultron):
+            self._acao_ultron(nome, args)
 
     # ----- alternar com a tela antiga (F2)
     def alternar(self):
