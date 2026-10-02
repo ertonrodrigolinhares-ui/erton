@@ -582,7 +582,12 @@ class Cena(QWidget):
         self.botao = BotaoNucleo(self.hud, self)
         self.botao.clicked.connect(lambda: getattr(win, "_toggle_mute", lambda: None)())
 
-        self._painel = [self.p_voz, self.p_sistema, self.p_status, self.p_ultron,
+        # Modos de escuta no topo, acima do anel (mesmos comandos do painel Stark)
+        self.b_chamada = self._botao_modo("☏  MODO CHAMADA", 'Só responde depois de "Hey Jarvis"', "modo chamada")
+        self.b_maos = self._botao_modo("⛭  MÃOS LIVRES", "Responde a tudo o que você falar", "modo mãos livres")
+        self.acender_modo(True)
+
+        self._painel = [self.b_chamada, self.b_maos, self.p_voz, self.p_sistema, self.p_status, self.p_ultron,
                         self.p_ativ, self.p_hist, self.p_rede, self.canal]
 
         self._t = QTimer(self); self._t.timeout.connect(self._atualizar); self._t.start(1000)
@@ -641,6 +646,10 @@ class Cena(QWidget):
         else:
             self.canal.setGeometry(m, H - 230, W - 2 * m, 170)
         self.botao.move(int(W / 2 - 23), H - 58)
+        larg_b, alt_b = 172, 30
+        x_b = int(W / 2 - larg_b - 6)
+        self.b_chamada.setGeometry(x_b, 54, larg_b, alt_b)
+        self.b_maos.setGeometry(x_b + larg_b + 12, 54, larg_b, alt_b)
         for w in self._painel:
             w.raise_()
         self.botao.raise_()
@@ -703,6 +712,26 @@ class Cena(QWidget):
         self.l_lat.setText(lat)
         self.l_rede_sub.setText("Internet ok · voz e IA disponíveis" if nome == "ONLINE"
                                 else ("Sem internet: a IA não responde" if nome == "OFFLINE" else "Testando a conexão..."))
+
+    # ----- modos de escuta
+    def _botao_modo(self, texto, dica, comando):
+        b = QPushButton(texto, self)
+        b.setToolTip(dica)
+        b.setCursor(Qt.CursorShape.PointingHandCursor)
+        b.setFont(fonte(MONO, 8, QFont.Weight.Bold, 1))
+        b.clicked.connect(lambda _=False, c=comando: self.win._send(c))
+        return b
+
+    def acender_modo(self, maos_livres: bool):
+        """Destaca o modo ativo (chamado pela janela quando o modo de escuta muda)."""
+        for b, aceso in ((self.b_chamada, not maos_livres), (self.b_maos, maos_livres)):
+            tom = CIANO if aceso else TEXTO2
+            fundo = "rgba(41,212,255,40)" if aceso else "rgba(4,20,56,150)"
+            borda = CIANO if aceso else "rgba(95,180,255,90)"
+            b.setStyleSheet(
+                f"QPushButton{{color:{tom}; background:{fundo}; border:1px solid {borda};"
+                f" border-radius:15px; padding:4px 12px;}}"
+                f" QPushButton:hover{{color:{TEXTO}; border-color:{CIANO};}}")
 
     # ----- botões do Ultron na lateral
     def montar_botoes_ultron(self, itens, acao):

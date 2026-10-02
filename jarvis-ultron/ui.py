@@ -8475,6 +8475,9 @@ class MainWindow(QMainWindow):
             botao = getattr(tela, nome, None)
             if botao is not None:
                 botao.acender(aceso)
+        cena = getattr(getattr(self, "_orbe", None), "cena", None)
+        if cena is not None and hasattr(cena, "acender_modo"):
+            cena.acender_modo(maos_livres)
 
     def _set_muted(self, valor: bool):
         if bool(valor) != self._muted:
