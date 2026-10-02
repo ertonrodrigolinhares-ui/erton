@@ -1,0 +1,1015 @@
+<title>TravelMate</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Young+Serif&display=swap">
+<style>
+/* Layout: navy masthead + one working column; each country dossier is a stack of colour-coded sections, one accent per topic. */
+:root{
+  --bg:#F4F6FB; --surface:#FFFFFF; --surface-2:#EDF0F7; --ink:#14213D; --muted:#56607A; --line:#DCE1EC;
+  --band:#14213D; --band-ink:#F4F6FB;
+  --teal:#0B8A8A; --coral:#D9472E; --saffron:#C98A0B; --violet:#5646C2; --jade:#21884F; --azure:#1D66C9;
+  --ok:#21884F; --warn:#B7790A; --bad:#C23A24;
+  --display:"Young Serif", Georgia, "Times New Roman", serif;
+  --body:"Plus Jakarta Sans", "Segoe UI", system-ui, sans-serif;
+  --logo:"Archivo Black", "Arial Black", Impact, sans-serif;
+  --r:14px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0C1322; --surface:#141E33; --surface-2:#1B2741; --ink:#EDF1F9; --muted:#A2ADC4; --line:#28354F;
+  --band:#08101E; --band-ink:#EDF1F9;
+  --teal:#3CC3C0; --coral:#FF7C5F; --saffron:#F2BE4E; --violet:#9A8DF5; --jade:#5CCB88; --azure:#64A0F2;
+  --ok:#5CCB88; --warn:#F2BE4E; --bad:#FF7C5F; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0C1322; --surface:#141E33; --surface-2:#1B2741; --ink:#EDF1F9; --muted:#A2ADC4; --line:#28354F;
+  --band:#08101E; --band-ink:#EDF1F9;
+  --teal:#3CC3C0; --coral:#FF7C5F; --saffron:#F2BE4E; --violet:#9A8DF5; --jade:#5CCB88; --azure:#64A0F2;
+  --ok:#5CCB88; --warn:#F2BE4E; --bad:#FF7C5F; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.55 var(--body);-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:var(--display);font-weight:400;line-height:1.15;text-wrap:balance;margin:0}
+p{margin:0}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--azure);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:clamp(16px,4vw,32px)}
+
+/* ── intro ── */
+.intro{position:fixed;inset:0;z-index:100;background:#0A1120;overflow:hidden;transition:opacity .7s ease}
+.intro.leaving{opacity:0;pointer-events:none}
+.mosaic{position:absolute;inset:0;display:grid;gap:3px;padding:3px}
+.tile{display:grid;place-items:center;border-radius:6px;font-size:var(--ts,22px);background:var(--c);
+  transform:scale(0) rotate(-12deg);opacity:0;animation:pop .5s cubic-bezier(.2,1.4,.4,1) var(--d) forwards;transition:opacity .9s ease, transform .9s ease, filter .9s ease}
+@keyframes pop{to{transform:scale(1) rotate(0);opacity:1}}
+.intro.shape .tile{animation:none;opacity:.08;transform:scale(.7);filter:saturate(.3)}
+.intro.shape .tile.in{opacity:1;transform:scale(1.04);filter:none;box-shadow:0 0 18px rgba(255,255,255,.25)}
+.intro.final .tile.in{opacity:.18}
+#logoCanvas{position:absolute;inset:0;width:100%;height:100%;opacity:0;transform:scale(.92);transition:opacity 1s ease, transform 1.2s cubic-bezier(.2,.8,.2,1)}
+.intro.final #logoCanvas{opacity:1;transform:none}
+.intro-tag{position:absolute;left:0;right:0;bottom:calc(14% + env(safe-area-inset-bottom,0px));text-align:center;color:#F4F6FB;
+  font:400 clamp(16px,2.4vw,24px) var(--display);opacity:0;transition:opacity .8s ease .5s;padding-inline:16px}
+.intro.final .intro-tag{opacity:.92}
+#skipIntro{position:absolute;right:16px;top:calc(16px + env(safe-area-inset-top,0px));background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);
+  color:#fff;border-radius:999px;padding:8px 16px;cursor:pointer;font-size:13px;letter-spacing:.06em;text-transform:uppercase}
+@media (prefers-reduced-motion: reduce){.tile{animation:none;opacity:1;transform:none}.intro,.tile,#logoCanvas{transition-duration:.01s}}
+
+/* ── masthead ── */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--band);color:var(--band-ink)}
+.top .wrap{display:flex;align-items:center;gap:16px;min-height:64px;flex-wrap:wrap;padding-block:8px}
+#miniLogo{height:30px;width:190px;display:block}
+.nav{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+.nav button{background:transparent;border:1px solid transparent;color:var(--band-ink);padding:8px 14px;border-radius:999px;cursor:pointer;font-weight:600;font-size:14px;opacity:.8}
+.nav button:hover{opacity:1;border-color:rgba(255,255,255,.25)}
+.nav button[aria-current="page"]{opacity:1;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.25)}
+.nav .ai-btn{background:linear-gradient(90deg,#0B8A8A,#5646C2);opacity:1}
+.ribbon{height:5px;background:linear-gradient(90deg,var(--teal) 0 16.6%,var(--azure) 0 33.3%,var(--violet) 0 50%,var(--coral) 0 66.6%,var(--saffron) 0 83.3%,var(--jade) 0)}
+
+main{padding-block:28px 80px}
+.view[hidden]{display:none}
+.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--muted)}
+.lead{color:var(--muted);max-width:62ch}
+
+/* ── planner ── */
+.hero{display:grid;gap:8px;margin-bottom:20px}
+.hero h1{font-size:clamp(30px,4.6vw,48px)}
+.planner{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:clamp(16px,3vw,28px);display:grid;gap:18px;box-shadow:0 10px 30px -18px rgba(20,33,61,.35)}
+.grid-f{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:14px}
+.field{display:grid;gap:6px;min-width:0}
+.field label,.flabel{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.field input,.field select{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:11px 12px;min-height:46px}
+.field input[type=range]{padding:0;min-height:28px;accent-color:var(--teal);background:transparent;border:0}
+.rangeval{font-weight:700;color:var(--ink)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:7px 14px;cursor:pointer;font-weight:600;font-size:14px}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.btn{border:0;border-radius:12px;padding:12px 20px;font-weight:700;cursor:pointer;background:var(--ink);color:var(--bg);min-height:46px}
+.btn.alt{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn.ai{background:linear-gradient(90deg,var(--teal),var(--violet));color:#fff}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.note{font-size:13px;color:var(--muted)}
+
+.featured{margin-top:28px;display:grid;gap:12px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,170px),1fr));gap:10px}
+.dest{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:14px;text-align:left;cursor:pointer;display:grid;gap:4px;border-top:4px solid var(--c)}
+.dest:hover{transform:translateY(-2px)}
+.dest .f{font-size:26px;line-height:1}
+.dest b{font-family:var(--display);font-weight:400;font-size:18px}
+.dest span{font-size:12.5px;color:var(--muted)}
+
+/* ── dossier ── */
+#dossie{margin-top:34px}
+.dhead{background:var(--band);color:var(--band-ink);border-radius:var(--r) var(--r) 0 0;padding:clamp(18px,3vw,30px);display:grid;gap:10px;position:relative;overflow:hidden}
+.dhead .flag{font-size:44px;line-height:1}
+.dhead h2{font-size:clamp(30px,4vw,44px)}
+.dhead p{opacity:.85;max-width:60ch}
+.facts{display:flex;flex-wrap:wrap;gap:8px}
+.facts span{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:4px 12px;font-size:13px}
+.src{position:absolute;right:16px;top:16px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;background:rgba(255,255,255,.14);padding:4px 10px;border-radius:999px}
+.subnav{position:sticky;top:calc(var(--hh,70px) + env(safe-area-inset-top,0px));z-index:10;background:var(--surface);border:1px solid var(--line);border-top:0;display:flex;gap:4px;overflow-x:auto;padding:8px;scrollbar-width:thin}
+.subnav a{white-space:nowrap;text-decoration:none;color:var(--ink);font-size:13.5px;font-weight:600;padding:6px 12px;border-radius:999px;border-bottom:3px solid var(--c)}
+.subnav a:hover{background:var(--surface-2)}
+.alert{display:flex;gap:10px;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--warn);padding:14px 16px;margin-top:14px;border-radius:10px}
+.sec{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);margin-top:16px;padding:clamp(16px,3vw,28px);display:grid;gap:16px;scroll-margin-top:calc(var(--hh,70px) + 70px)}
+.sec>header{display:grid;gap:4px;border-left:5px solid var(--c);padding-left:12px}
+.sec h3{font-size:clamp(22px,2.6vw,28px)}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px}
+.list{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.list li{display:flex;gap:10px;align-items:baseline;min-width:0}
+.list li::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:var(--c,var(--teal));transform:translateY(-1px)}
+
+/* roteiro */
+.days{display:grid;gap:10px;counter-reset:d}
+.day{display:grid;grid-template-columns:64px 1fr;gap:14px;align-items:start;border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--bg)}
+.day .dn{font:400 13px var(--body);text-transform:uppercase;letter-spacing:.1em;color:var(--muted);text-align:center;display:grid}
+.day .dn b{font:400 28px/1 var(--display);color:var(--teal)}
+.day h4{margin:0 0 4px;font-size:16px}
+.day .parts{display:grid;gap:4px;font-size:14px}
+.day .parts span b{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.06em;margin-right:6px}
+.day .cost{font-size:13px;color:var(--muted);margin-top:4px}
+.loader{display:flex;gap:14px;align-items:center;border:1px dashed var(--line);border-radius:12px;padding:16px;background:var(--bg)}
+.spin{width:22px;height:22px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--teal);animation:sp 1s linear infinite;flex:none}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* custos */
+.levels{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:10px}
+.level{border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:14px;text-align:left;cursor:pointer;display:grid;gap:4px}
+.level[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.level .t{font-family:var(--display);font-size:24px}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;width:max-content}
+.pill.ok{background:color-mix(in srgb,var(--ok) 16%,transparent);color:var(--ok)}
+.pill.warn{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.pill.bad{background:color-mix(in srgb,var(--bad) 16%,transparent);color:var(--bad)}
+.stack{display:flex;height:22px;border-radius:999px;overflow:hidden;background:var(--surface-2)}
+.stack i{display:block;height:100%}
+.legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));column-gap:20px;gap:8px}
+.legend div{display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid var(--line);padding:6px 0;font-size:14px}
+.legend div b{white-space:nowrap}
+.legend div span{display:flex;align-items:center;gap:8px}
+.legend div span::before{content:"";width:10px;height:10px;border-radius:3px;background:var(--c)}
+.total{display:flex;flex-wrap:wrap;align-items:baseline;gap:12px}
+.total b{font:400 clamp(30px,4vw,40px) var(--display)}
+
+/* clima */
+.clima-wrap{overflow-x:auto}
+.clima{display:grid;grid-template-columns:repeat(12,minmax(48px,1fr));gap:6px;min-width:600px;align-items:end}
+.mcol{display:grid;gap:6px;justify-items:center;text-align:center;padding:6px 2px;border-radius:10px;border:2px solid transparent}
+.mcol.sel{border-color:var(--ink)}
+.bar{width:70%;border-radius:6px 6px 2px 2px;background:var(--c);min-height:6px}
+.barbox{height:120px;display:flex;align-items:flex-end;justify-content:center;width:100%}
+.mcol .tmp{font-weight:700;font-size:13px}
+.rain{display:flex;gap:2px;height:8px}
+.rain i{width:6px;height:6px;border-radius:50%;background:var(--azure)}
+.rain i.off{background:var(--line)}
+.mcol .mn{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+.mcol .st{font-size:10.5px;color:var(--muted);line-height:1.2;min-height:2.4em}
+.mcol .best{font-size:11px;color:var(--jade);font-weight:700;min-height:1.2em}
+.seasons{display:flex;flex-wrap:wrap;gap:8px}
+.seasons span{display:flex;align-items:center;gap:6px;font-size:13px}
+.seasons span::before{content:"";width:12px;height:12px;border-radius:3px;background:var(--c)}
+
+/* seguranca */
+.gauge{display:flex;gap:6px;align-items:center}
+.gauge i{width:30px;height:10px;border-radius:999px;background:var(--line)}
+.gauge i.on{background:var(--c)}
+.box{border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:10px;background:var(--bg);min-width:0}
+.box h4{margin:0;font-size:15px}
+
+table.t{width:100%;border-collapse:collapse;font-size:14px}
+.t th,.t td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+.t th{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.t td.p{white-space:nowrap;font-weight:700;text-align:right}
+.tbl{overflow-x:auto}
+.gems{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:12px}
+.gem{border-radius:12px;padding:16px;background:var(--bg);border:1px solid var(--line);display:grid;gap:6px;min-width:0}
+.gem b{font-family:var(--display);font-weight:400;font-size:19px}
+.gem .price{font-weight:700;color:var(--coral);font-size:14px}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tags span{background:var(--surface-2);border-radius:8px;padding:5px 10px;font-size:13.5px}
+
+/* surpreenda */
+.surp{display:grid;gap:20px}
+.scene{display:grid;gap:0;margin-top:8px}
+.screen{position:relative;background:#05070D;color:#F4F1E8;border-radius:var(--r) var(--r) 0 0;overflow:hidden;min-height:360px}
+.screen::before,.screen::after{content:"";position:absolute;left:0;right:0;height:0;background:#000;z-index:3;transition:height 1s ease}
+.screen::before{top:0}.screen::after{bottom:0}
+.scene.play .screen::before,.scene.play .screen::after{height:28px}
+.screen canvas{position:absolute;inset:0;width:100%;height:100%}
+.sky{position:absolute;inset:0;background:radial-gradient(120% 80% at 50% 110%,var(--mc) 0%,transparent 55%),linear-gradient(180deg,#05070D 0%,#0B1530 70%,#1A1630 100%);opacity:.95}
+.sinner{position:relative;z-index:2;padding:52px clamp(18px,5vw,56px) 52px;display:grid;gap:14px;max-width:780px}
+.kick{font-size:12px;letter-spacing:.3em;text-transform:uppercase;opacity:.7}
+.screen h2{font-size:clamp(30px,5vw,54px);color:#fff}
+.sloc{opacity:.85}
+.beats{display:grid;gap:12px;margin:6px 0 0;padding:0;list-style:none}
+.beats li{display:grid;grid-template-columns:70px 1fr;gap:12px;opacity:0;transform:translateY(8px);animation:beat .8s ease forwards;animation-delay:calc(.6s + var(--i) * .7s)}
+.beats li b{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--mc);padding-top:4px}
+@keyframes beat{to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){.beats li{animation:none;opacity:1;transform:none}}
+.sdoss{background:var(--surface);border:1px solid var(--line);border-top:0;border-radius:0 0 var(--r) var(--r);padding:clamp(16px,3vw,28px);display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr))}
+.kv{display:grid;gap:4px;min-width:0}
+.kv b{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.alts{display:flex;flex-wrap:wrap;gap:8px}
+
+/* chat */
+.drawer{position:fixed;z-index:50;right:0;top:0;bottom:0;width:min(440px,100%);background:var(--surface);border-left:1px solid var(--line);
+  display:grid;grid-template-rows:auto 1fr auto;transform:translateX(105%);transition:transform .35s ease;box-shadow:-20px 0 40px -20px rgba(0,0,0,.35);
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.drawer.open{transform:none}
+.dtop{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.dtop h3{font-size:20px}
+.dtop button{margin-left:auto;background:transparent;border:1px solid var(--line);border-radius:10px;padding:6px 12px;cursor:pointer}
+.msgs{overflow-y:auto;padding:16px;display:grid;gap:12px;align-content:start}
+.msg{max-width:92%;padding:10px 14px;border-radius:14px;font-size:14.5px;min-width:0;overflow-wrap:anywhere}
+.msg.u{justify-self:end;background:var(--ink);color:var(--bg);border-bottom-right-radius:4px}
+.msg.a{justify-self:start;background:var(--surface-2);border-bottom-left-radius:4px}
+.msg ul{margin:6px 0;padding-left:18px}
+.sugs{display:flex;flex-wrap:wrap;gap:6px}
+.sugs button{font-size:13px;border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:6px 12px;cursor:pointer;text-align:left}
+.compose{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--line)}
+.compose input{flex:1;min-width:0;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--bg)}
+.fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:40;border:0;border-radius:999px;padding:14px 20px;font-weight:700;cursor:pointer;
+  background:linear-gradient(90deg,#0B8A8A,#5646C2);color:#fff;box-shadow:0 12px 30px -10px rgba(20,33,61,.6)}
+footer{border-top:1px solid var(--line);padding-block:24px;color:var(--muted);font-size:13px}
+@media (max-width:640px){
+  .day{grid-template-columns:44px 1fr;gap:10px}
+  .beats li{grid-template-columns:1fr;gap:2px}
+  #miniLogo{width:150px;height:24px}
+}
+</style>
+
+<div id="intro" class="intro" aria-hidden="true">
+  <div class="mosaic" id="mosaic"></div>
+  <canvas id="logoCanvas"></canvas>
+  <p class="intro-tag">Roteiros que só você vai viver.</p>
+  <button id="skipIntro" type="button">Pular</button>
+</div>
+
+<header class="top">
+  <div class="wrap">
+    <canvas id="miniLogo" aria-label="TravelMate" role="img"></canvas>
+    <nav class="nav" aria-label="Seções">
+      <button type="button" data-view="explorar" aria-current="page">Explorar</button>
+      <button type="button" data-view="surpreenda">Me surpreenda</button>
+      <button type="button" class="ai-btn" id="openChat">Assistente IA</button>
+    </nav>
+  </div>
+  <div class="ribbon"></div>
+</header>
+
+<main class="wrap">
+  <!-- EXPLORAR -->
+  <section class="view" id="v-explorar">
+    <div class="hero">
+      <p class="eyebrow">Planejador de viagem</p>
+      <h1>Para onde vamos?</h1>
+      <p class="lead">Escolha o país, a cidade, quantos dias e quanto quer gastar. O TravelMate monta o roteiro, calcula o custo total e mostra o que quase ninguém conhece.</p>
+    </div>
+    <form class="planner" id="planner">
+      <div class="grid-f">
+        <div class="field"><label for="fPais">País</label><select id="fPais"></select></div>
+        <div class="field"><label for="fCidade">Cidade (opcional)</label><input id="fCidade" type="text" placeholder="Ex.: Chiang Mai" autocomplete="off"></div>
+        <div class="field"><label for="fMes">Mês da viagem</label><select id="fMes"></select></div>
+        <div class="field"><label for="fDias">Dias de viagem: <span class="rangeval num" id="vDias"></span></label><input id="fDias" type="range" min="1" max="30" step="1"></div>
+        <div class="field"><label for="fPax">Viajantes</label><select id="fPax"></select></div>
+        <div class="field"><label for="fOrc">Orçamento total (R$)</label><input id="fOrc" type="number" min="1000" step="500" inputmode="numeric" class="num"></div>
+      </div>
+      <div class="field"><span class="flabel">Quem vai</span><div class="chips" id="cQuem"></div></div>
+      <div class="field"><span class="flabel">O que você procura</span><div class="chips" id="cPerfil"></div></div>
+      <div class="actions">
+        <button class="btn" type="submit">Planejar viagem</button>
+        <span class="note" id="planNote"></span>
+      </div>
+    </form>
+
+    <div class="featured">
+      <p class="eyebrow">Dossiês completos prontos</p>
+      <div class="cards" id="featured"></div>
+      <p class="note">Os outros países do mundo são montados na hora pela assistente de IA.</p>
+    </div>
+
+    <div id="dossie"></div>
+  </section>
+
+  <!-- SURPREENDA -->
+  <section class="view surp" id="v-surpreenda" hidden>
+    <div class="hero">
+      <p class="eyebrow">Me surpreenda</p>
+      <h1>Você escolhe a sensação. Nós escolhemos o país.</h1>
+      <p class="lead">Diga quando pode ir, quanto pode gastar e o que quer sentir. O TravelMate transforma a sugestão em uma cena de filme, com tudo o que você precisa para vivê-la.</p>
+    </div>
+    <form class="planner" id="surpForm">
+      <div class="grid-f">
+        <div class="field"><label for="sMes">Época do ano</label><select id="sMes"></select></div>
+        <div class="field"><label for="sOrc">Até quanto por pessoa: <span class="rangeval num" id="vSOrc"></span></label><input id="sOrc" type="range" min="4000" max="40000" step="1000"></div>
+      </div>
+      <div class="field"><span class="flabel">O que você quer sentir</span><div class="chips" id="sBusca"></div></div>
+      <div class="field"><span class="flabel">Com quem</span><div class="chips" id="sQuem"></div></div>
+      <div class="actions">
+        <button class="btn" type="submit">Me surpreenda</button>
+        <button class="btn ai" type="button" id="missaoIA">Criar missão inédita com IA</button>
+      </div>
+    </form>
+    <div id="cena"></div>
+  </section>
+
+  <footer>
+    Preços em reais são estimativas de referência para 2026, por pessoa, saindo do Brasil. Câmbio, temporada e antecedência mudam os valores: confirme antes de comprar. Regras de visto e alertas de segurança mudam; consulte o Itamaraty e o consulado do destino.
+  </footer>
+</main>
+
+<button class="fab" id="fab" type="button">Pergunte à IA</button>
+
+<aside class="drawer" id="drawer" aria-label="Assistente de viagem">
+  <div class="dtop"><h3>Assistente TravelMate</h3><button type="button" id="closeChat">Fechar</button></div>
+  <div class="msgs" id="msgs">
+    <div class="msg a">Olá! Sou a assistente do TravelMate. Pergunte sobre destinos, preços, segurança, documentos ou peça um roteiro diferente.</div>
+    <div class="sugs" id="sugs">
+      <button type="button">Quanto custa ver as lanternas flutuantes na Tailândia?</button>
+      <button type="button">Qual país é bom e barato para ir em julho?</button>
+      <button type="button">Roteiro de 4 dias em Lisboa fora do comum</button>
+      <button type="button">Preciso de visto para o México?</button>
+    </div>
+  </div>
+  <form class="compose" id="compose">
+    <input id="chatIn" type="text" placeholder="Escreva sua pergunta" autocomplete="off" aria-label="Sua pergunta">
+    <button class="btn" type="submit" id="chatSend">Enviar</button>
+  </form>
+</aside>
+
+<script>
+/* ===================== DATA ===================== */
+const MESES=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+const MES3=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+const PAISES_RAW="AF:Afeganistão|ZA:África do Sul|AL:Albânia|DE:Alemanha|AD:Andorra|AO:Angola|AG:Antígua e Barbuda|SA:Arábia Saudita|DZ:Argélia|AR:Argentina|AM:Armênia|AU:Austrália|AT:Áustria|AZ:Azerbaijão|BS:Bahamas|BH:Bahrein|BD:Bangladesh|BB:Barbados|BE:Bélgica|BZ:Belize|BJ:Benin|BY:Bielorrússia|BO:Bolívia|BA:Bósnia e Herzegovina|BW:Botsuana|BR:Brasil|BN:Brunei|BG:Bulgária|BF:Burkina Faso|BI:Burundi|BT:Butão|CV:Cabo Verde|KH:Camboja|CM:Camarões|CA:Canadá|QA:Catar|KZ:Cazaquistão|TD:Chade|CL:Chile|CN:China|CY:Chipre|CO:Colômbia|KM:Comores|CG:Congo|CD:Congo (RD)|KP:Coreia do Norte|KR:Coreia do Sul|CI:Costa do Marfim|CR:Costa Rica|HR:Croácia|CU:Cuba|DK:Dinamarca|DJ:Djibuti|DM:Dominica|EG:Egito|SV:El Salvador|AE:Emirados Árabes Unidos|EC:Equador|ER:Eritreia|SK:Eslováquia|SI:Eslovênia|ES:Espanha|SZ:Essuatíni|US:Estados Unidos|EE:Estônia|ET:Etiópia|FJ:Fiji|PH:Filipinas|FI:Finlândia|FR:França|GA:Gabão|GM:Gâmbia|GH:Gana|GE:Geórgia|GD:Granada|GR:Grécia|GT:Guatemala|GY:Guiana|GN:Guiné|GQ:Guiné Equatorial|GW:Guiné-Bissau|HT:Haiti|HN:Honduras|HU:Hungria|YE:Iêmen|MH:Ilhas Marshall|SB:Ilhas Salomão|IN:Índia|ID:Indonésia|IR:Irã|IQ:Iraque|IE:Irlanda|IS:Islândia|IL:Israel|IT:Itália|JM:Jamaica|JP:Japão|JO:Jordânia|KI:Kiribati|KW:Kuwait|LA:Laos|LS:Lesoto|LV:Letônia|LB:Líbano|LR:Libéria|LY:Líbia|LI:Liechtenstein|LT:Lituânia|LU:Luxemburgo|MK:Macedônia do Norte|MG:Madagascar|MY:Malásia|MW:Malawi|MV:Maldivas|ML:Mali|MT:Malta|MA:Marrocos|MU:Maurício|MR:Mauritânia|MX:México|MM:Mianmar|FM:Micronésia|MZ:Moçambique|MD:Moldávia|MC:Mônaco|MN:Mongólia|ME:Montenegro|NA:Namíbia|NR:Nauru|NP:Nepal|NI:Nicarágua|NE:Níger|NG:Nigéria|NO:Noruega|NZ:Nova Zelândia|OM:Omã|NL:Países Baixos|PW:Palau|PS:Palestina|PA:Panamá|PG:Papua-Nova Guiné|PK:Paquistão|PY:Paraguai|PE:Peru|PL:Polônia|PT:Portugal|KE:Quênia|KG:Quirguistão|GB:Reino Unido|CF:República Centro-Africana|CZ:República Tcheca|DO:República Dominicana|RO:Romênia|RW:Ruanda|RU:Rússia|WS:Samoa|SM:San Marino|LC:Santa Lúcia|KN:São Cristóvão e Névis|ST:São Tomé e Príncipe|VC:São Vicente e Granadinas|SN:Senegal|SL:Serra Leoa|RS:Sérvia|SC:Seychelles|SG:Singapura|SY:Síria|SO:Somália|LK:Sri Lanka|SD:Sudão|SS:Sudão do Sul|SE:Suécia|CH:Suíça|SR:Suriname|TJ:Tajiquistão|TH:Tailândia|TW:Taiwan|TZ:Tanzânia|TL:Timor-Leste|TG:Togo|TO:Tonga|TT:Trinidad e Tobago|TN:Tunísia|TM:Turcomenistão|TR:Turquia|TV:Tuvalu|UA:Ucrânia|UG:Uganda|UY:Uruguai|UZ:Uzbequistão|VU:Vanuatu|VA:Vaticano|VE:Venezuela|VN:Vietnã|ZM:Zâmbia|ZW:Zimbábue";
+const PAISES=PAISES_RAW.split("|").map(s=>{const [c,n]=s.split(":");return {c,n}});
+const NOME=Object.fromEntries(PAISES.map(p=>[p.c,p.n]));
+const flag=c=>String.fromCodePoint(...[...c.toUpperCase()].map(ch=>127397+ch.charCodeAt(0)));
+
+const PERFIS=[["cultura","Cultura"],["gastronomia","Gastronomia"],["aventura","Aventura"],["natureza","Natureza"],["romance","Romance"],["relax","Relax"],["compras","Compras"],["noite","Vida noturna"]];
+const QUEM=[["solo","Sozinho"],["casal","Casal"],["familia","Família"],["amigos","Amigos"]];
+const BUSCA=[["adrenalina","Adrenalina"],["romance","Romance"],["cultura","Cultura"],["natureza","Natureza"],["gastronomia","Gastronomia"],["relax","Relax"],["espiritualidade","Espiritualidade"],["aventura","Aventura"]];
+
+const SEASON_COLOR={"Inverno":"var(--azure)","Primavera":"var(--jade)","Verão":"var(--saffron)","Outono":"var(--coral)","Chuvas":"var(--teal)","Seca":"var(--saffron)","Fresca":"var(--jade)","Quente":"var(--coral)","Transição":"var(--violet)","Monções":"var(--teal)"};
+const seasonColor=s=>{for(const k in SEASON_COLOR){if((s||"").toLowerCase().includes(k.toLowerCase()))return SEASON_COLOR[k]}return "var(--violet)"};
+
+const C={
+TH:{tagline:"Templos dourados, ilhas de água clara e a comida de rua mais famosa do planeta.",capital:"Bangkok",moeda:"Baht (THB)",idioma:"Tailandês",
+ aviso:"Brasileiros não precisam de visto para turismo, mas o prazo de permanência mudou entre 2024 e 2025: confirme a regra atual. Antes de embarcar, preencha o cartão digital de chegada (TDAC).",
+ melhorEpoca:"Novembro a fevereiro: estação fresca e seca. Em novembro acontece o festival das lanternas (Yi Peng) em Chiang Mai.",
+ passagens:"Mais baratas de abril a junho e em setembro. Compre com 3 a 5 meses de antecedência e evite dezembro e janeiro.",
+ melhores:[11,12,1,2],
+ clima:[[27,0,"Fresca"],[28,0,"Fresca"],[30,1,"Quente"],[31,1,"Quente"],[30,2,"Quente"],[29,2,"Chuvas"],[29,2,"Chuvas"],[29,3,"Chuvas"],[28,3,"Chuvas"],[28,2,"Chuvas"],[27,1,"Fresca"],[26,0,"Fresca"]],
+ seguranca:{nivel:4,resumo:"Destino maduro e tranquilo para estrangeiros. Os riscos mais comuns são golpes e acidentes de trânsito.",
+  seguros:["Cidade antiga de Chiang Mai","Sukhumvit, Silom e beira-rio (Bangkok)","Krabi e Ao Nang","Koh Samui e Koh Lanta"],
+  cuidado:["Golpe do tuk-tuk e do 'palácio fechado hoje' em Bangkok","Alugar moto sem habilitação e capacete: é a maior causa de acidentes","Províncias do extremo sul (Yala, Pattani, Narathiwat): governos desaconselham viagem","Festas da lua cheia em Koh Phangan: risco de bebida adulterada"]},
+ atracoes:[["Grande Palácio e Wat Phra Kaew (Bangkok)","~R$ 80"],["Wat Arun, o Templo do Amanhecer","~R$ 30"],["Templo Doi Suthep (Chiang Mai)","~R$ 10"],["Santuário ético de elefantes","R$ 400–600"],["Passeio de barco pelas ilhas Phi Phi","R$ 250–450"],["Parque histórico de Ayutthaya","~R$ 10 por templo"]],
+ segredos:[["Nan","Cidade quieta do norte, com murais de templo do século 19 e quase nenhum turista estrangeiro."],["Ko Kood","Ilha de água transparente e cachoeiras, sem a agitação de Phi Phi."],["Lago dos Lótus Vermelhos","Talay Bua Daeng, em Udon Thani: lago coberto de flores de dezembro a fevereiro, visto de barco ao amanhecer."],["Sukhothai de bicicleta","Ruínas da primeira capital do Sião, pedalando ao nascer do sol."]],
+ experiencias:[["Noite das lanternas (Yi Peng)","Centenas de lanternas de papel sobem juntas em Chiang Mai, na lua cheia de novembro.","Grátis nas áreas públicas; eventos com ingresso de R$ 600 a R$ 2.500"],["Aula de culinária em fazenda","Colha ervas e cozinhe curry, pad thai e som tam nos arredores de Chiang Mai.","R$ 180–260"],["Luta de Muay Thai no estádio","Noite de lutas no Rajadamnern, o estádio mais antigo de Bangkok.","R$ 300–700"]],
+ hoteis:[["Riva Surya","Bangkok","Conforto à beira do rio, perto do Grande Palácio"],["Tamarind Village","Chiang Mai","Conforto na cidade antiga, ótimo para o Yi Peng"],["Mandarin Oriental","Bangkok","Luxo histórico, desde 1876"]],
+ restaurantes:[["Jay Fai","Bangkok","Omelete de caranguejo; comida de rua com estrela Michelin, fila longa"],["Thipsamai","Bangkok","O pad thai clássico da cidade"],["Khao Soi Khun Yai","Chiang Mai","Khao soi barato e famoso; abre só no almoço"]],
+ comidas:["Pad thai","Khao soi","Som tam","Tom yum","Massaman curry","Manga com arroz doce"],
+ tradicoes:["Cumprimente com o wai: mãos juntas e leve inclinação","Nunca toque a cabeça de alguém","Respeito absoluto à família real; críticas são crime","Tire os sapatos em templos e casas","Songkran, o ano-novo com guerra de água, de 13 a 15 de abril"],
+ voos:{companhias:["Emirates (via Dubai)","Qatar Airways (via Doha)","Turkish Airlines (via Istambul)","Ethiopian (via Adis Abeba)"],rota:"São Paulo → Bangkok com 1 conexão, 24 a 30 horas",preco:[5500,9000]},
+ pacotes:[["Clássico 10 dias","Bangkok, Chiang Mai e Phuket ou Krabi, com voos internos"],["Lua de mel 12 dias","Bangkok, Chiang Mai no Yi Peng e Koh Samui"],["Mochilão 21 dias","Tailândia, Laos e Camboja por terra"]],
+ dia:{eco:[120,60,30,50],conf:[300,150,70,150],luxo:[900,400,200,450]},
+ economia:["Entre cidades, use trem noturno ou voos da AirAsia","Coma em mercados de rua: refeição de R$ 10 a R$ 20","Use o app Grab em vez de táxi de rua","Saque valores maiores de uma vez: cada saque cobra cerca de 220 baht"],
+ roteiro:[["Chegada em Bangkok","Hospede-se em Sukhumvit, faça uma massagem tailandesa e jante em Chinatown (Yaowarat)."],["Bangkok imperial","Grande Palácio logo cedo, Wat Pho e barco pelo rio Chao Phraya até o Wat Arun no pôr do sol."],["Bangkok alternativa","Canais de Thonburi em barco longo, mercado Chatuchak (fim de semana) e rooftop à noite."],["Ayutthaya","Bate-volta de trem às ruínas da antiga capital; à noite, voo ou trem noturno para Chiang Mai."],["Chiang Mai","Cidade antiga, Wat Chedi Luang e conversa com monges no monk chat."],["Montanha e cozinha","Doi Suthep de manhã e aula de culinária em fazenda orgânica à tarde."],["Santuário ético","Dia com elefantes resgatados, sem montaria."],["Rumo ao sul","Voo para Krabi ou Koh Samui e fim de tarde na praia."],["Ilhas","Barco longtail pelas ilhas de Krabi, saindo cedo para fugir da multidão."],["Despedida","Manhã livre, última massagem e voo de volta."]]},
+JP:{tagline:"Tradição milenar e futuro no mesmo quarteirão.",capital:"Tóquio",moeda:"Iene (JPY)",idioma:"Japonês",
+ aviso:"Brasileiros foram isentos de visto de turismo de até 90 dias em 2023: confirme se a regra continua valendo antes de comprar.",
+ melhorEpoca:"Fim de março a meados de abril (cerejeiras) e novembro (folhas vermelhas). Evite o verão úmido e a Golden Week, do fim de abril ao início de maio.",
+ passagens:"Mais baratas em janeiro, fevereiro e junho. Compre com 4 a 6 meses de antecedência.",
+ melhores:[3,4,10,11],
+ clima:[[5,0,"Inverno"],[6,1,"Inverno"],[9,1,"Primavera"],[15,1,"Primavera"],[19,2,"Primavera"],[22,2,"Chuvas (tsuyu)"],[26,2,"Verão"],[27,2,"Verão"],[24,3,"Outono (tufões)"],[18,2,"Outono"],[13,1,"Outono"],[8,0,"Inverno"]],
+ seguranca:{nivel:5,resumo:"Um dos países mais seguros do mundo. Os riscos reais são naturais: terremotos e tufões.",
+  seguros:["Tóquio, inclusive à noite","Kyoto e Nara","Osaka","Hokkaido"],
+  cuidado:["Bares de Kabukicho e Roppongi que abordam na rua: cobrança abusiva","Temporada de tufões, de agosto a outubro","Instale o app Safety tips para alertas de terremoto"]},
+ atracoes:[["Fushimi Inari (Kyoto)","Grátis"],["Templo Kiyomizu-dera (Kyoto)","~R$ 20"],["teamLab Planets (Tóquio)","R$ 150–200"],["Hakone e vista do Monte Fuji","~R$ 250 (passe)"],["Castelo de Himeji","R$ 60–90"],["Shibuya Sky (Tóquio)","~R$ 120"]],
+ segredos:[["Kanazawa","Jardim Kenroku-en e bairro de gueixas, sem a lotação de Kyoto."],["Kumano Kodo","Trilha de peregrinação milenar nas montanhas de Wakayama, dormindo em pousadas."],["Naoshima","Ilha de arte contemporânea com museus de Tadao Ando."],["Koyasan","Durma num templo budista e participe da oração das 6h."]],
+ experiencias:[["Noite em templo em Koyasan","Jantar vegetariano dos monges e cerimônia do fogo ao amanhecer.","R$ 600–1.000 por pessoa"],["Treino de sumô","Assista ao treino da manhã num estábulo ou a um torneio (jan, mai e set em Tóquio).","R$ 150–800"],["Ryokan com onsen","Banho termal, jantar kaiseki e futon no tatame.","R$ 1.500–4.000 a noite para dois"]],
+ hoteis:[["Hotel Gracery Shinjuku","Tóquio","Conforto no centro, o hotel do Godzilla"],["Piece Hostel Sanjo","Kyoto","Econômico, com quartos privativos"],["Hoshinoya Kyoto","Kyoto","Luxo à beira do rio em Arashiyama"]],
+ restaurantes:[["Ichiran","Várias cidades","Ramen tonkotsu em cabines individuais"],["Mercado Nishiki","Kyoto","Petiscos de rua e espetinhos"],["Omoide Yokocho","Tóquio","Becos de yakitori em Shinjuku"]],
+ comidas:["Ramen","Sushi","Okonomiyaki","Takoyaki","Wagyu","Doces de matcha"],
+ tradicoes:["Não se dá gorjeta","Fale baixo no transporte público","Tire os sapatos em casas e ryokans","Evite comer andando na rua","Tatuagens podem impedir a entrada em onsens: pergunte antes"],
+ voos:{companhias:["Emirates (via Dubai)","Qatar Airways (via Doha)","Turkish Airlines (via Istambul)","Companhias americanas via EUA (exige visto americano)"],rota:"São Paulo → Tóquio com 1 conexão, 25 a 30 horas",preco:[6000,10000]},
+ pacotes:[["Clássico 12 dias","Tóquio, Hakone, Kyoto, Nara e Osaka de trem-bala"],["Sakura 10 dias","Tóquio e Kyoto no auge das cerejeiras"],["Japão profundo 15 dias","Kanazawa, Takayama, Kumano Kodo e Koyasan"]],
+ dia:{eco:[250,150,90,80],conf:[550,300,150,200],luxo:[1800,800,400,600]},
+ economia:["Compare o JR Pass com bilhetes avulsos: ficou mais caro em 2023","Lojas de conveniência servem refeições de R$ 20 a R$ 35","O almoço executivo (teishoku) custa metade do jantar","Hotéis-cápsula e business hotels são limpos e baratos"],
+ roteiro:[["Chegada em Tóquio","Hospede-se em Shinjuku e jante no Omoide Yokocho."],["Tóquio tradicional","Senso-ji em Asakusa cedo, parque Ueno e Akihabara à tarde."],["Tóquio moderna","Santuário Meiji, Harajuku, Shibuya e o Shibuya Sky no pôr do sol."],["Hakone","Lago Ashi, vista do Fuji e noite em onsen."],["Trem-bala para Kyoto","Chegada, caminhada por Gion ao anoitecer."],["Kyoto sagrada","Fushimi Inari às 7h, Kiyomizu-dera e as ladeiras de Higashiyama."],["Arashiyama","Bambuzal antes das 8h, templo Tenryu-ji e Pavilhão Dourado."],["Nara","Cervos soltos e o grande Buda do Todai-ji."],["Osaka","Castelo de Osaka e comida de rua em Dotonbori."],["Partida","Compras de última hora e voo de volta."]]},
+IT:{tagline:"Arte, mesa farta e paisagens em cada curva.",capital:"Roma",moeda:"Euro (EUR)",idioma:"Italiano",
+ aviso:"Brasileiros não precisam de visto para até 90 dias no Espaço Schengen. A autorização eletrônica ETIAS está prevista para começar: confira se já é exigida. Veneza cobra taxa de acesso em alguns dias.",
+ melhorEpoca:"Abril, maio, setembro e outubro: clima agradável e filas menores. Agosto é lotado, quente e caro.",
+ passagens:"Mais baratas de novembro a março, fora das festas. Compre com 3 a 4 meses de antecedência.",
+ melhores:[4,5,9,10],
+ clima:[[8,2,"Inverno"],[9,2,"Inverno"],[11,2,"Primavera"],[14,2,"Primavera"],[18,1,"Primavera"],[23,0,"Verão"],[26,0,"Verão"],[26,0,"Verão"],[22,1,"Outono"],[17,2,"Outono"],[12,3,"Outono"],[9,2,"Inverno"]],
+ seguranca:{nivel:4,resumo:"Seguro para turistas. O problema principal é furto de carteira e celular em áreas cheias.",
+  seguros:["Centro histórico de Florença","Trastevere e Monti (Roma)","Bolonha","Interior da Toscana e Dolomitas"],
+  cuidado:["Furtos no metrô de Roma e na estação Termini","Arredores da estação central de Milão à noite","Golpe da pulseira e do 'presente' em pontos turísticos","Nápoles: atenção aos pertences em áreas movimentadas"]},
+ atracoes:[["Coliseu e Fórum Romano","~R$ 110"],["Museus Vaticanos e Capela Sistina","~R$ 130"],["Galeria Uffizi (Florença)","R$ 120–160"],["Cúpula do Duomo de Florença","~R$ 180"],["Gôndola em Veneza","~R$ 560 por gôndola"],["Barco pela Costa Amalfitana","R$ 60–150"]],
+ segredos:[["Matera","Cidade escavada em cavernas, habitada há 9 mil anos."],["Civita di Bagnoregio","Vila medieval no alto de um penhasco, acessada por uma ponte."],["Procida","Ilha colorida vizinha de Capri, sem a multidão."],["Bolonha","A capital da comida italiana: tortellini, mortadela e arcadas."]],
+ experiencias:[["Vindima no Chianti","Colha uvas com a família da vinícola e almoce no meio do vinhedo.","R$ 600–1.200"],["Massa fresca com uma nonna","Aula de tortellini e tagliatelle numa casa de Bolonha.","R$ 400–700"],["Ópera na Arena de Verona","Ópera ao ar livre num anfiteatro romano, de junho a setembro.","R$ 200–1.500"]],
+ hoteis:[["Hotel Santa Maria","Roma","Conforto num claustro em Trastevere"],["Hotel Brunelleschi","Florença","Conforto superior ao lado do Duomo"],["Agriturismo no Chianti","Toscana","Fazenda-hotel com vinho próprio"]],
+ restaurantes:[["Trattoria Da Enzo al 29","Roma","Carbonara e alcachofra; chegue cedo"],["Roscioli","Roma","Salumeria e cacio e pepe"],["All'Antico Vinaio","Florença","O panino mais famoso da cidade"]],
+ comidas:["Carbonara","Cacio e pepe","Bistecca alla fiorentina","Pizza napolitana","Gelato","Tiramisù"],
+ tradicoes:["Cappuccino só de manhã","O coperto (taxa de mesa) é normal","Aperitivo no fim da tarde","Ombros e joelhos cobertos nas igrejas","No Ferragosto, 15 de agosto, muita coisa fecha"],
+ voos:{companhias:["ITA Airways (direto São Paulo–Roma)","TAP (via Lisboa)","Air France e KLM (via Paris ou Amsterdã)","Iberia (via Madri)"],rota:"Voo direto São Paulo → Roma, cerca de 12 horas",preco:[4000,7000]},
+ pacotes:[["Clássico 10 dias","Roma, Florença e Veneza de trem"],["Toscana e Cinque Terre 12 dias","De carro, com vinícolas e vilas"],["Sul 10 dias","Nápoles, Costa Amalfitana e Puglia"]],
+ dia:{eco:[250,150,60,80],conf:[550,300,120,200],luxo:[1600,700,300,500]},
+ economia:["Compre trens Italo e Frecciarossa com antecedência","Almoce o menu del giorno","Beba a água gratuita das fontes de Roma","No primeiro domingo do mês, museus estatais são gratuitos"],
+ roteiro:[["Chegada em Roma","Hospede-se em Trastevere e jante numa trattoria local."],["Roma antiga","Coliseu e Fórum cedo, bairro de Monti à tarde."],["Vaticano","Museus Vaticanos na abertura, Castel Sant'Angelo e Piazza Navona."],["Roma secreta","Buraco da fechadura do Aventino, mercado de Testaccio e aperitivo."],["Florença","Trem cedo, Duomo, Ponte Vecchio e pôr do sol no Piazzale Michelangelo."],["Arte e artesãos","Uffizi de manhã e oficinas do Oltrarno à tarde."],["Chianti e Siena","Vinícolas pela manhã e a Piazza del Campo à tarde."],["Val d'Orcia","Estradas de ciprestes, Pienza e Montepulciano."],["Veneza","Trem até Veneza e passeio por Cannaregio."],["Burano e partida","Casas coloridas de Burano e voo de volta."]]},
+PT:{tagline:"A Europa que fala a nossa língua.",capital:"Lisboa",moeda:"Euro (EUR)",idioma:"Português",
+ aviso:"Brasileiros não precisam de visto para até 90 dias. A autorização eletrônica ETIAS está prevista para começar: confira se já é exigida.",
+ melhorEpoca:"Maio, junho, setembro e outubro: sol, mar mais quente e menos turistas. Em junho há os Santos Populares.",
+ passagens:"Mais baratas de janeiro a março e em novembro. TAP e Azul fazem promoções frequentes.",
+ melhores:[5,6,9,10],
+ clima:[[11,2,"Inverno"],[12,2,"Inverno"],[14,1,"Primavera"],[16,1,"Primavera"],[18,1,"Primavera"],[21,0,"Verão"],[23,0,"Verão"],[23,0,"Verão"],[22,0,"Outono"],[18,1,"Outono"],[14,2,"Outono"],[12,2,"Inverno"]],
+ seguranca:{nivel:5,resumo:"Um dos países mais seguros da Europa.",
+  seguros:["Lisboa: Príncipe Real, Campo de Ourique e Belém","Porto: Ribeira e Foz","Algarve","Alentejo"],
+  cuidado:["Furtos no elétrico 28 e na Baixa de Lisboa","Venda de drogas falsas na Baixa e no Rossio: ignore","Ondas e correntes fortes no Atlântico: respeite as bandeiras"]},
+ atracoes:[["Mosteiro dos Jerónimos (Lisboa)","~R$ 110"],["Palácio da Pena (Sintra)","~R$ 130"],["Livraria Lello (Porto)","~R$ 60, abatido em compra"],["Elétrico 28","~R$ 20"],["Caves de vinho do Porto (Gaia)","R$ 100–200"],["Barco até a gruta de Benagil (Algarve)","R$ 120–200"]],
+ segredos:[["Monsaraz","Vila murada no alto do Alentejo, com céu escuro para ver estrelas."],["Piódão","Aldeia de xisto encravada na serra."],["Comporta","Praias selvagens e arrozais, a 1h de Lisboa."],["Vale do Douro de trem","Linha à beira do rio entre vinhedos em socalcos."]],
+ experiencias:[["Noite de fado em Alfama","Fado cantado sem microfone numa casa pequena.","R$ 60–500"],["Vindima no Douro","Pisa da uva em lagar de pedra em setembro.","R$ 500–900"],["Santos Populares","Arraiais, sardinha assada e marchas em Lisboa, 12 e 13 de junho.","Grátis"]],
+ hoteis:[["Memmo Alfama","Lisboa","Boutique com terraço sobre o Tejo"],["The Yeatman","Vila Nova de Gaia","Luxo com vista para o Porto"],["Pousadas de Portugal","Vários","Hotéis em castelos e mosteiros"]],
+ restaurantes:[["Cervejaria Ramiro","Lisboa","Mariscos e o prego no final"],["Taberna da Rua das Flores","Lisboa","Petiscos portugueses criativos"],["Casa Guedes","Porto","Sanduíche de pernil com queijo da serra"]],
+ comidas:["Bacalhau à Brás","Pastel de nata","Francesinha","Sardinha assada","Polvo à lagareiro","Vinho verde"],
+ tradicoes:["Bica é o café expresso","O couvert (pão, azeitona) é cobrado se você comer","O almoço é a refeição principal","Santos Populares em junho","Palavras diferentes: pequeno-almoço, casa de banho, autocarro"],
+ voos:{companhias:["TAP (direto de várias capitais)","Azul (Campinas e Recife → Lisboa e Porto)","LATAM (São Paulo → Lisboa)"],rota:"Voo direto, 9 a 10 horas",preco:[3500,6000]},
+ pacotes:[["Clássico 10 dias","Lisboa, Sintra, Porto e Douro"],["Sol 12 dias","Lisboa, Alentejo e Algarve"],["Portugal e Espanha 15 dias","Lisboa, Porto, Madri e Sevilha"]],
+ dia:{eco:[180,110,40,50],conf:[400,220,90,150],luxo:[1200,500,250,400]},
+ economia:["Peça o prato do dia: R$ 60 a R$ 80","Use o cartão Navegante ou Viva Viagem no transporte","Trens regionais custam pouco","Na baixa temporada os hotéis caem até 40%"],
+ roteiro:[["Lisboa","Baixa, Chiado e pôr do sol no Miradouro de Santa Catarina."],["Alfama","Castelo de São Jorge, becos de Alfama e noite de fado."],["Belém","Mosteiro dos Jerónimos, pastéis de Belém e LX Factory."],["Sintra","Palácio da Pena na abertura e Quinta da Regaleira."],["Costa","Cascais e Cabo da Roca, o ponto mais a oeste da Europa."],["Porto","Trem até o Porto e fim de tarde na Ribeira."],["Gaia e livrarias","Livraria Lello cedo e caves de vinho em Gaia."],["Douro","Vinícolas no vale e almoço numa quinta."],["Aveiro e Coimbra","Moliceiros em Aveiro e a universidade de Coimbra."],["Partida","Última bica e voo de volta."]]},
+PE:{tagline:"Império inca, Amazônia e uma das melhores cozinhas do mundo.",capital:"Lima",moeda:"Sol (PEN)",idioma:"Espanhol e quíchua",
+ aviso:"Brasileiros entram só com RG ou passaporte. A vacina de febre amarela é recomendada para a Amazônia. Reserve Machu Picchu e a Trilha Inca com meses de antecedência.",
+ melhorEpoca:"Maio a setembro, a estação seca nos Andes. Em 24 de junho acontece o Inti Raymi em Cusco.",
+ passagens:"Voos curtos desde o Brasil. Mais baratos em março, abril, outubro e novembro.",
+ melhores:[5,6,7,8,9],
+ clima:[[13,3,"Chuvas"],[13,3,"Chuvas"],[13,3,"Chuvas"],[12,2,"Transição"],[11,1,"Seca"],[10,0,"Seca"],[10,0,"Seca"],[11,0,"Seca"],[12,1,"Seca"],[13,1,"Transição"],[13,2,"Transição"],[13,2,"Chuvas"]],
+ seguranca:{nivel:3,resumo:"Rotas turísticas são seguras com cuidados básicos; atenção a furtos, táxis e altitude.",
+  seguros:["Miraflores e Barranco (Lima)","Centro de Cusco e Vale Sagrado","Arequipa","Aguas Calientes"],
+  cuidado:["Táxi de rua: use aplicativo ou o táxi do hotel","Centro de Lima à noite e bairros como La Victoria","Mal de altitude: descanse 2 dias em Cusco antes de esforços","Protestos e bloqueios de estrada: acompanhe o noticiário local"]},
+ atracoes:[["Machu Picchu (ingresso)","~R$ 230"],["Trem até Aguas Calientes","R$ 400–900 ida e volta"],["Montanha Colorida (Vinicunca)","R$ 150–250 com tour"],["Ilhas flutuantes dos Uros (Titicaca)","R$ 100–200"],["Sobrevoo das Linhas de Nazca","R$ 600–900"],["Boleto turístico de Cusco","~R$ 200"]],
+ segredos:[["Choquequirao","A 'irmã' de Machu Picchu, quase sem visitantes; 4 dias de trilha."],["Kuélap","Fortaleza dos Chachapoyas no norte, mais antiga que Machu Picchu."],["Huacachina","Oásis no deserto com sandboard e buggy nas dunas."],["Maras e Moray","Salinas em degraus e terraços circulares incas."]],
+ experiencias:[["Trilha Inca até o Portal do Sol","4 dias pelas pedras incas até ver Machu Picchu ao amanhecer.","R$ 4.000–6.500"],["Oferenda à Pachamama","Cerimônia andina com uma comunidade do Vale Sagrado.","R$ 150–300"],["Jantar no Mil","Menu do chef Virgilio Martínez a 3.500 m, ao lado de Moray.","a partir de R$ 1.500"]],
+ hoteis:[["Casa Andina","Cusco e Lima","Ótimo custo-benefício"],["Inkaterra Machu Picchu Pueblo","Aguas Calientes","Luxo na floresta"],["Hotéis-boutique em San Blas","Cusco","Charme no bairro dos artesãos"]],
+ restaurantes:[["Central","Lima","Eleito o melhor do mundo em 2023; reserve meses antes"],["La Mar","Lima","Cevicheria de Gastón Acurio"],["Chicha","Cusco","Cozinha andina de Gastón Acurio"]],
+ comidas:["Ceviche","Lomo saltado","Ají de gallina","Causa limeña","Anticuchos","Pisco sour"],
+ tradicoes:["Inti Raymi, a festa do Sol, em 24 de junho","Chá de folha de coca ajuda na altitude","Gorjeta de cerca de 10%","Montanhas são sagradas (apus): respeite os rituais"],
+ voos:{companhias:["LATAM (direto São Paulo–Lima)","Sky Airline","Avianca (via Bogotá)"],rota:"São Paulo → Lima direto em 5 horas, depois 1h15 até Cusco",preco:[1800,3500]},
+ pacotes:[["Clássico 8 dias","Lima, Cusco, Vale Sagrado e Machu Picchu"],["Aventura 12 dias","Trilha Inca e Montanha Colorida"],["Sul 14 dias","Arequipa, Canyon del Colca e Titicaca"]],
+ dia:{eco:[100,60,40,80],conf:[250,140,90,200],luxo:[900,400,250,600]},
+ economia:["Peça o menú del día: R$ 15 a R$ 30","Ônibus Cruz del Sur entre cidades","Compre Machu Picchu no site oficial","Os trens Expedition e Voyager bastam; o de luxo custa 5 vezes mais"],
+ roteiro:[["Lima","Miraflores, falésias do Malecón e Barranco à noite."],["Lima gastronômica","Centro histórico de manhã e ceviche no almoço."],["Cusco","Voo cedo e descanso para aclimatar."],["Cusco a pé","San Blas, Qorikancha e mercado de San Pedro."],["Vale Sagrado","Mercado e ruínas de Pisac."],["Maras e Moray","Salinas, terraços e fim de dia em Ollantaytambo."],["Aguas Calientes","Trem pela beira do rio Urubamba."],["Machu Picchu","Primeiro ônibus para ver a cidadela com névoa."],["Montanha Colorida","Saída de madrugada para a Vinicunca."],["Partida","Voo de volta via Lima."]]},
+MX:{tagline:"Pirâmides, cenotes e uma das cozinhas mais ricas do mundo.",capital:"Cidade do México",moeda:"Peso mexicano (MXN)",idioma:"Espanhol",
+ aviso:"Brasileiros precisam de visto mexicano, a menos que tenham visto válido dos EUA, do Canadá, do Reino Unido, do Japão ou do Espaço Schengen. Confirme no consulado.",
+ melhorEpoca:"Novembro a abril, a estação seca. Fim de outubro e início de novembro para o Dia dos Mortos.",
+ passagens:"Mais baratas de agosto a outubro e em maio. Evite dezembro, janeiro e a Semana Santa.",
+ melhores:[11,12,1,2,3],
+ clima:[[14,0,"Seca"],[16,0,"Seca"],[18,0,"Seca"],[19,1,"Seca"],[19,1,"Seca"],[18,2,"Chuvas"],[17,3,"Chuvas"],[17,3,"Chuvas"],[17,3,"Chuvas"],[16,2,"Chuvas"],[15,0,"Seca"],[14,0,"Seca"]],
+ seguranca:{nivel:3,resumo:"Os destinos turísticos são bem frequentados, mas o país tem estados com alerta de não viajar.",
+  seguros:["Roma, Condesa, Polanco e Coyoacán (Cidade do México)","Mérida, uma das cidades mais seguras do país","Centro de Oaxaca","San Miguel de Allende e Isla Mujeres"],
+  cuidado:["Estados com alerta de não viajar: Sinaloa, Guerrero, Michoacán, Tamaulipas, Colima e Zacatecas","Táxi de rua na capital: use aplicativo","Vida noturna de Cancún e Tulum: conflitos esporádicos","Furacões no Caribe de junho a novembro, com pico de agosto a outubro"]},
+ atracoes:[["Pirâmides de Teotihuacán","~R$ 30"],["Chichén Itzá","~R$ 200"],["Museu Nacional de Antropologia","~R$ 30"],["Casa Azul de Frida Kahlo","R$ 80–100"],["Barco trajinera em Xochimilco","R$ 150–200 por barco, por hora"],["Cenote Ik Kil","R$ 60–90"]],
+ segredos:[["Bacalar","A lagoa das sete cores, calma e sem resorts gigantes."],["Hierve el Agua","Cascatas petrificadas com piscinas naturais em Oaxaca."],["Valladolid","Cidade colonial cercada de cenotes como Suytun e Zací."],["Guanajuato","Cidade colorida com ruas em túneis e serenatas noturnas."]],
+ experiencias:[["Dia dos Mortos em Oaxaca","Desfiles, altares e noite nos cemitérios com velas.","Grátis; tour noturno R$ 200–450"],["Balão sobre Teotihuacán","Voo ao amanhecer sobre as pirâmides.","R$ 900–1.400"],["Nado com tubarão-baleia","Snorkel ao lado do maior peixe do mundo, de junho a setembro.","R$ 800–1.200"]],
+ hoteis:[["Hotel Carlota","Cidade do México","Design e piscina no bairro Cuauhtémoc"],["Casa Oaxaca","Oaxaca","Boutique no centro histórico"],["Pousadas em Isla Mujeres","Caribe","Base para o tubarão-baleia"]],
+ restaurantes:[["Contramar","Cidade do México","Tostadas de atum e peixe na brasa"],["Taquería El Califa de León","Cidade do México","Primeira taquería com estrela Michelin"],["Mercado 20 de Noviembre","Oaxaca","Corredor da fumaça: carnes na brasa"]],
+ comidas:["Tacos al pastor","Mole","Cochinita pibil","Chiles en nogada","Tlayuda","Mezcal"],
+ tradicoes:["Dia dos Mortos, de 31 de outubro a 2 de novembro","Gorjeta de 10% a 15%","Beba só água engarrafada","'Ahorita' pode querer dizer daqui a pouco ou mais tarde","Lucha libre na Arena México às terças e sextas"],
+ voos:{companhias:["Aeroméxico (direto São Paulo–Cidade do México)","Copa Airlines (via Panamá)","Avianca (via Bogotá)"],rota:"Voo direto São Paulo → Cidade do México, 9 a 10 horas; Cancún com 1 conexão",preco:[3000,5500]},
+ pacotes:[["Cultural 10 dias","Cidade do México, Puebla e Oaxaca"],["Caribe 10 dias","Cancún, Tulum e Bacalar"],["Yucatán 12 dias","Mérida, Chichén Itzá, cenotes e Holbox"]],
+ dia:{eco:[130,70,40,60],conf:[320,170,80,150],luxo:[1100,450,250,450]},
+ economia:["Coma em mercados e fondas: R$ 25 a R$ 40","Ônibus ADO entre cidades são confortáveis","No Caribe, fique em Puerto Morelos em vez da zona hoteleira","O metrô da capital custa centavos (evite o horário de pico)"],
+ roteiro:[["Cidade do México","Centro Histórico, Zócalo e Templo Mayor."],["Museus e parques","Museu de Antropologia, Chapultepec e jantar na Roma ou Condesa."],["Teotihuacán","Pirâmides ao amanhecer (balão opcional)."],["Coyoacán e Xochimilco","Casa Azul de Frida e trajinera com mariachi."],["Oaxaca","Voo curto e noite no centro histórico."],["Hierve el Agua","Cascatas petrificadas e visita a uma destilaria de mezcal."],["Monte Albán","Ruínas zapotecas e Mercado 20 de Noviembre."],["Yucatán","Voo para Cancún e estrada até Valladolid."],["Chichén Itzá","Ruínas na abertura e mergulho num cenote."],["Bacalar e partida","Manhã na lagoa e voo de volta."]]}
+};
+const CORES_DEST={TH:"var(--saffron)",JP:"var(--coral)",IT:"var(--jade)",PT:"var(--azure)",PE:"var(--violet)",MX:"var(--teal)"};
+
+const MISSOES=[
+{id:"lanternas",code:"TH",titulo:"Missão Noite das Lanternas",local:"Chiang Mai, Tailândia",meses:[11],tags:["romance","cultura","espiritualidade"],quem:["casal","amigos","solo"],custo:14000,cor:"#F5A524",
+ cena:["Ao anoitecer, você atravessa os portões da cidade antiga de Chiang Mai. O ar tem cheiro de incenso e capim-limão.","Monges acendem as primeiras velas. Você recebe a sua khom loi, a lanterna de papel de arroz, e escreve um desejo nela.","Na contagem, centenas de lanternas sobem ao mesmo tempo e o céu vira um rio de luz. No canal, os krathongs de folha de bananeira flutuam com velas acesas.","Você fecha a noite numa mesa de rua, com um khao soi quente e o céu ainda cheio de pontos de luz."],
+ onde:"Chiang Mai: eventos com ingresso em templos e campos nos arredores, e soltura pública no centro nas áreas e horários autorizados pela prefeitura.",
+ horario:"Lua cheia do 12º mês do calendário tailandês, geralmente em novembro. A soltura começa depois do pôr do sol, entre 18h30 e 20h.",
+ preco:"Áreas públicas: grátis (a lanterna custa cerca de R$ 10). Eventos com ingresso: R$ 600 a R$ 2.500 por pessoa, com traslado e jantar.",
+ hotel:"Tamarind Village, na cidade antiga (conforto), ou pousadas perto do Portão Tha Phae (econômico).",
+ comer:"Khao Soi Khun Yai no almoço e o mercado noturno de Chiang Mai depois da soltura.",
+ indicado:"Casais em lua de mel ou aniversário, e quem busca uma experiência espiritual. Fica muito cheio: evite se multidão incomoda.",
+ levar:["Roupa que cubra ombros e joelhos (templos)","Repelente","Dinheiro em baht","Sandália fácil de tirar","Capa de chuva leve","Hotel reservado com 4 a 6 meses de antecedência"]},
+{id:"aurora",code:"IS",titulo:"Missão Caçada à Aurora",local:"Sul da Islândia e Snæfellsnes",meses:[9,10,11,12,1,2,3],tags:["natureza","aventura","romance"],quem:["casal","amigos","solo"],custo:22000,cor:"#4BE3A1",
+ cena:["Meia-noite numa estrada vazia. O guia desliga o motor e pede silêncio.","No horizonte, uma faixa verde-clara começa a se mover e ganha tons de violeta.","Você deita na neve, o vapor da respiração sobe e o céu inteiro dança.","Na volta, um banho em águas termais ao ar livre fecha a noite."],
+ onde:"Longe das luzes de Reykjavík: Þingvellir, Vík e a península de Snæfellsnes. Acompanhe a previsão de aurora do instituto meteorológico islandês (vedur.is).",
+ horario:"Entre 21h e 2h, em noites de céu limpo, de setembro a março.",
+ preco:"Tour de ônibus: R$ 450 a R$ 700. Superjipe ou grupo pequeno: R$ 1.200 a R$ 2.000. Com carro alugado, só o custo do carro.",
+ hotel:"Hotel Rangá, no sul, que tem alarme de aurora para os hóspedes; fazendas-hotel na Ring Road para economizar.",
+ comer:"Sopa de cordeiro (kjötsúpa) e o cachorro-quente do Bæjarins Beztu Pylsur em Reykjavík.",
+ indicado:"Casais e fotógrafos. Exige paciência: a aurora não é garantida, planeje 4 ou mais noites.",
+ levar:["Roupa térmica em camadas","Bota impermeável","Tripé para o celular","Roupa de banho para as termas","Lanterna de cabeça com luz vermelha"]},
+{id:"balao",code:"TR",titulo:"Missão Voo do Amanhecer",local:"Göreme, Capadócia, Turquia",meses:[4,5,6,9,10],tags:["romance","aventura"],quem:["casal","familia","amigos"],custo:15000,cor:"#FF8A5B",
+ cena:["São 4h30. Os queimadores rugem e o balão se estica sobre o chão de pedra.","Você sobe devagar enquanto o sol nasce atrás das chaminés de fada.","Mais de cem balões flutuam ao redor, sobre vales cor-de-rosa.","No pouso, a tripulação brinda com espumante e entrega o certificado de voo."],
+ onde:"Saídas de Göreme, com voo sobre os vales Rosa e do Amor, conforme o vento.",
+ horario:"Busca no hotel entre 4h e 5h; cerca de 1 hora de voo ao nascer do sol. Vento forte cancela o voo.",
+ preco:"Cesto padrão: R$ 1.300 a R$ 2.000 por pessoa. Voo privado: a partir de R$ 3.000. No verão os preços sobem.",
+ hotel:"Hotel-caverna em Göreme com terraço virado para o nascer do sol.",
+ comer:"Testi kebab, cozido num jarro de barro que é quebrado na mesa, em Göreme ou Avanos.",
+ indicado:"Casais (o pedido de casamento clássico) e famílias com crianças a partir de 6 anos.",
+ levar:["Casaco leve: a madrugada é fria","Tênis fechado","Chapéu","Duas manhãs livres, caso o voo seja cancelado"]},
+{id:"inca",code:"PE",titulo:"Missão Portal do Sol",local:"Trilha Inca até Machu Picchu, Peru",meses:[5,6,7,8,9],tags:["aventura","adrenalina","cultura","natureza"],quem:["amigos","solo","casal"],custo:13000,cor:"#F2C14E",
+ cena:["Quarto dia de trilha. Você acorda às 3h30 numa barraca nas montanhas.","A lanterna ilumina degraus de pedra que os incas assentaram há 500 anos.","No Inti Punku, o Portal do Sol, a névoa se abre e Machu Picchu aparece inteira lá embaixo.","À noite, em Cusco, um pisco sour para comemorar."],
+ onde:"Saída do km 82, perto de Cusco: 4 dias e 3 noites com agência licenciada.",
+ horario:"Chegada ao Portal do Sol ao amanhecer do 4º dia. A trilha fecha em fevereiro para manutenção.",
+ preco:"Trilha clássica de 4 dias com agência: R$ 4.000 a R$ 6.500 por pessoa, com licença, carregadores e refeições. As licenças esgotam meses antes.",
+ hotel:"Casa Andina em Cusco (custo-benefício) ou Inkaterra Machu Picchu Pueblo (luxo).",
+ comer:"Chicha, de Gastón Acurio, em Cusco.",
+ indicado:"Amigos e viajantes solo com bom preparo físico. Não indicado sem 2 dias de aclimatação à altitude.",
+ levar:["Bota de trilha já amaciada","Saco de dormir para 0 °C","Passaporte (exigido na trilha)","Protetor solar e labial"]},
+{id:"saara",code:"MA",titulo:"Missão Noite no Saara",local:"Dunas de Erg Chebbi, Merzouga, Marrocos",meses:[3,4,5,10,11],tags:["aventura","cultura","romance"],quem:["casal","amigos","familia"],custo:11000,cor:"#F08A3C",
+ cena:["O sol baixa e as dunas passam de dourado a laranja.","Você segue em caravana de dromedários até o acampamento berbere.","Depois do jantar, tambores em volta da fogueira e um céu com mais estrelas do que você já viu.","Ao amanhecer, você sobe a duna mais alta para ver o sol nascer."],
+ onde:"Merzouga, a cerca de 9 horas de carro de Marrakech. Os tours de 3 dias passam pelo Vale do Draa e por Aït Benhaddou.",
+ horario:"Cavalgada no pôr do sol, por volta das 17h às 18h30, e volta ao nascer do sol.",
+ preco:"Tour de 3 dias saindo de Marrakech: R$ 600 a R$ 1.500 por pessoa. Acampamento de luxo com banheiro: R$ 1.200 a R$ 2.500 a noite.",
+ hotel:"Um riad tradicional na medina de Marrakech, antes e depois do deserto.",
+ comer:"Tagine e medfouna, o pão berbere assado na areia, em Merzouga.",
+ indicado:"Casais e grupos de amigos; famílias com crianças acima de 7 anos.",
+ levar:["Lenço para o rosto (vento e areia)","Casaco para a noite fria","Lanterna","Dinheiro em dirham","Roupas que cubram ombros e joelhos"]},
+{id:"muertos",code:"MX",titulo:"Missão Noite dos Mortos",local:"Oaxaca, México",meses:[10,11],tags:["cultura","gastronomia","espiritualidade"],quem:["amigos","casal","solo"],custo:10000,cor:"#FF7A1A",
+ cena:["31 de outubro. As ruas de Oaxaca têm cheiro de cempasúchil, a flor laranja que guia as almas.","Você acompanha uma comparsa com banda de música e rostos pintados de caveira.","No cemitério, famílias passam a noite junto aos túmulos, com velas, comida e mezcal.","De volta à cidade, um tamal e um chocolate quente de Oaxaca."],
+ onde:"Centro de Oaxaca e cemitérios como o Panteón General e o de Xoxocotlán.",
+ horario:"De 31 de outubro a 2 de novembro; cemitérios à noite, a partir das 20h.",
+ preco:"Desfiles e altares: grátis. Tour noturno de cemitérios: R$ 200 a R$ 450. Os hotéis triplicam o preço: reserve 6 meses antes.",
+ hotel:"Casa Oaxaca, no centro, ou pousadas no bairro de Jalatlaco.",
+ comer:"Corredor da fumaça do Mercado 20 de Noviembre, com carnes na brasa.",
+ indicado:"Quem gosta de cultura viva e fotografia. É uma tradição de família: vá com respeito, não como festa à fantasia.",
+ levar:["Casaco leve (noites frias)","Pergunte antes de fotografar túmulos","Sapato confortável","Pesos em espécie","Visto mexicano ou visto americano válido"]},
+{id:"sakura",code:"JP",titulo:"Missão Hanami",local:"Kyoto e Tóquio, Japão",meses:[3,4],tags:["cultura","romance","relax"],quem:["casal","familia","solo"],custo:20000,cor:"#FF9EC4",
+ cena:["Amanhecer no Caminho do Filósofo, em Kyoto. As cerejeiras estão no auge.","Pétalas caem sobre o canal enquanto você caminha antes da multidão.","À tarde, uma cerimônia do chá numa casa de madeira tradicional.","À noite, um ryokan com banho termal, jantar kaiseki e futon sobre o tatame."],
+ onde:"Kyoto (Caminho do Filósofo, parque Maruyama, Arashiyama) e Tóquio (Shinjuku Gyoen, rio Meguro).",
+ horario:"Floração do fim de março ao início de abril, variando a cada ano: acompanhe a previsão de floração. Vá entre 6h e 7h.",
+ preco:"Parques: grátis ou cerca de R$ 20. Cerimônia do chá: R$ 150 a R$ 300. Ryokan com jantar: R$ 1.500 a R$ 4.000 a noite para dois.",
+ hotel:"Hoshinoya Kyoto (luxo) ou Piece Hostel Sanjo (econômico, com quarto privativo).",
+ comer:"Mercado Nishiki em Kyoto e os becos do Omoide Yokocho em Tóquio.",
+ indicado:"Casais, famílias e fotógrafos. É alta temporada: reserve cedo.",
+ levar:["Cartão de transporte (Suica)","Sapatos fáceis de tirar","Toalha de mão","Saquinho para o lixo: há poucas lixeiras"]},
+{id:"tubarao",code:"MX",titulo:"Missão Gigantes Gentis",local:"Isla Mujeres e Holbox, México",meses:[6,7,8,9],tags:["adrenalina","natureza","aventura"],quem:["amigos","casal","familia"],custo:11000,cor:"#2FC3E0",
+ cena:["Mar aberto, duas horas de barco desde Isla Mujeres.","O capitão aponta uma sombra enorme logo abaixo da superfície.","Você salta e nada ao lado de um tubarão-baleia de 10 metros, que filtra plâncton com calma.","Fim de tarde com ceviche e pés na areia em Holbox."],
+ onde:"Saídas de Isla Mujeres, Cancún ou Holbox com operadoras licenciadas.",
+ horario:"De junho a meados de setembro; os barcos saem entre 6h e 7h.",
+ preco:"Tour com snorkel: R$ 800 a R$ 1.200 por pessoa.",
+ hotel:"Pousadas em Isla Mujeres, para sair cedo.",
+ comer:"Ceviche e tacos de peixe em Isla Mujeres; pizza de lagosta em Holbox.",
+ indicado:"Amigos e casais que nadam bem; famílias com crianças acima de 8 anos. É snorkel, não mergulho com cilindro.",
+ levar:["Protetor solar biodegradável","Remédio para enjoo","Câmera à prova d'água","Camiseta de lycra"]},
+{id:"fado",code:"PT",titulo:"Missão Noite de Fado",local:"Alfama, Lisboa, Portugal",meses:[1,2,3,4,5,6,7,8,9,10,11,12],tags:["gastronomia","romance","cultura"],quem:["casal","solo","amigos"],custo:9000,cor:"#E9B44C",
+ cena:["Fim de tarde no Miradouro de Santa Luzia. O Tejo fica cor de cobre.","Você desce pelos becos de Alfama ouvindo o elétrico 28 nos trilhos.","Numa casa pequena, as luzes se apagam e uma fadista canta sem microfone.","A noite termina com um pastel de nata morno e uma ginjinha no Rossio."],
+ onde:"Alfama e Mouraria, em Lisboa.",
+ horario:"Pôr do sol nos miradouros (17h no inverno, 21h no verão); fado a partir das 20h30.",
+ preco:"Fado vadio em tasca: consumo de R$ 60 a R$ 150. Casa de fado com jantar: R$ 300 a R$ 500 por pessoa.",
+ hotel:"Memmo Alfama, boutique com terraço sobre o rio.",
+ comer:"Cervejaria Ramiro e, de manhã, os Pastéis de Belém.",
+ indicado:"Casais e viajantes solo. Boa em qualquer mês; de maio a outubro as noites são mais longas.",
+ levar:["Sapato sem salto: a calçada portuguesa escorrega","Casaco leve para a noite","Silêncio durante o fado"]},
+{id:"safari",code:"KE",titulo:"Missão Grande Migração",local:"Masai Mara, Quênia",meses:[7,8,9,10],tags:["aventura","natureza","adrenalina"],quem:["familia","casal","amigos"],custo:30000,cor:"#E3A33B",
+ cena:["Amanhecer na savana. O jipe para na margem do rio Mara.","Milhares de gnus se amontoam na barranca. Um salta, e a manada inteira vem atrás.","Crocodilos esperam na água; leões observam do outro lado.","À noite, jantar sob as estrelas no acampamento, com hipopótamos ao fundo."],
+ onde:"Reserva Nacional Masai Mara e as conservancies vizinhas.",
+ horario:"Travessias de julho a outubro; safáris às 6h e às 16h, quando os animais estão ativos.",
+ preco:"Taxa do parque: US$ 100 a US$ 200 por dia (confira o valor atual). Safári de 3 dias com acampamento: R$ 4.000 a R$ 12.000 por pessoa.",
+ hotel:"Acampamento tendado numa conservancy, com menos jipes por animal.",
+ comer:"Nyama choma, o churrasco queniano, no Carnivore, em Nairóbi.",
+ indicado:"Famílias, casais e fotógrafos. Exige vacina de febre amarela.",
+ levar:["Certificado internacional de vacina de febre amarela","Binóculo","Roupas em tons neutros","Repelente e orientação médica sobre malária"]},
+{id:"bungee",code:"NZ",titulo:"Missão Salto no Abismo",local:"Queenstown, Nova Zelândia",meses:[12,1,2,3],tags:["adrenalina","aventura","natureza"],quem:["amigos","solo"],custo:26000,cor:"#38D39F",
+ cena:["Ponte Kawarau, 43 metros acima de um rio verde-esmeralda. Aqui nasceu o bungee jump comercial, em 1988.","O instrutor confere as cordas. Contagem: 5, 4, 3...","Você salta, a água chega perto do rosto e a corda te devolve para o céu.","À noite, um Fergburger gigante e um Pinot Noir de Central Otago."],
+ onde:"Ponte Kawarau, a 20 minutos de Queenstown.",
+ horario:"O dia todo; no verão (dezembro a março) a luz vai até as 21h30.",
+ preco:"Bungee na Kawarau: R$ 1.000 a R$ 1.300. Combos com jetboat saem mais em conta.",
+ hotel:"Hotéis à beira do lago Wakatipu.",
+ comer:"Fergburger, no centro de Queenstown.",
+ indicado:"Amigos e viajantes solo. Há limites de peso e de saúde.",
+ levar:["Roupa confortável","Bolsos vazios","Seguro-viagem que cubra esportes radicais"]},
+{id:"vindima",code:"IT",titulo:"Missão Vindima na Toscana",local:"Chianti, Toscana, Itália",meses:[9,10],tags:["gastronomia","romance","relax"],quem:["casal","amigos"],custo:18000,cor:"#B5476B",
+ cena:["Manhã de setembro entre colinas de ciprestes no Chianti.","Você colhe uvas com a família dona da vinícola e pisa a uva no tonel.","No almoço, uma mesa comprida no meio do vinhedo: pici, pecorino e o vinho do ano anterior.","Pôr do sol em San Gimignano, com as torres medievais douradas."],
+ onde:"Região do Chianti Classico, entre Florença e Siena.",
+ horario:"Colheita de meados de setembro ao início de outubro.",
+ preco:"Colheita com almoço: R$ 600 a R$ 1.200 por pessoa. Degustação simples: R$ 150 a R$ 300.",
+ hotel:"Um agriturismo (fazenda-hotel) no Chianti.",
+ comer:"Antica Macelleria Cecchini, em Panzano, para a carne toscana.",
+ indicado:"Casais e amigos que gostam de vinho. Alugue carro ou contrate motorista.",
+ levar:["Tênis que pode sujar","Chapéu","Motorista designado","Espaço na mala para vinho"]}
+];
+
+/* ===================== HELPERS ===================== */
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const brl=n=>"R$ "+Math.round(n).toLocaleString("pt-BR");
+const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ===================== FLAGS + LOGO ===================== */
+const FLAGS=[
+ (c,x,y,w,h)=>{c.fillStyle="#009C3B";c.fillRect(x,y,w,h);c.fillStyle="#FFDF00";c.beginPath();c.moveTo(x+w*.5,y+h*.12);c.lineTo(x+w*.95,y+h*.5);c.lineTo(x+w*.5,y+h*.88);c.lineTo(x+w*.05,y+h*.5);c.fill();c.fillStyle="#002776";c.beginPath();c.arc(x+w/2,y+h/2,Math.min(w,h)*.24,0,7);c.fill()},
+ (c,x,y,w,h)=>{["#009246","#FFFFFF","#CE2B37"].forEach((k,i)=>{c.fillStyle=k;c.fillRect(x+i*w/3,y,w/3+1,h)})},
+ (c,x,y,w,h)=>{c.fillStyle="#FFFFFF";c.fillRect(x,y,w,h);c.fillStyle="#BC002D";c.beginPath();c.arc(x+w/2,y+h/2,Math.min(w,h)*.3,0,7);c.fill()},
+ (c,x,y,w,h)=>{["#111111","#DD0000","#FFCE00"].forEach((k,i)=>{c.fillStyle=k;c.fillRect(x,y+i*h/3,w,h/3+1)})},
+ (c,x,y,w,h)=>{["#0055A4","#FFFFFF","#EF4135"].forEach((k,i)=>{c.fillStyle=k;c.fillRect(x+i*w/3,y,w/3+1,h)})},
+ (c,x,y,w,h)=>{const s=[["#A51931",1],["#F4F5F8",1],["#2D2A4A",2],["#F4F5F8",1],["#A51931",1]];let yy=y;s.forEach(([k,n])=>{c.fillStyle=k;c.fillRect(x,yy,w,h*n/6+1);yy+=h*n/6})},
+ (c,x,y,w,h)=>{["#74ACDF","#FFFFFF","#74ACDF"].forEach((k,i)=>{c.fillStyle=k;c.fillRect(x,y+i*h/3,w,h/3+1)});c.fillStyle="#F6B40E";c.beginPath();c.arc(x+w/2,y+h/2,Math.min(w,h/3)*.32,0,7);c.fill()},
+ (c,x,y,w,h)=>{["#006847","#FFFFFF","#CE1126"].forEach((k,i)=>{c.fillStyle=k;c.fillRect(x+i*w/3,y,w/3+1,h)});c.fillStyle="#8C5A2B";c.beginPath();c.arc(x+w/2,y+h/2,Math.min(w/3,h)*.3,0,7);c.fill()},
+ (c,x,y,w,h)=>{c.fillStyle="#046A38";c.fillRect(x,y,w*.4,h);c.fillStyle="#DA291C";c.fillRect(x+w*.4,y,w*.6,h);c.fillStyle="#FFE900";c.beginPath();c.arc(x+w*.4,y+h/2,Math.min(w,h)*.2,0,7);c.fill()},
+ (c,x,y,w,h)=>{c.fillStyle="#006AA7";c.fillRect(x,y,w,h);c.fillStyle="#FECC00";c.fillRect(x+w*.28,y,w*.18,h);c.fillRect(x,y+h*.42,w,h*.16)}
+];
+function cssVar(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
+async function fontReady(){try{await Promise.race([document.fonts.load('400 100px "Archivo Black"'),new Promise(r=>setTimeout(r,1500))])}catch(e){}}
+/* Draws TRAVELMATE with a flag inside each letter. Returns layout so the mosaic can sample the letter shapes. */
+function drawLogo(cv,{maxW,maxH,stroke}){
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  const W=cv.clientWidth,H=cv.clientHeight; cv.width=W*dpr; cv.height=H*dpr;
+  const ctx=cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
+  const word="TRAVELMATE", fam='"Archivo Black","Arial Black",Impact,sans-serif';
+  ctx.font=`400 100px ${fam}`;
+  const gap=6; const widths=[...word].map(ch=>ctx.measureText(ch).width);
+  const total=widths.reduce((a,b)=>a+b,0)+gap*(word.length-1);
+  const size=Math.min(100*(maxW*W)/total,(maxH*H)/0.78);
+  const k=size/100, tw=total*k, x0=(W-tw)/2, base=H/2+size*0.36, top=base-size*0.74, lh=size*0.76;
+  ctx.font=`400 ${size}px ${fam}`; ctx.textBaseline="alphabetic";
+  const off=document.createElement("canvas"); const octx=off.getContext("2d");
+  let x=x0; const boxes=[];
+  [...word].forEach((ch,i)=>{
+    const w=widths[i]*k; off.width=Math.ceil((w+4)*dpr); off.height=Math.ceil((lh+8)*dpr);
+    octx.setTransform(dpr,0,0,dpr,0,0); octx.clearRect(0,0,off.width,off.height);
+    octx.globalCompositeOperation="source-over"; FLAGS[i%FLAGS.length](octx,0,0,w+4,lh+8);
+    octx.globalCompositeOperation="destination-in"; octx.font=ctx.font; octx.fillStyle="#000"; octx.fillText(ch,2,base-top+4);
+    ctx.drawImage(off,x-2,top-4,w+4,lh+8);
+    if(stroke){ctx.lineWidth=Math.max(1,size/60);ctx.strokeStyle=stroke;ctx.strokeText(ch,x,base)}
+    boxes.push({ch,x,w}); x+=w+gap*k;
+  });
+  return {x0,base,size,gap:gap*k,widths:widths.map(w=>w*k),font:ctx.font,W,H};
+}
+
+/* ===================== INTRO ===================== */
+const TILES=[["🗼","#3B5BDB"],["🗽","#0B8A8A"],["🏯","#D9472E"],["🕌","#C98A0B"],["🗿","#5646C2"],["🏛️","#21884F"],["⛩️","#E8590C"],["🎡","#1D66C9"],["🏝️","#12B886"],["🌋","#C2255C"],["🐘","#7048E8"],["🏜️","#E67700"],["🎭","#AE3EC9"],["🦁","#F08C00"],["🏔️","#1C7ED6"],["🍷","#A61E4D"],["🌮","#2B8A3E"],["🎈","#F76707"],["🛶","#0C8599"],["🌸","#D6336C"],["🏰","#4263EB"],["🦙","#9C36B5"],["🐨","#5C940D"],["🎆","#364FC7"],["🌉","#E03131"],["🗻","#1971C2"],["🐫","#D9480F"],["🏮","#C92A2A"],["🌌","#5F3DC4"],["🏖️","#0CA678"]];
+async function intro(){
+  const el=$("#intro"); if(store.get("tm_seen_intro")&&location.hash!=="#intro"){/* still show, but shorter */}
+  const mos=$("#mosaic"); const W=innerWidth,H=innerHeight;
+  const cell=Math.max(30,Math.min(56,Math.round(Math.min(W,H)/12)));
+  const cols=Math.ceil(W/cell), rows=Math.ceil(H/cell);
+  mos.style.gridTemplateColumns=`repeat(${cols},1fr)`; mos.style.gridTemplateRows=`repeat(${rows},1fr)`;
+  mos.style.setProperty("--ts",Math.round(cell*.5)+"px");
+  const frag=document.createDocumentFragment(); const tiles=[];
+  for(let i=0;i<cols*rows;i++){const t=TILES[(i*7+Math.floor(i/cols)*3)%TILES.length];const d=document.createElement("div");d.className="tile";d.textContent=t[0];d.style.setProperty("--c",t[1]);d.style.setProperty("--d",(Math.random()*1.5).toFixed(2)+"s");frag.appendChild(d);tiles.push(d)}
+  mos.appendChild(frag);
+  await fontReady();
+  const cv=$("#logoCanvas"); const L=drawLogo(cv,{maxW:.88,maxH:.32,stroke:"rgba(255,255,255,.85)"});
+  // mask: which tiles sit inside the letters
+  const m=document.createElement("canvas"); m.width=W; m.height=H; const mc=m.getContext("2d"); mc.font=L.font; mc.fillStyle="#000";
+  let x=L.x0; [..."TRAVELMATE"].forEach((ch,i)=>{mc.fillText(ch,x,L.base);x+=L.widths[i]+L.gap});
+  const img=mc.getImageData(0,0,W,H).data;
+  tiles.forEach((t,i)=>{const cx=Math.floor((i%cols+.5)*cell*(W/(cols*cell))),cy=Math.floor((Math.floor(i/cols)+.5)*cell*(H/(rows*cell)));if(cx<W&&cy<H&&img[(cy*W+cx)*4+3]>40)t.classList.add("in")});
+  const T=reduce?[0,200,1400]:[2100,3300,6200];
+  const timers=[setTimeout(()=>el.classList.add("shape"),T[0]),setTimeout(()=>el.classList.add("final"),T[1]),setTimeout(end,T[2])];
+  function end(){timers.forEach(clearTimeout);el.classList.add("leaving");setTimeout(()=>el.remove(),800);store.set("tm_seen_intro",1)}
+  $("#skipIntro").onclick=end; el.addEventListener("click",e=>{if(el.classList.contains("final"))end()});
+}
+
+/* ===================== STATE ===================== */
+const DEF={pais:"TH",cidade:"",dias:10,pax:2,quem:"casal",perfil:["cultura","romance"],mes:11,orc:30000};
+const S=Object.assign({},DEF,store.get("tm_state")||{});
+const SS=Object.assign({mes:11,orc:15000,busca:["romance","cultura"],quem:"casal"},store.get("tm_surp")||{});
+let dossie=null, roteiroIA=null, nivelSel=null;
+const save=()=>{store.set("tm_state",S);store.set("tm_surp",SS)};
+
+/* ===================== AI ===================== */
+let SAMPLE=null, AI="loading";
+(async()=>{try{SAMPLE=window.claude&&window.claude.use?await window.claude.use("sample"):null}catch(e){SAMPLE=null}AI=SAMPLE?"ok":"off";aiUI()})();
+const ERR={not_granted:"Você não autorizou a IA nesta página.",sampling_disabled:"A IA não está disponível para esta conta.",not_declared:"A IA não está disponível nesta página.",capability_disabled:"A IA não está disponível nesta visualização.",rate_limited:"Muitos pedidos seguidos. Aguarde um pouco e tente de novo.",session_expired:"Sua sessão expirou. Entre de novo no Claude.",refused:"A IA não pôde responder a esse pedido. Tente reformular.",invalid_json:"A resposta veio incompleta. Tente de novo.",empty_completion:"A IA não devolveu conteúdo. Tente pedir algo mais simples.",prompt_too_large:"O pedido ficou grande demais."};
+const errMsg=e=>ERR[e&&e.code]||"Falha de conexão com a IA. Tente de novo.";
+function aiFatal(e){if(["not_granted","sampling_disabled","not_declared","capability_disabled","capability_removed"].includes(e&&e.code)){AI="off";aiUI()}}
+function aiUI(){
+  const off=AI==="off";
+  $$("[data-ai]").forEach(b=>{b.disabled=off;b.title=off?"Abra o TravelMate dentro do Claude para usar a IA":""});
+  $("#missaoIA").disabled=off; $("#chatSend").disabled=off;
+  $("#chatIn").placeholder=off?"Assistente disponível ao abrir o app no Claude":"Escreva sua pergunta";
+}
+function loaderHTML(msg){return `<div class="loader" role="status"><div class="spin"></div><div><b>${esc(msg)}</b><div class="note" data-tick>Isso leva de 30 segundos a 2 minutos.</div></div><button class="btn alt" type="button" data-stop>Parar</button></div>`}
+const TICKS=["Consultando épocas e clima…","Comparando custos e câmbio…","Buscando lugares pouco conhecidos…","Checando segurança da região…","Montando o roteiro dia a dia…"];
+async function runAI(container,msg,fn){
+  container.innerHTML=loaderHTML(msg); const ctl=new AbortController();
+  const stop=container.querySelector("[data-stop]"); stop.onclick=()=>ctl.abort();
+  let i=0; const tick=container.querySelector("[data-tick]"); const iv=setInterval(()=>{tick.textContent=TICKS[i++%TICKS.length]},4000);
+  try{return await fn(ctl.signal)}catch(e){aiFatal(e);container.innerHTML=e.code==="cancelled"?`<p class="note">Pedido cancelado.</p>`:`<div class="alert" role="alert">${esc(errMsg(e))}</div>`;return null}finally{clearInterval(iv)}
+}
+function perfilTxt(){return S.perfil.map(p=>(PERFIS.find(x=>x[0]===p)||[,p])[1]).join(", ")||"variado"}
+function quemTxt(q){return (QUEM.find(x=>x[0]===q)||[,q])[1]}
+
+function promptDossie(nome,cidade){
+return `Você é o motor de conteúdo do TravelMate, app brasileiro de viagens. Gere o dossiê de viagem de ${nome}${cidade?` com foco em ${cidade}`:""}, para um viajante saindo do Brasil.
+Responda SOMENTE com um JSON válido, neste formato exato (textos em português do Brasil; preços em reais como faixas realistas de 2026):
+{"capital":"","moeda":"","idioma":"","tagline":"frase curta e marcante","aviso":"visto, documentos e vacinas para brasileiros, e alertas oficiais se houver",
+"melhorEpoca":"","passagens":"quando as passagens costumam ser mais baratas e com quanta antecedência comprar","melhores":[meses 1-12],
+"clima":[[temperatura média em °C (número), chuva de 0 a 3 (número), "estação ou época, ex.: Verão, Chuvas, Seca"], ... 12 itens de janeiro a dezembro],
+"seguranca":{"nivel":número de 1 (perigoso) a 5 (muito seguro),"resumo":"","seguros":["regiões recomendadas para turistas"],"cuidado":["locais e situações que exigem cuidado"]},
+"atracoes":[["nome","preço em R$"]] (6 itens),
+"segredos":[["lugar pouco famoso que vale muito","por quê"]] (4 itens),
+"experiencias":[["experiência criativa e marcante","descrição","preço em R$"]] (3 itens),
+"hoteis":[["nome","cidade","faixa e por que vale"]] (3 itens),
+"restaurantes":[["nome","cidade","o que pedir"]] (3 itens),
+"comidas":[6 pratos típicos],"tradicoes":[5 costumes e regras de etiqueta],
+"voos":{"companhias":["companhia (rota)"],"rota":"","preco":[mínimo, máximo] ida e volta por pessoa em R$ desde São Paulo, números},
+"pacotes":[["nome do pacote","o que inclui"]] (3 itens),
+"dia":{"eco":[hospedagem, alimentação, transporte, experiências],"conf":[...],"luxo":[...]} em R$ por pessoa por dia, números,
+"economia":[4 dicas para economizar],
+"roteiro":[["título do dia","o que fazer, fugindo do óbvio"]] (10 dias)}
+Regras: cite apenas hotéis e restaurantes que você tem certeza que existem, bem avaliados e com bom custo-benefício. Seja honesto sobre segurança: se houver alerta oficial para não viajar ao país ou a regiões, diga claramente em "aviso" e em "seguranca". Use faixas de preço, não números inventados com falsa precisão.`}
+
+function promptRoteiro(d){
+return `Você é o planejador do TravelMate, app brasileiro de viagens. Crie um roteiro personalizado e criativo.
+Destino: ${d.nome}${S.cidade?`, cidade principal: ${S.cidade}`:""}.
+Duração: ${S.dias} dias. Mês: ${MESES[S.mes-1]}. Viajantes: ${S.pax} (${quemTxt(S.quem)}). Interesses: ${perfilTxt()}.
+Orçamento total do grupo: ${brl(S.orc)} (inclui passagens). Nível de gasto sugerido: ${{eco:"econômico",conf:"conforto",luxo:"luxo"}[nivelAtual()]}.
+Regras: fuja dos roteiros tradicionais; inclua pelo menos uma experiência inusitada a cada dois dias e um lugar pouco famoso que vale a pena; indique restaurantes reais e bem avaliados com ótimo custo-benefício; agrupe atividades por região para não perder tempo; considere o clima do mês; respeite o orçamento.
+Responda SOMENTE com JSON válido: {"resumo":"2 frases","dias":[{"titulo":"","manha":"","tarde":"","noite":"","custo":número em R$ por pessoa no dia, sem hospedagem}],"dicas":["3 dicas práticas"]} com exatamente ${S.dias} itens em "dias".`}
+
+function normDossie(o,code){
+  const arr=v=>Array.isArray(v)?v:[]; const num=v=>Number(String(v).replace(/[^\d.]/g,""))||0;
+  let clima=arr(o.clima).slice(0,12).map(m=>Array.isArray(m)?[num(m[0]),Math.max(0,Math.min(3,Math.round(num(m[1])))),String(m[2]||"")]:[0,0,""]);
+  while(clima.length<12)clima.push([0,0,""]);
+  const dd=o.dia||{}; const dia={}; ["eco","conf","luxo"].forEach(k=>{const a=arr(dd[k]).map(num);dia[k]=[0,1,2,3].map(i=>a[i]||0)});
+  const voos=o.voos||{}; const p=arr(voos.preco).map(num);
+  return {code,nome:NOME[code],ia:true,tagline:o.tagline||"",capital:o.capital||"",moeda:o.moeda||"",idioma:o.idioma||"",aviso:o.aviso||"",
+    melhorEpoca:o.melhorEpoca||"",passagens:o.passagens||"",melhores:arr(o.melhores).map(num).filter(n=>n>=1&&n<=12),clima,
+    seguranca:{nivel:Math.max(1,Math.min(5,Math.round(num((o.seguranca||{}).nivel))||3)),resumo:(o.seguranca||{}).resumo||"",seguros:arr((o.seguranca||{}).seguros),cuidado:arr((o.seguranca||{}).cuidado)},
+    atracoes:arr(o.atracoes),segredos:arr(o.segredos),experiencias:arr(o.experiencias),hoteis:arr(o.hoteis),restaurantes:arr(o.restaurantes),
+    comidas:arr(o.comidas),tradicoes:arr(o.tradicoes),voos:{companhias:arr(voos.companhias),rota:voos.rota||"",preco:[p[0]||0,p[1]||p[0]||0]},
+    pacotes:arr(o.pacotes),dia,economia:arr(o.economia),roteiro:arr(o.roteiro)};
+}
+
+/* ===================== PLANNER UI ===================== */
+function chipGroup(el,items,{multi,get,set}){
+  el.innerHTML=items.map(([k,l])=>`<button type="button" class="chip" data-k="${k}">${esc(l)}</button>`).join("");
+  const sync=()=>el.querySelectorAll(".chip").forEach(b=>b.setAttribute("aria-pressed",multi?get().includes(b.dataset.k):get()===b.dataset.k));
+  el.onclick=e=>{const b=e.target.closest(".chip");if(!b)return;const k=b.dataset.k;
+    if(multi){const v=get();set(v.includes(k)?v.filter(x=>x!==k):[...v,k])}else set(k);sync();save()};
+  sync();
+}
+function initPlanner(){
+  const sorted=[...PAISES].sort((a,b)=>a.n.localeCompare(b.n,"pt"));
+  $("#fPais").innerHTML=`<optgroup label="Dossiês completos">${Object.keys(C).map(c=>`<option value="${c}">${flag(c)} ${esc(NOME[c])}</option>`).join("")}</optgroup><optgroup label="Todos os países (com IA)">${sorted.map(p=>`<option value="${p.c}">${flag(p.c)} ${esc(p.n)}</option>`).join("")}</optgroup>`;
+  $("#fMes").innerHTML=MESES.map((m,i)=>`<option value="${i+1}">${m}</option>`).join("");
+  $("#sMes").innerHTML=$("#fMes").innerHTML;
+  $("#fPax").innerHTML=Array.from({length:10},(_,i)=>`<option value="${i+1}">${i+1} ${i?"pessoas":"pessoa"}</option>`).join("");
+  $("#fPais").value=S.pais; $("#fCidade").value=S.cidade; $("#fMes").value=S.mes; $("#fDias").value=S.dias; $("#fPax").value=S.pax; $("#fOrc").value=S.orc;
+  $("#vDias").textContent=S.dias;
+  $("#fPais").onchange=e=>{S.pais=e.target.value;save()};
+  $("#fCidade").oninput=e=>{S.cidade=e.target.value.trim();save()};
+  $("#fMes").onchange=e=>{S.mes=+e.target.value;save();if(dossie)renderDossie()};
+  $("#fDias").oninput=e=>{S.dias=+e.target.value;$("#vDias").textContent=S.dias;save()};
+  $("#fDias").onchange=()=>{if(dossie&&dossie.code===S.pais){roteiroIA=null;renderDossie()}};
+  $("#fPax").onchange=e=>{S.pax=+e.target.value;save();if(dossie)renderDossie()};
+  $("#fOrc").onchange=e=>{S.orc=Math.max(0,+e.target.value||0);nivelSel=null;save();if(dossie)renderDossie()};
+  chipGroup($("#cQuem"),QUEM,{get:()=>S.quem,set:v=>S.quem=v});
+  chipGroup($("#cPerfil"),PERFIS,{multi:true,get:()=>S.perfil,set:v=>S.perfil=v});
+  $("#planner").onsubmit=e=>{e.preventDefault();plan(true)};
+  $("#featured").innerHTML=Object.keys(C).map(c=>`<button type="button" class="dest" data-c="${c}" style="--c:${CORES_DEST[c]}"><span class="f">${flag(c)}</span><b>${esc(NOME[c])}</b><span>${esc(C[c].tagline)}</span></button>`).join("");
+  $("#featured").onclick=e=>{const b=e.target.closest(".dest");if(!b)return;S.pais=b.dataset.c;$("#fPais").value=S.pais;save();plan(true)};
+}
+
+async function plan(scroll){
+  const code=S.pais; nivelSel=null; roteiroIA=null;
+  const box=$("#dossie");
+  if(C[code]){dossie=Object.assign({code,nome:NOME[code]},C[code]);renderDossie();if(scroll)box.scrollIntoView({behavior:reduce?"auto":"smooth",block:"start"});return}
+  if(scroll)box.scrollIntoView({behavior:reduce?"auto":"smooth",block:"start"});
+  if(AI!=="ok"){box.innerHTML=`<div class="alert" role="alert"><div><b>${flag(code)} ${esc(NOME[code])}</b> é montado na hora pela assistente de IA, que só funciona com o TravelMate aberto dentro do Claude. Os dossiês prontos estão acima: Tailândia, Japão, Itália, Portugal, Peru e México.</div></div>`;return}
+  const cidade=S.cidade;
+  const r=await runAI(box,`Montando o dossiê de ${NOME[code]}…`,signal=>SAMPLE.json(promptDossie(NOME[code],cidade),{signal,cache:{gcTime:86400000}}));
+  if(!r)return; dossie=normDossie(r,code); renderDossie();
+}
+
+/* ===================== DOSSIER ===================== */
+const LV={eco:"Econômico",conf:"Conforto",luxo:"Luxo"};
+function calc(d){
+  const voo=(d.voos.preco[0]+d.voos.preco[1])/2, pax=S.pax, dias=S.dias, mult={eco:.85,conf:1,luxo:1.25};
+  const out={}; ["eco","conf","luxo"].forEach(k=>{const a=d.dia[k];const r={hosp:a[0]*dias*pax,alim:a[1]*dias*pax,transp:a[2]*dias*pax,exp:a[3]*dias*pax,pass:voo*mult[k]*pax};r.total=r.hosp+r.alim+r.transp+r.exp+r.pass;out[k]=r});
+  return out;
+}
+function nivelAtual(){if(nivelSel)return nivelSel;if(!dossie)return "conf";const c=calc(dossie);return ["luxo","conf","eco"].find(k=>c[k].total<=S.orc)||"eco"}
+
+function renderDossie(){
+  const d=dossie, box=$("#dossie"); if(!d)return;
+  const secs=[["roteiro","Roteiro","var(--teal)"],["custos","Custos","var(--coral)"],["clima","Clima e épocas","var(--azure)"],["seguranca","Segurança","var(--jade)"],["atracoes","Atrações","var(--saffron)"],["segredos","Pouco famosos","var(--violet)"],["comer","Comer e dormir","var(--coral)"],["cultura","Cultura","var(--saffron)"],["voos","Voos e pacotes","var(--azure)"]];
+  box.innerHTML=`
+  <div class="dhead">
+    ${d.ia?`<span class="src">Gerado por IA</span>`:`<span class="src">Dossiê TravelMate</span>`}
+    <span class="flag">${flag(d.code)}</span>
+    <h2>${esc(d.nome)}${S.cidade?` <span style="opacity:.7">· ${esc(S.cidade)}</span>`:""}</h2>
+    <p>${esc(d.tagline)}</p>
+    <div class="facts"><span>Capital: ${esc(d.capital)}</span><span>Moeda: ${esc(d.moeda)}</span><span>Idioma: ${esc(d.idioma)}</span><span class="num">${S.dias} dias · ${S.pax} ${S.pax>1?"pessoas":"pessoa"} · ${MESES[S.mes-1]}</span></div>
+  </div>
+  <nav class="subnav" aria-label="Seções do dossiê">${secs.map(([id,l,c])=>`<a href="#s-${id}" style="--c:${c}">${l}</a>`).join("")}</nav>
+  ${d.aviso?`<div class="alert"><div><b>Antes de ir:</b> ${esc(d.aviso)}</div></div>`:""}
+  ${secRoteiro(d)}${secCustos(d)}${secClima(d)}${secSeg(d)}${secAtr(d)}${secSeg2(d)}${secComer(d)}${secCult(d)}${secVoos(d)}`;
+  box.querySelectorAll(".subnav a").forEach(a=>a.onclick=e=>{e.preventDefault();const t=document.getElementById(a.getAttribute("href").slice(1));if(t)t.scrollIntoView({behavior:reduce?"auto":"smooth"})});
+  box.querySelectorAll(".level").forEach(b=>b.onclick=()=>{nivelSel=b.dataset.k;renderDossie();document.getElementById("s-custos").scrollIntoView({block:"start"})});
+  const gen=box.querySelector("#genRoteiro"); if(gen)gen.onclick=genRoteiro;
+  aiUI();
+}
+const head=(id,c,eyebrow,title,sub)=>`<header style="--c:${c}"><span class="eyebrow">${eyebrow}</span><h3>${title}</h3>${sub?`<p class="lead">${sub}</p>`:""}</header>`;
+
+function templateDias(d){
+  const base=d.roteiro.map(r=>({titulo:r[0],desc:r[1]})); const n=S.dias; let out=base.slice(0,n);
+  const extra=[...d.segredos.map(s=>({titulo:"Fora do roteiro: "+s[0],desc:s[1]})),...d.experiencias.map(x=>({titulo:x[0],desc:x[1]+" ("+x[2]+")"}))];
+  let i=0; while(out.length<n){out.push(extra[i]||{titulo:"Dia livre",desc:"Volte ao bairro de que mais gostou, ou faça uma aula, um mercado local ou um passeio que ficou para trás."});i++}
+  if(n>=2&&n<base.length)out[n-1]={titulo:"Despedida",desc:"Manhã livre para um último passeio e voo de volta."};
+  return out;
+}
+function secRoteiro(d){
+  let body;
+  if(roteiroIA){
+    body=`${roteiroIA.resumo?`<p class="lead">${esc(roteiroIA.resumo)}</p>`:""}<div class="days">${roteiroIA.dias.map((x,i)=>`
+      <div class="day"><div class="dn">Dia<b class="num">${i+1}</b></div><div><h4>${esc(x.titulo)}</h4><div class="parts">
+      ${x.manha?`<span><b>Manhã</b>${esc(x.manha)}</span>`:""}${x.tarde?`<span><b>Tarde</b>${esc(x.tarde)}</span>`:""}${x.noite?`<span><b>Noite</b>${esc(x.noite)}</span>`:""}</div>
+      ${x.custo?`<div class="cost num">Gasto estimado no dia: ${brl(Number(x.custo)||0)} por pessoa, sem hospedagem</div>`:""}</div></div>`).join("")}</div>
+      ${roteiroIA.dicas&&roteiroIA.dicas.length?`<ul class="list" style="--c:var(--teal)">${roteiroIA.dicas.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>`:""}`;
+  }else{
+    body=`<div class="days">${templateDias(d).map((x,i)=>`<div class="day"><div class="dn">Dia<b class="num">${i+1}</b></div><div><h4>${esc(x.titulo)}</h4><div class="parts"><span>${esc(x.desc)}</span></div></div></div>`).join("")}</div>`;
+  }
+  return `<section class="sec" id="s-roteiro">${head("roteiro","var(--teal)","Roteiro de "+S.dias+(S.dias>1?" dias":" dia"),roteiroIA?"Seu roteiro personalizado":"Roteiro sugerido",roteiroIA?"":"Base pronta. Peça à IA para adaptar à sua cidade, ao seu perfil e ao seu orçamento.")}
+  <div class="actions"><button class="btn ai" type="button" id="genRoteiro" data-ai>${roteiroIA?"Gerar outra versão com IA":"Personalizar com IA"}</button><span class="note">Perfil: ${esc(perfilTxt())} · ${esc(quemTxt(S.quem))}</span></div>
+  <div id="roteiroBody">${body}</div></section>`;
+}
+async function genRoteiro(){
+  const d=dossie; const box=$("#roteiroBody"); const btn=$("#genRoteiro"); btn.disabled=true;
+  const r=await runAI(box,`Criando ${S.dias} dias em ${d.nome}…`,signal=>SAMPLE.json(promptRoteiro(d),{signal,cache:false}));
+  btn.disabled=false;
+  if(!r||!Array.isArray(r.dias)){if(r)box.innerHTML=`<div class="alert">A resposta veio sem os dias. Tente de novo.</div>`;return}
+  roteiroIA=r; renderDossie(); document.getElementById("s-roteiro").scrollIntoView({block:"start"});
+}
+function secCustos(d){
+  const c=calc(d), k=nivelAtual(), r=c[k];
+  const parts=[["Passagens","pass","var(--azure)"],["Hospedagem","hosp","var(--violet)"],["Alimentação","alim","var(--coral)"],["Transporte local","transp","var(--teal)"],["Experiências","exp","var(--saffron)"]];
+  const diff=S.orc-r.total;
+  const status=diff>=0?`<span class="pill ok">Cabe no orçamento · sobram ${brl(diff)}</span>`:`<span class="pill bad">Faltam ${brl(-diff)} no orçamento</span>`;
+  return `<section class="sec" id="s-custos">${head("custos","var(--coral)","Estimativa total","Quanto vai custar",`Para ${S.pax} ${S.pax>1?"pessoas":"pessoa"} em ${S.dias} dias, com passagem ida e volta desde São Paulo. Hospedagem considera quarto duplo dividido.`)}
+  <div class="levels">${["eco","conf","luxo"].map(x=>`<button type="button" class="level" data-k="${x}" aria-pressed="${x===k}"><span class="eyebrow">${LV[x]}</span><span class="t num">${brl(c[x].total)}</span>${c[x].total<=S.orc?`<span class="pill ok">Cabe</span>`:`<span class="pill warn">Acima do orçamento</span>`}</button>`).join("")}</div>
+  <div class="total"><b class="num">${brl(r.total)}</b><span class="note">nível ${LV[k].toLowerCase()} · ${brl(r.total/S.pax)} por pessoa</span>${status}</div>
+  <div class="stack" role="img" aria-label="Divisão do custo">${parts.map(([l,f,col])=>`<i style="width:${(r[f]/r.total*100).toFixed(1)}%;background:${col}" title="${l}"></i>`).join("")}</div>
+  <div class="legend">${parts.map(([l,f,col])=>`<div style="--c:${col}"><span>${l}</span><b class="num">${brl(r[f])}</b></div>`).join("")}</div>
+  <div class="box" style="--c:var(--coral)"><h4>Onde economizar</h4><ul class="list">${d.economia.map(t=>`<li>${esc(t)}</li>`).join("")}</ul></div></section>`;
+}
+function secClima(d){
+  const temps=d.clima.map(m=>m[0]); const lo=Math.min(...temps,0), hi=Math.max(...temps,30);
+  const sel=S.mes; const m=d.clima[sel-1]||[0,0,""]; const best=d.melhores.includes(sel);
+  const verdict=best?`<span class="pill ok">${MESES[sel-1]} é uma das melhores épocas</span>`:m[1]>=3?`<span class="pill bad">${MESES[sel-1]}: muita chuva, planeje com cuidado</span>`:`<span class="pill warn">${MESES[sel-1]}: época boa, mas não a ideal</span>`;
+  const seasons=[...new Set(d.clima.map(x=>x[2]).filter(Boolean))];
+  return `<section class="sec" id="s-clima">${head("clima","var(--azure)","Estatística do ano","Clima e melhores épocas","")}
+  <div class="actions">${verdict}</div>
+  <div class="clima-wrap"><div class="clima" role="table" aria-label="Clima mês a mês">${d.clima.map((x,i)=>`
+    <div class="mcol${i+1===sel?" sel":""}" role="row" style="--c:${seasonColor(x[2])}">
+      <span class="best">${d.melhores.includes(i+1)?"★ ideal":""}</span>
+      <span class="tmp num">${x[0]}°</span>
+      <div class="barbox"><div class="bar" style="height:${Math.max(6,((x[0]-lo)/(hi-lo||1))*100).toFixed(0)}%"></div></div>
+      <div class="rain" title="Chuva ${x[1]} de 3">${[1,2,3].map(n=>`<i class="${n<=x[1]?"":"off"}"></i>`).join("")}</div>
+      <span class="mn">${MES3[i]}</span><span class="st">${esc(x[2])}</span></div>`).join("")}</div></div>
+  <div class="seasons">${seasons.map(s=>`<span style="--c:${seasonColor(s)}">${esc(s)}</span>`).join("")}<span class="note">Barras: temperatura média · pontos azuis: chuva (0 a 3)</span></div>
+  <div class="two"><div class="box"><h4>Melhor época</h4><p>${esc(d.melhorEpoca)}</p></div><div class="box"><h4>Passagens mais baratas</h4><p>${esc(d.passagens)}</p></div></div></section>`;
+}
+function secSeg(d){
+  const s=d.seguranca; const col=s.nivel>=4?"var(--ok)":s.nivel===3?"var(--warn)":"var(--bad)"; const lbl=["","Perigoso","Arriscado","Atenção","Seguro","Muito seguro"][s.nivel];
+  return `<section class="sec" id="s-seguranca">${head("seguranca","var(--jade)","Segurança","Onde ficar e onde ter cuidado","")}
+  <div class="actions"><div class="gauge" style="--c:${col}" aria-label="Nível ${s.nivel} de 5">${[1,2,3,4,5].map(n=>`<i class="${n<=s.nivel?"on":""}"></i>`).join("")}</div><b>${lbl}</b><span class="note">${esc(s.resumo)}</span></div>
+  <div class="two"><div class="box"><h4>Regiões recomendadas para turistas</h4><ul class="list" style="--c:var(--ok)">${s.seguros.map(t=>`<li>${esc(t)}</li>`).join("")}</ul></div>
+  <div class="box"><h4>Exigem mais cuidado</h4><ul class="list" style="--c:var(--warn)">${s.cuidado.map(t=>`<li>${esc(t)}</li>`).join("")}</ul></div></div></section>`;
+}
+function secAtr(d){
+  return `<section class="sec" id="s-atracoes">${head("atracoes","var(--saffron)","Atrações","As melhores atrações e seus preços","")}
+  <div class="tbl"><table class="t"><thead><tr><th>Atração</th><th style="text-align:right">Preço por pessoa</th></tr></thead><tbody>${d.atracoes.map(a=>`<tr><td>${esc(a[0])}</td><td class="p num">${esc(a[1])}</td></tr>`).join("")}</tbody></table></div>
+  <div class="gems">${d.experiencias.map(x=>`<div class="gem"><span class="eyebrow">Experiência diferente</span><b>${esc(x[0])}</b><p>${esc(x[1])}</p><span class="price">${esc(x[2])}</span></div>`).join("")}</div></section>`;
+}
+function secSeg2(d){
+  return `<section class="sec" id="s-segredos">${head("segredos","var(--violet)","Não é famoso, mas você precisa conhecer","Lugares que quase ninguém visita","")}
+  <div class="gems">${d.segredos.map(x=>`<div class="gem"><b>${esc(x[0])}</b><p>${esc(x[1])}</p></div>`).join("")}</div></section>`;
+}
+function secComer(d){
+  return `<section class="sec" id="s-comer">${head("comer","var(--coral)","Custo-benefício","Hotéis e restaurantes bem avaliados","")}
+  <div class="two"><div class="box"><h4>Onde dormir</h4><ul class="list" style="--c:var(--violet)">${d.hoteis.map(h=>`<li><span><b>${esc(h[0])}</b> · ${esc(h[1])}<br><span class="note">${esc(h[2])}</span></span></li>`).join("")}</ul></div>
+  <div class="box"><h4>Onde comer</h4><ul class="list" style="--c:var(--coral)">${d.restaurantes.map(h=>`<li><span><b>${esc(h[0])}</b> · ${esc(h[1])}<br><span class="note">${esc(h[2])}</span></span></li>`).join("")}</ul></div></div></section>`;
+}
+function secCult(d){
+  return `<section class="sec" id="s-cultura">${head("cultura","var(--saffron)","Para estar por dentro","Comidas locais e tradições","")}
+  <div class="two"><div class="box"><h4>Prove</h4><div class="tags">${d.comidas.map(t=>`<span>${esc(t)}</span>`).join("")}</div></div>
+  <div class="box"><h4>Costumes e etiqueta</h4><ul class="list" style="--c:var(--saffron)">${d.tradicoes.map(t=>`<li>${esc(t)}</li>`).join("")}</ul></div></div></section>`;
+}
+function secVoos(d){
+  return `<section class="sec" id="s-voos">${head("voos","var(--azure)","Como chegar","Companhias aéreas e pacotes",`${esc(d.voos.rota)} · ida e volta de ${brl(d.voos.preco[0])} a ${brl(d.voos.preco[1])} por pessoa em classe econômica.`)}
+  <div class="two"><div class="box"><h4>Melhores companhias</h4><ul class="list" style="--c:var(--azure)">${d.voos.companhias.map(t=>`<li>${esc(t)}</li>`).join("")}</ul></div>
+  <div class="box"><h4>Pacotes recomendados</h4><ul class="list" style="--c:var(--teal)">${d.pacotes.map(p=>`<li><span><b>${esc(p[0])}</b><br><span class="note">${esc(p[1])}</span></span></li>`).join("")}</ul></div></div>
+  <p class="note">Compare o pacote com a compra separada de voo e hotel: fora da alta temporada, montar por conta própria costuma sair mais barato.</p></section>`;
+}
+
+/* ===================== SURPREENDA ===================== */
+function initSurp(){
+  $("#sMes").value=SS.mes; $("#sOrc").value=SS.orc; $("#vSOrc").textContent=brl(SS.orc);
+  $("#sMes").onchange=e=>{SS.mes=+e.target.value;save()};
+  $("#sOrc").oninput=e=>{SS.orc=+e.target.value;$("#vSOrc").textContent=brl(SS.orc);save()};
+  chipGroup($("#sBusca"),BUSCA,{multi:true,get:()=>SS.busca,set:v=>SS.busca=v});
+  chipGroup($("#sQuem"),QUEM,{get:()=>SS.quem,set:v=>SS.quem=v});
+  $("#surpForm").onsubmit=e=>{e.preventDefault();surpreenda()};
+  $("#missaoIA").onclick=missaoIA;
+}
+function ranking(){
+  return MISSOES.map(m=>{let s=0;if(m.meses.includes(SS.mes))s+=4;else if(m.meses.some(x=>Math.abs(x-SS.mes)===1||Math.abs(x-SS.mes)===11))s+=1;else s-=3;
+    s+=2*m.tags.filter(t=>SS.busca.includes(t)).length; if(m.quem.includes(SS.quem))s+=1.5; s+=m.custo<=SS.orc?2:-Math.min(4,(m.custo-SS.orc)/3000);
+    return {m,s:s+Math.random()*.4}}).sort((a,b)=>b.s-a.s);
+}
+let lastRank=[], rankIdx=0;
+function surpreenda(){lastRank=ranking();rankIdx=0;renderCena(lastRank[0].m)}
+function renderCena(m,ia,quiet){
+  const box=$("#cena"); const alts=lastRank.filter(r=>r.m.id!==m.id).slice(0,3);
+  const fits=m.custo<=SS.orc;
+  box.innerHTML=`<article class="scene" style="--mc:${esc(m.cor||"#F5A524")}">
+   <div class="screen"><div class="sky"></div><canvas class="fx"></canvas>
+    <div class="sinner"><p class="kick">TravelMate apresenta${ia?" · criada por IA":""}</p><h2>${esc(m.titulo)}</h2><p class="sloc">${m.code&&NOME[m.code]?flag(m.code)+" ":""}${esc(m.local)}</p>
+     <ol class="beats">${m.cena.map((t,i)=>`<li style="--i:${i}"><b>Cena ${i+1}</b><span>${esc(t)}</span></li>`).join("")}</ol></div></div>
+   <div class="sdoss">
+    <div class="kv"><b>Onde acontece</b><span>${esc(m.onde)}</span></div>
+    <div class="kv"><b>Melhor horário</b><span>${esc(m.horario)}</span></div>
+    <div class="kv"><b>Preço</b><span>${esc(m.preco)}</span></div>
+    <div class="kv"><b>Viagem completa estimada</b><span class="num">${brl(m.custo)} por pessoa</span>${fits?`<span class="pill ok">Cabe no seu orçamento</span>`:`<span class="pill warn">Acima do seu orçamento</span>`}</div>
+    <div class="kv"><b>Hotel recomendado</b><span>${esc(m.hotel)}</span></div>
+    <div class="kv"><b>Onde comer depois</b><span>${esc(m.comer)}</span></div>
+    <div class="kv"><b>Indicado para</b><span>${esc(m.indicado)}</span></div>
+    <div class="kv"><b>O que levar</b><ul class="list" style="--c:var(--mc)">${(m.levar||[]).map(t=>`<li>${esc(t)}</li>`).join("")}</ul></div>
+    <div class="kv" style="grid-column:1/-1"><div class="actions">
+      ${m.code&&NOME[m.code]?`<button class="btn" type="button" id="planMissao">Planejar esta viagem</button>`:""}
+      ${!ia?`<button class="btn alt" type="button" id="outraMissao">Outra missão</button>`:""}
+      ${!m.meses||m.meses.includes(SS.mes)?"":`<span class="note">Melhor época: ${m.meses.map(x=>MESES[x-1]).join(", ")}.</span>`}</div>
+      ${alts.length&&!ia?`<p class="note" style="margin-top:10px">Também combinam com você:</p><div class="alts">${alts.map(a=>`<button type="button" class="chip" data-m="${a.m.id}">${flag(a.m.code)} ${esc(a.m.titulo.replace("Missão ",""))}</button>`).join("")}</div>`:""}
+    </div></div></article>`;
+  requestAnimationFrame(()=>box.querySelector(".scene").classList.add("play"));
+  fx(box.querySelector(".fx"),m.cor||"#F5A524");
+  const pm=$("#planMissao"); if(pm)pm.onclick=()=>{S.pais=m.code;S.mes=m.meses&&m.meses.length?(m.meses.includes(SS.mes)?SS.mes:m.meses[0]):SS.mes;S.quem=SS.quem;$("#fPais").value=S.pais;$("#fMes").value=S.mes;save();initQuemSync();show("explorar");plan(true)};
+  const om=$("#outraMissao"); if(om)om.onclick=()=>{rankIdx=(rankIdx+1)%lastRank.length;renderCena(lastRank[rankIdx].m)};
+  box.querySelectorAll("[data-m]").forEach(b=>b.onclick=()=>renderCena(MISSOES.find(x=>x.id===b.dataset.m)));
+  if(!quiet)box.scrollIntoView({behavior:reduce?"auto":"smooth",block:"start"});
+}
+function initQuemSync(){$$("#cQuem .chip").forEach(b=>b.setAttribute("aria-pressed",b.dataset.k===S.quem))}
+let fxRaf=0;
+function fx(cv,color){
+  cancelAnimationFrame(fxRaf); if(!cv)return; const dpr=Math.min(devicePixelRatio||1,2);
+  const W=cv.clientWidth,H=cv.clientHeight; cv.width=W*dpr; cv.height=H*dpr; const c=cv.getContext("2d"); c.setTransform(dpr,0,0,dpr,0,0);
+  const P=Array.from({length:Math.round(W/14)},()=>({x:Math.random()*W,y:Math.random()*H,r:1.5+Math.random()*4,v:.15+Math.random()*.5,w:Math.random()*6.28}));
+  const draw=()=>{c.clearRect(0,0,W,H);P.forEach(p=>{p.y-=p.v;p.w+=.02;if(p.y<-10){p.y=H+10;p.x=Math.random()*W}
+    const x=p.x+Math.sin(p.w)*6; const g=c.createRadialGradient(x,p.y,0,x,p.y,p.r*4);g.addColorStop(0,color);g.addColorStop(1,"transparent");c.fillStyle=g;c.globalAlpha=.75;c.beginPath();c.arc(x,p.y,p.r*4,0,7);c.fill();
+    c.globalAlpha=1;c.fillStyle="#FFF4D6";c.beginPath();c.arc(x,p.y,p.r*.6,0,7);c.fill()});if(!reduce)fxRaf=requestAnimationFrame(draw)};
+  draw();
+}
+async function missaoIA(){
+  if(AI!=="ok")return; const box=$("#cena"); lastRank=ranking();
+  const busca=SS.busca.map(b=>(BUSCA.find(x=>x[0]===b)||[,b])[1]).join(", ")||"surpresa";
+  const prompt=`Você é o diretor criativo do TravelMate, app brasileiro de viagens. Sugira UM destino no mundo para uma experiência inesquecível e pouco óbvia, apresentada como uma cena de filme.
+Viajante: vai em ${MESES[SS.mes-1]}, pode gastar até ${brl(SS.orc)} por pessoa na viagem toda (saindo do Brasil, com passagens), quer sentir: ${busca}; viaja com: ${quemTxt(SS.quem)}.
+Evite estas missões que o app já tem: ${MISSOES.map(m=>m.titulo).join("; ")}.
+A experiência precisa acontecer de verdade nesse mês. Seja honesto sobre preços (faixas em R$) e segurança. Cite só hotéis e restaurantes que você tem certeza que existem.
+Responda SOMENTE com JSON válido: {"code":"código ISO de 2 letras do país","titulo":"Missão ...","local":"cidade/região, país","meses":[meses ideais 1-12],"custo":número estimado em R$ por pessoa para a viagem de 7 a 10 dias,"cor":"cor hex que combina com a cena","cena":["4 frases curtas no presente, em segunda pessoa, como cenas de filme"],"onde":"","horario":"melhor horário","preco":"preço da experiência","hotel":"hotel recomendado","comer":"onde comer depois","indicado":"para que tipo de pessoa é indicado","levar":["4 a 6 itens"]}`;
+  const r=await runAI(box,"Escrevendo o roteiro da sua cena…",signal=>SAMPLE.json(prompt,{signal,cache:false}));
+  if(!r)return;
+  const m={id:"ia",code:String(r.code||"").toUpperCase().slice(0,2),titulo:r.titulo||"Missão surpresa",local:r.local||"",meses:Array.isArray(r.meses)?r.meses.map(Number):[],custo:Number(r.custo)||0,cor:/^#[0-9a-f]{3,8}$/i.test(r.cor||"")?r.cor:"#F5A524",
+    cena:Array.isArray(r.cena)?r.cena.slice(0,6):[],onde:r.onde||"",horario:r.horario||"",preco:r.preco||"",hotel:r.hotel||"",comer:r.comer||"",indicado:r.indicado||"",levar:Array.isArray(r.levar)?r.levar:[]};
+  renderCena(m,true);
+}
+
+/* ===================== CHAT ===================== */
+const turns=[];
+function fmt(t){
+  const lines=esc(t).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").split("\n"); let out="",inList=false;
+  lines.forEach(l=>{const m=l.match(/^\s*(?:[-•*]|\d+\.)\s+(.*)/);if(m){if(!inList){out+="<ul>";inList=true}out+=`<li>${m[1]}</li>`}else{if(inList){out+="</ul>";inList=false}if(l.trim())out+=`<p>${l}</p>`}});
+  return out+(inList?"</ul>":"");
+}
+function ctxTxt(){return `país em análise: ${NOME[S.pais]}${S.cidade?", cidade "+S.cidade:""}; ${S.dias} dias em ${MESES[S.mes-1]}; ${S.pax} viajante(s), ${quemTxt(S.quem)}; orçamento total ${brl(S.orc)}; interesses: ${perfilTxt()}`}
+let chatCtl=null;
+async function ask(q){
+  if(!q||AI!=="ok")return; $("#sugs")?.remove();
+  const msgs=$("#msgs"); const u=document.createElement("div");u.className="msg u";u.textContent=q;msgs.appendChild(u);
+  const a=document.createElement("div");a.className="msg a";a.textContent="Pensando…";msgs.appendChild(a);msgs.scrollTop=msgs.scrollHeight;
+  turns.push({role:"user",content:q}); while(turns.length>12)turns.splice(0,2);
+  const rules=`Você é a assistente de viagens do app TravelMate. Responda em português do Brasil, com tom cordial e profissional. Dê preços em reais como faixas estimadas e lembre que câmbio e temporada mudam os valores. Fale de segurança com honestidade e cite alertas oficiais quando existirem. Prefira sugestões fora do óbvio e lugares bem avaliados com bom custo-benefício. Seja breve: até cerca de 180 palavras, com listas iniciadas por "- " quando ajudar. Contexto do planejamento atual do usuário: ${ctxTxt()}.`;
+  $("#chatSend").disabled=true; chatCtl=new AbortController();
+  try{const {text}=await SAMPLE([{role:"user",content:rules},...turns],{cache:false,signal:chatCtl.signal,modelTier:"quick",onText:({text})=>{a.innerHTML=fmt(text);msgs.scrollTop=msgs.scrollHeight}});
+    turns.push({role:"assistant",content:text})}
+  catch(e){aiFatal(e);if(e.text)a.innerHTML=fmt(e.text);else a.textContent=errMsg(e);turns.pop()}
+  finally{$("#chatSend").disabled=AI!=="ok"}
+}
+function initChat(){
+  const open=()=>{$("#drawer").classList.add("open");setTimeout(()=>$("#chatIn").focus(),300)};
+  $("#openChat").onclick=open; $("#fab").onclick=open; $("#closeChat").onclick=()=>$("#drawer").classList.remove("open");
+  $("#compose").onsubmit=e=>{e.preventDefault();const q=$("#chatIn").value.trim();$("#chatIn").value="";ask(q)};
+  $("#sugs").onclick=e=>{const b=e.target.closest("button");if(b)ask(b.textContent)};
+  document.addEventListener("keydown",e=>{if(e.key==="Escape")$("#drawer").classList.remove("open")});
+}
+
+/* ===================== NAV ===================== */
+function show(v){$$(".view").forEach(s=>s.hidden=s.id!=="v-"+v);if(v==="surpreenda"&&!$("#cena").innerHTML){lastRank=ranking();renderCena(lastRank[0].m,false,true)}$$(".nav [data-view]").forEach(b=>b.setAttribute("aria-current",b.dataset.view===v?"page":"false"));window.scrollTo({top:0})}
+$$(".nav [data-view]").forEach(b=>b.onclick=()=>show(b.dataset.view));
+
+/* ===================== BOOT ===================== */
+const setHH=()=>document.documentElement.style.setProperty("--hh",$(".top").offsetHeight+"px");setHH();addEventListener("resize",setHH);
+initPlanner(); initSurp(); initChat(); aiUI();
+if(C[S.pais])plan(false); else {const p=S.pais;S.pais="TH";plan(false);S.pais=p}
+if(location.hash==="#surpreenda")show("surpreenda");
+fontReady().then(()=>{const ml=$("#miniLogo");drawLogo(ml,{maxW:1,maxH:1});addEventListener("resize",()=>drawLogo(ml,{maxW:1,maxH:1}))});
+intro();
+</script>
