@@ -33,7 +33,7 @@ import unicodedata
 from collections import deque
 from pathlib import Path
 
-from PyQt6.QtCore import QEasingCurve, QEvent, QObject, QPointF, QPropertyAnimation, QRectF, Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QEasingCurve, QEvent, QObject, QPointF, QPropertyAnimation, QRect, QRectF, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import (QBrush, QColor, QFont, QImage, QKeySequence, QLinearGradient, QPainter, QPainterPath, QPen,
                          QPixmap, QRadialGradient, QShortcut)
 from PyQt6.QtWidgets import (QGraphicsOpacityEffect, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
@@ -93,10 +93,13 @@ def definir_ultron(win, ligado: bool) -> None:
     try:
         hud = getattr(win, "hud", None)
         if hud is not None:
+            hud._quadro_novo = True
             hud.update()
         orbe = getattr(win, "_orbe", None)
         cena = getattr(orbe, "cena", None) if orbe is not None else None
         if cena is not None:
+            if hasattr(cena, "acender_modo"):
+                cena.acender_modo(getattr(cena, "_maos_livres", True))
             cena.update()
             for w in cena.findChildren(QWidget):
                 w.update()
@@ -119,7 +122,29 @@ def _sem_acento(texto: str) -> str:
     return unicodedata.normalize("NFD", texto).encode("ascii", "ignore").decode().lower()
 
 
+_fundo_cache: dict = {}
+
+
 def pintar_fundo(p: QPainter, W: float, H: float) -> None:
+    """Desenha o fundo guardado em memória; só refaz quando muda o tamanho ou a cor (Ultron)."""
+    dev = p.device()
+    dpr = dev.devicePixelRatioF() if dev is not None else 1.0
+    chave = (int(W), int(H), round(dpr, 2), _ULTRON)
+    px = _fundo_cache.get(chave)
+    if px is None:
+        _fundo_cache.clear()
+        px = QPixmap(max(1, int(W * dpr)), max(1, int(H * dpr)))
+        px.setDevicePixelRatio(dpr)
+        px.fill(QColor("#000000"))
+        q = QPainter(px)
+        q.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        _desenhar_fundo(q, W, H)
+        q.end()
+        _fundo_cache[chave] = px
+    p.drawPixmap(0, 0, px)
+
+
+def _desenhar_fundo(p: QPainter, W: float, H: float) -> None:
     """Azul da sala escura com grade, como no monitor do vídeo."""
     cx, cy = W / 2, H / 2
     fundo = QRadialGradient(QPointF(cx, cy * 0.95), max(W, H) * 0.8)
@@ -173,6 +198,8 @@ class Orbe:
             })
         self.faiscas = [(rnd.randrange(self.FIOS), rnd.uniform(0, math.tau), rnd.uniform(0.2, 0.6)) for _ in range(14)]
         self._inicio = time.time()
+        self._quadro = None  # último quadro desenhado (reaproveitado)
+        self._chave = None
 
     def _ponto(self, fio: dict, ang: float, t: float, R: float, cx: float, cy: float, agito: float) -> QPointF:
         r = fio["raio"]
@@ -184,6 +211,43 @@ class Orbe:
         return QPointF(cx + (x * math.cos(g) - y * math.sin(g)) * R, cy + (x * math.sin(g) + y * math.cos(g)) * R)
 
     def pintar(self, hud, p: QPainter) -> None:
+        """Cola o quadro pronto. Só desenha um quadro novo quando a animação avança
+        (hud._quadro_novo) ou o tamanho/cor muda. Assim, quando um painel por cima se
+        atualiza, o anel não é redesenhado do zero (isso roubava processador das tarefas)."""
+        dpr = hud.devicePixelRatioF()
+        chave = (hud.width(), hud.height(), round(dpr, 2), _ULTRON)
+        if self._quadro is None or self._chave != chave or getattr(hud, "_quadro_novo", True):
+            px = QPixmap(max(1, int(hud.width() * dpr)), max(1, int(hud.height() * dpr)))
+            px.setDevicePixelRatio(dpr)
+            px.fill(QColor("#000000"))
+            q = QPainter(px)
+            self._desenhar(hud, q)
+            q.end()
+            self._quadro, self._chave = px, chave
+            hud._quadro_novo = False
+        p.drawPixmap(0, 0, self._quadro)
+
+    @staticmethod
+    def area_animada(hud) -> QRect:
+        """Pedaço da tela que muda quando o anel anda (sem voz): só o centro. Atualizar só
+        ele evita redesenhar à toa os painéis de vidro das laterais."""
+        W, H = hud.width(), hud.height()
+        R = min(W, H) * 0.34
+        meia = R * 1.45 + 16
+        topo = max(0.0, H / 2 - R * 1.42 - 4)
+        return QRect(int(W / 2 - meia), int(topo), int(2 * meia), int(H - topo))
+
+    @staticmethod
+    def _tracar(p: QPainter, cams, camadas, brilho: float) -> None:
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        for largura, tom, alfa in camadas:
+            for cam, fio, pulso in cams:
+                pen = QPen(cor(tom, alfa * brilho * pulso), largura * fio["largura"])
+                pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+                p.setPen(pen)
+                p.drawPath(cam)
+
+    def _desenhar(self, hud, p: QPainter) -> None:
         W, H = hud.width(), hud.height()
         cx, cy = W / 2, H / 2
         fw = min(W, H)
@@ -230,12 +294,27 @@ class Orbe:
         camadas = [(9.0, CIANO, 10), (3.5, AZUL, 40), (1.6, CIANO, 120), (0.7, GELO, 120)]
         if leve:
             camadas = camadas[1:]
-        for largura, tom, alfa in camadas:
-            for cam, fio, pulso in cams:
-                pen = QPen(cor(tom, alfa * brilho * pulso), largura * fio["largura"])
-                pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-                p.setPen(pen)
-                p.drawPath(cam)
+        # O brilho (traços largos e difusos) é desenhado em meia resolução, só na área do anel:
+        # a olho nu fica igual e custa ~1/4 do processador. O fio fino do centro continua em
+        # resolução total, para o anel não perder a nitidez.
+        largas = [c for c in camadas if c[0] > 1.0]
+        finas = [c for c in camadas if c[0] <= 1.0]
+        if largas:
+            esc = 0.5
+            caixa = QRectF(cx - R * 1.7, cy - R * 1.7, R * 3.4, R * 3.4)
+            img = QPixmap(max(1, int(caixa.width() * esc)), max(1, int(caixa.height() * esc)))
+            img.fill(Qt.GlobalColor.transparent)
+            q = QPainter(img)
+            q.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+            q.setCompositionMode(QPainter.CompositionMode.CompositionMode_Plus)
+            q.scale(esc, esc)
+            q.translate(-caixa.x(), -caixa.y())
+            # em meia resolução o traço médio espalha a luz; um pouco mais de intensidade compensa
+            self._tracar(q, cams, [(w, t, a * 1.35 if w < 2.0 else a) for w, t, a in largas], brilho)
+            q.end()
+            p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
+            p.drawPixmap(caixa, img, QRectF(img.rect()))
+        self._tracar(p, cams, finas, brilho)
 
         for i, ang0, vel in self.faiscas:
             fio = self.fios[i]
@@ -517,6 +596,9 @@ class Cena(QWidget):
         self._rede = ("VERIFICANDO", AMBAR, "")
 
         self.ativa = True
+        # A cena cobre a janela inteira com o anel (que é opaco). Marcando como opaca, o Qt
+        # deixa de desenhar o painel antigo que fica escondido atrás dela.
+        self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, True)
         self.hud.setParent(self)
         self.hud._cena = True
         self.hud.show()
@@ -724,14 +806,18 @@ class Cena(QWidget):
 
     def acender_modo(self, maos_livres: bool):
         """Destaca o modo ativo (chamado pela janela quando o modo de escuta muda)."""
+        self._maos_livres = bool(maos_livres)
+        destaque = cor(CIANO)  # segue o tema (laranja no modo Ultron)
+        d = destaque.name()
         for b, aceso in ((self.b_chamada, not maos_livres), (self.b_maos, maos_livres)):
-            tom = CIANO if aceso else TEXTO2
-            fundo = "rgba(41,212,255,40)" if aceso else "rgba(4,20,56,150)"
-            borda = CIANO if aceso else "rgba(95,180,255,90)"
+            tom = d if aceso else cor(TEXTO2).name()
+            fundo = (f"rgba({destaque.red()},{destaque.green()},{destaque.blue()},40)" if aceso
+                     else "rgba(4,20,56,150)")
+            borda = d if aceso else "rgba(95,180,255,90)"
             b.setStyleSheet(
                 f"QPushButton{{color:{tom}; background:{fundo}; border:1px solid {borda};"
                 f" border-radius:15px; padding:4px 12px;}}"
-                f" QPushButton:hover{{color:{TEXTO}; border-color:{CIANO};}}")
+                f" QPushButton:hover{{color:{TEXTO}; border-color:{d};}}")
 
     # ----- botões do Ultron na lateral
     def montar_botoes_ultron(self, itens, acao):
@@ -1371,6 +1457,7 @@ class ControleOrbe(QObject):
         self.win = win
         self.hud = win.hud
         self.hud._orbe = Orbe()
+        self.hud.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, True)
         self.cena = None
         if cena_ligada() and hasattr(win, "centralWidget") and win.centralWidget() is not None:
             self.cena = Cena(win)

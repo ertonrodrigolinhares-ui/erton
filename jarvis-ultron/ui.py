@@ -2425,14 +2425,19 @@ class HudCanvas(QWidget):
         if self._blink_tick >= 32:
             self._blink = not self._blink
             self._blink_tick = 0
-        # Jarvis Ultron (economia): parado, redesenha 1 a cada 3 quadros; com voz ou
-        # pensando, todos. Minimizado, não redesenha.
+        # Jarvis Ultron (economia): parado ou pensando/executando tarefa, redesenha 1 a cada
+        # 3 quadros (sobra processador para a tarefa); falando, todos. Minimizado, não redesenha.
         if _economia_ligada():
             if _janela_escondida(self):
                 return
-            if not (voz_ativa or is_active) and self._tick % 3:
+            if not (voz_ativa or self.speaking) and self._tick % 3:
                 return
-        self.update()
+        self._quadro_novo = True  # a animação andou: o orbe desenha um quadro novo
+        orbe = getattr(self, "_orbe", None)
+        if orbe is not None and hasattr(orbe, "area_animada") and not (voz_ativa or self.speaking):
+            self.update(orbe.area_animada(self))  # sem voz, o anel só mexe no centro
+        else:
+            self.update()
 
     def _proj(self, r, theta, phi, sr, cx, cy):
         x = r * math.sin(phi) * math.cos(theta)

@@ -573,6 +573,9 @@ class TelaStark(QWidget):
         self._internet.start(30 * 60 * 1000)
 
     def _girar_botoes(self):
+        cena = getattr(getattr(self.window(), "_orbe", None), "cena", None)
+        if cena is not None and cena.ativa and cena.isVisible():
+            return  # a tela do orbe cobre este painel: não adianta animar
         if self.isVisible() and not self.window().isMinimized():
             for b in self.botoes:
                 b.girar(6)
