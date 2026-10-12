@@ -69,6 +69,28 @@ Cópia do projeto **JARVIS-OS V.2** (licença MIT, veja `LICENSE`), com ajustes 
 2. Extraia este pacote numa pasta nova e siga os passos acima (Iniciar Jarvis Ultron → Instalar Hermes).
 3. A pasta antiga do Jarvis pode ser apagada depois que a nova estiver funcionando.
 
+## Cérebro Gemma 4 no seu PC (sem Gemini, privado)
+
+O Jarvis pode pensar com o **Gemma 4** rodando no seu próprio computador, pelo Ollama. O raciocínio
+não sai do PC, então dá para usar com dados de clientes, sem limite e sem chave.
+
+1. Dê dois cliques em **"Instalar Gemma 4"**. Ele vê a memória do PC e escolhe o tamanho certo
+   (26B com 32 GB ou mais, E4B com 16 GB, E2B abaixo disso), instala o Ollama, baixa o Gemma
+   (10 a 18 GB, demora na primeira vez), instala o Whisper para transcrever sua voz no PC e liga
+   o Jarvis no Gemma.
+2. Abra o **"Iniciar Jarvis Ultron"** normalmente.
+
+Para voltar ao Gemini: **"Voltar para o Gemini"**. Para usar o Gemma de novo: rode o "Instalar
+Gemma 4" (ele pula o que já está pronto).
+
+Bom saber:
+- A voz e a conversa ficam como no modo reserva: ele ouve, pensa e responde em frases curtas, e
+  executa as tarefas (sites, lembretes, automações). Sem placa de vídeo, cada resposta leva
+  alguns segundos.
+- Voz: a da Microsoft (internet) é mais natural, mas o texto da resposta passa por ela. Com
+  `JARVIS_VOZ_PRIVADA=1` no `.env`, usa a voz do Windows e nada sai do PC.
+- Ferramentas que usam a internet (pesquisa, clima, sites) continuam usando a internet.
+
 ## Trocar a chave do Gemini
 
 - **Jeito mais fácil:** apague o arquivo **`.env`** desta pasta e abra o `Iniciar Jarvis Ultron`.

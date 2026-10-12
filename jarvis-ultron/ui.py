@@ -6983,7 +6983,15 @@ class MainWindow(QMainWindow):
             candidate_is_saved = False
 
         self._show_setup()
-        if candidate_key and self._overlay:
+        # Jarvis Ultron: com o Gemma 4 no PC como cérebro, não precisa da chave do Gemini.
+        from core.cerebro_gemma import cerebro_gemma
+        if cerebro_gemma() and self._overlay:
+            ov = self._overlay
+            ov._modo_reserva = True
+            ov._modo_gemma = True
+            ov._verified_key = "sem-gemini"
+            QTimer.singleShot(0, lambda: ov.done.emit("sem-gemini", ov._sel_os, False))
+        elif candidate_key and self._overlay:
             self._overlay.validate_candidate(
                 candidate_key,
                 remember_key=candidate_is_saved,
@@ -8800,7 +8808,11 @@ class MainWindow(QMainWindow):
             self._ready = False
             return
         key = normalized_key or verified_key
-        if modo_reserva:  # Jarvis Ultron: abre pela reserva Groq; não guarda a chave recusada
+        modo_gemma = bool(getattr(self._overlay, "_modo_gemma", False)) if self._overlay else False
+        if modo_gemma:  # Jarvis Ultron: cérebro Gemma 4 no PC; nada de chave do Gemini
+            remember_key = False
+            key = ""
+        elif modo_reserva:  # Jarvis Ultron: abre pela reserva Groq; não guarda a chave recusada
             os.environ["JARVIS_SEM_GEMINI"] = "1"
             remember_key = False
             self._log.append_log("SYS: Chave do Gemini recusada pelo Google. Usando a reserva (Groq).")

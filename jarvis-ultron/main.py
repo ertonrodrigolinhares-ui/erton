@@ -1345,7 +1345,14 @@ class JarvisLive:
             self._portao = PortaoDeVoz.da_configuracao(avisar=self.ui.write_log)
             self._portao.ao_mudar = self._aviso_de_escuta
             self._mostrar_selo(self._portao.estado)  # selo na tela desde a abertura, sem som
-        self._reserva = None if self.cloud_safe else ReservaGroq.da_configuracao()
+        from core.cerebro_gemma import CerebroGemma, cerebro_gemma
+
+        if self.cloud_safe:
+            self._reserva = None
+        elif cerebro_gemma():  # Jarvis Ultron: Gemma 4 no PC como cérebro principal
+            self._reserva = CerebroGemma.da_configuracao()
+        else:
+            self._reserva = ReservaGroq.da_configuracao()
         self._modo_reserva = False
         self._falhas_seguidas = 0
         self._avisos_trava = threading.Lock()  # avisos guardados no modo chamada
@@ -1951,6 +1958,11 @@ class JarvisLive:
     def _ativar_modo_reserva(self) -> None:
         if self._modo_reserva:
             return
+        from core.cerebro_gemma import CerebroGemma
+
+        if isinstance(getattr(self, "_reserva", None), CerebroGemma):
+            self._ligar_cerebro_gemma()
+            return
         self._modo_reserva = True
         com_ferramentas = not getattr(self, "cloud_safe", False)
         self.ui.write_log("SYS: Gemini indisponível. Modo reserva (Groq) ligado: "
@@ -1960,6 +1972,25 @@ class JarvisLive:
                  if com_ferramentas else
                  "A conexão principal caiu. Estou no modo reserva: posso conversar, mas sem as ferramentas até ela voltar.")
         threading.Thread(target=self._falar_reserva, daemon=True, args=(aviso,)).start()
+
+    def _ligar_cerebro_gemma(self) -> None:
+        """Jarvis Ultron: o Gemma 4 do PC é o cérebro. Aquece o modelo e já começa a ouvir."""
+        self._modo_reserva = True
+        self.ui.write_log("SYS: Cérebro: Gemma 4 no seu PC. Preparando (a primeira vez pode levar 1 minuto)...")
+
+        def preparar():
+            ferramentas, _ = self._ferramentas_da_reserva()
+            pronto = self._reserva.aquecer(ferramentas)
+            if pronto:
+                self.ui.write_log("SYS: Gemma 4 pronto. Converso e executo as tarefas.")
+                self._falar_reserva("Jarvis online. Estou rodando no Gemma 4, no seu computador.")
+            else:
+                self.ui.write_log("SYS: O Gemma 4 não respondeu. Confira se o Ollama está instalado "
+                                  "(rode o 'Instalar Gemma 4').")
+                self._falar_reserva("Não consegui ligar o Gemma. Rode o Instalar Gemma 4 na pasta do Jarvis.")
+
+        threading.Thread(target=preparar, daemon=True, name="GemmaAquecer").start()
+        threading.Thread(target=self._escutar_reserva, daemon=True).start()
 
     def _desativar_modo_reserva(self) -> None:
         self._modo_reserva = False
@@ -2050,6 +2081,16 @@ class JarvisLive:
     def _falar_reserva(self, texto: str) -> None:
         from actions.tts_engine import TTSEngine
 
+        if os.environ.get("JARVIS_VOZ_PRIVADA", "").strip() in ("1", "sim", "true"):
+            # Jarvis Ultron: voz do próprio Windows; o texto da resposta não sai do PC.
+            from actions.tts_engine import falar_com_voz_do_windows
+
+            self.set_speaking(True)
+            try:
+                falar_com_voz_do_windows(texto)
+            finally:
+                self.set_speaking(False)
+            return
         motor = TTSEngine(
             provider="edge",
             voice_id=os.environ.get("JARVIS_VOZ_RESERVA", "pt-BR-AntonioNeural"),
@@ -2640,6 +2681,16 @@ class JarvisLive:
                 stream.close()
 
     async def run(self):
+        # Jarvis Ultron: cérebro Gemma 4 no PC. Não usa o Gemini: liga o cérebro local e fica de pé.
+        from core.cerebro_gemma import cerebro_gemma
+
+        if cerebro_gemma():
+            if self._reserva is not None:
+                self._ativar_modo_reserva()
+                while not self._shutdown_requested.is_set():
+                    await asyncio.sleep(0.5)
+                return
+            self.ui.write_log("SYS: Não consegui preparar o Gemma 4. Tentando o Gemini.")
         # Jarvis Ultron: aberto pela reserva (Google recusou a chave): conversa pelo Groq já, e
         # continua tentando o Gemini em segundo plano.
         if os.environ.get("JARVIS_SEM_GEMINI") == "1" and self._reserva is not None:

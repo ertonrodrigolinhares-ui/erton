@@ -16,6 +16,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import threading
 import wave
 
 MODELOS_PREFERIDOS = [
@@ -80,6 +81,7 @@ class ReservaGroq:
         self.cliente = cliente
         self.modelo = os.environ.get("JARVIS_GROQ_MODELO", "").strip() or None
         self.mensagens = [{"role": "system", "content": INSTRUCOES}]
+        self._trava_resposta = threading.Lock()
 
     @classmethod
     def da_configuracao(cls) -> "ReservaGroq | None":
@@ -109,19 +111,30 @@ class ReservaGroq:
         - ferramentas: lista no formato Groq (use gemini_para_groq nas ferramentas do Jarvis);
         - executar: função executar(nome, args_dict) -> texto do resultado.
         """
-        self.mensagens.append({"role": "user", "content": texto})
-        try:
-            conteudo = self._conversar(ferramentas, executar)
-        except Exception as erro:
-            # tira o pedido do usuário para não sujar o histórico
-            while self.mensagens and self.mensagens[-1]["role"] != "system":
-                if self.mensagens[-1]["role"] == "user":
+        # voz e texto digitado podem chegar juntos: um pedido de cada vez (o histórico é um só)
+        with self._trava():
+            self.mensagens.append({"role": "user", "content": texto})
+            try:
+                conteudo = self._conversar(ferramentas, executar)
+            except Exception as erro:
+                # tira o pedido do usuário para não sujar o histórico
+                while self.mensagens and self.mensagens[-1]["role"] != "system":
+                    if self.mensagens[-1]["role"] == "user":
+                        self.mensagens.pop()
+                        break
                     self.mensagens.pop()
-                    break
-                self.mensagens.pop()
-            return _explicar(erro)
-        self._aparar_historico()
-        return conteudo
+                return self._explicar(erro)
+            self._aparar_historico()
+            return conteudo
+
+    def _trava(self):
+        trava = getattr(self, "_trava_resposta", None)
+        if trava is None:
+            trava = self._trava_resposta = threading.Lock()
+        return trava
+
+    def _explicar(self, erro: Exception) -> str:
+        return _explicar(erro)
 
     def _conversar(self, ferramentas, executar) -> str:
         modelo = self._escolher_modelo()
