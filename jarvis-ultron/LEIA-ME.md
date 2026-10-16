@@ -358,11 +358,14 @@ o que já existe e só pergunta do Metricool se você quiser reconectar.
 ### Segurança
 - A rotina das 8h **só prepara** os posts. **Nada é publicado sem o seu "ok".**
 - A trava é garantida por um programa (`hermes/hooks/aprovacao_jarvis.py`), não só por instrução:
-  publicar, agendar, editar, apagar ou mexer em anúncios é bloqueado, a não ser que você tenha dito
-  "ok" ao Jarvis nos últimos 10 minutos. Se você disser "não pode publicar", ele não considera aprovado.
+  publicar, agendar, editar, apagar ou mexer em anúncios é bloqueado. Com o seu "ok", a trava abre só
+  enquanto o Hermes faz o que você aprovou (no máximo 10 minutos) e fecha assim que ele termina. Se
+  você disser "não pode publicar", ele não considera aprovado.
 - O "ok" só conta numa fala sua **depois** de ouvir o que vai ser feito, e tem que ser claro e curto
   ("ok", "sim, pode publicar", "ok, pode fazer"). "Ok, pode cancelar", "ok, entendi", "sim, mas tá
-  caro" ou uma pergunta não contam: o Jarvis pergunta de novo. Vale também para vídeos e para o Claude.
+  caro", "ok, pode fazer amanhã", "peraí" ou uma pergunta não contam: o Jarvis pergunta de novo. Antes
+  de gastar ou mudar algo, o Jarvis confere de novo a sua fala inteira (às vezes a transcrição chega
+  aos pedaços). Vale também para vídeos e para o Claude.
 - No navegador, o Hermes não digita senhas, não paga nada e não envia mensagens sem o seu ok.
 - Os posts ficam no perfil de atleta; nada da empresa ou de clientes.
 

@@ -1448,12 +1448,13 @@ class JarvisLive:
             return
         asyncio.run_coroutine_threadsafe(self.send_text(text), self._loop)
 
-    def _nova_fala(self, texto: str) -> int:
+    def _nova_fala(self, texto: str, em_pedacos: bool = False) -> int:
         """Jarvis Ultron: uma fala NOVA do Erton (falada ou digitada). As aprovações só aceitam o
-        "ok" numa fala com número maior que o da proposta (core/aprovacao.py)."""
+        "ok" numa fala com número maior que o da proposta (core/aprovacao.py). em_pedacos: fala do
+        Gemini ao vivo, que ainda cresce até o fim do turno."""
         from core.aprovacao import nova_fala
 
-        return nova_fala(self, texto)
+        return nova_fala(self, texto, em_pedacos)
 
     async def send_text(self, text: str) -> bool:
         """Send a text turn from either the desktop callback or a web client."""
@@ -2739,6 +2740,8 @@ class JarvisLive:
 
     async def _receive_audio(self):
         print("[JARVIS] 👂 Recv started")
+        from core.aprovacao import fechar_fala, mais_um_pedaco
+
         out_buf, in_buf = [], []
         _new_turn = True
         turn_had_audio = False
@@ -2788,15 +2791,18 @@ class JarvisLive:
                                     self._current_input_transcript = ""
                                 in_buf.append(txt)
                                 self._current_input_transcript = " ".join(in_buf).strip()
-                                if fala_nova:
-                                    # Fala nova do Erton. Transcrição que chega DEPOIS de uma ferramenta,
-                                    # no mesmo turno do modelo, é o pedido chegando atrasado (ou ele falando
-                                    # por cima): não conta, senão um "pode fazer" dito junto com o pedido
-                                    # aprovaria o vídeo antes de ele ouvir o preço.
-                                    fala_do_buf = (None if ferramenta_no_turno
-                                                   else self._nova_fala(self._current_input_transcript))
-                                elif fala_do_buf is not None and fala_do_buf == getattr(self, "_fala_n", 0):
-                                    self._fala_texto = self._current_input_transcript
+                                if fala_nova and not ferramenta_no_turno:
+                                    fala_do_buf = self._nova_fala(self._current_input_transcript, em_pedacos=True)
+                                else:
+                                    # Transcrição que chega DEPOIS de uma ferramenta, no mesmo turno do
+                                    # modelo, é o pedido chegando atrasado (ou ele falando por cima): não
+                                    # conta como fala nova, senão um "pode fazer" dito junto com o pedido
+                                    # aprovaria o vídeo antes de ele ouvir o preço. O resto de uma fala
+                                    # ("Ok," ... "pode cancelar") faz o texto dela crescer: a aprovação
+                                    # confere de novo com a fala inteira (aprovacao.ainda_aprovado).
+                                    if fala_nova:
+                                        fala_do_buf = None
+                                    mais_um_pedaco(self, fala_do_buf, self._current_input_transcript)
                                 if (
                                     not getattr(self, "_pending_self_quit", False)
                                     and self._is_explicit_self_quit_transcript(self._current_input_transcript)
@@ -2821,6 +2827,7 @@ class JarvisLive:
                                     self._queue_self_quit_after_farewell()
                                 self.ui.write_log(f"You: {full_in}")
                             in_buf = []
+                            fechar_fala(self, fala_do_buf)  # o que chegar depois já é outra fala
                             fala_do_buf = None
                             ferramenta_no_turno = False
 

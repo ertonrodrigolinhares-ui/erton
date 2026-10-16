@@ -4,8 +4,9 @@
   resposta pronta para ser falada.
 - aprovar_e_executar(): em duas chamadas. A primeira guarda a proposta (o Jarvis conta ao Erton o
   que vai ser publicado); a segunda só passa com um "ok" claro numa fala NOVA dele depois disso
-  (core/aprovacao.py). Aí registra o "ok" por alguns minutos (é o que libera a trava de aprovação
-  do Hermes) e pede para o Hermes publicar/executar o que foi aprovado.
+  (core/aprovacao.py). Aí, em segundo plano, confere o "ok" de novo com a fala inteira, abre a trava
+  de aprovação do Hermes, pede para ele publicar/executar só o que foi aprovado e fecha a trava
+  assim que ele termina.
 
 O "Instalar Hermes.bat" preenche no .env: HERMES_API_URL, HERMES_API_KEY e HERMES_JARVIS_HOME.
 """
@@ -21,7 +22,7 @@ import unicodedata
 from datetime import datetime
 from pathlib import Path
 
-JANELA_APROVACAO = 10 * 60  # segundos em que o "ok" vale
+JANELA_APROVACAO = 10 * 60  # no máximo isso com a trava aberta (ela fecha quando o Hermes termina)
 VALIDADE_PROPOSTA = 10 * 60  # segundos que a proposta contada ao Erton espera o "ok" dele
 TEMPO_MAXIMO = 15 * 60  # tarefas de agentes podem demorar
 
@@ -30,7 +31,7 @@ TEMPO_MAXIMO = 15 * 60  # tarefas de agentes podem demorar
 PALAVRAS_OK = (
     "ok", "okay", "okey", "sim", "aprovo", "aprovado", "aprovada", "autorizo", "autorizado", "confirmo",
     "confirmado", "pode sim", "pode fazer", "pode publicar", "pode postar", "pode mandar", "pode aplicar",
-    "pode seguir", "manda ver", "manda bala",
+    "pode seguir", "pode agendar", "manda ver", "manda bala",
 )
 # Depois de um "ok"/"sim", ou vem uma destas ações...
 ACOES_OK = tuple(p for p in PALAVRAS_OK if p not in ("ok", "okay", "okey", "sim"))
@@ -40,14 +41,19 @@ COMPLEMENTOS_OK = {"ok", "okay", "okey", "sim", "pode", "isso", "mesmo", "claro"
 # Palavras de chamar ou de enrolar antes do "ok" ("Jarvis, ok", "beleza, pode fazer")
 VOCATIVOS = {"hey", "ei", "oi", "jarvis"}
 ANTES_DO_OK = {"beleza", "certo", "claro", "entao", "bom", "ta", "fechado", "perfeito", "show", "otimo"}
-# Negação, adiamento, dúvida ou preço: nada disso é "ok" ("ok, pode cancelar", "sim, mas tá caro")
-PALAVRAS_NAO = ("nao", "cancel", "esquec", "deix", "desist", "depois", "pens", "aguard", "esper",
-                "negativ", "jamais", "nunca", "duvid", "talvez")  # começos de palavra
+# Negação, adiamento, espera, condição, dúvida ou preço: nada disso é "ok" ("ok, pode cancelar",
+# "sim, mas tá caro", "ok, pode fazer amanhã", "ok pode fazer, peraí"). Na dúvida o Jarvis pergunta de novo.
+PALAVRAS_NAO = ("nao", "cancel", "esquec", "deix", "desist", "depois", "pens", "aguard", "aguent", "esper",
+                "negativ", "jamais", "nunca", "duvid", "talvez", "amanh", "seman", "daqui", "tard", "noit",
+                "madrugad", "minut", "instant", "moment", "sabad", "doming")  # começos de palavra
 PALAVRAS_NAO_EXATAS = {"n", "nem", "num", "para", "pare", "parar", "paro", "mas", "caro", "cara", "caros",
-                       "caras", "calma", "segura", "nope"}
-FRASES_NAO = ("mais tarde", "outro dia", "outra hora")
+                       "caras", "calma", "segura", "nope", "pera", "perai", "mes", "meses", "hora", "horas",
+                       "dia", "dias", "segunda", "terca", "quarta", "quinta", "sexta", "feira", "antes", "se",
+                       "quando"}
+FRASES_NAO = ("mais tarde", "outro dia", "outra hora", "logo mais")
 MAX_PALAVRAS_OK = 8
 
+DEMOROU = "O Hermes demorou demais para responder. A tarefa pode continuar rodando; pergunte de novo daqui a pouco."
 SEM_HERMES = ("O Hermes ainda não está configurado. Dê dois cliques em 'Instalar Hermes' na pasta "
               "do Jarvis Ultron e depois abra o Jarvis de novo.")
 
@@ -110,7 +116,7 @@ def perguntar(pedido: str, tempo_maximo: float = TEMPO_MAXIMO) -> str:
         except requests.exceptions.ConnectionError:
             continue
         except requests.exceptions.Timeout:
-            return "O Hermes demorou demais para responder. A tarefa pode continuar rodando; pergunte de novo daqui a pouco."
+            return DEMOROU
         desligado = False
         resposta = tentativa
         if tentativa.status_code not in (401, 404):  # 401/404: endereço errado para este perfil
@@ -133,17 +139,50 @@ def arquivo_aprovacao() -> Path:
     return Path(pasta) / "jarvis" / "aprovacao.json"
 
 
-def registrar_aprovacao(tipo: str, agora: float | None = None) -> None:
-    """Libera a trava do Hermes para 'redes' (posts) ou 'anuncios' por JANELA_APROVACAO segundos."""
+_trava_arquivo = threading.Lock()
+
+
+def registrar_aprovacao(tipo: str, agora: float | None = None) -> float:
+    """Libera a trava do Hermes para 'redes' (posts) ou 'anuncios' por no máximo JANELA_APROVACAO
+    segundos. Devolve até quando (para fechar_aprovacao)."""
     agora = agora or time.time()
     arquivo = arquivo_aprovacao()
     arquivo.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        dados = json.loads(arquivo.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        dados = {}
-    dados[tipo] = {"ate": agora + JANELA_APROVACAO, "em": datetime.fromtimestamp(agora).isoformat(timespec="seconds")}
-    arquivo.write_text(json.dumps(dados, ensure_ascii=False, indent=2), encoding="utf-8")
+    with _trava_arquivo:
+        try:
+            dados = json.loads(arquivo.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            dados = {}
+        dados[tipo] = {"ate": agora + JANELA_APROVACAO, "em": datetime.fromtimestamp(agora).isoformat(timespec="seconds")}
+        arquivo.write_text(json.dumps(dados, ensure_ascii=False, indent=2), encoding="utf-8")
+    return dados[tipo]["ate"]
+
+
+def fechar_aprovacao(tipo: str, ate: float) -> None:
+    """Fecha a trava de novo assim que o Hermes terminou o que foi aprovado: o "ok" vale para aquela
+    tarefa, não para qualquer publicação nos minutos seguintes. Não mexe se outro "ok" foi registrado
+    depois (outro 'ate')."""
+    arquivo = arquivo_aprovacao()
+    with _trava_arquivo:
+        try:
+            dados = json.loads(arquivo.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return
+        if not isinstance(dados.get(tipo), dict) or dados[tipo].get("ate") != ate:
+            return
+        dados[tipo]["ate"] = 0
+        arquivo.write_text(json.dumps(dados, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _avisar(jarvis, texto: str) -> None:
+    """Conta o resultado ao Erton (respeita o modo chamada) ou, sem isso, só mostra na tela."""
+    anunciar = getattr(jarvis, "anunciar", None)
+    if callable(anunciar):
+        anunciar(texto, "Hermes")
+        return
+    ui = getattr(jarvis, "ui", None)
+    if ui is not None:
+        ui.write_log(f"Hermes: {texto[:500]}")
 
 
 _proposta: dict = {}
@@ -153,7 +192,8 @@ _trava = threading.Lock()
 def aprovar_e_executar(tipo: str, detalhes: str, jarvis, confirmar: bool = False) -> str:
     """confirmar=False: guarda a proposta (o Jarvis conta ao Erton o que vai ser feito e pede o ok).
     confirmar=True: só publica se for a mesma proposta, recente, e o Erton disse um "ok" claro numa
-    fala NOVA depois de ouvi-la (a frase do pedido ou uma fala antiga não valem). O ok vale uma vez."""
+    fala NOVA depois de ouvi-la (a frase do pedido ou uma fala antiga não valem). O ok vale uma vez.
+    A publicação roda em segundo plano (_publicar) e o resultado é contado ao Erton quando sair."""
     from core import aprovacao
 
     if tipo not in ("redes", "anuncios"):
@@ -171,16 +211,43 @@ def aprovar_e_executar(tipo: str, detalhes: str, jarvis, confirmar: bool = False
     with _trava:
         proposta_ok = (_proposta.get("chave") == chave
                        and time.monotonic() - _proposta.get("em", 0) < VALIDADE_PROPOSTA)
-        aprovado = proposta_ok and aprovacao.aprovou_depois(jarvis, _proposta.get("marca", 0))
-        if aprovado:
+        fala_do_ok = aprovacao.fala_que_aprovou(jarvis, _proposta.get("marca", 0)) if proposta_ok else 0
+        proposta = dict(_proposta)
+        if fala_do_ok:
             _proposta.clear()
     if not proposta_ok:
         return ("Não registrei aprovação: primeiro chame com confirm=false e exatamente o que vai ser "
                 "publicado, conte isso ao Erton e espere o ok dele.")
-    if not aprovado:
+    if not fala_do_ok:
         return ("Não registrei aprovação: o Erton precisa dizer claramente, depois de ouvir a proposta, "
                 "por exemplo 'ok, pode publicar'. Pergunte a ele antes.")
-    registrar_aprovacao(tipo)
+    # em segundo plano: no Gemini ao vivo o resto da fala do "ok" só chega depois que a ferramenta
+    # responde (o laço que recebe a transcrição fica parado enquanto ela roda)
+    threading.Thread(target=_publicar, args=(tipo, detalhes, jarvis, fala_do_ok, proposta),
+                     daemon=True, name="HermesPublicar").start()
+    return ("Aprovado. O Hermes está publicando em segundo plano só o que foi aprovado. Diga ao Erton, em uma "
+            "frase curta em português, que você avisa quando terminar. Não chame ferramentas de novo para isso.")
+
+
+def _publicar(tipo: str, detalhes: str, jarvis, fala_do_ok: int, proposta: dict) -> None:
+    from core import aprovacao
+
+    # A ferramenta pode ter chegado com só o começo da resposta transcrito ("Ok," ... "pode
+    # cancelar"): antes de abrir a trava do Hermes, confere de novo com a fala inteira.
+    if not aprovacao.ainda_aprovado(jarvis, fala_do_ok):
+        with _trava:
+            if not _proposta:  # a proposta continua valendo para um "ok" claro numa fala nova
+                _proposta.update(proposta, marca=aprovacao.marca(jarvis))
+        _avisar(jarvis, "Não publiquei nada: a sua resposta não foi um 'ok' claro. Se quiser publicar, "
+                        "diga 'ok, pode publicar'.")
+        return
+    ate = registrar_aprovacao(tipo)
     skill = "publicar-aprovados" if tipo == "redes" else "anuncios-meta"
-    return perguntar(f"O Erton aprovou agora ({tipo}): {detalhes}. Use a skill {skill} e execute "
-                     "somente o que foi aprovado.")
+    try:
+        resposta = perguntar(f"O Erton aprovou agora ({tipo}): {detalhes}. Use a skill {skill} e execute "
+                             "somente o que foi aprovado.")
+    except Exception as erro:  # nunca deixa o fio morrer calado
+        resposta = f"O Hermes falhou: {str(erro)[:160]}"
+    if resposta != DEMOROU:  # demorou: a tarefa pode seguir rodando (a trava fecha sozinha no prazo)
+        fechar_aprovacao(tipo, ate)
+    _avisar(jarvis, resposta)

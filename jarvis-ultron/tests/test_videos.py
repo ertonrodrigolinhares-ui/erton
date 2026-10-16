@@ -10,7 +10,8 @@ from unittest.mock import patch
 RAIZ = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RAIZ))
 
-from core.aprovacao import nova_fala
+from core import aprovacao
+from core.aprovacao import fechar_fala, mais_um_pedaco, nova_fala
 
 
 def _modulo():
@@ -70,12 +71,34 @@ class OkAntesDoVideoTests(unittest.TestCase):
         with patch.object(self.m, "gerar") as gerar:
             self.m.executar(dict(self.pedido), jarvis)
             for recusa in ("Ok, pode cancelar, tá caro", "ok, deixa pra depois", "sim, mas muito caro",
-                           "ok, quanto fica em euro?", "ok, entendi"):
+                           "ok, quanto fica em euro?", "ok, entendi", "ok, pode fazer amanhã",
+                           "ok, pode fazer daqui a pouco", "ok pode fazer peraí", "sim, pode fazer na semana que vem"):
                 jarvis.falar(recusa)
                 r = self.m.executar(dict(self.pedido, confirm=True), jarvis)
                 self.assertIn("Not confirmed", r, recusa)
             _esperar_video()
         gerar.assert_not_called()
+
+    def test_resto_da_fala_que_vira_recusa_nao_faz_e_o_preco_continua_valendo(self):
+        # Gemini ao vivo: a ferramenta chegou com só o "Ok," transcrito; o resto chega depois
+        jarvis = JarvisFalso("faz um vídeo de um triatleta no Havaí")
+        with patch.object(aprovacao, "SILENCIO", 0.2), \
+                patch.object(self.m, "gerar", return_value=Path("/tmp/video.mp4")) as gerar, \
+                patch.object(self.m, "_abrir"):
+            self.m.executar(dict(self.pedido), jarvis)
+            numero = nova_fala(jarvis, "Ok,", em_pedacos=True)
+            r = self.m.executar(dict(self.pedido, confirm=True), jarvis)
+            self.assertIn("background", r)
+            mais_um_pedaco(jarvis, numero, "Ok, pode cancelar, tá caro")
+            fechar_fala(jarvis, numero)
+            _esperar_video()
+            gerar.assert_not_called()
+            self.assertIn("Não fiz o vídeo", jarvis.avisos[-1])
+            # um "ok" claro numa fala nova ainda vale para o mesmo preço
+            jarvis.falar("ok, pode fazer")
+            self.assertIn("background", self.m.executar(dict(self.pedido, confirm=True), jarvis))
+            _esperar_video()
+        gerar.assert_called_once()
 
     def test_ok_dito_antes_do_preco_nao_vale(self):
         jarvis = JarvisFalso("ok, pode fazer")
@@ -190,10 +213,16 @@ class OkNoGeminiAoVivoTests(unittest.TestCase):
     pedido não pode aprovar o vídeo na segunda chamada do mesmo turno."""
 
     def setUp(self):
+        from core import aprovacao
+
         self.m = _modulo()
-        self.respostas = []
+        self.respostas, self.avisos = [], []
+        silencio = patch.object(aprovacao, "SILENCIO", 0.4)  # o padrão (2 s) só deixaria o teste lento
+        silencio.start()
+        self.addCleanup(silencio.stop)
 
     def _rodar(self, mensagens):
+        """mensagens: o que o Gemini manda, na ordem; um número é uma pausa (segundos) na conexão."""
         import asyncio
 
         import main
@@ -208,7 +237,7 @@ class OkNoGeminiAoVivoTests(unittest.TestCase):
         for nome in ("_checar_pedido_de_modo", "_pedido_de_cerebro", "_falar_com_voz_externa"):
             setattr(jarvis, nome, lambda t: None)
         jarvis._is_explicit_self_quit_transcript = lambda t: False
-        jarvis.anunciar = lambda *a, **k: "falado"
+        jarvis.anunciar = lambda texto, *a, **k: self.avisos.append(texto) or "falado"
         m, respostas = self.m, self.respostas
 
         async def ferramentas(chamadas):
@@ -220,6 +249,9 @@ class OkNoGeminiAoVivoTests(unittest.TestCase):
         class Sessao:
             async def receive(self):
                 for mensagem in mensagens:
+                    if isinstance(mensagem, (int, float)):
+                        await asyncio.sleep(mensagem)
+                        continue
                     yield mensagem
                 jarvis._shutdown_requested.set()
 
@@ -246,6 +278,22 @@ class OkNoGeminiAoVivoTests(unittest.TestCase):
                              _video(True), _fim_do_turno()])
         gerar.assert_not_called()
         self.assertIn("Not confirmed", self.respostas[1])
+
+    def test_ok_que_vira_recusa_quando_o_resto_da_fala_chega_nao_faz(self):
+        # "Ok, pode cancelar, tá caro": a ferramenta chega quando só o "Ok," foi transcrito; o resto
+        # chega depois. O vídeo pago não pode começar com o pedaço "Ok,".
+        gerar = self._rodar([_pedaco("Jarvis, faz um vídeo de 8 segundos do meu treino"), _video(False),
+                             _fim_do_turno(), _pedaco("Ok,"), _video(True), 0.2,
+                             _pedaco("pode cancelar, tá caro"), _fim_do_turno()])
+        gerar.assert_not_called()
+        self.assertTrue(any("Não fiz o vídeo" in a for a in self.avisos), self.avisos)
+
+    def test_resto_da_fala_que_chega_depois_do_fim_do_turno_tambem_conta(self):
+        # o resto da fala chega só depois do fim do turno do modelo (vira uma fala nova): não faz
+        gerar = self._rodar([_pedaco("Jarvis, faz um vídeo de 8 segundos do meu treino"), _video(False),
+                             _fim_do_turno(), _pedaco("Ok,"), _video(True), _fim_do_turno(), 0.2,
+                             _pedaco("pode cancelar, tá caro"), _fim_do_turno()])
+        gerar.assert_not_called()
 
     def test_ok_numa_fala_nova_depois_do_preco_vale(self):
         gerar = self._rodar([_pedaco("Jarvis, faz um vídeo de 8 segundos do meu treino"), _video(False),

@@ -214,27 +214,37 @@ def executar(args: dict, jarvis) -> str:
     with _trava:
         pedido_ok = (_pendente.get("chave") == chave
                      and time.monotonic() - _pendente.get("em", 0) < VALIDADE_PEDIDO)
-        aprovado = pedido_ok and aprovacao.aprovou_depois(jarvis, _pendente.get("marca", 0))
-        if aprovado:
+        fala_do_ok = aprovacao.fala_que_aprovou(jarvis, _pendente.get("marca", 0)) if pedido_ok else 0
+        preco_em = _pendente.get("em", 0)
+        if fala_do_ok:
             _pendente.clear()
     if not pedido_ok:
         return ("Not confirmed: first call with confirm=false to show the price for exactly this video, "
                 "then ask the user for an ok.")
-    if not aprovado:
+    if not fala_do_ok:
         return "Not confirmed: the user did not clearly approve. Ask for an explicit ok (for example 'ok, pode fazer')."
 
     ui = getattr(jarvis, "ui", None)
 
     def trabalhar():
-        try:
-            if _modo_privado():  # o modo mudou entre o preço e o ok
-                raise RuntimeError("o modo privado foi ligado; nada foi mandado para o Google")
-            arquivo = gerar(descricao, segundos, qualidade, vertical)
-        except Exception as erro:
-            aviso = f"Não consegui fazer o vídeo: {_explicar(erro)}."
+        # A ferramenta pode ter chegado com só o começo da resposta transcrito ("Ok," ... "pode
+        # cancelar, tá caro"): antes de gastar, confere de novo com a fala inteira.
+        if not aprovacao.ainda_aprovado(jarvis, fala_do_ok):
+            with _trava:
+                if not _pendente:  # o preço continua valendo para um "ok" claro numa fala nova
+                    _pendente.update(chave=chave, em=preco_em, marca=aprovacao.marca(jarvis))
+            aviso = ("Não fiz o vídeo: a sua resposta não foi um 'ok' claro, então nada foi cobrado. "
+                     "Se quiser mesmo o vídeo, diga 'ok, pode fazer'.")
         else:
-            _abrir(arquivo)
-            aviso = f"O vídeo ficou pronto e já abri para você. Está salvo em {arquivo.parent}."
+            try:
+                if _modo_privado():  # o modo mudou entre o preço e o ok
+                    raise RuntimeError("o modo privado foi ligado; nada foi mandado para o Google")
+                arquivo = gerar(descricao, segundos, qualidade, vertical)
+            except Exception as erro:
+                aviso = f"Não consegui fazer o vídeo: {_explicar(erro)}."
+            else:
+                _abrir(arquivo)
+                aviso = f"O vídeo ficou pronto e já abri para você. Está salvo em {arquivo.parent}."
         anunciar = getattr(jarvis, "anunciar", None)
         if callable(anunciar):  # respeita o modo chamada: guarda o aviso até o "Hey Jarvis"
             anunciar(aviso, "Vídeo")

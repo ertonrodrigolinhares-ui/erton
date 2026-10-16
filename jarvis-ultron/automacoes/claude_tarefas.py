@@ -164,8 +164,8 @@ def _codigo(args: dict, jarvis, chefe) -> str:
         pendente = _estado["plano"]
         contado = pendente is not None and pendente["em"] is not None
         valido = contado and time.monotonic() - pendente["em"] < chefe.VALIDADE_PLANO
-        aprovado = valido and aprovacao.aprovou_depois(jarvis, pendente["marca"])
-        if aprovado:
+        fala_do_ok = aprovacao.fala_que_aprovou(jarvis, pendente["marca"]) if valido else 0
+        if fala_do_ok:
             _estado["plano"] = None
     if pendente is not None and not contado:
         return ("Not confirmed: the plan was not told to the user yet (it is waiting to be spoken). Wait until "
@@ -173,10 +173,20 @@ def _codigo(args: dict, jarvis, chefe) -> str:
     if not valido:
         return ("Not confirmed: there is no recent plan from Claude. Call with confirm=false first to make the plan, "
                 "tell it to the user and wait for an explicit ok.")
-    if not aprovado:
+    if not fala_do_ok:
         return "Not confirmed: the user did not clearly approve the plan. Ask for an explicit ok (e.g. 'ok, pode fazer')."
 
     def aplicar():
+        # A ferramenta pode ter chegado com só o começo da resposta transcrito ("Ok," ... "pode
+        # cancelar"): antes de mexer no código, confere de novo com a fala inteira.
+        if not aprovacao.ainda_aprovado(jarvis, fala_do_ok):
+            with _trava:
+                if _estado["plano"] is None:  # o plano continua valendo para um "ok" claro numa fala nova
+                    pendente["marca"] = aprovacao.marca(jarvis)
+                    _estado["plano"] = pendente
+            _avisar(jarvis, "Não apliquei o plano do Claude: a sua resposta não foi um 'ok' claro, então nada "
+                            "foi mudado. Se quiser aplicar, diga 'ok, pode fazer'.")
+            return
         resultado = chefe.aplicar_plano(pendente["plano"], pendente["sessao"], pendente["pedido"])
         if resultado.detalhes:
             _log(jarvis, f"SYS: 🤖 {resultado.detalhes}")

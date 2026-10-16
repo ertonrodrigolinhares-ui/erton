@@ -17,7 +17,8 @@ RAIZ = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RAIZ))
 
 from core import claude_chefe as chefe
-from core.aprovacao import nova_fala
+from core import aprovacao
+from core.aprovacao import fechar_fala, mais_um_pedaco, nova_fala
 
 # Um "claude" de mentira: responde no mesmo formato JSON do Claude Code e anota como foi chamado.
 FALSO = textwrap.dedent('''\
@@ -368,6 +369,29 @@ class FerramentaClaudeTests(Base):
             # o ok dito antes de ouvir continua não valendo
             r = self.m.executar({"request": "mude a soma", "kind": "codigo", "confirm": True}, jarvis)
             self.assertIn("Not confirmed", r)
+            jarvis.falar("ok, pode fazer")
+            r = self.m.executar({"request": "mude a soma", "kind": "codigo", "confirm": True}, jarvis)
+            self.assertIn("Approved", r)
+            _esperar()
+        self.assertIn("a - b", (self.jarvis_dir / "modulo.py").read_text(encoding="utf-8"))
+
+    def test_ok_que_vira_recusa_quando_o_resto_da_fala_chega_nao_aplica(self):
+        """Gemini ao vivo: a ferramenta chega com só o "Ok," transcrito e o resto ("pode cancelar")
+        chega depois. O código não muda; o plano continua valendo para um "ok" claro numa fala nova."""
+        jarvis = JarvisFalso("Jarvis, pede pro Claude mudar a soma")
+        with patch.dict(os.environ, {"FAKE_CLAUDE_CODIGO": "def soma(a, b):\n    return a - b\n"}), \
+                patch.object(chefe, "rodar_testes", return_value=set()), \
+                patch.object(aprovacao, "SILENCIO", 0.2):
+            self.m.executar({"request": "mude a soma", "kind": "codigo"}, jarvis)
+            _esperar()
+            numero = nova_fala(jarvis, "Ok,", em_pedacos=True)
+            r = self.m.executar({"request": "mude a soma", "kind": "codigo", "confirm": True}, jarvis)
+            self.assertIn("Approved", r)
+            mais_um_pedaco(jarvis, numero, "Ok, pode cancelar, deixa como está")
+            fechar_fala(jarvis, numero)
+            _esperar()
+            self.assertIn("a + b", (self.jarvis_dir / "modulo.py").read_text(encoding="utf-8"))
+            self.assertIn("Não apliquei", jarvis.avisos[-1])
             jarvis.falar("ok, pode fazer")
             r = self.m.executar({"request": "mude a soma", "kind": "codigo", "confirm": True}, jarvis)
             self.assertIn("Approved", r)

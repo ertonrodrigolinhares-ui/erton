@@ -412,6 +412,14 @@ def _carregar_gancho():
     return modulo
 
 
+def _esperar_publicacao():
+    import threading
+
+    for t in threading.enumerate():
+        if t.name == "HermesPublicar":
+            t.join(10)
+
+
 class TravaDeAprovacaoTests(unittest.TestCase):
     def setUp(self):
         import tempfile
@@ -462,9 +470,16 @@ class TravaDeAprovacaoTests(unittest.TestCase):
         """Duas chamadas: a proposta é contada ao Erton e só um "ok" numa fala NOVA dele publica."""
         from core.aprovacao import nova_fala
 
-        jarvis = SimpleNamespace(_fala_n=0, _fala_texto="")
+        avisos = []
+        jarvis = SimpleNamespace(_fala_n=0, _fala_texto="", anunciar=lambda texto, *a, **k: avisos.append(texto))
         aprovar = hermes_ponte.aprovar_e_executar
-        with patch.object(hermes_ponte, "perguntar", return_value="Publicado.") as pedido:
+        trava_no_meio = []
+
+        def publicar(pedido):  # enquanto o Hermes publica o que foi aprovado, a trava está aberta
+            trava_no_meio.append(self.gancho.decidir(self._evento("mcp__metricool__create_post")))
+            return "Publicado."
+
+        with patch.object(hermes_ponte, "perguntar", side_effect=publicar) as pedido:
             nova_fala(jarvis, "ok, pode publicar os posts 1 e 3")
             # sem a proposta contada antes, nem o ok mais claro vale
             self.assertIn("Não registrei", aprovar("redes", "posts 1 e 3", jarvis, True))
@@ -480,12 +495,57 @@ class TravaDeAprovacaoTests(unittest.TestCase):
             nova_fala(jarvis, "ok, pode publicar o 1 e o 3")
             self.assertIn("Não registrei", aprovar("redes", "todos os posts", jarvis, True))  # outra coisa
             self.assertIn("Não registrei", aprovar("anuncios", "posts 1 e 3", jarvis, True))
-            self.assertEqual(aprovar("redes", "posts 1 e 3", jarvis, True), "Publicado.")
+            self.assertIn("segundo plano", aprovar("redes", "posts 1 e 3", jarvis, True))
+            _esperar_publicacao()
             self.assertIn("publicar-aprovados", pedido.call_args.args[0])
+            self.assertEqual(avisos, ["Publicado."])
             # o mesmo ok vale uma vez só
             self.assertIn("Não registrei", aprovar("redes", "posts 1 e 3", jarvis, True))
             self.assertEqual(pedido.call_count, 1)
+        self.assertEqual(trava_no_meio, [None])
+        # o Hermes terminou: a trava fecha de novo (o ok não libera outras publicações por 10 minutos)
+        self.assertEqual(self.gancho.decidir(self._evento("mcp__metricool__create_post"))["action"], "block")
+
+    def test_trava_continua_aberta_se_o_hermes_demorou(self):
+        """Se o Hermes estourou o tempo, a tarefa aprovada pode continuar rodando: a trava só fecha no prazo."""
+        from core.aprovacao import nova_fala
+
+        jarvis = SimpleNamespace(_fala_n=0, _fala_texto="", anunciar=lambda *a, **k: None)
+        with patch.object(hermes_ponte, "perguntar", return_value=hermes_ponte.DEMOROU):
+            hermes_ponte.aprovar_e_executar("redes", "post 2", jarvis)
+            nova_fala(jarvis, "ok, pode publicar")
+            hermes_ponte.aprovar_e_executar("redes", "post 2", jarvis, True)
+            _esperar_publicacao()
         self.assertIsNone(self.gancho.decidir(self._evento("mcp__metricool__create_post")))
+        depois = _time.time() + hermes_ponte.JANELA_APROVACAO + 1
+        self.assertEqual(self.gancho.decidir(self._evento("mcp__metricool__create_post"), agora=depois)["action"],
+                         "block")
+
+    def test_ok_que_vira_recusa_quando_o_resto_da_fala_chega_nao_publica(self):
+        """Gemini ao vivo: a ferramenta chega quando só o "Ok," foi transcrito; o resto ("não, espera")
+        chega depois. Nada é publicado e a trava do Hermes nem abre; a proposta continua de pé."""
+        from core import aprovacao
+
+        avisos = []
+        jarvis = SimpleNamespace(_fala_n=0, _fala_texto="", anunciar=lambda texto, *a, **k: avisos.append(texto))
+        aprovacao.nova_fala(jarvis, "Jarvis, publica o post 2", em_pedacos=True)
+        aprovacao.fechar_fala(jarvis, 1)
+        with patch.object(aprovacao, "SILENCIO", 0.2), \
+                patch.object(hermes_ponte, "perguntar", return_value="Publicado.") as pedido:
+            hermes_ponte.aprovar_e_executar("redes", "post 2", jarvis)
+            numero = aprovacao.nova_fala(jarvis, "Ok,", em_pedacos=True)
+            self.assertIn("segundo plano", hermes_ponte.aprovar_e_executar("redes", "post 2", jarvis, True))
+            aprovacao.mais_um_pedaco(jarvis, numero, "Ok, não, espera, deixa eu ver de novo")
+            aprovacao.fechar_fala(jarvis, numero)
+            _esperar_publicacao()
+            pedido.assert_not_called()
+            self.assertFalse(hermes_ponte.arquivo_aprovacao().exists())
+            self.assertIn("Não publiquei", avisos[-1])
+            # um "ok" claro numa fala nova ainda publica a mesma proposta
+            aprovacao.nova_fala(jarvis, "ok, pode publicar")
+            hermes_ponte.aprovar_e_executar("redes", "post 2", jarvis, True)
+            _esperar_publicacao()
+        pedido.assert_called_once()
 
     def test_ok_velho_nao_publica_pelo_jarvis(self):
         """A frase antiga "Ok Jarvis, como estão meus anúncios?" não vira aprovação depois que o
@@ -497,6 +557,8 @@ class TravaDeAprovacaoTests(unittest.TestCase):
                                     write_log=lambda t: None)
         jarvis._current_input_transcript = jarvis._last_input_transcript = "Ok Jarvis, como estão meus anúncios?"
         jarvis._fala_n, jarvis._fala_texto = 1, "Ok Jarvis, como estão meus anúncios?"
+        avisos = []
+        jarvis.anunciar = lambda texto, *a, **k: avisos.append(texto)
 
         def chamar(**args):
             chamada = SimpleNamespace(name="approve_publication", id="a", args=args)
@@ -509,7 +571,9 @@ class TravaDeAprovacaoTests(unittest.TestCase):
             self.assertIn("Não registrei", chamar(**detalhes, confirm=True))  # ninguém disse ok depois
             pedido.assert_not_called()
             jarvis._nova_fala("sim, pode publicar")
-            self.assertEqual(chamar(**detalhes, confirm=True), "Publicado.")
+            self.assertIn("segundo plano", chamar(**detalhes, confirm=True))
+            _esperar_publicacao()
+        self.assertEqual(avisos, ["Publicado."])
         declaracao = next(d for d in main.TOOL_DECLARATIONS if d["name"] == "approve_publication")
         self.assertIn("confirm", declaracao["parameters"]["properties"])
 
@@ -525,13 +589,22 @@ class OkClaroTests(unittest.TestCase):
                      "Ok Jarvis, como estão meus anúncios?", "ok jarvis como estao meus anuncios",
                      "Jarvis, o que a gente posta hoje?", "sim, me fala dos posts", "Jarvis, publica os posts de hoje",
                      "ok, o Claude terminou", "ok, espera", "não pode publicar", "", "beleza",
-                     "ok, pode fazer, mas só amanhã", "Jarvis, faz um vídeo de 8 segundos do meu treino, pode fazer"):
+                     "ok, pode fazer, mas só amanhã", "Jarvis, faz um vídeo de 8 segundos do meu treino, pode fazer",
+                     # adiar ou esperar também não é "ok" agora
+                     "ok, pode fazer amanhã", "ok, pode fazer, só amanhã", "sim, pode fazer na semana que vem",
+                     "ok, pode fazer mês que vem", "ok, pode fazer daqui a pouco", "ok, pode fazer, pera",
+                     "ok pode fazer peraí", "ok, pode fazer mais tarde", "ok, pode publicar logo mais",
+                     "ok, pode publicar à noite", "sim, pode fazer na sexta", "ok, pode publicar no sábado",
+                     "ok, pode fazer em cinco minutos", "ok, um instante", "ok, pode fazer outra hora",
+                     "ok, pode fazer se for barato", "ok, pode fazer quando der"):
             self.assertFalse(hermes_ponte.usuario_aprovou(fala), fala)
 
     def test_ok_claro_continua_valendo(self):
         for fala in ("ok", "Ok.", "sim", "ok, pode fazer", "sim, pode publicar", "ok, pode publicar o 1 e o 3",
                      "Ok Jarvis, pode publicar os posts 1 e 3", "pode fazer", "manda ver", "aprovado", "pode sim",
-                     "beleza, pode fazer", "tá bom, pode fazer", "Hey Jarvis, ok, pode fazer", "sim, por favor"):
+                     "beleza, pode fazer", "tá bom, pode fazer", "Hey Jarvis, ok, pode fazer", "sim, por favor",
+                     "ok, isso mesmo", "ok, pode agendar", "ok, pode publicar no horário sugerido",
+                     "ok, pode publicar o segundo", "ok, pode fazer agora"):
             self.assertTrue(hermes_ponte.usuario_aprovou(fala), fala)
 
 
