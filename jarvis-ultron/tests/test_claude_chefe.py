@@ -17,6 +17,7 @@ RAIZ = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RAIZ))
 
 from core import claude_chefe as chefe
+from core.aprovacao import nova_fala
 
 # Um "claude" de mentira: responde no mesmo formato JSON do Claude Code e anota como foi chamado.
 FALSO = textwrap.dedent('''\
@@ -247,14 +248,36 @@ def _plugin():
 
 
 class JarvisFalso:
-    def __init__(self, fala=""):
-        self._current_input_transcript = self._last_input_transcript = fala
-        self.avisos, self.logs, self.sigilosos = [], [], []
-        self.ui = NS(write_log=self.logs.append)
+    """Imita o JarvisLive: conta as falas do Erton e, no modo chamada, guarda os avisos."""
 
-    def anunciar(self, texto, titulo="Lembrete", sigiloso=False):
+    def __init__(self, fala=""):
+        self._fala_n, self._fala_texto = 0, ""
+        self.avisos, self.logs, self.guardados, self.sigilosos = [], [], [], []
+        self.chamada_fechada = False
+        self.ui = NS(write_log=self.logs.append)
+        if fala:
+            self.falar(fala)
+
+    def falar(self, texto):
+        nova_fala(self, texto)
+
+    def anunciar(self, texto, titulo="Lembrete", sigiloso=False, ao_falar=None):
+        if self.chamada_fechada:  # modo chamada esperando o "Hey Jarvis"
+            self.guardados.append((texto, ao_falar, sigiloso))
+            return "guardado"
         self.avisos.append(texto)
         self.sigilosos.append(sigiloso)
+        return "falado"
+
+    def hey_jarvis(self):
+        """Abre a conversa: fala os avisos guardados."""
+        self.chamada_fechada = False
+        guardados, self.guardados = self.guardados, []
+        for texto, ao_falar, sigiloso in guardados:
+            self.avisos.append(texto)
+            self.sigilosos.append(sigiloso)
+            if ao_falar is not None:
+                ao_falar()
 
 
 def _esperar():
@@ -308,11 +331,11 @@ class FerramentaClaudeTests(Base):
             r = self.m.executar({"request": "mude a soma", "kind": "codigo", "confirm": True}, jarvis)
             self.assertIn("Not confirmed", r)
             # resposta sem ok claro não vale
-            jarvis._current_input_transcript = "hmm, e se der errado?"
+            jarvis.falar("hmm, e se der errado?")
             r = self.m.executar({"request": "mude a soma", "kind": "codigo", "confirm": True}, jarvis)
             self.assertIn("Not confirmed", r)
             # agora sim
-            jarvis._current_input_transcript = "ok, pode fazer"
+            jarvis.falar("ok, pode fazer")
             r = self.m.executar({"request": "mude a soma", "kind": "codigo", "confirm": True}, jarvis)
             self.assertIn("Approved", r)
             _esperar()
@@ -321,6 +344,35 @@ class FerramentaClaudeTests(Base):
         # o mesmo ok não aplica de novo
         r = self.m.executar({"request": "mude a soma", "kind": "codigo", "confirm": True}, jarvis)
         self.assertIn("Not confirmed", r)
+
+    def test_no_modo_chamada_o_plano_so_vale_depois_de_contado(self):
+        """O plano fica guardado até o "Hey Jarvis": o ok antes disso não vale, e os 15 minutos
+        contam de quando o Erton ouviu o plano (não de quando o Claude terminou)."""
+        import time as _time
+
+        jarvis = JarvisFalso("Jarvis, pede pro Claude mudar a soma")
+        jarvis.chamada_fechada = True
+        with patch.dict(os.environ, {"FAKE_CLAUDE_CODIGO": "def soma(a, b):\n    return a - b\n"}), \
+                patch.object(chefe, "rodar_testes", return_value=set()), \
+                patch.object(chefe, "VALIDADE_PLANO", 0.5):
+            self.m.executar({"request": "mude a soma", "kind": "codigo"}, jarvis)
+            _esperar()
+            self.assertEqual(jarvis.avisos, [])  # guardado, ainda não foi contado
+            # "Hey Jarvis, ok..." antes de ouvir o plano não vale
+            jarvis.falar("ok, pode fazer")
+            r = self.m.executar({"request": "mude a soma", "kind": "codigo", "confirm": True}, jarvis)
+            self.assertIn("not told", r)
+            _time.sleep(0.6)  # o plano ficou pronto há mais tempo que a validade...
+            jarvis.hey_jarvis()  # ...mas só agora o Erton ouviu
+            self.assertIn("plano do Claude está pronto", jarvis.avisos[0])
+            # o ok dito antes de ouvir continua não valendo
+            r = self.m.executar({"request": "mude a soma", "kind": "codigo", "confirm": True}, jarvis)
+            self.assertIn("Not confirmed", r)
+            jarvis.falar("ok, pode fazer")
+            r = self.m.executar({"request": "mude a soma", "kind": "codigo", "confirm": True}, jarvis)
+            self.assertIn("Approved", r)
+            _esperar()
+        self.assertIn("a - b", (self.jarvis_dir / "modulo.py").read_text(encoding="utf-8"))
 
     def test_confirmar_sem_plano_nao_faz_nada(self):
         r = self.m.executar({"request": "mude", "kind": "codigo", "confirm": True}, JarvisFalso("ok, pode fazer"))
@@ -680,11 +732,14 @@ class TrocaDeModoComOClaudeMudandoTests(unittest.TestCase):
         jarvis = object.__new__(main.JarvisLive)
         jarvis.ui, jarvis._cerebro_nome, jarvis.avisos = ui, "gemini", []
         jarvis._falar_aviso = jarvis.avisos.append
-        with patch("core.cerebro_gemma.modelo_instalado", return_value=True):
+        with patch("core.cerebro_gemma.modelo_instalado", return_value=True), \
+                patch("core.cerebro_gemma.whisper_instalado", return_value=True):
             with chefe._aplicando:
+                jarvis._trocando_cerebro = True  # o pedido de "modo privado" já calou a nuvem
                 jarvis._trocar_cerebro("gemma")
             self.assertEqual(ui.trocas, [])
             self.assertIn("Claude", jarvis.avisos[0])
+            self.assertFalse(jarvis._trocando_cerebro)  # não trocou: o Jarvis volta a ouvir
             jarvis._trocar_cerebro("gemma")  # terminou: agora troca
         self.assertEqual(ui.trocas, ["gemma"])
 

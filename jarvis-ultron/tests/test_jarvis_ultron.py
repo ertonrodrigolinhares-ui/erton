@@ -421,6 +421,7 @@ class TravaDeAprovacaoTests(unittest.TestCase):
                                              "HERMES_API_KEY": "chave"})
         self.env.start()
         self.gancho = _carregar_gancho()
+        hermes_ponte._proposta.clear()
 
     def tearDown(self):
         self.env.stop()
@@ -458,14 +459,80 @@ class TravaDeAprovacaoTests(unittest.TestCase):
         self.assertEqual(leitura.stdout.strip(), "")
 
     def test_aprovacao_exige_ok_na_fala_do_usuario(self):
+        """Duas chamadas: a proposta é contada ao Erton e só um "ok" numa fala NOVA dele publica."""
+        from core.aprovacao import nova_fala
+
+        jarvis = SimpleNamespace(_fala_n=0, _fala_texto="")
+        aprovar = hermes_ponte.aprovar_e_executar
         with patch.object(hermes_ponte, "perguntar", return_value="Publicado.") as pedido:
-            self.assertIn("Não registrei", hermes_ponte.aprovar_e_executar("redes", "posts 1 e 3", "quais os posts de hoje?"))
-            self.assertIn("Não registrei", hermes_ponte.aprovar_e_executar("redes", "posts 1", "não pode publicar"))
+            nova_fala(jarvis, "ok, pode publicar os posts 1 e 3")
+            # sem a proposta contada antes, nem o ok mais claro vale
+            self.assertIn("Não registrei", aprovar("redes", "posts 1 e 3", jarvis, True))
+            self.assertIn("Proposta registrada", aprovar("redes", "posts 1 e 3", jarvis))
+            # a frase do pedido (ou uma fala antiga) não é o ok depois de ouvir a proposta
+            self.assertIn("Não registrei", aprovar("redes", "posts 1 e 3", jarvis, True))
+            nova_fala(jarvis, "quais os posts de hoje?")
+            self.assertIn("Não registrei", aprovar("redes", "posts 1 e 3", jarvis, True))
+            nova_fala(jarvis, "não pode publicar")
+            self.assertIn("Não registrei", aprovar("redes", "posts 1 e 3", jarvis, True))
             pedido.assert_not_called()
             self.assertFalse(hermes_ponte.arquivo_aprovacao().exists())
-            self.assertEqual(hermes_ponte.aprovar_e_executar("redes", "posts 1 e 3", "ok, pode publicar o 1 e o 3"), "Publicado.")
+            nova_fala(jarvis, "ok, pode publicar o 1 e o 3")
+            self.assertIn("Não registrei", aprovar("redes", "todos os posts", jarvis, True))  # outra coisa
+            self.assertIn("Não registrei", aprovar("anuncios", "posts 1 e 3", jarvis, True))
+            self.assertEqual(aprovar("redes", "posts 1 e 3", jarvis, True), "Publicado.")
             self.assertIn("publicar-aprovados", pedido.call_args.args[0])
+            # o mesmo ok vale uma vez só
+            self.assertIn("Não registrei", aprovar("redes", "posts 1 e 3", jarvis, True))
+            self.assertEqual(pedido.call_count, 1)
         self.assertIsNone(self.gancho.decidir(self._evento("mcp__metricool__create_post")))
+
+    def test_ok_velho_nao_publica_pelo_jarvis(self):
+        """A frase antiga "Ok Jarvis, como estão meus anúncios?" não vira aprovação depois que o
+        resultado do Hermes chega (pelo approve_publication do próprio Jarvis)."""
+        import main
+
+        jarvis = object.__new__(main.JarvisLive)
+        jarvis.ui = SimpleNamespace(muted=False, operational_ready=True, set_state=lambda e: None,
+                                    write_log=lambda t: None)
+        jarvis._current_input_transcript = jarvis._last_input_transcript = "Ok Jarvis, como estão meus anúncios?"
+        jarvis._fala_n, jarvis._fala_texto = 1, "Ok Jarvis, como estão meus anúncios?"
+
+        def chamar(**args):
+            chamada = SimpleNamespace(name="approve_publication", id="a", args=args)
+            return asyncio.run(jarvis._execute_tool(chamada)).response["result"]
+
+        with patch.object(hermes_ponte, "perguntar", return_value="Publicado.") as pedido:
+            detalhes = {"kind": "redes", "details": "post 2 agora"}
+            self.assertIn("Não registrei", chamar(**detalhes, confirm=True))
+            self.assertIn("Proposta registrada", chamar(**detalhes))
+            self.assertIn("Não registrei", chamar(**detalhes, confirm=True))  # ninguém disse ok depois
+            pedido.assert_not_called()
+            jarvis._nova_fala("sim, pode publicar")
+            self.assertEqual(chamar(**detalhes, confirm=True), "Publicado.")
+        declaracao = next(d for d in main.TOOL_DECLARATIONS if d["name"] == "approve_publication")
+        self.assertIn("confirm", declaracao["parameters"]["properties"])
+
+
+class OkClaroTests(unittest.TestCase):
+    """usuario_aprovou é estrito: recusa que começa com "ok", pergunta ou só "entendi" não são ok."""
+
+    def test_recusas_e_perguntas_nao_sao_aprovacao(self):
+        for fala in ("ok, pode cancelar", "Ok, pode cancelar, tá caro", "ok, esquece", "ok, deixa pra lá",
+                     "OK, desisto", "ok, para", "ok, pare", "ok nem pensar", "ok, num quero", "ok, depois",
+                     "ok, vou pensar", "sim, mas muito caro", "tá caro demais, ok", "ok, quanto fica em euro?",
+                     "quem publica isso?", "okay, deixa pra depois", "ok, outro dia", "ok, entendi", "sim, entendi",
+                     "Ok Jarvis, como estão meus anúncios?", "ok jarvis como estao meus anuncios",
+                     "Jarvis, o que a gente posta hoje?", "sim, me fala dos posts", "Jarvis, publica os posts de hoje",
+                     "ok, o Claude terminou", "ok, espera", "não pode publicar", "", "beleza",
+                     "ok, pode fazer, mas só amanhã", "Jarvis, faz um vídeo de 8 segundos do meu treino, pode fazer"):
+            self.assertFalse(hermes_ponte.usuario_aprovou(fala), fala)
+
+    def test_ok_claro_continua_valendo(self):
+        for fala in ("ok", "Ok.", "sim", "ok, pode fazer", "sim, pode publicar", "ok, pode publicar o 1 e o 3",
+                     "Ok Jarvis, pode publicar os posts 1 e 3", "pode fazer", "manda ver", "aprovado", "pode sim",
+                     "beleza, pode fazer", "tá bom, pode fazer", "Hey Jarvis, ok, pode fazer", "sim, por favor"):
+            self.assertTrue(hermes_ponte.usuario_aprovou(fala), fala)
 
 
 class RespostaHttp:
@@ -1420,6 +1487,31 @@ class AvisosFaladosTests(unittest.TestCase):
         self.assertIn("ligar para o contador", jarvis.session.textos[0])
         self.assertNotIn("Grupo Silva", jarvis.session.textos[0])
 
+    def test_aviso_guardado_avisa_quem_pediu_quando_for_falado(self):
+        jarvis = self._jarvis(True)
+        jarvis.AVISO_ESPERA_AO_CHAMAR = 0
+        falados = []
+
+        def ao_falar():
+            falados.append("falado")
+
+        async def cenario():
+            jarvis._loop = asyncio.get_running_loop()
+            self.assertEqual(jarvis.anunciar("o plano do Claude está pronto", "Claude", ao_falar=ao_falar),
+                             "guardado")
+            await asyncio.sleep(0.05)
+            self.assertEqual(falados, [])  # ainda não foi falado
+            jarvis._chamada_fechada = lambda: False  # disse "Hey Jarvis"
+            with patch("core.palavra_ativacao.tocar_aviso"):
+                jarvis._aviso_de_escuta("ouvindo")
+            for _ in range(40):
+                await asyncio.sleep(0.05)
+                if falados and jarvis.session.textos:
+                    break
+        asyncio.run(cenario())
+        self.assertEqual(falados, ["falado"])
+        self.assertIn("o plano do Claude está pronto", jarvis.session.textos[0])
+
     def test_sem_gemini_fala_com_a_voz_reserva(self):
         jarvis = self._jarvis(False)
         jarvis.session, jarvis._loop = None, None
@@ -1432,6 +1524,77 @@ class AvisosFaladosTests(unittest.TestCase):
                 break
             _t.sleep(0.05)
         self.assertEqual(falados, ["beber água"])
+
+
+class TextoDigitadoSemGeminiTests(unittest.TestCase):
+    """Gemma/modo reserva: o texto digitado também é a fala atual do Erton para o "ok"."""
+
+    def setUp(self):
+        import main
+
+        self.videos = _plugin_da_pasta("videos.py")
+        self.pedido = {"description": "a beach at sunrise", "seconds": 8}
+        jarvis = object.__new__(main.JarvisLive)
+        jarvis.ui = UIFalsa()
+        jarvis._portao = PortaoDeVoz(object())
+        jarvis.session = jarvis._loop = None
+        jarvis._reserva = object()
+        jarvis.respondidos = []
+        jarvis._responder_pela_reserva = jarvis.respondidos.append
+        jarvis.anunciar = lambda *a, **k: "falado"
+        self.jarvis = jarvis
+
+    def _digitar(self, texto):
+        import time as _t
+
+        antes = len(self.jarvis.respondidos)
+        self.jarvis._on_text_command(texto)
+        for _ in range(100):
+            if len(self.jarvis.respondidos) > antes:
+                break
+            _t.sleep(0.01)
+        self.assertEqual(self.jarvis.respondidos[-1], texto)
+
+    def _confirmar(self):
+        import threading
+
+        with patch.object(self.videos, "gerar", return_value=Path("/tmp/v.mp4")) as gerar, \
+                patch.object(self.videos, "_abrir"):
+            r = self.videos.executar(dict(self.pedido, confirm=True), self.jarvis)
+            for t in threading.enumerate():
+                if t.name == "VideoVeo":
+                    t.join(5)
+        return r, gerar
+
+    def test_ok_digitado_depois_do_preco_vale(self):
+        self.jarvis._nova_fala("faz um vídeo da praia")  # falado (como no _escutar_reserva)
+        self.videos.executar(dict(self.pedido), self.jarvis)
+        self._digitar("ok, pode fazer")
+        self.assertEqual(self.jarvis._last_input_transcript, "ok, pode fazer")
+        r, gerar = self._confirmar()
+        self.assertIn("background", r)
+        gerar.assert_called_once()
+
+    def test_nao_digitado_depois_de_um_ok_falado_vale_o_nao(self):
+        self.jarvis._nova_fala("faz um vídeo da praia")
+        self.videos.executar(dict(self.pedido), self.jarvis)
+        self.jarvis._nova_fala("ok, pode fazer")
+        self._digitar("não faz, tá caro")
+        r, gerar = self._confirmar()
+        self.assertIn("Not confirmed", r)
+        gerar.assert_not_called()
+
+    def test_aviso_da_tela_nao_conta_como_fala(self):
+        self.jarvis._nova_fala("oi")
+        self._digitar("[FILE_UPLOADED] path=C:/ok.mp4 | name=ok.mp4")
+        self.assertEqual((self.jarvis._fala_n, self.jarvis._fala_texto), (1, "oi"))
+
+    def test_texto_digitado_no_gemini_tambem_conta(self):
+        self.jarvis.session = SessaoFalsa()
+        self.assertTrue(asyncio.run(self.jarvis.send_text("ok, pode fazer")))
+        self.assertEqual((self.jarvis._fala_n, self.jarvis._fala_texto), (1, "ok, pode fazer"))
+        asyncio.run(self.jarvis.send_text("[UI EVENT] Say exactly: ok"))
+        self.assertEqual(self.jarvis._fala_n, 1)
 
 
 class LembretesFaladosTests(unittest.TestCase):

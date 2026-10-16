@@ -506,15 +506,18 @@ TOOL_DECLARATIONS = [
     {
         "name": "approve_publication",
         "description": (
-            "Records the user's explicit approval and tells Hermes to publish/schedule the approved posts "
-            "(kind='redes') or apply the approved ad change (kind='anuncios'). Call ONLY right after the user "
-            "clearly approves in their own words (e.g. 'ok, pode publicar os posts 1 e 3'). Never assume approval."
+            "Tells Hermes to publish/schedule posts (kind='redes') or apply an ad change (kind='anuncios'), "
+            "always with the user's explicit approval, in two calls: first call with confirm=false records the "
+            "proposal; then tell the user in Portuguese exactly what will be published/changed and ask for an "
+            "explicit ok. Only after the user clearly approves in their own words, call again with confirm=true "
+            "(same kind and details). Never assume approval."
         ),
         "parameters": {
             "type": "OBJECT",
             "properties": {
                 "kind": {"type": "STRING", "enum": ["redes", "anuncios"], "description": "redes = posts; anuncios = Meta ads"},
-                "details": {"type": "STRING", "description": "Exactly what was approved, e.g. 'posts 1 e 3, agendar no horario sugerido'"}
+                "details": {"type": "STRING", "description": "Exactly what will be done, e.g. 'posts 1 e 3, agendar no horario sugerido'"},
+                "confirm": {"type": "BOOLEAN", "description": "true ONLY after the user approved the proposal told to them"}
             },
             "required": ["kind", "details"]
         }
@@ -1367,6 +1370,9 @@ class JarvisLive:
         self._current_input_transcript = ""
         self._last_input_transcript = ""
         self._last_input_transcript_at = 0.0
+        # Jarvis Ultron: número e texto da fala atual do Erton (o "ok" das aprovações: core/aprovacao.py)
+        self._fala_n = 0
+        self._fala_texto = ""
         self._pending_self_quit = False
         self._pending_self_quit_farewell_received = False
         self._self_quit_timer = None
@@ -1397,6 +1403,7 @@ class JarvisLive:
         self._falhas_seguidas = 0
         self._avisos_trava = threading.Lock()  # avisos guardados no modo chamada
         self._avisos_guardados = []
+        self._avisos_ao_falar = []  # quem quer saber quando o aviso guardado foi falado
         if not self.cloud_safe:
             self._iniciar_lembretes_geekie()
             threading.Thread(target=self._preparar_automacoes, daemon=True, name="Automacoes").start()
@@ -1430,10 +1437,23 @@ class JarvisLive:
             self.ui.write_log("SYS: 🔒 Trocando para o modo privado: espere o selo e mande de novo.")
             return
         if not self._loop or not self.session:
-            if getattr(self, "_reserva", None) is not None and str(text or "").strip():
+            texto = str(text or "").strip()
+            if getattr(self, "_reserva", None) is not None and texto:
+                if not texto.startswith("["):  # [UI EVENT], [FILE_UPLOADED]: não são falas do Erton
+                    # o "ok" digitado também é a fala atual do Erton (como no send_text e no _escutar_reserva)
+                    self._current_input_transcript = self._last_input_transcript = texto
+                    self._last_input_transcript_at = time.monotonic()
+                    self._nova_fala(texto)
                 threading.Thread(target=self._responder_pela_reserva, args=(text,), daemon=True).start()
             return
         asyncio.run_coroutine_threadsafe(self.send_text(text), self._loop)
+
+    def _nova_fala(self, texto: str) -> int:
+        """Jarvis Ultron: uma fala NOVA do Erton (falada ou digitada). As aprovações só aceitam o
+        "ok" numa fala com número maior que o da proposta (core/aprovacao.py)."""
+        from core.aprovacao import nova_fala
+
+        return nova_fala(self, texto)
 
     async def send_text(self, text: str) -> bool:
         """Send a text turn from either the desktop callback or a web client."""
@@ -1444,6 +1464,8 @@ class JarvisLive:
             return False
         self._last_input_transcript = self._current_input_transcript
         self._last_input_transcript_at = time.monotonic()
+        if not self._current_input_transcript.startswith("["):  # [UI EVENT], [FILE_UPLOADED] não contam
+            self._nova_fala(self._current_input_transcript)
         self._checar_pedido_de_modo(self._current_input_transcript)
         outgoing_text = self._current_input_transcript
         if (
@@ -1709,7 +1731,7 @@ class JarvisLive:
 
     AVISO_ESPERA_AO_CHAMAR = 4.0  # segundos depois do "Hey Jarvis" para falar os avisos guardados
 
-    def anunciar(self, texto: str, titulo: str = "Lembrete", sigiloso: bool = False) -> str:
+    def anunciar(self, texto: str, titulo: str = "Lembrete", sigiloso: bool = False, ao_falar=None) -> str:
         """Fala um aviso em voz alta respeitando o modo de escuta. Qualquer fio pode chamar.
 
         - conversa aberta (mãos livres ou depois do "Hey Jarvis"): o Jarvis fala agora;
@@ -1718,7 +1740,8 @@ class JarvisLive:
         - sem o Gemini (modo reserva): fala com a voz reserva;
         - sigiloso=True (ex.: resultado do Claude, que lê arquivos de clientes): fala só com a voz do
           Windows, no PC; o texto nunca vai para o Gemini.
-        Devolve "falado", "guardado" ou "na_tela".
+        Devolve "falado", "guardado" ou "na_tela". Se ficou "guardado", ao_falar (opcional) é
+        chamado quando o aviso for falado de verdade (o plano do Claude só vale depois disso).
         """
         texto = " ".join(str(texto or "").split())
         if not texto:
@@ -1735,6 +1758,8 @@ class JarvisLive:
         if self._chamada_fechada() and not fala_sempre:
             with self._trava_avisos():
                 self._avisos_guardados.append((texto, sigiloso))
+                if ao_falar is not None:
+                    self._avisos_ao_falar.append(ao_falar)
             return "guardado"
         return self._falar_aviso(texto, sigiloso=sigiloso)
 
@@ -1742,6 +1767,8 @@ class JarvisLive:
         if not hasattr(self, "_avisos_trava"):
             self._avisos_trava = threading.Lock()
             self._avisos_guardados = []
+        if not hasattr(self, "_avisos_ao_falar"):
+            self._avisos_ao_falar = []
         return self._avisos_trava
 
     def _falar_aviso(self, texto: str, sigiloso: bool = False) -> str:
@@ -1784,12 +1811,18 @@ class JarvisLive:
                 return  # a conversa fechou de novo; continuam guardados
             with self._trava_avisos():
                 guardados, self._avisos_guardados = self._avisos_guardados, []
+                ao_falar, self._avisos_ao_falar = self._avisos_ao_falar, []
             sigilosos = [t for t, sigiloso in guardados if sigiloso]
             comuns = [t for t, sigiloso in guardados if not sigiloso]
             if sigilosos:  # primeiro os sigilosos, pela voz do PC (nunca juntos num pedido ao Gemini)
                 self._falar_no_pc("Enquanto você estava fora: " + " ".join(sigilosos))
             if comuns:
                 self._falar_aviso(("Enquanto você estava fora: " if not sigilosos else "") + " ".join(comuns))
+            for avisar in ao_falar:  # só agora o Erton ouviu (ex.: o plano do Claude passa a valer)
+                try:
+                    avisar()
+                except Exception as erro:
+                    print(f"[Aviso] {erro}")
         threading.Thread(target=depois, daemon=True, name="AvisosGuardados").start()
 
     def _notificar_na_tela(self, titulo: str, texto: str) -> None:
@@ -1884,7 +1917,8 @@ class JarvisLive:
         if session is None or loop is None or self._chamada_fechada():
             return  # modo chamada esperando o "Hey Jarvis": fica só na tela
         aviso = (f"[Resultado do Hermes para o pedido: {pedido}]\n{texto}\n"
-                 "Resuma isso para o usuário agora, em português do Brasil, em poucas frases.")
+                 "Resuma isso para o usuário agora, em português do Brasil, em poucas frases. "
+                 "Não chame ferramentas.")
         asyncio.run_coroutine_threadsafe(
             session.send_client_content(turns={"parts": [{"text": aviso}]}, turn_complete=True), loop)
 
@@ -2035,6 +2069,7 @@ class JarvisLive:
 
         if aplicando():
             # religar o cérebro agora mataria a mudança do Claude no meio (sem testes e sem desfazer)
+            self._trocando_cerebro = False  # não vai trocar: o microfone volta a funcionar
             self._falar_aviso("O Claude está mudando o meu código agora. Espere ele terminar para trocar de "
                               "modo; eu aviso quando acabar.")
             return
@@ -2228,7 +2263,7 @@ class JarvisLive:
         if session is not None and loop is not None and not getattr(self, "_modo_reserva", False) \
                 and not self._chamada_fechada():
             directiva = (f"[Resultado de automação] {texto}\nLeia isso ao usuário em português, "
-                         "sem acrescentar nada.")
+                         "sem acrescentar nada. Não chame ferramentas.")
             asyncio.run_coroutine_threadsafe(
                 session.send_client_content(turns={"parts": [{"text": directiva}]}, turn_complete=True), loop)
         else:
@@ -2295,6 +2330,7 @@ class JarvisLive:
                     # o "ok" das aprovações é conferido nesta fala (e não numa antiga do Gemini)
                     self._current_input_transcript = self._last_input_transcript = texto
                     self._last_input_transcript_at = time.monotonic()
+                    self._nova_fala(texto)
                     self._checar_pedido_de_modo(texto)
                     if self._pedido_de_cerebro(texto):
                         continue
@@ -2435,10 +2471,10 @@ class JarvisLive:
 
             elif name == "approve_publication":
                 from core import hermes_ponte
-                ultima_fala = self._current_input_transcript or self._last_input_transcript
+                # o "ok" é conferido no código: numa fala NOVA do Erton depois da proposta (core/aprovacao.py)
                 result = await asyncio.to_thread(
                     hermes_ponte.aprovar_e_executar,
-                    args.get("kind", ""), args.get("details", ""), ultima_fala,
+                    args.get("kind", ""), args.get("details", ""), self, bool(args.get("confirm")),
                 )
 
             elif name == "suspend_listening":
@@ -2706,6 +2742,9 @@ class JarvisLive:
         out_buf, in_buf = [], []
         _new_turn = True
         turn_had_audio = False
+        # Jarvis Ultron: contagem das falas do Erton para o "ok" das aprovações (core/aprovacao.py)
+        ferramenta_no_turno = False  # já rodou ferramenta neste turno do modelo
+        fala_do_buf = None  # número da fala que está em in_buf (None: não contou como fala nova)
 
         try:
             while True:
@@ -2744,10 +2783,20 @@ class JarvisLive:
                             self._ultima_fala_em = time.monotonic()
                             txt = _clean_transcript(sc.input_transcription.text)
                             if txt:
-                                if not in_buf:
+                                fala_nova = not in_buf
+                                if fala_nova:
                                     self._current_input_transcript = ""
                                 in_buf.append(txt)
                                 self._current_input_transcript = " ".join(in_buf).strip()
+                                if fala_nova:
+                                    # Fala nova do Erton. Transcrição que chega DEPOIS de uma ferramenta,
+                                    # no mesmo turno do modelo, é o pedido chegando atrasado (ou ele falando
+                                    # por cima): não conta, senão um "pode fazer" dito junto com o pedido
+                                    # aprovaria o vídeo antes de ele ouvir o preço.
+                                    fala_do_buf = (None if ferramenta_no_turno
+                                                   else self._nova_fala(self._current_input_transcript))
+                                elif fala_do_buf is not None and fala_do_buf == getattr(self, "_fala_n", 0):
+                                    self._fala_texto = self._current_input_transcript
                                 if (
                                     not getattr(self, "_pending_self_quit", False)
                                     and self._is_explicit_self_quit_transcript(self._current_input_transcript)
@@ -2772,6 +2821,8 @@ class JarvisLive:
                                     self._queue_self_quit_after_farewell()
                                 self.ui.write_log(f"You: {full_in}")
                             in_buf = []
+                            fala_do_buf = None
+                            ferramenta_no_turno = False
 
                             full_out = " ".join(out_buf).strip()
                             if full_out:
@@ -2788,6 +2839,7 @@ class JarvisLive:
                             _new_turn = True
 
                     if response.tool_call:
+                        ferramenta_no_turno = True
                         function_calls = list(response.tool_call.function_calls)
                         for fc in function_calls:
                             print(f"[JARVIS] 📞 {fc.name}")

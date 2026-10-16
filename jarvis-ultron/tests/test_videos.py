@@ -10,6 +10,8 @@ from unittest.mock import patch
 RAIZ = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RAIZ))
 
+from core.aprovacao import nova_fala
+
 
 def _modulo():
     spec = importlib.util.spec_from_file_location("auto_videos", RAIZ / "automacoes" / "videos.py")
@@ -19,11 +21,17 @@ def _modulo():
 
 
 class JarvisFalso:
+    """Imita o JarvisLive: conta as falas do Erton (o "ok" só vale numa fala nova)."""
+
     def __init__(self, fala=""):
-        self._current_input_transcript = fala
-        self._last_input_transcript = fala
+        self._fala_n, self._fala_texto = 0, ""
         self.avisos, self.logs = [], []
         self.ui = NS(write_log=self.logs.append)
+        if fala:
+            self.falar(fala)
+
+    def falar(self, texto):
+        nova_fala(self, texto)
 
     def _falar_aviso(self, texto):
         self.avisos.append(texto)
@@ -48,9 +56,32 @@ class OkAntesDoVideoTests(unittest.TestCase):
         gerar.assert_not_called()
 
     def test_confirmar_sem_ok_do_usuario_nao_faz(self):
+        jarvis = JarvisFalso("faz um vídeo de um triatleta no Havaí")
         with patch.object(self.m, "gerar") as gerar:
-            self.m.executar(dict(self.pedido), JarvisFalso())
-            r = self.m.executar(dict(self.pedido, confirm=True), JarvisFalso("hmm, quanto fica mesmo?"))
+            self.m.executar(dict(self.pedido), jarvis)
+            jarvis.falar("hmm, quanto fica mesmo?")
+            r = self.m.executar(dict(self.pedido, confirm=True), jarvis)
+            _esperar_video()
+        self.assertIn("Not confirmed", r)
+        gerar.assert_not_called()
+
+    def test_recusa_que_comeca_com_ok_nao_vale(self):
+        jarvis = JarvisFalso("faz um vídeo de um triatleta no Havaí")
+        with patch.object(self.m, "gerar") as gerar:
+            self.m.executar(dict(self.pedido), jarvis)
+            for recusa in ("Ok, pode cancelar, tá caro", "ok, deixa pra depois", "sim, mas muito caro",
+                           "ok, quanto fica em euro?", "ok, entendi"):
+                jarvis.falar(recusa)
+                r = self.m.executar(dict(self.pedido, confirm=True), jarvis)
+                self.assertIn("Not confirmed", r, recusa)
+            _esperar_video()
+        gerar.assert_not_called()
+
+    def test_ok_dito_antes_do_preco_nao_vale(self):
+        jarvis = JarvisFalso("ok, pode fazer")
+        with patch.object(self.m, "gerar") as gerar:
+            self.m.executar(dict(self.pedido), jarvis)  # o preço vem depois do "ok"
+            r = self.m.executar(dict(self.pedido, confirm=True), jarvis)
             _esperar_video()
         self.assertIn("Not confirmed", r)
         gerar.assert_not_called()
@@ -63,18 +94,21 @@ class OkAntesDoVideoTests(unittest.TestCase):
         gerar.assert_not_called()
 
     def test_ok_para_outro_video_nao_vale(self):
+        jarvis = JarvisFalso("faz um vídeo de um triatleta no Havaí")
         with patch.object(self.m, "gerar") as gerar:
-            self.m.executar(dict(self.pedido), JarvisFalso())
-            r = self.m.executar(dict(self.pedido, seconds=4, confirm=True), JarvisFalso("ok, pode fazer"))
+            self.m.executar(dict(self.pedido), jarvis)
+            jarvis.falar("ok, pode fazer")
+            r = self.m.executar(dict(self.pedido, seconds=4, confirm=True), jarvis)
             _esperar_video()
         self.assertIn("Not confirmed", r)
         gerar.assert_not_called()
 
     def test_com_ok_faz_em_segundo_plano_abre_e_avisa(self):
-        jarvis = JarvisFalso("ok, pode fazer")
+        jarvis = JarvisFalso("faz um vídeo de um triatleta no Havaí")
         with patch.object(self.m, "gerar", return_value=Path("/tmp/video.mp4")) as gerar, \
                 patch.object(self.m, "_abrir") as abrir:
-            self.m.executar(dict(self.pedido), JarvisFalso())
+            self.m.executar(dict(self.pedido), jarvis)
+            jarvis.falar("ok, pode fazer")
             r = self.m.executar(dict(self.pedido, confirm=True), jarvis)
             _esperar_video()
         self.assertIn("background", r)
@@ -126,12 +160,98 @@ class OkAntesDoVideoTests(unittest.TestCase):
         self.assertTrue(carregar_ferramentas(RAIZ / "automacoes").ferramentas["generate_video"].usa_ia_nuvem)
 
     def test_erro_do_google_vira_aviso_em_portugues(self):
-        jarvis = JarvisFalso("ok, pode fazer")
+        jarvis = JarvisFalso("faz um vídeo de um triatleta no Havaí")
         with patch.object(self.m, "gerar", side_effect=RuntimeError("403 billing account not enabled")):
-            self.m.executar(dict(self.pedido), JarvisFalso())
+            self.m.executar(dict(self.pedido), jarvis)
+            jarvis.falar("ok, pode fazer")
             self.m.executar(dict(self.pedido, confirm=True), jarvis)
             _esperar_video()
         self.assertIn("faturamento", jarvis.avisos[0])
+
+
+def _pedaco(texto):
+    """Um pedaço da transcrição da fala do Erton (Gemini ao vivo)."""
+    return NS(server_content=NS(input_transcription=NS(text=texto), output_transcription=None, turn_complete=False),
+              tool_call=None)
+
+
+def _video(confirm):
+    fc = NS(name="generate_video", id="v", args={"description": "my workout", "seconds": 8, "confirm": confirm})
+    return NS(server_content=None, tool_call=NS(function_calls=[fc]))
+
+
+def _fim_do_turno():
+    return NS(server_content=NS(input_transcription=None, output_transcription=None, turn_complete=True),
+              tool_call=None)
+
+
+class OkNoGeminiAoVivoTests(unittest.TestCase):
+    """No Gemini ao vivo a transcrição chega em pedaços e atrasada: o "pode fazer" dito junto com o
+    pedido não pode aprovar o vídeo na segunda chamada do mesmo turno."""
+
+    def setUp(self):
+        self.m = _modulo()
+        self.respostas = []
+
+    def _rodar(self, mensagens):
+        import asyncio
+
+        import main
+
+        jarvis = object.__new__(main.JarvisLive)
+        jarvis.ui = NS(muted=False, write_log=lambda t: None, clear_subtitle=lambda: None,
+                       show_subtitle=lambda t: None)
+        jarvis._portao = NS(estender=lambda: None, estado="ouvindo")
+        jarvis._turn_done_event = None
+        jarvis._shutdown_requested = threading.Event()
+        jarvis._fala_n, jarvis._fala_texto = 0, ""
+        for nome in ("_checar_pedido_de_modo", "_pedido_de_cerebro", "_falar_com_voz_externa"):
+            setattr(jarvis, nome, lambda t: None)
+        jarvis._is_explicit_self_quit_transcript = lambda t: False
+        jarvis.anunciar = lambda *a, **k: "falado"
+        m, respostas = self.m, self.respostas
+
+        async def ferramentas(chamadas):
+            respostas.extend(m.executar(dict(fc.args), jarvis) for fc in chamadas)
+            return []
+
+        jarvis._execute_tool_batch = ferramentas
+
+        class Sessao:
+            async def receive(self):
+                for mensagem in mensagens:
+                    yield mensagem
+                jarvis._shutdown_requested.set()
+
+            async def send_tool_response(self, function_responses):
+                pass
+
+        jarvis.session = Sessao()
+        with patch.object(self.m, "gerar", return_value=Path("/tmp/video.mp4")) as gerar, \
+                patch.object(self.m, "_abrir"):
+            asyncio.run(jarvis._receive_audio())
+            _esperar_video()
+        return gerar
+
+    def test_pode_fazer_que_chega_depois_do_preco_no_mesmo_turno_nao_vale(self):
+        gerar = self._rodar([_pedaco("Jarvis, faz um vídeo de 8 segundos do meu treino"), _video(False),
+                             _pedaco(", pode fazer"), _video(True), _fim_do_turno()])
+        gerar.assert_not_called()
+        self.assertIn("Not confirmed", self.respostas[1])
+
+    def test_pedido_inteiro_transcrito_atrasado_nao_vale(self):
+        # o preço saiu antes de chegar qualquer pedaço da fala; o pedido (que soa como um "ok")
+        # chega depois, no mesmo turno do modelo: não é uma fala nova depois do preço
+        gerar = self._rodar([_video(False), _pedaco("Ok Jarvis, pode fazer um vídeo do meu treino"),
+                             _video(True), _fim_do_turno()])
+        gerar.assert_not_called()
+        self.assertIn("Not confirmed", self.respostas[1])
+
+    def test_ok_numa_fala_nova_depois_do_preco_vale(self):
+        gerar = self._rodar([_pedaco("Jarvis, faz um vídeo de 8 segundos do meu treino"), _video(False),
+                             _fim_do_turno(), _pedaco("ok, pode fazer"), _video(True), _fim_do_turno()])
+        gerar.assert_called_once()
+        self.assertIn("background", self.respostas[1])
 
 
 class Operacao:

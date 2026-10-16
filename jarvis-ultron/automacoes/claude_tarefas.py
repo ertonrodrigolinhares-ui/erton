@@ -52,24 +52,23 @@ _ocupado = threading.Lock()   # uma tarefa do Claude por vez
 _estado: dict = {"plano": None, "ultima_sessao": None}
 
 
-def _fala_atual(jarvis) -> str:
-    return str(getattr(jarvis, "_current_input_transcript", "") or getattr(jarvis, "_last_input_transcript", "") or "")
-
-
-def _avisar(jarvis, texto: str, sigiloso: bool = False) -> None:
-    """sigiloso=True: o texto pode ter dados de clientes (o Claude lê clientes.txt, Faturas...),
-    então o Jarvis fala só com a voz do PC, sem mandar para o Gemini."""
+def _avisar(jarvis, texto: str, ao_falar=None, sigiloso: bool = False) -> str:
+    """Avisa o Erton. Devolve "guardado" se o aviso ficou esperando o "Hey Jarvis" (aí ao_falar é
+    chamado quando ele for falado de verdade). sigiloso=True: o texto pode ter dados de clientes (o
+    Claude lê clientes.txt, Faturas...), então o Jarvis fala só com a voz do PC, sem mandar para o Gemini."""
     extra = {"sigiloso": True} if sigiloso else {}
     anunciar = getattr(jarvis, "anunciar", None)
     if callable(anunciar):
-        anunciar(texto, "Claude", **extra)
-        return
+        if ao_falar is None:
+            return str(anunciar(texto, "Claude", **extra) or "")
+        return str(anunciar(texto, "Claude", ao_falar=ao_falar, **extra) or "")
     ui = getattr(jarvis, "ui", None)
     if ui is not None:
         ui.write_log(f"SYS: 🤖 Claude: {texto}")
     falar = getattr(jarvis, "_falar_aviso", None)
     if callable(falar):
         falar(texto, **extra)
+    return "falado"
 
 
 def _log(jarvis, texto: str) -> None:
@@ -129,6 +128,8 @@ def _codigo(args: dict, jarvis, chefe) -> str:
         return "This packaged Jarvis cannot change its own code. Tell the user in Portuguese."
     pedido = str(args.get("request", "")).strip()
 
+    from core import aprovacao
+
     if not args.get("confirm"):
         def planejar():
             resposta = chefe.planejar(pedido)
@@ -136,11 +137,22 @@ def _codigo(args: dict, jarvis, chefe) -> str:
                 _avisar(jarvis, f"O Claude não conseguiu fazer o plano: {resposta.erro}.")
                 return
             fala, plano = chefe.separar_fala(resposta.texto)
-            with _trava:  # o "ok" só vale numa fala DEPOIS de o plano ser contado
-                _estado["plano"] = {"pedido": pedido, "plano": plano or resposta.texto, "sessao": resposta.sessao,
-                                    "em": time.monotonic(), "fala": _fala_atual(jarvis).strip().lower()}
+            # o "ok" só vale numa fala DEPOIS de o plano ser contado. No modo chamada o aviso fica
+            # guardado até o "Hey Jarvis": até lá o plano não foi contado ("em" e "marca" vazios).
+            pendente = {"pedido": pedido, "plano": plano or resposta.texto, "sessao": resposta.sessao,
+                        "em": None, "marca": None}
+            with _trava:
+                _estado["plano"] = pendente
+
+            def contado():  # agora o Erton ouviu: a validade e a marca da fala começam aqui
+                with _trava:
+                    if _estado["plano"] is pendente:
+                        pendente.update(em=time.monotonic(), marca=aprovacao.marca(jarvis))
+
             _log(jarvis, f"SYS: 🤖 Plano do Claude:\n{(plano or resposta.texto)[:1500]}")
-            _avisar(jarvis, f"O plano do Claude está pronto: {fala} Para aplicar, diga 'ok, pode fazer'.")
+            if _avisar(jarvis, f"O plano do Claude está pronto: {fala} Para aplicar, diga 'ok, pode fazer'.",
+                       ao_falar=contado) != "guardado":
+                contado()
 
         if _em_segundo_plano(jarvis, "ClaudePlano", planejar) is None:
             return "Claude is still working on the previous task. Tell the user to wait for it to finish."
@@ -148,15 +160,16 @@ def _codigo(args: dict, jarvis, chefe) -> str:
         return ("Claude is reading the code and writing a PLAN (nothing is changed yet). Tell the user, in one short "
                 "Portuguese sentence, that you will tell the plan when it is ready.")
 
-    from core.hermes_ponte import usuario_aprovou
-
-    fala = _fala_atual(jarvis)
     with _trava:
         pendente = _estado["plano"]
-        valido = pendente is not None and time.monotonic() - pendente["em"] < chefe.VALIDADE_PLANO
-        aprovado = valido and fala.strip().lower() != pendente["fala"] and usuario_aprovou(fala)
+        contado = pendente is not None and pendente["em"] is not None
+        valido = contado and time.monotonic() - pendente["em"] < chefe.VALIDADE_PLANO
+        aprovado = valido and aprovacao.aprovou_depois(jarvis, pendente["marca"])
         if aprovado:
             _estado["plano"] = None
+    if pendente is not None and not contado:
+        return ("Not confirmed: the plan was not told to the user yet (it is waiting to be spoken). Wait until "
+                "the user hears the plan and then approves it in their own words.")
     if not valido:
         return ("Not confirmed: there is no recent plan from Claude. Call with confirm=false first to make the plan, "
                 "tell it to the user and wait for an explicit ok.")

@@ -198,24 +198,23 @@ def executar(args: dict, jarvis) -> str:
     vertical = bool(args.get("vertical"))
     dolares, reais = estimar(segundos, qualidade)
     chave = (descricao.lower(), segundos, qualidade, vertical)
-    fala = str(getattr(jarvis, "_current_input_transcript", "") or getattr(jarvis, "_last_input_transcript", "") or "")
+    from core import aprovacao
 
     if not args.get("confirm"):
         with _trava:
             _pendente.clear()
-            _pendente.update(chave=chave, em=time.monotonic(), fala=fala.strip().lower())
+            _pendente.update(chave=chave, em=time.monotonic(), marca=aprovacao.marca(jarvis))
         return (f"Estimated price: about US$ {dolares:.2f} (about R$ {reais:.2f}) for a {segundos}-second "
                 f"{'vertical ' if vertical else ''}video ({qualidade}). Tell the user this price in Portuguese "
                 "and ask for an explicit ok before making it.")
 
     # Confirmado: só vale se o próprio Erton aprovou este mesmo pedido, em palavras dele, numa fala
-    # DEPOIS de ouvir o preço (um "pode fazer" dito junto com o pedido não conta).
-    from core.hermes_ponte import usuario_aprovou
-
+    # NOVA depois de ouvir o preço (um "pode fazer" dito junto com o pedido não conta, nem quando a
+    # transcrição dele chega atrasada): core/aprovacao.py.
     with _trava:
         pedido_ok = (_pendente.get("chave") == chave
                      and time.monotonic() - _pendente.get("em", 0) < VALIDADE_PEDIDO)
-        aprovado = pedido_ok and fala.strip().lower() != _pendente.get("fala") and usuario_aprovou(fala)
+        aprovado = pedido_ok and aprovacao.aprovou_depois(jarvis, _pendente.get("marca", 0))
         if aprovado:
             _pendente.clear()
     if not pedido_ok:
