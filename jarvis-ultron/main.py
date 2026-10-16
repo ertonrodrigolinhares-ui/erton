@@ -2168,7 +2168,9 @@ class JarvisLive:
                 texto = self._reserva.transcrever(pcm)
                 if texto:
                     self.ui.write_log(f"You: {texto}")
-                    self._last_input_transcript = texto  # o "ok" das aprovações é conferido nesta fala
+                    # o "ok" das aprovações é conferido nesta fala (e não numa antiga do Gemini)
+                    self._current_input_transcript = self._last_input_transcript = texto
+                    self._last_input_transcript_at = time.monotonic()
                     self._checar_pedido_de_modo(texto)
                     if self._pedido_de_cerebro(texto):
                         continue
