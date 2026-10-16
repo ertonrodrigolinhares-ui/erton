@@ -8,7 +8,8 @@ Esta central:
   de cada tipo (texto, leve, pro, imagem/Nano Banana, voz ao vivo);
 - se um modelo não existir mais (404) ou acabar a cota gratuita (429), tenta o próximo
   (cada modelo tem a sua própria cota grátis);
-- vale para a biblioteca nova (google-genai) e para a antiga (google-generativeai).
+- vale para a biblioteca nova (google-genai) e para a antiga (google-generativeai); no caminho
+  Vertex AI, os pedidos da biblioteca antiga (que só conhece o caminho normal) vão pela nova.
 
 Padrão: rapidez (modelos estáveis). Para preferir uma versão (ex.: Gemini 3.5, mesmo em preview),
 coloque no .env: JARVIS_PRIORIDADE=versao e JARVIS_GEMINI_VERSAO=3.5
@@ -85,7 +86,8 @@ def _chave() -> str:
 
 
 def _versao(nome: str) -> float:
-    achado = re.search(r"gemini-(\d+(?:\.\d+)?)", nome)
+    # "gemini-3.1-flash" e também o nome do Vertex AI para a voz ("gemini-live-2.5-flash-...")
+    achado = re.search(r"gemini-(?:live-)?(\d+(?:\.\d+)?)", nome)
     return float(achado.group(1)) if achado else 0.0
 
 
@@ -156,10 +158,10 @@ def _da_categoria(cat: str, modelos: list[tuple[str, set[str]]]) -> list[str]:
         vivos = [n for n, acoes in modelos if "bidigeneratecontent" in acoes]
         # Voz: 3.x sempre antes do 2.5 (aposentando), mesmo que o 2.5 seja de áudio nativo; depois a
         # versão escolhida no .env, estável antes de preview, a mais nova (3.5 antes de 3.1) e, na
-        # mesma versão, o áudio nativo (mais rápido).
+        # mesma versão, o áudio nativo (mais rápido) e o estável antes do preview.
         return sorted(vivos, key=lambda n: (_versao(n) < VERSAO_MINIMA, _fora_da_preferida(n),
                                             _grupo(n) == 2 and prioridade() == "rapidez", -_versao(n),
-                                            "native-audio" not in n, n))
+                                            "native-audio" not in n, "preview" in n or "exp" in n, n))
     if cat == "imagem":
         return _ordenar([n for n in gerar if "image" in n and "imagen" not in n])
     if cat == "leve":
@@ -199,6 +201,13 @@ def candidatos(pedido: str) -> list[str]:
         lista += [pedido] + ([_ALIAS[cat]] if cat in _ALIAS else [])
         if cat == "imagem":
             lista += ["gemini-3.1-flash-image", "gemini-2.5-flash-image"]
+    if cat == "ao_vivo":
+        from core.gemini_acesso import VIVO_VERTEX, via
+
+        if via() == "vertex":
+            # o Vertex AI pode recusar a lista ou não dizer quais modelos são de voz: os modelos de
+            # voz conhecidos do Vertex ficam na reserva (se um não conectar, a voz passa para o próximo)
+            lista += list(VIVO_VERTEX)
     return _sem_os_que_falharam(list(dict.fromkeys(m for m in lista if m)) or [pedido])
 
 
@@ -322,6 +331,10 @@ def instalar() -> None:
 
         @functools.wraps(original_gerar)
         def gerar(self, *args, **kwargs):
+            from core.gemini_acesso import via
+
+            if via() == "vertex" and not kwargs.get("stream"):
+                return _antiga_pelo_vertex(self, *args, **kwargs)
             ultimo = None
             for modelo in candidatos(getattr(self, "__jarvis_pedido__", self._model_name)):
                 self._model_name = "models/" + modelo
@@ -337,6 +350,35 @@ def instalar() -> None:
         antiga.GenerativeModel.generate_content = gerar
     except ImportError:
         pass
+
+
+def _antiga_pelo_vertex(modelo, contents=None, *, generation_config=None, **_outros):
+    """A biblioteca antiga (google-generativeai) não conhece o Vertex AI: sempre chama o caminho normal,
+    que recusa as chaves "AQ.". No caminho Vertex, o mesmo pedido vai pela biblioteca nova (que obedece
+    GOOGLE_GENAI_USE_VERTEXAI e passa pela central de modelos); a resposta também tem .text."""
+    from google import genai
+
+    from core.gemini_acesso import opcoes_http
+
+    config = dict(getattr(modelo, "_generation_config", None) or {})
+    if isinstance(generation_config, dict):
+        config.update(generation_config)
+    instrucao = getattr(modelo, "_system_instruction", None)
+    texto = "".join(getattr(p, "text", "") or "" for p in (getattr(instrucao, "parts", None) or []))
+    if texto:
+        config["system_instruction"] = texto
+    chave = ""
+    try:  # a chave que a parte do Jarvis passou para a biblioteca antiga (genai.configure)
+        from google.generativeai import client as cliente_antigo
+
+        opcoes = cliente_antigo._client_manager.client_config.get("client_options")
+        chave = str(getattr(opcoes, "api_key", "") or "")
+    except Exception:
+        pass
+    cliente = genai.Client(api_key=chave or _chave() or None, http_options=opcoes_http())
+    pedido = getattr(modelo, "__jarvis_pedido__", None) or str(modelo._model_name)
+    return cliente.models.generate_content(model=str(pedido).removeprefix("models/"), contents=contents,
+                                           config=config or None)
 
 
 def _trocar_modelo(classe, nome: str) -> None:

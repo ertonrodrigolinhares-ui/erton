@@ -4965,6 +4965,14 @@ class SetupOverlay(QWidget):
         def _validate():
             from core.api_key_validator import validate_gemini_api_key
             result = validate_gemini_api_key(normalized)
+            if result.valid:
+                # Jarvis Ultron: o Jarvis passa a usar o caminho em que a chave funcionou (normal ou
+                # Vertex AI); uma escolha antiga de "vertex" não fica valendo para uma chave normal.
+                try:
+                    from core.gemini_acesso import aplicar_via
+                    aplicar_via(getattr(result, "via", "studio"))
+                except Exception:
+                    pass
             self.validation_finished.emit(result.valid, result.message, normalized, remember_key)
 
         threading.Thread(target=_validate, daemon=True).start()
@@ -8866,8 +8874,10 @@ class MainWindow(QMainWindow):
                 from core.env_arquivo import atualizar_env
                 atualizar_env(env_jarvis, "GEMINI_API_KEY", key.strip())
                 self._log.append_log("SYS: Chave do Gemini atualizada no arquivo .env.")
-                if os.environ.get("JARVIS_GEMINI_VIA", "").strip().lower() == "vertex":
-                    atualizar_env(env_jarvis, "JARVIS_GEMINI_VIA", "vertex")
+                # o caminho em que a chave funcionou (também "studio", para apagar um "vertex" antigo)
+                from core.gemini_acesso import via as via_gemini
+                atualizar_env(env_jarvis, "JARVIS_GEMINI_VIA", via_gemini())
+                if via_gemini() == "vertex":
                     self._log.append_log("SYS: A chave funciona pelo caminho Vertex AI (gravado no .env).")
         except Exception as e:
             self._log.append_log(f"SYS: Não consegui atualizar a chave no .env: {e}")

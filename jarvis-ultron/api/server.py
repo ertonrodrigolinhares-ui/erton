@@ -177,6 +177,13 @@ async def save_gemini_key(
         validation = await asyncio.to_thread(validate_gemini_api_key, key)
         if not validation.valid:
             raise HTTPException(status_code=422, detail=validation.message)
+        if getattr(validation, "via", "studio") == "vertex":
+            # os clientes deste servidor usam o caminho normal; trocar o caminho do processo valeria
+            # para todos os usuários, então uma chave que só funciona pelo Vertex AI não é aceita aqui
+            raise HTTPException(
+                status_code=422,
+                detail="This key only works through Vertex AI, which the hosted API does not support.",
+            )
     set_user_secret(db, user.id, "gemini_api_key", key)
     return {"configured": True}
 

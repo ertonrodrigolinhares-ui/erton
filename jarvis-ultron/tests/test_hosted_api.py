@@ -86,6 +86,29 @@ class HostedApiTests(unittest.TestCase):
         with tenant_scope(self.user_id):
             self.assertEqual(_api_key(), raw_key)
 
+    def test_vertex_only_key_does_not_switch_every_tenant_to_vertex(self):
+        import os
+
+        from core.api_key_validator import ApiKeyValidationResult
+
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("GOOGLE_GENAI_USE_VERTEXAI", None)
+            os.environ.pop("JARVIS_GEMINI_VIA", None)
+            with patch(
+                "api.server.validate_gemini_api_key",
+                return_value=ApiKeyValidationResult(True, "Gemini API key verified (Vertex AI).", via="vertex"),
+            ):
+                response = self.client.post(
+                    "/me/gemini-key",
+                    headers=self.headers,
+                    json={"api_key": "AQ." + "C" * 40, "validate": True},
+                )
+            self.assertEqual(response.status_code, 422, response.text)
+            self.assertIn("Vertex", response.json()["detail"])
+            self.assertNotIn("GOOGLE_GENAI_USE_VERTEXAI", os.environ)
+        me = self.client.get("/auth/me", headers=self.headers)
+        self.assertFalse(me.json()["gemini_configured"])
+
     def test_memory_is_scoped_by_tenant(self):
         with tenant_scope(self.user_id):
             update_memory({"identity": {"name": {"value": "Morgan"}}})

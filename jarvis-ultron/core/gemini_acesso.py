@@ -8,8 +8,10 @@ Há dois caminhos para a mesma IA do Google:
 Por que isso importa: desde 2026 o AI Studio só cria chaves que começam com "AQ.", e para muitas
 contas o caminho normal recusa essas chaves (erro 401 ACCESS_TOKEN_TYPE_UNSUPPORTED). As chaves
 "AQ." são do tipo que o Vertex AI usa; por isso o Jarvis tenta os dois caminhos e fica com o que
-funcionar. A escolha fica no .env (JARVIS_GEMINI_VIA=vertex) e vale para todas as partes do Jarvis
-de uma vez (a biblioteca do Google lê GOOGLE_GENAI_USE_VERTEXAI).
+funcionar. A escolha fica no .env (JARVIS_GEMINI_VIA=vertex) e vale para as partes do Jarvis de
+uma vez: a biblioteca nova do Google lê GOOGLE_GENAI_USE_VERTEXAI, e os pedidos das partes que ainda
+usam a biblioteca antiga (que só conhece o caminho normal) vão pela nova (core/modelos.py). O que só
+existe no caminho normal (a File API, para mandar arquivos grandes) não funciona pelo Vertex AI.
 
 Testador (para o Erton, no Windows): dê dois cliques em "Testar chave do Gemini". Ele testa a chave
 do .env (ou uma nova, digitada escondida) nos dois caminhos e na conversa ao vivo, explica em
@@ -46,7 +48,8 @@ def via() -> str:
 
 
 def aplicar_via(escolha: str | None = None) -> str:
-    """Faz todas as conexões do Gemini (as 19 partes do Jarvis) usarem o caminho escolhido."""
+    """Faz as conexões do Gemini usarem o caminho escolhido (as da biblioteca nova direto; as da
+    antiga pela central de modelos, core/modelos.py)."""
     escolha = (escolha or via()).strip().lower()
     if escolha == "vertex":
         os.environ["JARVIS_GEMINI_VIA"] = "vertex"
@@ -124,11 +127,11 @@ def cliente(chave: str, via_: str, timeout_ms: int = 15000):
     return genai.Client(api_key=chave, vertexai=(via_ == "vertex"), http_options=types.HttpOptions(**opcoes))
 
 
-def testar_via(chave: str, via_: str) -> Resultado:
+def testar_via(chave: str, via_: str, timeout_ms: int = 15000) -> Resultado:
     """A chave funciona por este caminho? Lista os modelos e faz um pedido mínimo de texto."""
     r = Resultado(via=via_)
     try:
-        c = cliente(chave, via_)
+        c = cliente(chave, via_, timeout_ms=timeout_ms)
         nomes = []
         try:
             for m in c.models.list(config={"page_size": 200}):

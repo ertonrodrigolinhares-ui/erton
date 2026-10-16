@@ -206,6 +206,11 @@ class UIRemota:
         tipo = mensagem[0]
         if tipo == "pronto":
             os.environ.update({str(k): str(v) for k, v in dict(mensagem[1]).items()})
+            try:  # o caminho do Gemini que a tela validou (tira um GOOGLE_GENAI_USE_VERTEXAI antigo)
+                from core.gemini_acesso import aplicar_via
+                aplicar_via()
+            except Exception:
+                pass
             self._pronto.set()
         elif tipo == "estado_tela":
             estado = dict(mensagem[1])

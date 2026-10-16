@@ -930,6 +930,21 @@ def _process_unknown(path: Path, action: str, params: dict, speak=None) -> str:
 
     # --- Tier 2: Upload via Gemini File API (handles binary formats natively) ---
     try:
+        from core.gemini_acesso import via
+
+        if via() == "vertex":
+            # Jarvis Ultron: o Vertex AI não tem a File API; o arquivo vai junto com o pedido
+            import mimetypes
+
+            from google.genai import types
+
+            if path.stat().st_size > 18_000_000:
+                raise RuntimeError("file too large to send inline through Vertex AI")
+            tipo = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+            return _generate_content([
+                f"File name: {path.name}\nTask: {task}",
+                types.Part.from_bytes(data=path.read_bytes(), mime_type=tipo),
+            ])
         client = _gemini_client()
         print(f"[FileProcessor] Uploading {path.name} via Gemini File API...")
         uploaded = client.files.upload(

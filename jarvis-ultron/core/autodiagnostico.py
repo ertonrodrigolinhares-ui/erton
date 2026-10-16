@@ -56,6 +56,10 @@ def verificar_gemini() -> Item:
     if not chave:
         return Item("Chave do Gemini", "defeito", "nenhuma chave configurada",
                     "Abra o Jarvis e cole a chave na tela, ou coloque GEMINI_API_KEY no arquivo .env.")
+    from core.gemini_acesso import via
+
+    if via() == "vertex":
+        return _verificar_gemini_vertex(chave)
     try:
         from google import genai
 
@@ -84,6 +88,21 @@ def verificar_gemini() -> Item:
         return Item("Chave do Gemini", "defeito", "a chave funciona, mas não tem modelo de voz ao vivo",
                     "Crie a chave num projeto novo do AI Studio.")
     return Item("Chave do Gemini", "ok", f"aceita pelo Google ({len(modelos_da_chave)} modelos disponíveis)")
+
+
+def _verificar_gemini_vertex(chave: str) -> Item:
+    """Caminho Vertex AI: a lista de modelos não diz quais são de voz ao vivo (e pode ser recusada),
+    então o teste da chave é o mesmo do testador: um pedido mínimo de texto pelo Vertex AI."""
+    from core.gemini_acesso import VIVO_VERTEX, testar_via
+
+    r = testar_via(chave, "vertex", timeout_ms=8000)
+    if r.ok:
+        voz = os.environ.get("GEMINI_LIVE_MODEL", "").strip() or VIVO_VERTEX[0]
+        return Item("Chave do Gemini", "ok", f"aceita pelo Vertex AI (voz: {voz})")
+    estado = "defeito" if r.codigo in ("CHAVE_INVALIDA", "API_DESLIGADA", "RECUSADA") else "atencao"
+    return Item("Chave do Gemini", estado, f"o Vertex AI não aceitou a chave: {r.motivo}",
+                "Dê dois cliques em 'Testar chave do Gemini': ele testa os dois caminhos e explica "
+                "o que fazer. Enquanto isso, a reserva (Groq) funciona.")
 
 
 def verificar_modelos() -> Item:

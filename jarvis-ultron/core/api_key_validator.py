@@ -9,6 +9,9 @@ import re
 class ApiKeyValidationResult:
     valid: bool
     message: str
+    # Jarvis Ultron: caminho pelo qual a chave funcionou ("studio" ou "vertex"). O validador não muda
+    # o caminho do programa (no servidor com vários usuários isso valeria para todos); quem chama decide.
+    via: str = "studio"
 
 
 def describe_api_key_for_log(api_key: str) -> str:
@@ -141,7 +144,7 @@ def _validate_with_gemini(api_key: str, timeout_seconds: float) -> ApiKeyValidat
                 False,
                 "The key is valid for Gemini, but this project has no Gemini Live model access. Enable Gemini Live/billing for the project or create an authorization key in Google AI Studio.",
             )
-        return ApiKeyValidationResult(True, "Gemini API key verified.")
+        return ApiKeyValidationResult(True, "Gemini API key verified.", via="studio")
     except Exception as e:
         text = str(e).strip() or e.__class__.__name__
         lowered = text.lower()
@@ -168,18 +171,17 @@ def _validate_with_gemini(api_key: str, timeout_seconds: float) -> ApiKeyValidat
 
 
 def _validate_with_vertex(api_key: str) -> ApiKeyValidationResult | None:
-    """Jarvis Ultron: a mesma chave pelo Vertex AI (modo expresso). Se funcionar, o Jarvis inteiro
-    passa a usar esse caminho (JARVIS_GEMINI_VIA=vertex). None = também não funcionou."""
+    """Jarvis Ultron: a mesma chave pelo Vertex AI (modo expresso). Se funcionar, devolve via="vertex"
+    e a tela do Jarvis passa a usar esse caminho (aplicar_via). None = também não funcionou."""
     try:
-        from core.gemini_acesso import aplicar_via, testar_via
+        from core.gemini_acesso import testar_via
 
         resultado = testar_via(api_key, "vertex")
     except Exception:
         return None
     if not resultado.ok:
         return None
-    aplicar_via("vertex")
-    return ApiKeyValidationResult(True, "Gemini API key verified (Vertex AI).")
+    return ApiKeyValidationResult(True, "Gemini API key verified (Vertex AI).", via="vertex")
 
 
 def validate_gemini_api_key(api_key: str, timeout_seconds: float = 8.0) -> ApiKeyValidationResult:
