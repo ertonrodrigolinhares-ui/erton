@@ -2318,7 +2318,9 @@ class HudCanvas(QWidget):
         self._noise_count = int(profile["noise_count"])
         self._scanline_step = int(profile["scanline_step"])
         self._antialias = bool(profile["antialias"])
-        self._tmr.setInterval(int(profile["frame_ms"]))
+        gpu = getattr(self, "_orbe_gpu", None)
+        # Jarvis Ultron: com a placa de vídeo desenhando o anel, 60 quadros por segundo
+        self._tmr.setInterval(16 if gpu is not None and gpu.ativo else int(profile["frame_ms"]))
         if not self._tmr.isActive():
             self._tmr.start()
         self.update()
@@ -2430,7 +2432,18 @@ class HudCanvas(QWidget):
         if _economia_ligada():
             if _janela_escondida(self):
                 return
+            gpu = getattr(self, "_orbe_gpu", None)
+            if gpu is not None and gpu.ativo:
+                # placa de vídeo: 60 quadros falando; parado ou pensando, 30 (já é bem fluido)
+                if (voz_ativa or self.speaking) or self._tick % 2 == 0:
+                    gpu.update()
+                return
             if not (voz_ativa or self.speaking) and self._tick % 3:
+                return
+        else:
+            gpu = getattr(self, "_orbe_gpu", None)
+            if gpu is not None and gpu.ativo:
+                gpu.update()
                 return
         self._quadro_novo = True  # a animação andou: o orbe desenha um quadro novo
         orbe = getattr(self, "_orbe", None)

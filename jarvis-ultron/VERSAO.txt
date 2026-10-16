@@ -1,6 +1,10 @@
 Jarvis Ultron - versão 2026-10-16
 
 Novidades desta versão:
+- Anel desenhado pela placa de vídeo: 60 quadros, 18 fios com brilho suave, quase sem processador
+  (Python por quadro: de 23 ms para 0,6 ms). Volta sozinho ao desenho normal se a placa recusar.
+  (JARVIS_ORBE_GPU=0 no .env desliga.)
+- F2: os textos dos cantos de cima não somem mais ao voltar para a tela do anel.
 - Tela e cérebro em dois programas separados: a animação não atrasa mais as tarefas e uma
   tarefa pesada não congela a tela. A tela religa o cérebro sozinha se ele parar.
   (JARVIS_UM_PROCESSO=1 no .env volta ao jeito antigo.)

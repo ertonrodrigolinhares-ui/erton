@@ -95,6 +95,9 @@ def definir_ultron(win, ligado: bool) -> None:
         if hud is not None:
             hud._quadro_novo = True
             hud.update()
+            gpu = getattr(hud, "_orbe_gpu", None)
+            if gpu is not None:
+                gpu.update()
         orbe = getattr(win, "_orbe", None)
         cena = getattr(orbe, "cena", None) if orbe is not None else None
         if cena is not None:
@@ -214,6 +217,9 @@ class Orbe:
         """Cola o quadro pronto. Só desenha um quadro novo quando a animação avança
         (hud._quadro_novo) ou o tamanho/cor muda. Assim, quando um painel por cima se
         atualiza, o anel não é redesenhado do zero (isso roubava processador das tarefas)."""
+        gpu = getattr(hud, "_orbe_gpu", None)
+        if gpu is not None and gpu.ativo:
+            return  # a placa de vídeo desenha (ui_orbe_gpu.py); a camada dela cobre o HUD inteiro
         dpr = hud.devicePixelRatioF()
         chave = (hud.width(), hud.height(), round(dpr, 2), _ULTRON)
         if self._quadro is None or self._chave != chave or getattr(hud, "_quadro_novo", True):
@@ -247,25 +253,34 @@ class Orbe:
                 p.setPen(pen)
                 p.drawPath(cam)
 
-    def _desenhar(self, hud, p: QPainter) -> None:
+    def estado_quadro(self, hud) -> dict:
+        """As contas do quadro atual (tamanho, voz, agitação, brilho), iguais para o desenho
+        normal e para o desenho pela placa de vídeo (ui_orbe_gpu.py)."""
         W, H = hud.width(), hud.height()
-        cx, cy = W / 2, H / 2
         fw = min(W, H)
         t = time.time() - self._inicio
         voz = getattr(hud, "_nivel_suave", 0.0)
         falando = bool(hud.speaking) and not hud.muted
         pensando = hud.state in ("THINKING", "PROCESSING")
-        leve = getattr(hud, "_render_stride", 1) > 1
-        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-
-        pintar_fundo(p, W, H)
-
-        R = fw * 0.34 * (1.0 + 0.08 * voz)
-        agito = 1.0 + (1.2 * voz if falando else 0.0) + (0.35 if pensando else 0.0)
-        tt = t * (1.0 + (1.0 if pensando else 0.0) + (0.7 * voz if falando else 0.0))
         brilho = 0.75 + 0.25 * (voz if falando else 0.0) + (0.1 if pensando else 0.0)
         if hud.muted:
             brilho *= 0.45
+        return {
+            "W": W, "H": H, "cx": W / 2, "cy": H / 2, "t": t,
+            "R": fw * 0.34 * (1.0 + 0.08 * voz),
+            "agito": 1.0 + (1.2 * voz if falando else 0.0) + (0.35 if pensando else 0.0),
+            "tt": t * (1.0 + (1.0 if pensando else 0.0) + (0.7 * voz if falando else 0.0)),
+            "brilho": brilho,
+            "leve": getattr(hud, "_render_stride", 1) > 1,
+        }
+
+    def _desenhar(self, hud, p: QPainter) -> None:
+        q = self.estado_quadro(hud)
+        W, H, cx, cy, t = q["W"], q["H"], q["cx"], q["cy"], q["t"]
+        R, agito, tt, brilho, leve = q["R"], q["agito"], q["tt"], q["brilho"], q["leve"]
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+
+        pintar_fundo(p, W, H)
 
         # Luz difusa atrás do anel
         halo = QRadialGradient(QPointF(cx, cy), R * 1.35)
@@ -327,7 +342,11 @@ class Orbe:
             p.setBrush(QBrush(g))
             p.drawEllipse(pt, 14, 14)
         p.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
+        self.pintar_letreiro(hud, p, cx, cy, R, t, H)
 
+    def pintar_letreiro(self, hud, p: QPainter, cx: float, cy: float, R: float, t: float, H: float) -> None:
+        """Estado ("OUVINDO"...) com a linha pontilhada e, fora da cena, o botãozinho do mudo."""
+        W = hud.width()
         # Estado no topo, com linha pontilhada embaixo
         estado = "MUDO" if hud.muted else ("FALANDO" if hud.speaking else ESTADOS_PT.get(hud.state, hud.state))
         topo = max(16.0, cy - R * 1.42)
@@ -733,6 +752,8 @@ class Cena(QWidget):
         self.b_chamada.setGeometry(x_b, 54, larg_b, alt_b)
         self.b_maos.setGeometry(x_b + larg_b + 12, 54, larg_b, alt_b)
         for w in self._painel:
+            w.raise_()
+        for w in (self.topo_esq, self.topo_dir):  # textos dos cantos (somiam depois do F2)
             w.raise_()
         self.botao.raise_()
         ctl = getattr(self.win, "_orbe", None)
@@ -1463,6 +1484,15 @@ class ControleOrbe(QObject):
             self.cena = Cena(win)
             atalho = QShortcut(QKeySequence("F2"), win)
             atalho.activated.connect(self.cena.alternar)
+        self.hud._orbe_gpu = None
+        try:
+            import ui_orbe_gpu
+
+            self.hud._orbe_gpu = ui_orbe_gpu.criar(self.hud, self.hud._orbe)
+        except Exception as erro:
+            print(f"[Orbe GPU] Desenho normal: {erro}")
+        if self.hud._orbe_gpu is not None:
+            self.hud.set_graphics_quality(self.hud._graphics_quality)  # 60 quadros
         self.biometria = Biometria(self.hud)
         self.resumo = Resumo(self.hud)
         self.biometria.concluida.connect(self.resumo.carregar)
@@ -1472,6 +1502,9 @@ class ControleOrbe(QObject):
 
         def ao_redimensionar(ev, antigo=antigo):
             antigo(ev)
+            gpu = getattr(self.hud, "_orbe_gpu", None)
+            if gpu is not None:
+                gpu.setGeometry(self.hud.rect())
             self.reencaixar()
         self.hud.resizeEvent = ao_redimensionar
 
