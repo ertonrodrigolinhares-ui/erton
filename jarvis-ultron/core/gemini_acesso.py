@@ -58,7 +58,26 @@ def aplicar_via(escolha: str | None = None) -> str:
         os.environ.pop("GOOGLE_GENAI_USE_VERTEXAI", None)
         if os.environ.get("JARVIS_GEMINI_VIA", "").strip().lower() == "vertex":
             os.environ["JARVIS_GEMINI_VIA"] = "studio"
+        # o modelo de voz do Vertex AI (gravado pelo testador) não abre pelo caminho normal; sem ele
+        # a voz escolhe um do caminho normal (senão o do Vertex seria tentado primeiro a cada religada)
+        if voz_so_do_vertex(os.environ.get("GEMINI_LIVE_MODEL", "")):
+            os.environ.pop("GEMINI_LIVE_MODEL", None)
     return escolha
+
+
+def voz_so_do_vertex(nome: str) -> bool:
+    """True para um modelo de voz que só existe no Vertex AI (ex.: "gemini-live-2.5-flash-native-audio")."""
+    return nome_curto(nome) in VIVO_VERTEX
+
+
+def esquecer_voz_do_vertex(env: Path | str) -> bool:
+    """No caminho normal: tira um GEMINI_LIVE_MODEL do Vertex AI do processo e do .env.
+    True se tirou do .env."""
+    if voz_so_do_vertex(os.environ.get("GEMINI_LIVE_MODEL", "")):
+        os.environ.pop("GEMINI_LIVE_MODEL", None)
+    from core.env_arquivo import remover_env
+
+    return remover_env(env, "GEMINI_LIVE_MODEL", se=voz_so_do_vertex)
 
 
 def versao_api() -> str | None:

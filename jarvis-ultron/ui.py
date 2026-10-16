@@ -8879,6 +8879,10 @@ class MainWindow(QMainWindow):
                 atualizar_env(env_jarvis, "JARVIS_GEMINI_VIA", via_gemini())
                 if via_gemini() == "vertex":
                     self._log.append_log("SYS: A chave funciona pelo caminho Vertex AI (gravado no .env).")
+                else:  # um modelo de voz do Vertex AI gravado antes não abre pelo caminho normal
+                    from core.gemini_acesso import esquecer_voz_do_vertex
+                    if esquecer_voz_do_vertex(env_jarvis):
+                        self._log.append_log("SYS: Modelo de voz do Vertex AI tirado do .env (a chave usa o caminho normal).")
         except Exception as e:
             self._log.append_log(f"SYS: Não consegui atualizar a chave no .env: {e}")
         self._ready = True

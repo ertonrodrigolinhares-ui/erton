@@ -176,6 +176,78 @@ class ValidadorDaTelaTests(unittest.TestCase):
         self.assertIn('JARVIS_GEMINI_VIA="studio"', conteudo)
         self.assertNotIn('"vertex"', conteudo)
 
+    def test_chave_normal_tira_o_modelo_de_voz_do_vertex_do_env(self):
+        import ui
+        from core import modelos
+
+        # o testador gravou o caminho Vertex e o modelo de voz dele; depois veio uma chave do AI Studio
+        pasta = Path(tempfile.mkdtemp())
+        env = pasta / ".env"
+        env.write_text('GEMINI_API_KEY="AQ.antiga-000000000000000000"\nJARVIS_GEMINI_VIA="vertex"\n'
+                       'GEMINI_LIVE_MODEL="gemini-live-2.5-flash-native-audio"\nJARVIS_CIDADE="João Pessoa"\n',
+                       encoding="utf-8")
+        chave = "AIza" + "c" * 35
+        overlay = NS(_verified_key=chave, _modo_reserva=False, _modo_gemma=False, hide=lambda: None)
+        logs = []
+        janela = NS(_overlay=overlay, _log=NS(append_log=logs.append), _ready=False,
+                    _apply_state=lambda estado: None, _show_voice_select_then_name=lambda: None)
+        guardado = (modelos._cache, modelos._cache_momento)
+        with patch.object(ui, "BASE_DIR", pasta), patch.object(ui, "CONFIG_DIR", pasta / "config"), \
+                patch.object(ui, "API_FILE", pasta / "config" / "api_keys.json"), \
+                patch.dict(os.environ, {"GEMINI_API_KEY": "", "GEMINI_LIVE_MODEL": "gemini-live-2.5-flash-native-audio"}):
+            ga.aplicar_via("vertex")  # o que o .env antigo deixou valendo ao abrir
+            ga.aplicar_via("studio")  # a tela validou a chave nova pelo caminho normal
+            self.assertNotIn("GEMINI_LIVE_MODEL", os.environ)
+            os.environ["GEMINI_LIVE_MODEL"] = "gemini-live-2.5-flash-native-audio"  # mesmo se ainda estivesse
+            ui.MainWindow._on_setup_done(janela, chave, "windows", False)
+            self.assertNotIn("GEMINI_LIVE_MODEL", os.environ)
+            # a voz começa por um modelo do caminho normal, não pelo nome do Vertex AI
+            try:
+                modelos._cache = [(n, {"bidigeneratecontent"}) for n in (
+                    "gemini-2.5-flash-native-audio-latest", "gemini-live-2.5-flash-preview")]
+                modelos._cache_momento = time.time()
+                with patch.dict(os.environ, {"GEMINI_API_KEY": "x"}):
+                    vivos = modelos.candidatos("gemini-2.5-flash-native-audio-preview-12-2025")
+            finally:
+                modelos._cache, modelos._cache_momento = guardado
+        self.assertFalse(any(ga.voz_so_do_vertex(m) for m in vivos), vivos)
+        conteudo = env.read_text(encoding="utf-8")
+        self.assertNotIn("GEMINI_LIVE_MODEL", conteudo)
+        self.assertIn('JARVIS_GEMINI_VIA="studio"', conteudo)
+        self.assertIn(f'GEMINI_API_KEY="{chave}"', conteudo)
+        self.assertIn('JARVIS_CIDADE="João Pessoa"', conteudo)
+        self.assertTrue(any("Vertex AI tirado do .env" in linha for linha in logs), logs)
+
+    def test_modelo_de_voz_escolhido_para_o_caminho_normal_fica(self):
+        pasta = Path(tempfile.mkdtemp())
+        env = pasta / ".env"
+        env.write_text("GEMINI_LIVE_MODEL=models/gemini-live-2.5-flash-preview\n", encoding="utf-8")
+        with patch.dict(os.environ, {"GEMINI_LIVE_MODEL": "models/gemini-live-2.5-flash-preview"}):
+            ga.aplicar_via("studio")
+            self.assertFalse(ga.esquecer_voz_do_vertex(env))
+            self.assertEqual(os.environ["GEMINI_LIVE_MODEL"], "models/gemini-live-2.5-flash-preview")
+        self.assertIn("gemini-live-2.5-flash-preview", env.read_text(encoding="utf-8"))
+        # no Vertex AI o modelo de voz do Vertex continua valendo
+        with patch.dict(os.environ, {"GEMINI_LIVE_MODEL": "gemini-live-2.5-flash"}):
+            ga.aplicar_via("vertex")
+            self.assertEqual(os.environ["GEMINI_LIVE_MODEL"], "gemini-live-2.5-flash")
+        # com "models/" na frente também é reconhecido como do Vertex AI
+        env.write_text("GEMINI_LIVE_MODEL='models/gemini-live-2.5-flash' # do testador\nOUTRA=1\n", encoding="utf-8")
+        with patch.dict(os.environ, {"GEMINI_LIVE_MODEL": ""}):
+            self.assertTrue(ga.esquecer_voz_do_vertex(env))
+        self.assertEqual(env.read_text(encoding="utf-8"), "OUTRA=1\n")
+
+    def test_cerebro_esquece_o_modelo_de_voz_do_vertex_no_caminho_normal(self):
+        from core.ponte import UIRemota
+
+        with patch.dict(os.environ, {"JARVIS_GEMINI_VIA": "vertex", "GOOGLE_GENAI_USE_VERTEXAI": "true",
+                                     "GEMINI_LIVE_MODEL": "gemini-live-2.5-flash-native-audio"}):
+            remota = UIRemota(None)
+            # a tela não manda GEMINI_LIVE_MODEL (tirou); o cérebro tinha lido o .env antigo
+            remota._tratar(("pronto", {"JARVIS_GEMINI_VIA": "studio", "GEMINI_API_KEY": "chave-da-tela"}))
+            self.assertNotIn("GEMINI_LIVE_MODEL", os.environ)
+            self.assertEqual(ga.via(), "studio")
+
     def test_cerebro_segue_o_caminho_que_a_tela_mandou(self):
         from core.ponte import UIRemota
 
