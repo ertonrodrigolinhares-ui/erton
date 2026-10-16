@@ -154,6 +154,17 @@ class OkAntesDoVideoTests(unittest.TestCase):
         self.assertIn("Not confirmed", r)
         gerar.assert_not_called()
 
+    def test_dolar_com_virgula_no_env_funciona(self):
+        with patch.dict("os.environ", {"JARVIS_DOLAR": "5,40"}):
+            dolares, reais = self.m.estimar(8, "rapido")
+            r = self.m.executar(dict(self.pedido), JarvisFalso())
+        self.assertAlmostEqual(reais, dolares * 5.40)
+        self.assertIn("US$ 0.96", r)
+        for ruim in ("abc", "0", "-3", "nan"):
+            with patch.dict("os.environ", {"JARVIS_DOLAR": ruim}):
+                dolares, reais = self.m.estimar(8, "rapido")
+            self.assertAlmostEqual(reais, dolares * 5.4, msg=ruim)
+
     def test_modo_privado_nunca_manda_a_descricao_para_o_google(self):
         import os
 
@@ -315,6 +326,7 @@ class Operacao:
         return NS(generated_videos=[NS(video=self.video)])
 
     error = None
+    name = "models/veo/operations/teste-123"
 
 
 class VideoFalso:
@@ -364,6 +376,118 @@ class GerarTests(unittest.TestCase):
             arquivo = self.m.gerar("a runner", 4, "maximo", False, cliente=cliente, dormir=lambda s: None)
         self.assertTrue(arquivo.exists())
         self.assertEqual([p[0] for p in cliente.pedidos], ["veo-3.1-generate-preview", "veo-3.1-generate-001"])
+
+    # --- o econômico nunca vira um modelo mais caro que o preço aprovado
+
+    def test_economico_sem_veo_lite_nao_usa_o_modelo_rapido(self):
+        cliente = ClienteVeo(["veo-3.1-fast-generate-preview", "veo-3.1-generate-preview"],
+                             inexistentes={"veo-3.1-lite-generate-preview"})
+        with patch.object(self.m, "pasta_videos", lambda: Path(self.casa)):
+            with self.assertRaises(RuntimeError) as erro:
+                self.m.gerar("a runner", 8, "economico", False, cliente=cliente, dormir=lambda s: None)
+        modelos = [p[0] for p in cliente.pedidos]
+        self.assertTrue(modelos)
+        self.assertTrue(all("lite" in m for m in modelos), modelos)
+        self.assertIn("rápida", self.m._explicar(erro.exception))  # sugere pedir de novo (novo preço, novo ok)
+
+    def test_lista_de_modelos_fica_na_faixa_de_preco(self):
+        sem_lista = NS(models=NS(list=lambda config=None: (_ for _ in ()).throw(RuntimeError("sem rede"))))
+        conta = NS(models=NS(list=lambda config=None: [NS(name=f"models/{n}") for n in (
+            "veo-3.1-fast-generate-preview", "veo-3.1-generate-preview", "veo-3.1-lite-generate-preview")]))
+        for cliente in (sem_lista, conta):
+            self.assertTrue(all("lite" in n for n in self.m.escolher_modelo(cliente, "economico")))
+            self.assertTrue(all("fast" in n for n in self.m.escolher_modelo(cliente, "rapido")))
+            self.assertFalse(any("fast" in n or "lite" in n for n in self.m.escolher_modelo(cliente, "maximo")))
+
+    # --- 1080p só com 8 segundos
+
+    def test_video_curto_pede_720p_e_o_de_8_segundos_1080p(self):
+        for segundos, esperado in ((4, "720p"), (6, "720p"), (8, "1080p")):
+            for qualidade in ("rapido", "maximo"):
+                cliente = ClienteVeo(["veo-3.1-fast-generate-preview", "veo-3.1-generate-preview"])
+                with patch.object(self.m, "pasta_videos", lambda: Path(self.casa)):
+                    self.m.gerar("a runner", segundos, qualidade, False, cliente=cliente, dormir=lambda s: None)
+                modelo, config = cliente.pedidos[0]
+                self.assertEqual((config.duration_seconds, config.resolution), (segundos, esperado), modelo)
+
+    def test_veo_3_0_vertical_pede_720p(self):
+        self.assertEqual(self.m._resolucao("veo-3.0-fast-generate-001", 8, "rapido", True), "720p")
+        self.assertEqual(self.m._resolucao("veo-3.0-fast-generate-001", 8, "rapido", False), "1080p")
+        self.assertEqual(self.m._resolucao("veo-3.1-fast-generate-preview", 8, "rapido", True), "1080p")
+
+    # --- uma falha de rede depois de o Google começar não perde o vídeo já pago
+
+    def test_queda_de_rede_ao_acompanhar_nao_perde_o_video(self):
+        cliente = ClienteVeo(["veo-3.1-fast-generate-preview"])
+        andar, falhas = cliente._andar, [ConnectionError("wifi caiu")]
+
+        def andar_com_queda(operacao):
+            if falhas:
+                raise falhas.pop()
+            return andar(operacao)
+
+        cliente.operations = NS(get=andar_com_queda)
+        with patch.object(self.m, "pasta_videos", lambda: Path(self.casa)):
+            arquivo = self.m.gerar("a runner", 8, "rapido", False, cliente=cliente, dormir=lambda s: None)
+        self.assertTrue(arquivo.exists())
+        self.assertEqual(len(cliente.pedidos), 1)  # não pediu (nem pagou) um segundo vídeo
+
+    def test_falha_passageira_ao_baixar_tenta_de_novo(self):
+        class VideoNaNuvem(VideoFalso):
+            uri, video_bytes = "https://exemplo/video", None
+
+        baixar = []
+
+        def download(file):
+            baixar.append(file)
+            if len(baixar) == 1:
+                raise OSError("conexão reiniciada")
+            file.video_bytes = b"mp4"
+
+        cliente = ClienteVeo(["veo-3.1-fast-generate-preview"])
+        cliente._gerar = lambda model, source, config: Operacao(1, VideoNaNuvem())
+        cliente.models.generate_videos = cliente._gerar
+        cliente.files = NS(download=download)
+        with patch.object(self.m, "pasta_videos", lambda: Path(self.casa)):
+            arquivo = self.m.gerar("a runner", 8, "rapido", False, cliente=cliente, dormir=lambda s: None)
+        self.assertTrue(arquivo.exists())
+        self.assertEqual(len(baixar), 2)
+
+    def test_pc_dormiu_na_espera_olha_mais_uma_vez_antes_de_desistir(self):
+        relogio = iter([0, 10 ** 6, 10 ** 6])
+        cliente = ClienteVeo(["veo-3.1-fast-generate-preview"])
+        cliente.models.generate_videos = lambda model, source, config: Operacao(1, VideoFalso())
+        with patch.object(self.m, "pasta_videos", lambda: Path(self.casa)):
+            arquivo = self.m.gerar("a runner", 8, "rapido", False, cliente=cliente,
+                                   dormir=lambda s: None, agora=lambda: next(relogio))
+        self.assertTrue(arquivo.exists())
+
+    def test_sem_resposta_avisa_que_pode_ter_cobrado_e_anota_o_pedido(self):
+        relogio = iter([0, 10 ** 6, 10 ** 6])
+        cliente = ClienteVeo(["veo-3.1-fast-generate-preview"])
+        cliente.models.generate_videos = lambda model, source, config: Operacao(5, VideoFalso())
+        with patch.object(self.m, "pasta_videos", lambda: Path(self.casa)):
+            with self.assertRaises(self.m.VideoJaPedido) as erro:
+                self.m.gerar("a runner", 8, "rapido", False, cliente=cliente,
+                             dormir=lambda s: None, agora=lambda: next(relogio))
+        aviso = self.m._explicar(erro.exception)
+        self.assertIn("15 minutos", aviso)
+        self.assertIn("pode cobrar", aviso)
+        self.assertIn("pendentes.txt", aviso)
+        anotado = (Path(self.casa) / "pendentes.txt").read_text(encoding="utf-8")
+        self.assertIn("operations/teste-123", anotado)
+
+    def test_falha_de_rede_que_nao_passa_tambem_avisa_da_cobranca(self):
+        cliente = ClienteVeo(["veo-3.1-fast-generate-preview"])
+        cliente.files = NS(download=lambda file: (_ for _ in ()).throw(ConnectionError("sem internet")))
+        cliente.models.generate_videos = lambda model, source, config: Operacao(
+            1, type("VideoNaNuvem", (VideoFalso,), {"uri": "https://exemplo/video", "video_bytes": None})())
+        with patch.object(self.m, "pasta_videos", lambda: Path(self.casa)):
+            with self.assertRaises(self.m.VideoJaPedido) as erro:
+                self.m.gerar("a runner", 8, "rapido", False, cliente=cliente, dormir=lambda s: None)
+        aviso = self.m._explicar(erro.exception)
+        self.assertIn("conexão com o Google falhou", aviso)
+        self.assertIn("antes de pedir outro", aviso)
 
     def test_carrega_como_ferramenta_do_jarvis(self):
         from core.automacoes import carregar_ferramentas

@@ -188,9 +188,14 @@ Bom saber:
 "vertical para o Instagram"). O Jarvis **diz o preço antes** (mais ou menos US$ 0,96 / R$ 5 por um
 vídeo de 8 segundos na qualidade padrão) e só faz com o seu **"ok, pode fazer"** dito depois de
 ouvir o preço. O vídeo fica pronto em 1 a alguns minutos, em segundo plano; ele salva em
-`Documentos\Jarvis Ultron\Videos`, abre e avisa. Qualidades: econômico, rápido (padrão) e máximo.
+`Documentos\Jarvis Ultron\Videos`, abre e avisa. Qualidades: econômico, rápido (padrão) e máximo;
+o Jarvis nunca troca sozinho para um modelo mais caro do que o do preço aprovado. Vídeos de 4 ou 6
+segundos saem em 720p (o Google só faz 1080p com 8 segundos).
 Precisa da chave do Gemini com **faturamento ativado** no Google (o Veo não tem uso grátis). O
 preço falado é uma estimativa; o valor certo é o da sua conta do Google Cloud.
+Se a internet cair enquanto o vídeo é feito, o Jarvis continua tentando. Se mesmo assim o vídeo não
+chegar, ele avisa que o Google pode cobrar por ele e anota o pedido em `Videos\pendentes.txt`:
+confira a conta do Google antes de pedir outro.
 
 ## Chave do Gemini que começa com "AQ." (conversa natural)
 
