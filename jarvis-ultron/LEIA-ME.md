@@ -69,6 +69,20 @@ Cópia do projeto **JARVIS-OS V.2** (licença MIT, veja `LICENSE`), com ajustes 
 2. Extraia este pacote numa pasta nova e siga os passos acima (Iniciar Jarvis Ultron → Instalar Hermes).
 3. A pasta antiga do Jarvis pode ser apagada depois que a nova estiver funcionando.
 
+## Tela e cérebro separados (o Jarvis não trava)
+
+O Jarvis agora roda como **dois programas** que conversam entre si, só dentro do seu PC:
+- a **tela** (a janela, o anel, os painéis e os botões);
+- o **cérebro** (microfone, voz, Gemini/Groq/Gemma, ferramentas, Hermes e lembretes).
+
+Assim a animação da tela não atrasa as tarefas, e uma tarefa pesada não congela a tela. Você
+continua abrindo só o "Iniciar Jarvis Ultron": a tela abre o cérebro sozinha. Na janela preta
+aparece `[Ponte] Cérebro conectado`.
+
+- Se o cérebro parar, a tela avisa e **religa ele sozinha** (até 3 vezes em 5 minutos).
+- Fechando a janela, o cérebro fecha junto.
+- Para voltar ao jeito antigo (um programa só), ponha `JARVIS_UM_PROCESSO=1` no `.env`.
+
 ## Cérebro Gemma 4 no seu PC (sem Gemini, privado)
 
 O Jarvis pode pensar com o **Gemma 4** rodando no seu próprio computador, pelo Ollama. O raciocínio

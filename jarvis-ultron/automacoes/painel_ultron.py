@@ -14,6 +14,9 @@ Para tirar o painel, apague este arquivo (o botão ⚙ ULTRON some junto).
 
 from __future__ import annotations
 
+# Desenha na janela: com tela e cérebro separados, roda no programa da tela.
+NA_TELA = True
+
 import threading
 
 # Botões do painel: (nome_da_ferramenta, emoji, título, subtítulo, argumentos).

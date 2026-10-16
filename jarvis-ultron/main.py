@@ -1353,6 +1353,7 @@ class JarvisLive:
             self._reserva = CerebroGemma.da_configuracao()
         else:
             self._reserva = ReservaGroq.da_configuracao()
+        self._cerebro_nome = "gemma" if isinstance(self._reserva, CerebroGemma) else "gemini"
         self._modo_reserva = False
         self._falhas_seguidas = 0
         self._avisos_trava = threading.Lock()  # avisos guardados no modo chamada
@@ -1373,7 +1374,8 @@ class JarvisLive:
         # Jarvis Ultron: "modo ultron" abre o painel de automações; "modo jarvis" fecha.
         baixo = " ".join(str(text or "").lower().split())
         if len(baixo.split()) <= 4 and ("modo ultron" in baixo or "modo jarvis" in baixo or baixo == "ultron"):
-            abrir = getattr(self, "_abrir_ultron", None)
+            # o painel Ultron registra _abrir_ultron; com a tela em outro programa, vai pela ponte
+            abrir = getattr(self, "_abrir_ultron", None) or getattr(self.ui, "abrir_ultron", None)
             if callable(abrir):
                 abrir(fechar="jarvis" in baixo)
             return
@@ -1723,6 +1725,9 @@ class JarvisLive:
 
     def _notificar_na_tela(self, titulo: str, texto: str) -> None:
         """Balão do Windows (perto do relógio) e aviso dentro da janela do Jarvis."""
+        if getattr(self.ui, "remota", False):  # tela em outro programa: ela mesma mostra
+            self.ui.notificar(titulo, texto)
+            return
         janela = getattr(getattr(self, "ui", None), "_win", None)
         if janela is None:
             return
@@ -1757,7 +1762,10 @@ class JarvisLive:
         for arquivo, motivo in carga.erros + habilidades.erros:
             self.ui.write_log(f"SYS: Automação com problema: {arquivo}: {motivo}")
             print(f"[Automações] {arquivo}: {motivo}")
+        tela_em_outro_programa = bool(getattr(self.ui, "remota", False))
         for arquivo, iniciar in carga.inicios:
+            if tela_em_outro_programa and arquivo in carga.na_tela:
+                continue  # roda no programa da tela (core/ponte.py)
             try:
                 iniciar(self)
             except Exception as erro:
@@ -2896,6 +2904,96 @@ def _modelo_indisponivel(erro: Exception) -> bool:
         "no longer available", "retired", "1008"))
 
 
+def rodar_cerebro(ui):
+    """O cérebro do Jarvis (voz, IA, ferramentas). Roda num fio da tela (um programa só) ou
+    no programa próprio do cérebro, com a UIRemota no lugar da tela (veja core/ponte.py)."""
+    ui.wait_for_api_key()
+    voice_name = _load_voice_name()
+    jarvis = JarvisLive(ui, voice_name)
+    ui.on_quit_requested = jarvis.request_shutdown
+    ligar = getattr(ui, "ligar_jarvis", None)
+    if callable(ligar):  # cérebro em programa próprio: manda o estado dele para os painéis da tela
+        ligar(jarvis)
+
+    # Trial/keyword runtime limiting: set via env `JARVIS_TRIAL_KEYWORD`.
+    # If set to any non-empty string, jarvis will run for 3600 seconds (1 hour).
+    trial_kw = os.environ.get("JARVIS_TRIAL_KEYWORD")
+    if trial_kw:
+        jarvis.runtime_limit_seconds = int(os.environ.get("JARVIS_RUNTIME_SECONDS", "3600"))
+        jarvis.ui.write_log(f"SYS: Trial keyword detected. Running for {jarvis.runtime_limit_seconds} seconds.")
+
+    locked_secret = os.environ.get("JARVIS_LOCKED_KEY_SECRET")
+    if locked_secret:
+        jarvis.required_unlock_secret = locked_secret.strip()
+
+    # Locked container check: if `JARVIS_LOCKED_VOLUME` is set, require
+    # presence of `/Volumes/<name>/unlock.key` before full operation.
+    locked_vol = os.environ.get("JARVIS_LOCKED_VOLUME")
+    if locked_vol:
+        mount_path = f"/Volumes/{locked_vol}/unlock.key"
+        jarvis.required_unlock_path = mount_path
+        jarvis.ui.write_log(f"SYS: Locked volume required: {mount_path}")
+    ui.on_voice_change = jarvis.update_voice
+    def _on_tts_change(provider, api_key, voice_id):
+        if provider == "gemini":
+            jarvis._tts_engine = None
+            jarvis._ext_tts_provider = ""
+            jarvis._ext_tts_voice_id = ""
+            jarvis._ext_tts_api_key = ""
+            jarvis.update_voice(voice_id)
+        else:
+            jarvis._ext_tts_provider = provider
+            jarvis._ext_tts_voice_id = voice_id
+            jarvis._ext_tts_api_key = api_key
+            try:
+                from actions.tts_engine import TTSEngine
+                jarvis._tts_engine = TTSEngine(
+                    provider=provider,
+                    api_key=api_key,
+                    voice_id=voice_id,
+                )
+                jarvis.ui.write_log(f"SYS: TTS engine ready: {provider} / {voice_id}")
+                jarvis.ui.write_log("SYS: Gemini audio muted - using external TTS")
+            except Exception as e:
+                jarvis.ui.write_log(f"SYS: TTS engine error: {e}")
+            # Restart session so new TTS takes effect
+            if jarvis.session and jarvis._loop:
+                try:
+                    asyncio.run_coroutine_threadsafe(jarvis.session.close(), jarvis._loop)
+                except Exception as e:
+                    print(f"[JARVIS] Could not close session: {e}")
+    ui.on_tts_provider_change = _on_tts_change
+    chave_eleven = os.environ.get("ELEVENLABS_API_KEY", "").strip()
+    if chave_eleven and os.environ.get("JARVIS_USAR_ELEVENLABS", "1").strip() != "0":
+        _on_tts_change("elevenlabs", chave_eleven,
+                       os.environ.get("JARVIS_VOZ_ELEVENLABS", "").strip() or "pNInz6obpgDQGcFmaJgB")
+    try:
+        asyncio.run(jarvis.run())
+    except KeyboardInterrupt:
+        print("\n🔴 Shutting down...")
+    except Exception as exc:
+        message = f"Gemini startup failed: {str(exc)[:180]}"
+        print(f"[JARVIS] ❌ {message}")
+        try:
+            ui.write_log(f"ERR: {message}")
+            ui.set_state("LISTENING")
+        except Exception:
+            pass
+
+
+def _automacoes_de_tela(jarvis_na_tela) -> None:
+    """Modo separado: as automações que desenham na tela (painel Stark, painel Ultron) rodam aqui,
+    no programa da tela; o cérebro roda as outras."""
+    carga = carregar_automacoes()
+    for arquivo, iniciar in carga.inicios:
+        if arquivo not in carga.na_tela:
+            continue
+        try:
+            iniciar(jarvis_na_tela)
+        except Exception as erro:
+            print(f"[Automações] {arquivo}: {erro}")
+
+
 def main():
     import sys
 
@@ -2926,78 +3024,19 @@ def main():
     except Exception as exc:
         print(f"[Automações] Tela: {exc}")
 
-    def runner():
-        ui.wait_for_api_key()
-        voice_name = _load_voice_name()
-        jarvis = JarvisLive(ui, voice_name)
-        ui.on_quit_requested = jarvis.request_shutdown
+    from core.ponte import PonteTela, modo_separado
 
-        # Trial/keyword runtime limiting: set via env `JARVIS_TRIAL_KEYWORD`.
-        # If set to any non-empty string, jarvis will run for 3600 seconds (1 hour).
-        trial_kw = os.environ.get("JARVIS_TRIAL_KEYWORD")
-        if trial_kw:
-            jarvis.runtime_limit_seconds = int(os.environ.get("JARVIS_RUNTIME_SECONDS", "3600"))
-            jarvis.ui.write_log(f"SYS: Trial keyword detected. Running for {jarvis.runtime_limit_seconds} seconds.")
+    def no_mesmo_programa():
+        threading.Thread(target=rodar_cerebro, args=(ui,), daemon=True, name="Cerebro").start()
 
-        locked_secret = os.environ.get("JARVIS_LOCKED_KEY_SECRET")
-        if locked_secret:
-            jarvis.required_unlock_secret = locked_secret.strip()
-
-        # Locked container check: if `JARVIS_LOCKED_VOLUME` is set, require
-        # presence of `/Volumes/<name>/unlock.key` before full operation.
-        locked_vol = os.environ.get("JARVIS_LOCKED_VOLUME")
-        if locked_vol:
-            mount_path = f"/Volumes/{locked_vol}/unlock.key"
-            jarvis.required_unlock_path = mount_path
-            jarvis.ui.write_log(f"SYS: Locked volume required: {mount_path}")
-        ui.on_voice_change = jarvis.update_voice
-        def _on_tts_change(provider, api_key, voice_id):
-            if provider == "gemini":
-                jarvis._tts_engine = None
-                jarvis._ext_tts_provider = ""
-                jarvis._ext_tts_voice_id = ""
-                jarvis._ext_tts_api_key = ""
-                jarvis.update_voice(voice_id)
-            else:
-                jarvis._ext_tts_provider = provider
-                jarvis._ext_tts_voice_id = voice_id
-                jarvis._ext_tts_api_key = api_key
-                try:
-                    from actions.tts_engine import TTSEngine
-                    jarvis._tts_engine = TTSEngine(
-                        provider=provider,
-                        api_key=api_key,
-                        voice_id=voice_id,
-                    )
-                    jarvis.ui.write_log(f"SYS: TTS engine ready: {provider} / {voice_id}")
-                    jarvis.ui.write_log("SYS: Gemini audio muted - using external TTS")
-                except Exception as e:
-                    jarvis.ui.write_log(f"SYS: TTS engine error: {e}")
-                # Restart session so new TTS takes effect
-                if jarvis.session and jarvis._loop:
-                    try:
-                        asyncio.run_coroutine_threadsafe(jarvis.session.close(), jarvis._loop)
-                    except Exception as e:
-                        print(f"[JARVIS] Could not close session: {e}")
-        ui.on_tts_provider_change = _on_tts_change
-        chave_eleven = os.environ.get("ELEVENLABS_API_KEY", "").strip()
-        if chave_eleven and os.environ.get("JARVIS_USAR_ELEVENLABS", "1").strip() != "0":
-            _on_tts_change("elevenlabs", chave_eleven,
-                           os.environ.get("JARVIS_VOZ_ELEVENLABS", "").strip() or "pNInz6obpgDQGcFmaJgB")
-        try:
-            asyncio.run(jarvis.run())
-        except KeyboardInterrupt:
-            print("\n🔴 Shutting down...")
-        except Exception as exc:
-            message = f"Gemini startup failed: {str(exc)[:180]}"
-            print(f"[JARVIS] ❌ {message}")
-            try:
-                ui.write_log(f"ERR: {message}")
-                ui.set_state("LISTENING")
-            except Exception:
-                pass
-
-    threading.Thread(target=runner, daemon=True).start()
+    if modo_separado():
+        # Jarvis Ultron: tela e cérebro em programas separados; um nunca trava o outro.
+        ponte = PonteTela(ui, ao_falhar=no_mesmo_programa,
+                          ao_conectar=lambda: _automacoes_de_tela(ponte.jarvis))
+        ui._app.aboutToQuit.connect(ponte.encerrar)
+        ponte.iniciar()
+    else:
+        no_mesmo_programa()
     print("[JARVIS] ✅ Interface ready.")
     ui.root.mainloop()
     print("[JARVIS] Interface closed.")

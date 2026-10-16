@@ -9307,6 +9307,21 @@ class JarvisUI:
         while not self._win._ready:
             time.sleep(0.1)
 
+    def notificar(self, titulo: str, texto: str):
+        """Jarvis Ultron: balão do Windows (perto do relógio) + aviso na janela. Qualquer fio."""
+        janela = self._win
+
+        def mostrar():
+            bandeja = getattr(janela, "_tray", None)
+            if bandeja is not None and bandeja.isVisible():
+                bandeja.showMessage(f"Jarvis · {titulo}", texto, QSystemTrayIcon.MessageIcon.Information, 10000)
+            mostrar_aviso = getattr(janela, "_show_toast", None)
+            if callable(mostrar_aviso):
+                mostrar_aviso(f"{titulo}: {texto}", "warning")
+
+        from core.na_tela import executar
+        executar(mostrar)
+
     def start_speaking(self):
         self.set_state("SPEAKING")
 

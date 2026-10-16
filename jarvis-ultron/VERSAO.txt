@@ -1,4 +1,15 @@
-Jarvis Ultron - versão 2026-09-25
+Jarvis Ultron - versão 2026-10-16
+
+Novidades desta versão:
+- Tela e cérebro em dois programas separados: a animação não atrasa mais as tarefas e uma
+  tarefa pesada não congela a tela. A tela religa o cérebro sozinha se ele parar.
+  (JARVIS_UM_PROCESSO=1 no .env volta ao jeito antigo.)
+- Texto digitado enquanto o cérebro ainda abre não se perde: é entregue quando ele fica pronto.
+- Cérebro Gemma 4 no PC (Instalar Gemma 4 / Voltar para o Gemini).
+- Tela mais leve (anel reaproveitado, brilho em meia resolução) e botões Modo Chamada/Mãos Livres
+  e do Ultron na tela do orbe.
+
+Versão anterior:
 
 Novidades desta versão:
 - Interface ULTRON: botão ⚙ ULTRON (ou "Jarvis, modo Ultron") abre um painel só de automações;

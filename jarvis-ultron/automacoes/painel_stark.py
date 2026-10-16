@@ -13,6 +13,9 @@ Funciona junto com os arquivos lembretes.py e rotinas.py (sem eles, mostra só o
 
 from __future__ import annotations
 
+# Desenha na janela: com tela e cérebro separados, roda no programa da tela.
+NA_TELA = True
+
 import json
 import threading
 import time
@@ -89,6 +92,8 @@ def texto_geekie(hoje: date | None = None) -> str:
 
 
 def texto_voz(jarvis) -> tuple[str, bool]:
+    if getattr(jarvis, "_cerebro_nome", "") == "gemma":
+        return "Cérebro: Gemma 4 (no PC)", True
     if getattr(jarvis, "_modo_reserva", False):
         return "Voz: reserva (Groq)", False
     if getattr(jarvis, "session", None) is None:

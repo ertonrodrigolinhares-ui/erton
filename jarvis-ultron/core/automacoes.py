@@ -8,7 +8,8 @@ Coloque o arquivo na pasta `automacoes` do Jarvis e abra o Jarvis de novo. Dois 
    (a mesma forma das ferramentas do Gemini; "parameters" pode ser omitido).
    Opcional: `def iniciar(jarvis): ...` roda uma vez quando o Jarvis abre (para automações que
    trabalham sozinhas, como lembretes, ou que acrescentam algo na tela). Um arquivo pode ter só o
-   `iniciar`, sem FERRAMENTA. Para mexer na tela, use `core.na_tela.executar(funcao)`.
+   `iniciar`, sem FERRAMENTA. Para mexer na tela, use `core.na_tela.executar(funcao)` e ponha
+   `NA_TELA = True` no arquivo (assim o `iniciar` roda no programa da tela).
 
 2. `nome.md`: um agente/habilidade para o Hermes (mesmo formato de SKILL.md, com
    `name:` no cabeçalho). O Jarvis copia para o perfil jarvis do Hermes ao abrir. Se o cabeçalho
@@ -45,6 +46,7 @@ class Carga:
     erros: list = field(default_factory=list)  # (arquivo, motivo)
     habilidades: list = field(default_factory=list)  # nomes das skills copiadas para o Hermes
     inicios: list = field(default_factory=list)  # (arquivo, iniciar) que rodam quando o Jarvis abre
+    na_tela: set = field(default_factory=set)  # arquivos cujo iniciar desenha na tela (rodam no programa da tela)
 
 
 def pasta_padrao() -> Path:
@@ -70,6 +72,8 @@ def carregar_ferramentas(pasta: Path | None = None, reservados: set[str] | None 
             iniciar = getattr(modulo, "iniciar", None)
             if iniciar is not None and not callable(iniciar):
                 raise ValueError("'iniciar' precisa ser uma função iniciar(jarvis)")
+            if iniciar is not None and _desenha_na_tela(modulo, arquivo):
+                carga.na_tela.add(arquivo.name)
             if not hasattr(modulo, "FERRAMENTA"):
                 if iniciar is None:
                     raise ValueError("falta FERRAMENTA (ou a função iniciar(jarvis))")
@@ -93,6 +97,18 @@ def carregar_ferramentas(pasta: Path | None = None, reservados: set[str] | None 
         except Exception as erro:
             carga.erros.append((arquivo.name, str(erro)[:160]))
     return carga
+
+
+def _desenha_na_tela(modulo, arquivo: Path) -> bool:
+    """A automação mexe na janela? (NA_TELA = True no arquivo, ou usa core.na_tela.)
+    Com tela e cérebro em programas separados, essas rodam no programa da tela."""
+    marcado = getattr(modulo, "NA_TELA", None)
+    if marcado is not None:
+        return bool(marcado)
+    try:
+        return "core.na_tela" in arquivo.read_text(encoding="utf-8")
+    except OSError:
+        return False
 
 
 def _cabecalho(texto: str) -> dict:
