@@ -178,9 +178,16 @@ if (Test-Path $py) {
 if ($whisperOk) {
     Write-Host "Whisper local pronto: sua voz e transcrita no PC." -ForegroundColor Green
 } else {
-    Write-Host "O Whisper local nao foi instalado agora." -ForegroundColor Yellow
-    Write-Host "Abra o 'Iniciar Jarvis Ultron' uma vez (ele prepara o Jarvis) e depois rode este"
-    Write-Host "instalador de novo. Ate la, a voz e transcrita pelo Groq (se a chave dele estiver no .env)."
+    # Sem o Whisper local o modo privado nao ouve a voz (ela nunca vai para a internet nesse modo).
+    # Entao o Jarvis NAO e ligado no Gemma agora.
+    Definir-Env "JARVIS_GEMMA_MODELO" $apelido
+    Write-Host ""
+    Write-Host "O Whisper local nao foi instalado agora, entao o modo privado NAO foi ligado." -ForegroundColor Yellow
+    Write-Host "Sem ele o Jarvis nao consegue ouvir a sua voz no modo privado (ela nunca vai para a internet)."
+    Write-Host "Abra o 'Iniciar Jarvis Ultron' uma vez (ele prepara o Jarvis), feche e rode este"
+    Write-Host "instalador de novo: ele pula o que ja esta pronto e termina a instalacao."
+    Read-Host "Aperte Enter para fechar"
+    exit 0
 }
 
 # ---------------------------------------------------------------- ligar o Jarvis no Gemma

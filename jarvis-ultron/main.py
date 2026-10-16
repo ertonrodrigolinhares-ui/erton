@@ -1267,6 +1267,39 @@ LOCAL_MACHINE_ONLY_ACTIONS = frozenset({
     "computer_settings",
 })
 
+# Jarvis Ultron: no modo privado (JARVIS_CEREBRO=gemma) nada vai para IA na nuvem. Estas ferramentas
+# mandam o pedido (ou a tela) para o Gemini, o Hermes (modelos grátis da Nous) ou outra IA na nuvem:
+# não são oferecidas ao Gemma e são recusadas em _execute_tool. As automações da pasta marcam isso
+# com USA_IA_NUVEM = True (ex.: claude_task, generate_video).
+FERRAMENTAS_NUVEM_IA = frozenset({
+    "web_search", "deep_research", "agent_task", "generate_image", "hermes_agent", "approve_publication",
+    "create_presentation", "code_helper", "dev_agent", "file_processor", "screen_process", "flight_finder",
+    "computer_control", "desktop_control", "computer_settings",
+})
+
+AVISO_MODO_PRIVADO = ("No modo privado isso não é usado, porque mandaria o pedido para uma IA na nuvem. "
+                      "Para usar, diga 'modo normal'.")
+
+
+def bloqueio_do_modo_privado(nome: str, args: dict | None = None) -> str | None:
+    """Jarvis Ultron: no modo privado, a recusa (em português) para uma ferramenta que usa IA na nuvem;
+    None quando pode rodar. Vale para o Gemma, o painel Ultron e qualquer outra chamada."""
+    from core.cerebro_gemma import cerebro_gemma
+
+    if not cerebro_gemma():
+        return None
+    args = args or {}
+    if nome in FERRAMENTAS_NUVEM_IA:
+        return AVISO_MODO_PRIVADO
+    if nome == "youtube_video" and str(args.get("action", "")).strip().lower() == "summarize":
+        return AVISO_MODO_PRIVADO  # o resumo do vídeo é feito pelo Gemini
+    if nome == "school_tasks" and args.get("refresh"):
+        return AVISO_MODO_PRIVADO  # ler o Geekie de novo é trabalho do Hermes
+    automacao = carregar_automacoes().ferramentas.get(nome)
+    if automacao is not None and getattr(automacao, "usa_ia_nuvem", False):
+        return AVISO_MODO_PRIVADO
+    return None
+
 
 _AUTOMACOES = None
 
@@ -1357,7 +1390,9 @@ class JarvisLive:
             self._reserva = CerebroGemma.da_configuracao()
         else:
             self._reserva = ReservaGroq.da_configuracao()
-        self._cerebro_nome = "gemma" if isinstance(self._reserva, CerebroGemma) else "gemini"
+        # modo privado mesmo se o Gemma não subiu (assim "modo normal" digitado ainda troca)
+        self._cerebro_nome = "gemma" if (not self.cloud_safe and cerebro_gemma()) else "gemini"
+        self._trocando_cerebro = False  # indo para o modo privado: nada do microfone/texto vai para a nuvem
         self._modo_reserva = False
         self._falhas_seguidas = 0
         self._avisos_trava = threading.Lock()  # avisos guardados no modo chamada
@@ -1390,6 +1425,9 @@ class JarvisLive:
         from core.autodiagnostico import pediu_diagnostico
         if pediu_diagnostico(text) and (not self.session or getattr(self, "_modo_reserva", False)):
             threading.Thread(target=self._autodiagnostico, daemon=True).start()
+            return
+        if getattr(self, "_trocando_cerebro", False):  # indo para o modo privado: não manda para a nuvem
+            self.ui.write_log("SYS: 🔒 Trocando para o modo privado: espere o selo e mande de novo.")
             return
         if not self._loop or not self.session:
             if getattr(self, "_reserva", None) is not None and str(text or "").strip():
@@ -1429,7 +1467,8 @@ class JarvisLive:
         mime_type: str = "audio/pcm;rate=16000",
     ) -> bool:
         """Queue browser-captured PCM for the active Gemini Live session."""
-        if not data or self.out_queue is None or self._shutdown_requested.is_set():
+        if not data or self.out_queue is None or self._shutdown_requested.is_set() \
+                or getattr(self, "_trocando_cerebro", False):
             return False
         await self.out_queue.put({"data": data, "mime_type": mime_type})
         return True
@@ -1640,9 +1679,11 @@ class JarvisLive:
     async def _geekie_pendencias(self, atualizar: bool = False) -> str:
         """Jarvis Ultron: pendências do Geekie One (lista salva pelo Hermes; lê de novo se velha)."""
         from core import geekie, hermes_ponte
+        from core.cerebro_gemma import cerebro_gemma
 
         atividades, atualizado = geekie.ler()
-        if (atualizar or geekie.desatualizada(atualizado)) and hermes_ponte.configurado():
+        # no modo privado o Hermes (IA na nuvem) não é chamado: fica a lista salva
+        if (atualizar or geekie.desatualizada(atualizado)) and hermes_ponte.configurado() and not cerebro_gemma():
             return await self._hermes_sem_travar(
                 "Use a skill geekie-pendencias agora: leia (somente leitura) as atividades pendentes do "
                 "Geekie One, salve a lista e responda o resumo falado.")
@@ -1668,13 +1709,15 @@ class JarvisLive:
 
     AVISO_ESPERA_AO_CHAMAR = 4.0  # segundos depois do "Hey Jarvis" para falar os avisos guardados
 
-    def anunciar(self, texto: str, titulo: str = "Lembrete") -> str:
+    def anunciar(self, texto: str, titulo: str = "Lembrete", sigiloso: bool = False) -> str:
         """Fala um aviso em voz alta respeitando o modo de escuta. Qualquer fio pode chamar.
 
         - conversa aberta (mãos livres ou depois do "Hey Jarvis"): o Jarvis fala agora;
         - modo chamada esperando o "Hey Jarvis": toca um som, mostra na tela e guarda o aviso
           para falar assim que você chamar (JARVIS_AVISO_FALA_SEMPRE=1 fala mesmo assim);
-        - sem o Gemini (modo reserva): fala com a voz reserva.
+        - sem o Gemini (modo reserva): fala com a voz reserva;
+        - sigiloso=True (ex.: resultado do Claude, que lê arquivos de clientes): fala só com a voz do
+          Windows, no PC; o texto nunca vai para o Gemini.
         Devolve "falado", "guardado" ou "na_tela".
         """
         texto = " ".join(str(texto or "").split())
@@ -1691,9 +1734,9 @@ class JarvisLive:
         fala_sempre = os.environ.get("JARVIS_AVISO_FALA_SEMPRE", "0").strip().lower() in {"1", "true", "sim", "yes"}
         if self._chamada_fechada() and not fala_sempre:
             with self._trava_avisos():
-                self._avisos_guardados.append(texto)
+                self._avisos_guardados.append((texto, sigiloso))
             return "guardado"
-        return self._falar_aviso(texto)
+        return self._falar_aviso(texto, sigiloso=sigiloso)
 
     def _trava_avisos(self):
         if not hasattr(self, "_avisos_trava"):
@@ -1701,7 +1744,12 @@ class JarvisLive:
             self._avisos_guardados = []
         return self._avisos_trava
 
-    def _falar_aviso(self, texto: str) -> str:
+    def _falar_aviso(self, texto: str, sigiloso: bool = False) -> str:
+        if sigiloso:  # nunca vai para a IA na nuvem nem para a voz da internet
+            if getattr(self, "ui", None) is not None and not getattr(self.ui, "muted", False):
+                threading.Thread(target=self._falar_no_pc, args=(texto,), daemon=True, name="Aviso").start()
+                return "falado"
+            return "na_tela"
         session, loop = getattr(self, "session", None), getattr(self, "_loop", None)
         if session is not None and loop is not None and not getattr(self, "_modo_reserva", False):
             aviso = (f"[Aviso do Jarvis] {texto}\n"
@@ -1715,6 +1763,16 @@ class JarvisLive:
             return "falado"
         return "na_tela"
 
+    def _falar_no_pc(self, texto: str) -> None:
+        """Voz do próprio Windows: o texto não sai do PC (avisos sigilosos)."""
+        from actions.tts_engine import falar_com_voz_do_windows
+
+        self.set_speaking(True)
+        try:
+            falar_com_voz_do_windows(texto)
+        finally:
+            self.set_speaking(False)
+
     def _falar_avisos_guardados(self) -> None:
         """Chamado quando a conversa abre ("Hey Jarvis" ou mãos livres): fala o que ficou guardado."""
         with self._trava_avisos():
@@ -1726,8 +1784,12 @@ class JarvisLive:
                 return  # a conversa fechou de novo; continuam guardados
             with self._trava_avisos():
                 guardados, self._avisos_guardados = self._avisos_guardados, []
-            if guardados:
-                self._falar_aviso("Enquanto você estava fora: " + " ".join(guardados))
+            sigilosos = [t for t, sigiloso in guardados if sigiloso]
+            comuns = [t for t, sigiloso in guardados if not sigiloso]
+            if sigilosos:  # primeiro os sigilosos, pela voz do PC (nunca juntos num pedido ao Gemini)
+                self._falar_no_pc("Enquanto você estava fora: " + " ".join(sigilosos))
+            if comuns:
+                self._falar_aviso(("Enquanto você estava fora: " if not sigilosos else "") + " ".join(comuns))
         threading.Thread(target=depois, daemon=True, name="AvisosGuardados").start()
 
     def _notificar_na_tela(self, titulo: str, texto: str) -> None:
@@ -1797,6 +1859,10 @@ class JarvisLive:
         """Jarvis Ultron: tarefas do Hermes podem levar minutos. Espera um pouco; se demorar, a
         conversa segue e o resultado é entregue quando ficar pronto (antes o Jarvis travava)."""
         from core import hermes_ponte
+        from core.cerebro_gemma import cerebro_gemma
+
+        if cerebro_gemma():  # modo privado: o Hermes roda em IA na nuvem
+            return AVISO_MODO_PRIVADO
 
         tarefa = asyncio.ensure_future(asyncio.to_thread(hermes_ponte.perguntar, pedido))
         try:
@@ -1949,14 +2015,20 @@ class JarvisLive:
         destino = pedido_de_privacidade(fala)
         if destino is None:
             return False
+        if destino == "gemma" and getattr(self, "_cerebro_nome", "gemini") != "gemma":
+            # Até o cérebro novo subir (a checagem do Ollama pode levar segundos), nada do microfone
+            # nem do texto vai para a nuvem. Se a troca não acontecer, _trocar_cerebro libera.
+            self._trocando_cerebro = True
+            self.ui.write_log("SYS: 🔒 Preparando o modo privado: espere o selo antes de falar de clientes.")
         threading.Thread(target=self._trocar_cerebro, args=(destino,), daemon=True, name="TrocarCerebro").start()
         return True
 
     def _trocar_cerebro(self, destino: str) -> None:
-        from core.cerebro_gemma import modelo_instalado
+        from core.cerebro_gemma import modelo_instalado, whisper_instalado
 
         atual = "gemma" if getattr(self, "_cerebro_nome", "gemini") == "gemma" else "gemini"
         if destino == atual:
+            self._trocando_cerebro = False
             self._falar_aviso("Já estou no modo privado." if destino == "gemma" else "Já estou no modo normal.")
             return
         from core.claude_chefe import aplicando
@@ -1968,10 +2040,16 @@ class JarvisLive:
             return
         trocar = getattr(self.ui, "trocar_cerebro", None)
         if not callable(trocar):
-            self.ui.write_log("SYS: Para trocar de cérebro pela voz, o Jarvis precisa estar em dois programas "
-                              "(tire JARVIS_UM_PROCESSO do .env). Ou use 'Instalar Gemma 4' / 'Voltar para o Gemini'.")
+            self._trocando_cerebro = False
+            self._troca_pela_voz_indisponivel(destino)
+            return
+        if destino == "gemma" and not whisper_instalado():
+            self._trocando_cerebro = False  # sem ouvir no PC, a voz não pode ir para a nuvem: não liga
+            self._falar_aviso("O modo privado não foi ligado: falta a transcrição local da sua voz. "
+                              "Rode o Instalar Gemma 4 de novo na pasta do Jarvis.")
             return
         if destino == "gemma" and not modelo_instalado():
+            self._trocando_cerebro = False
             self._falar_aviso("Para o modo privado, primeiro rode o Instalar Gemma 4 na pasta do Jarvis.")
             return
         if destino == "gemma":
@@ -1979,6 +2057,24 @@ class JarvisLive:
         else:
             self.ui.write_log("SYS: Voltando ao modo normal (Gemini)...")
         trocar(destino)  # a tela religa o programa do cérebro já com o cérebro novo
+
+    def _troca_pela_voz_indisponivel(self, destino: str) -> None:
+        """Tela e cérebro no mesmo programa (JARVIS_UM_PROCESSO, app empacotado ou a volta automática para
+        um programa só): aqui não dá para religar o cérebro. Diz em voz alta que NÃO trocou."""
+        como = " (tire JARVIS_UM_PROCESSO do .env)" if os.environ.get("JARVIS_UM_PROCESSO", "").strip() else ""
+        if destino != "gemma":
+            self.ui.write_log("SYS: Modo normal NÃO ligado: com o Jarvis em um programa só, a troca pela voz não "
+                              f"funciona{como}. Use o 'Voltar para o Gemini' e abra o Jarvis de novo.")
+            self._falar_aviso("Não consegui voltar ao modo normal por aqui. Use o Voltar para o Gemini e abra "
+                              "o Jarvis de novo.")
+            return
+        self.ui.write_log("SYS: 🔒 Modo privado NÃO ligado: com o Jarvis em um programa só, a troca pela voz não "
+                          f"funciona{como}. Feche o Jarvis, rode o 'Instalar Gemma 4' e abra de novo.")
+        self._falar_aviso("Atenção: o modo privado NÃO foi ligado; continuo usando a nuvem. Desliguei o microfone "
+                          "por segurança: não fale dados de clientes agora.")
+        mutar = getattr(self.ui, "set_muted_threadsafe", None)
+        if callable(mutar):  # depois do aviso (a voz reserva não fala com o microfone desligado)
+            mutar(True)
 
     def _checar_pedido_de_modo(self, fala: str) -> None:
         """Troca o modo pela frase falada, mesmo que a IA não chame a ferramenta."""
@@ -2041,6 +2137,9 @@ class JarvisLive:
                 self.ui.write_log("SYS: O Gemma 4 não respondeu. Confira se o Ollama está instalado "
                                   "(rode o 'Instalar Gemma 4').")
                 self._falar_reserva("Não consegui ligar o Gemma. Rode o Instalar Gemma 4 na pasta do Jarvis.")
+            checar = getattr(self._reserva, "checar_ouvido", None)
+            if callable(checar) and not checar():  # sem o Whisper local: avisa já na abertura
+                self._avisar_sem_ouvido()
 
         threading.Thread(target=preparar, daemon=True, name="GemmaAquecer").start()
         threading.Thread(target=self._escutar_reserva, daemon=True).start()
@@ -2055,6 +2154,16 @@ class JarvisLive:
         self.ui.write_log(f"Jarvis: {resposta}")
         self._falar_reserva(resposta)
 
+    def _avisar_sem_ouvido(self) -> None:
+        """Modo privado sem a transcrição local da voz: avisa uma vez (tela e voz) por motivo.
+        A voz nunca vai para a nuvem; dá para digitar."""
+        erro = getattr(getattr(self, "_reserva", None), "erro_ouvido", None)
+        if not erro or erro == getattr(self, "_erro_ouvido_avisado", None):
+            return
+        self._erro_ouvido_avisado = erro
+        self.ui.write_log(f"SYS: 🔒 {erro}")
+        self._falar_reserva(erro)
+
     # Ferramentas essenciais no modo reserva. Mandar TODAS ao Groq gasta muito do limite grátis, então
     # só as mais usadas por voz vão para a reserva (as automações da pasta entram sempre).
     RESERVA_FERRAMENTAS_ESSENCIAIS = {
@@ -2066,16 +2175,22 @@ class JarvisLive:
     def _ferramentas_da_reserva(self):
         """Ferramentas do Jarvis no formato do Groq + a função que as executa (modo reserva).
         No modo nuvem (cloud_safe) a reserva fica só na conversa, sem ferramentas.
-        JARVIS_RESERVA_FERRAMENTAS=0 no .env desliga as ferramentas (fica só conversa, mais leve)."""
+        JARVIS_RESERVA_FERRAMENTAS=0 no .env desliga as ferramentas (fica só conversa, mais leve).
+        No modo privado (Gemma) só vão as que não usam IA na nuvem, e sem gravar memória."""
         if getattr(self, "cloud_safe", False):
             return None, None
         if os.environ.get("JARVIS_RESERVA_FERRAMENTAS", "1").strip() in ("0", "nao", "não", "false"):
             return None, None
         if getattr(self, "_reserva_ferramentas", None) is None:
+            from core.cerebro_gemma import cerebro_gemma
             from core.reserva_groq import gemini_para_groq
             plugins = set(carregar_automacoes().ferramentas)  # as automações da pasta entram sempre
             escolhidas = [d for d in get_tool_declarations()
                           if d.get("name") in self.RESERVA_FERRAMENTAS_ESSENCIAIS or d.get("name") in plugins]
+            if cerebro_gemma():
+                # a memória de longo prazo vai no prompt do Gemini depois, no modo normal
+                escolhidas = [d for d in escolhidas if d.get("name") != "save_memory"
+                              and bloqueio_do_modo_privado(d.get("name", "")) is None]
             self._reserva_ferramentas = gemini_para_groq(escolhidas)
         return self._reserva_ferramentas, self._executar_ferramenta_reserva
 
@@ -2170,7 +2285,8 @@ class JarvisLive:
         try:
             for pcm in capturar_falas(
                 continuar=lambda: self._modo_reserva and not self._shutdown_requested.is_set(),
-                pode_ouvir=lambda: not self._is_speaking and not self.ui.muted,
+                pode_ouvir=lambda: (not self._is_speaking and not self.ui.muted
+                                    and not getattr(self, "_trocando_cerebro", False)),
                 portao=self._portao,
             ):
                 texto = self._reserva.transcrever(pcm)
@@ -2188,6 +2304,8 @@ class JarvisLive:
                         self._autodiagnostico()
                         continue
                     self._responder_pela_reserva(texto)
+                else:
+                    self._avisar_sem_ouvido()  # modo privado sem o Whisper local: avisa uma vez
         except Exception as erro:
             print(f"[Reserva] Microfone do modo reserva parou: {erro}")
 
@@ -2238,6 +2356,13 @@ class JarvisLive:
                 },
             )
 
+        # Jarvis Ultron: modo privado. Trava no código (não só no prompt do Gemma): vale também para o
+        # painel Ultron e para chamadas que o modelo inventar.
+        bloqueio = bloqueio_do_modo_privado(name, args)
+        if bloqueio is not None:
+            self.ui.write_log(f"SYS: 🔒 {name} não é usado no modo privado (usa IA na nuvem).")
+            return types.FunctionResponse(id=fc.id, name=name, response={"result": bloqueio})
+
         if getattr(self.ui, "operational_ready", True) is False:
             return types.FunctionResponse(
                 id=fc.id,
@@ -2265,6 +2390,16 @@ class JarvisLive:
             )
 
         if name == "save_memory":
+            from core.cerebro_gemma import cerebro_gemma
+
+            if cerebro_gemma():
+                # modo privado: não grava (a memória de longo prazo vai no prompt do Gemini depois)
+                if not self.ui.muted:
+                    self.ui.set_state("LISTENING")
+                return types.FunctionResponse(
+                    id=fc.id, name=name,
+                    response={"result": "Memória não é gravada no modo privado.", "silent": True}
+                )
             category = args.get("category", "notes")
             key      = args.get("key", "")
             value    = args.get("value", "")
@@ -2540,7 +2675,8 @@ class JarvisLive:
         def callback(indata, frames, time_info, status):
             with self._speaking_lock:
                 jarvis_speaking = self._is_speaking
-            if not jarvis_speaking and not self.ui.muted:
+            # indo para o modo privado: o microfone já para de ir para o Gemini
+            if not jarvis_speaking and not self.ui.muted and not getattr(self, "_trocando_cerebro", False):
                 data = self._portao.processar(indata)
                 if data:
                     loop.call_soon_threadsafe(
@@ -2746,10 +2882,19 @@ class JarvisLive:
         if cerebro_gemma():
             if self._reserva is not None:
                 self._ativar_modo_reserva()
-                while not self._shutdown_requested.is_set():
-                    await asyncio.sleep(0.5)
-                return
-            self.ui.write_log("SYS: Não consegui preparar o Gemma 4. Tentando o Gemini.")
+            else:
+                # Modo privado sem o Gemma: NUNCA cai para o Gemini (a tela mostra MODO PRIVADO).
+                # Fica parado até ele pedir o modo normal (digitado) ou fechar o Jarvis.
+                aviso = ("Modo privado: não consegui ligar o Gemma 4, e não vou usar a nuvem. Rode o Instalar "
+                         "Gemma 4 na pasta do Jarvis, ou digite 'modo normal' para voltar ao Gemini.")
+                self.ui.write_log(f"ERR: 🔒 {aviso}")
+                from actions.tts_engine import falar_com_voz_do_windows
+
+                threading.Thread(target=falar_com_voz_do_windows, args=(aviso,), daemon=True,
+                                 name="AvisoPrivado").start()
+            while not self._shutdown_requested.is_set():
+                await asyncio.sleep(0.5)
+            return
         # Jarvis Ultron: aberto pela reserva (Google recusou a chave): conversa pelo Groq já, e
         # continua tentando o Gemini em segundo plano.
         if os.environ.get("JARVIS_SEM_GEMINI") == "1" and self._reserva is not None:

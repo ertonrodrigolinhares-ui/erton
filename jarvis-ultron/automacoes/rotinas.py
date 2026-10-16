@@ -181,6 +181,11 @@ def rodar(args: dict, jarvis, caminho: Path | None = None) -> str:
     passos = rotina.get("passos", [])
     lista = " ".join(f"{i}) {p}" for i, p in enumerate(passos, 1))
     if rotina.get("agente") == "hermes":
+        from core.cerebro_gemma import cerebro_gemma
+
+        if cerebro_gemma():  # modo privado: o Hermes roda em IA na nuvem
+            return (f"A rotina '{nome}' é feita pelo Hermes, que usa IA na nuvem, então não roda no modo "
+                    "privado. Para usar, diga 'modo normal'.")
         pedido = (f"Rotina '{nome}' do usuário. Faça estes passos em ordem e responda um resumo curto em "
                   f"português: {lista}. Nunca publique, envie mensagens, compre ou apague nada.")
         return f"[Hermes, rotina {nome}] " + str(_pelo_hermes(nome, pedido, jarvis))

@@ -1378,6 +1378,48 @@ class AvisosFaladosTests(unittest.TestCase):
         self.assertIn("Enquanto você estava fora: ligar para o contador", jarvis.session.textos[0])
         self.assertEqual(jarvis._avisos_guardados, [])
 
+    def test_aviso_sigiloso_nunca_vai_para_o_gemini(self):
+        # resultado do Claude (pode ter dados de clientes): fala só com a voz do PC
+        jarvis = self._jarvis(False)
+        jarvis.set_speaking = lambda valor: None
+
+        async def cenario():
+            jarvis._loop = asyncio.get_running_loop()
+            with patch("actions.tts_engine.falar_com_voz_do_windows") as voz:
+                self.assertEqual(jarvis.anunciar("Grupo Silva deve R$ 42.000", "Claude", sigiloso=True), "falado")
+                for _ in range(40):
+                    await asyncio.sleep(0.05)
+                    if voz.called:
+                        break
+            return voz
+        voz = asyncio.run(cenario())
+        voz.assert_called_once_with("Grupo Silva deve R$ 42.000")
+        self.assertEqual(jarvis.session.textos, [])
+
+    def test_aviso_sigiloso_guardado_tambem_fica_no_pc(self):
+        jarvis = self._jarvis(True)
+        jarvis.AVISO_ESPERA_AO_CHAMAR = 0
+        jarvis.set_speaking = lambda valor: None
+
+        async def cenario():
+            jarvis._loop = asyncio.get_running_loop()
+            self.assertEqual(jarvis.anunciar("Grupo Silva deve R$ 42.000", "Claude", sigiloso=True), "guardado")
+            self.assertEqual(jarvis.anunciar("ligar para o contador"), "guardado")
+            jarvis._chamada_fechada = lambda: False  # disse "Hey Jarvis"
+            with patch("core.palavra_ativacao.tocar_aviso"), \
+                    patch("actions.tts_engine.falar_com_voz_do_windows") as voz:
+                jarvis._aviso_de_escuta("ouvindo")
+                for _ in range(40):
+                    await asyncio.sleep(0.05)
+                    if jarvis.session.textos:
+                        break
+            return voz
+        voz = asyncio.run(cenario())
+        voz.assert_called_once_with("Enquanto você estava fora: Grupo Silva deve R$ 42.000")
+        self.assertEqual(len(jarvis.session.textos), 1)
+        self.assertIn("ligar para o contador", jarvis.session.textos[0])
+        self.assertNotIn("Grupo Silva", jarvis.session.textos[0])
+
     def test_sem_gemini_fala_com_a_voz_reserva(self):
         jarvis = self._jarvis(False)
         jarvis.session, jarvis._loop = None, None
@@ -1476,6 +1518,18 @@ class RotinasSalvasTests(unittest.TestCase):
         self.assertEqual(r, "[Hermes, rotina pesquisa] 3 provas")
         self.assertIn("1) pesquise provas de triathlon 2) liste as datas", pedidos[0])
         self.assertIn("Nunca publique", pedidos[0])
+
+    def test_rotina_do_hermes_nao_roda_no_modo_privado(self):
+        import os
+        self.m.salvar({"name": "clientes", "steps": "resuma as pendências do cliente Fulano", "agent": "hermes"},
+                      self.arquivo)
+
+        class Jarvis:
+            _loop = None
+        with patch.dict(os.environ, {"JARVIS_CEREBRO": "gemma"}), \
+                patch("core.hermes_ponte.perguntar", side_effect=AssertionError("Hermes no modo privado")):
+            r = self.m.rodar({"name": "clientes"}, Jarvis(), self.arquivo)
+        self.assertIn("modo privado", r)
 
 
 class PainelStarkTests(unittest.TestCase):

@@ -24,6 +24,11 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+USA_IA_NUVEM = True  # a descrição vai para o Veo (Google): desligada no modo privado
+
+AVISO_MODO_PRIVADO = ("No modo privado não faço vídeos, porque a descrição iria para a IA de vídeo do Google, "
+                      "na nuvem. Para fazer, diga 'modo normal'.")
+
 FERRAMENTA = {
     "name": "generate_video",
     "description": (
@@ -176,10 +181,18 @@ def _explicar(erro: Exception) -> str:
     return str(erro)[:160]
 
 
+def _modo_privado() -> bool:
+    from core.cerebro_gemma import cerebro_gemma
+
+    return cerebro_gemma()
+
+
 def executar(args: dict, jarvis) -> str:
     descricao = str(args.get("description", "")).strip()
     if not descricao:
         return "Faltou a descrição do vídeo."
+    if _modo_privado():  # antes do preço e do confirm=true: nada vai para o Google
+        return AVISO_MODO_PRIVADO
     segundos = _segundos(args.get("seconds"))
     qualidade = _qualidade(args.get("quality"))
     vertical = bool(args.get("vertical"))
@@ -215,6 +228,8 @@ def executar(args: dict, jarvis) -> str:
 
     def trabalhar():
         try:
+            if _modo_privado():  # o modo mudou entre o preço e o ok
+                raise RuntimeError("o modo privado foi ligado; nada foi mandado para o Google")
             arquivo = gerar(descricao, segundos, qualidade, vertical)
         except Exception as erro:
             aviso = f"Não consegui fazer o vídeo: {_explicar(erro)}."

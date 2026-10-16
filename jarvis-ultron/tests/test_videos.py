@@ -97,6 +97,34 @@ class OkAntesDoVideoTests(unittest.TestCase):
         self.assertIn("Not confirmed", r)
         gerar.assert_not_called()
 
+    def test_modo_privado_nunca_manda_a_descricao_para_o_google(self):
+        import os
+
+        pedido = dict(self.pedido, description="client Fulano from company X receiving a certificate")
+        with patch.dict(os.environ, {"JARVIS_CEREBRO": "gemma"}), patch.object(self.m, "gerar") as gerar:
+            r1 = self.m.executar(dict(pedido), JarvisFalso())
+            r2 = self.m.executar(dict(pedido, confirm=True), JarvisFalso("ok, pode fazer"))
+            _esperar_video()
+        self.assertIn("modo privado", r1)
+        self.assertNotIn("US$", r1)
+        self.assertIn("modo privado", r2)
+        gerar.assert_not_called()
+
+    def test_modo_privado_ligado_entre_o_preco_e_o_ok(self):
+        jarvis = JarvisFalso("ok, pode fazer")
+        with patch.object(self.m, "gerar") as gerar:
+            self.m.executar(dict(self.pedido), JarvisFalso())
+            with patch.object(self.m, "_modo_privado", side_effect=[False, True]):
+                self.m.executar(dict(self.pedido, confirm=True), jarvis)
+                _esperar_video()
+        gerar.assert_not_called()
+        self.assertIn("modo privado", jarvis.avisos[0])
+
+    def test_marcada_como_ia_na_nuvem(self):
+        from core.automacoes import carregar_ferramentas
+
+        self.assertTrue(carregar_ferramentas(RAIZ / "automacoes").ferramentas["generate_video"].usa_ia_nuvem)
+
     def test_erro_do_google_vira_aviso_em_portugues(self):
         jarvis = JarvisFalso("ok, pode fazer")
         with patch.object(self.m, "gerar", side_effect=RuntimeError("403 billing account not enabled")):

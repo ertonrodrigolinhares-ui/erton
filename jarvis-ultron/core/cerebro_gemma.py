@@ -4,11 +4,12 @@ Liga com JARVIS_CEREBRO="gemma" no .env (o "Instalar Gemma 4" já faz isso). Nes
 não usa o Gemini: ouve você, transcreve, pensa no Gemma 4 e fala a resposta. O raciocínio fica no
 computador, então pode usar com dados de clientes.
 
-- Transcrição (fala -> texto): Whisper local (faster-whisper), também no PC. Se ele não estiver
-  instalado, usa o Whisper do Groq (precisa de GROQ_API_KEY e manda o áudio para a internet).
+- Transcrição (fala -> texto): Whisper local (faster-whisper), também no PC. A voz NUNCA vai para a
+  nuvem neste modo: sem o Whisper local, o Jarvis avisa (tela e voz) e você digita.
 - Voz: a mesma da reserva (Microsoft Edge, pela internet). Para não mandar nem o texto das
   respostas para fora, ponha JARVIS_VOZ_PRIVADA=1 no .env (usa a voz que vem no Windows).
-- Ferramentas: as mesmas do modo reserva (abrir sites, lembretes, automações...).
+- Ferramentas: só as que rodam sem IA na nuvem (abrir sites, lembretes, automações locais...).
+  Pesquisa pelo Gemini, Hermes, Claude, imagens e vídeos ficam desligados (main.FERRAMENTAS_NUVEM_IA).
 
 Ajustes no .env (todos opcionais):
   JARVIS_GEMMA_MODELO   nome do modelo no Ollama (padrão: jarvis-gemma, criado pelo instalador)
@@ -54,20 +55,46 @@ import unicodedata
 
 _PRIVADO = re.compile(r"\bmodo (privado|sigiloso|confidencial|seguro)\b")
 _NORMAL = re.compile(r"\b(modo normal|modo publico|sair do modo (privado|sigiloso|confidencial|seguro))\b")
+# "não quero sair do modo privado", "nada de modo normal": negação nunca tira do modo privado
+_NEGACAO = re.compile(r"\b(nao|nunca|nem|jamais|sem)\b|\bnada de\b")
+# Sair do modo privado (ir para a nuvem) só com o pedido inteiro, sem mais nada na frase:
+# "Jarvis, modo normal", "sair do modo privado", "volta para o modo normal".
+_NORMAL_EXATO = re.compile(
+    r"^(?:(?:ok|ei|hey|oi) )?(?:jarvis )?(?:por favor )?(?:(?:pode )?(?:volta|voltar|volte) (?:para o|pro|ao) )?"
+    r"(?:modo normal|modo publico|sair do modo (?:privado|sigiloso|confidencial|seguro))(?: por favor)?$")
 
 
 def pedido_de_privacidade(fala: str) -> str | None:
     """"modo privado" -> "gemma"; "modo normal" / "sair do modo privado" -> "gemini"; senão None.
-    Só frases curtas (um pedido, não uma conversa que cita as palavras)."""
+    Só frases curtas (um pedido, não uma conversa que cita as palavras). Sair do modo privado (ir
+    para a nuvem) nunca com negação e só com o pedido sozinho: na dúvida, fica no modo privado."""
     texto = unicodedata.normalize("NFKD", str(fala or "").lower())
-    texto = " ".join("".join(c for c in texto if not unicodedata.combining(c)).replace(",", " ").split())
+    texto = "".join(c for c in texto if not unicodedata.combining(c))
+    texto = " ".join(re.sub(r"[,.;:!?]", " ", texto).split())
     if not texto or len(texto.split()) > 7:
         return None
     if _NORMAL.search(texto):
-        return "gemini"
+        return "gemini" if _NORMAL_EXATO.match(texto) and not _NEGACAO.search(texto) else None
     if _PRIVADO.search(texto):
         return "gemma"
     return None
+
+
+AVISO_SEM_WHISPER = ("No modo privado não consigo ouvir sua voz: a transcrição local (Whisper) não está "
+                     "instalada, e a voz não vai para a internet. Rode o 'Instalar Gemma 4' de novo. "
+                     "Enquanto isso, digite.")
+AVISO_WHISPER_FALHOU = ("Não consegui carregar a transcrição local da voz (Whisper). Na primeira vez ela precisa "
+                        "da internet para baixar o modelo; tento de novo em 1 minuto. Enquanto isso, digite.")
+
+
+def whisper_instalado() -> bool:
+    """O Whisper local (faster-whisper) está instalado neste Python? (não carrega o modelo)"""
+    import importlib.util
+
+    try:
+        return importlib.util.find_spec("faster_whisper") is not None
+    except (ImportError, ValueError):
+        return False
 
 
 def modelo_instalado(nome: str | None = None) -> bool:
@@ -134,9 +161,11 @@ class CerebroGemma(ReservaGroq):
         self.modelo = modelo or os.environ.get("JARVIS_GEMMA_MODELO", "").strip() or MODELO_PADRAO
         self.mensagens = [{"role": "system", "content": INSTRUCOES_GEMMA}]
         self._trava_resposta = threading.Lock()
-        self._ouvido = ouvido          # quem transcreve (Whisper local ou Groq); escolhido no 1º uso
+        self._ouvido = ouvido          # quem transcreve (Whisper local, no PC); escolhido no 1º uso
         self._ouvido_escolhido = ouvido is not None
         self._trava_ouvido = threading.Lock()
+        self._tentar_ouvido_apos = 0.0  # depois de uma falha ao carregar, espera antes de tentar de novo
+        self.erro_ouvido: str | None = None  # por que não dá para ouvir (o Jarvis avisa na tela e na voz)
 
     @classmethod
     def da_configuracao(cls) -> "CerebroGemma | None":
@@ -166,27 +195,38 @@ class CerebroGemma(ReservaGroq):
             return False
 
     # ---------- ouvir ----------
+    ESPERA_NOVA_TENTATIVA = 60  # segundos entre tentativas de carregar o Whisper que falhou
+
+    def checar_ouvido(self) -> bool:
+        """Na abertura: o Whisper local está instalado? Se não, guarda o aviso em erro_ouvido."""
+        if self._ouvido is not None or whisper_instalado():
+            return True
+        self.erro_ouvido = AVISO_SEM_WHISPER
+        return False
+
     def _preparar_ouvido(self):
+        """Só o Whisper local. No modo privado a voz NUNCA vai para a nuvem (nada de Groq): sem ele,
+        transcrever devolve "" e erro_ouvido diz o motivo (o Jarvis avisa uma vez)."""
         with self._trava_ouvido:
-            if self._ouvido_escolhido:
+            if self._ouvido_escolhido or time.monotonic() < self._tentar_ouvido_apos:
                 return self._ouvido
             self._ouvido_escolhido = True
             try:
                 from faster_whisper import WhisperModel
-
-                tamanho = os.environ.get("JARVIS_WHISPER_MODELO", "").strip() or WHISPER_PADRAO
+            except Exception as erro:  # não instalado, ou "DLL load failed" no Windows (ImportError/OSError)
+                self.erro_ouvido = AVISO_SEM_WHISPER
+                print(f"[Gemma] Whisper local não instalado ({erro}): não transcrevo a voz no modo privado.")
+                return None
+            tamanho = os.environ.get("JARVIS_WHISPER_MODELO", "").strip() or WHISPER_PADRAO
+            try:
                 self._ouvido = ("local", WhisperModel(tamanho, device="cpu", compute_type="int8"))
+                self.erro_ouvido = None
                 print(f"[Gemma] Transcrição local (Whisper {tamanho}) pronta.")
-            except ImportError:
-                chave = os.environ.get("GROQ_API_KEY", "").strip()
-                if chave:
-                    import groq
-
-                    self._ouvido = ("groq", ReservaGroq(chave, cliente=groq.Groq(api_key=chave, timeout=60)))
-                    print("[Gemma] Whisper local não instalado; transcrevendo pelo Groq.")
-                else:
-                    print("[Gemma] Sem Whisper local e sem chave do Groq: não consigo transcrever a voz.")
             except Exception as erro:
+                # ex.: sem internet no 1º download do modelo: tenta de novo daqui a pouco, nunca pela nuvem
+                self._ouvido_escolhido = False
+                self._tentar_ouvido_apos = time.monotonic() + self.ESPERA_NOVA_TENTATIVA
+                self.erro_ouvido = AVISO_WHISPER_FALHOU
                 print(f"[Gemma] Whisper local falhou ao carregar: {erro}")
             return self._ouvido
 
@@ -194,9 +234,7 @@ class CerebroGemma(ReservaGroq):
         ouvido = self._preparar_ouvido()
         if ouvido is None:
             return ""
-        tipo, motor = ouvido
-        if tipo == "groq":
-            return motor.transcrever(pcm, taxa)
+        _tipo, motor = ouvido
         try:
             if taxa == 16000:
                 import numpy as np

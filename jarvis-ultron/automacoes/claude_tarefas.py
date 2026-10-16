@@ -19,6 +19,8 @@ import threading
 import time
 from pathlib import Path
 
+USA_IA_NUVEM = True  # o Claude roda na nuvem: desligado no modo privado
+
 _AGENTES = sorted(p.parent.name for p in (Path(__file__).resolve().parents[1] / "claude" / "skills").glob("*/SKILL.md"))
 
 FERRAMENTA = {
@@ -54,17 +56,20 @@ def _fala_atual(jarvis) -> str:
     return str(getattr(jarvis, "_current_input_transcript", "") or getattr(jarvis, "_last_input_transcript", "") or "")
 
 
-def _avisar(jarvis, texto: str) -> None:
+def _avisar(jarvis, texto: str, sigiloso: bool = False) -> None:
+    """sigiloso=True: o texto pode ter dados de clientes (o Claude lê clientes.txt, Faturas...),
+    então o Jarvis fala só com a voz do PC, sem mandar para o Gemini."""
+    extra = {"sigiloso": True} if sigiloso else {}
     anunciar = getattr(jarvis, "anunciar", None)
     if callable(anunciar):
-        anunciar(texto, "Claude")
+        anunciar(texto, "Claude", **extra)
         return
     ui = getattr(jarvis, "ui", None)
     if ui is not None:
         ui.write_log(f"SYS: 🤖 Claude: {texto}")
     falar = getattr(jarvis, "_falar_aviso", None)
     if callable(falar):
-        falar(texto)
+        falar(texto, **extra)
 
 
 def _log(jarvis, texto: str) -> None:
@@ -110,7 +115,7 @@ def _tarefa(args: dict, jarvis, chefe) -> str:
         if arquivo is not None:
             _log(jarvis, f"SYS: 🤖 Relatório do Claude salvo em {arquivo}")
             _abrir(arquivo)
-        _avisar(jarvis, fala + (" O relatório completo está aberto na tela." if arquivo else ""))
+        _avisar(jarvis, fala + (" O relatório completo está aberto na tela." if arquivo else ""), sigiloso=True)
 
     if _em_segundo_plano(jarvis, "ClaudeTarefa", trabalhar) is None:
         return "Claude is still working on the previous task. Tell the user to wait for it to finish."

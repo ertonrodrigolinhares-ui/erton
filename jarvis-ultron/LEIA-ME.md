@@ -116,14 +116,21 @@ Bom saber:
   alguns segundos.
 - Voz: a da Microsoft (internet) é mais natural, mas o texto da resposta passa por ela. Com
   `JARVIS_VOZ_PRIVADA=1` no `.env`, usa a voz do Windows e nada sai do PC.
-- Ferramentas que usam a internet (pesquisa, clima, sites) continuam usando a internet.
+- Ferramentas que usam a internet sem IA (clima, sites) continuam usando a internet. As que mandam
+  o pedido para uma IA na nuvem ficam **desligadas** no modo Gemma: pesquisa pelo Gemini, Hermes,
+  Claude, imagens, vídeos, resumo de vídeos do YouTube e agentes. Nesse modo o Jarvis também não
+  grava nada na memória (que depois iria para o Gemini).
+- Sem o Whisper local, a voz **não** vai para a internet: o Jarvis avisa e você digita. O instalador
+  só liga o Gemma quando o Whisper ficou pronto.
 
 ### Modo privado por voz (sem fechar o Jarvis)
 
 Com o Gemma 4 instalado, diga **"Jarvis, modo privado"**: o Jarvis troca o cérebro para o Gemma
 na hora (aparece o selo 🔒 MODO PRIVADO no alto da tela) e nada mais vai para a nuvem — nem para o
 Gemini, nem para o Claude. Use para falar de clientes. Para voltar: **"Jarvis, modo normal"** (ou
-"sair do modo privado"). A escolha fica gravada para a próxima vez que abrir.
+"sair do modo privado"), dito sozinho; uma frase com "não" ("não quero sair do modo privado") não
+troca nada. A escolha fica gravada para a próxima vez que abrir. Até o selo 🔒 aparecer, o microfone
+não manda nada para a nuvem; se a troca não der certo, o Jarvis avisa em voz alta.
 
 ## Claude como chefe de tarefas (pesquisas, relatórios, agentes e o próprio código)
 

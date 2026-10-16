@@ -19,6 +19,9 @@ e o autodiagnóstico (botão ✚) mostra o motivo.
 Um `.py` também pode trabalhar sozinho (sem você pedir) ou acrescentar algo na tela: basta ter a
 função `iniciar(jarvis)`, que roda quando o Jarvis abre.
 
+Se a automação manda o seu pedido para uma IA na nuvem (Gemini, Claude, Hermes...), ponha
+`USA_IA_NUVEM = True` no arquivo: no **modo privado** ela fica desligada.
+
 Arquivos terminados em `.exemplo` são só modelos e não são carregados.
 
 ## Automações que já vêm na pasta

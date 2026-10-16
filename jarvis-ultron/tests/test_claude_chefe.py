@@ -249,11 +249,12 @@ def _plugin():
 class JarvisFalso:
     def __init__(self, fala=""):
         self._current_input_transcript = self._last_input_transcript = fala
-        self.avisos, self.logs = [], []
+        self.avisos, self.logs, self.sigilosos = [], [], []
         self.ui = NS(write_log=self.logs.append)
 
-    def anunciar(self, texto, titulo="Lembrete"):
+    def anunciar(self, texto, titulo="Lembrete", sigiloso=False):
         self.avisos.append(texto)
+        self.sigilosos.append(sigiloso)
 
 
 def _esperar():
@@ -279,6 +280,8 @@ class FerramentaClaudeTests(Base):
         self.assertIn("background", r)
         _esperar()
         self.assertIn("Achei três mudanças importantes.", jarvis.avisos[0])
+        # o resultado pode ter dados de clientes: é falado só no PC, nunca mandado para o Gemini
+        self.assertEqual(jarvis.sigilosos[0], True)
         relatorios = list((chefe.pasta_trabalho() / "Relatorios").glob("*.md"))
         self.assertEqual(len(relatorios), 1)
         # continuar a conversa usa a mesma sessão
@@ -335,7 +338,9 @@ class FerramentaClaudeTests(Base):
     def test_carrega_como_ferramenta(self):
         from core.automacoes import carregar_ferramentas
 
-        self.assertIn("claude_task", carregar_ferramentas(RAIZ / "automacoes").ferramentas)
+        ferramentas = carregar_ferramentas(RAIZ / "automacoes").ferramentas
+        self.assertIn("claude_task", ferramentas)
+        self.assertTrue(ferramentas["claude_task"].usa_ia_nuvem)  # fica fora do modo privado
 
 
 def _permitidas_e_proibidas(argv):

@@ -10,6 +10,8 @@ Coloque o arquivo na pasta `automacoes` do Jarvis e abra o Jarvis de novo. Dois 
    trabalham sozinhas, como lembretes, ou que acrescentam algo na tela). Um arquivo pode ter só o
    `iniciar`, sem FERRAMENTA. Para mexer na tela, use `core.na_tela.executar(funcao)` e ponha
    `NA_TELA = True` no arquivo (assim o `iniciar` roda no programa da tela).
+   Se a ferramenta manda o pedido para uma IA na nuvem (Gemini, Claude, Hermes...), ponha
+   `USA_IA_NUVEM = True`: no modo privado ela não é oferecida ao Gemma nem roda.
 
 2. `nome.md`: um agente/habilidade para o Hermes (mesmo formato de SKILL.md, com
    `name:` no cabeçalho). O Jarvis copia para o perfil jarvis do Hermes ao abrir. Se o cabeçalho
@@ -38,6 +40,7 @@ class Automacao:
     declaracao: dict
     executar: Callable
     arquivo: Path
+    usa_ia_nuvem: bool = False  # USA_IA_NUVEM = True no arquivo: fica desligada no modo privado
 
 
 @dataclass
@@ -91,7 +94,8 @@ def carregar_ferramentas(pasta: Path | None = None, reservados: set[str] | None 
             if not str(declaracao.get("description", "")).strip():
                 raise ValueError("falta a descrição (description)")
             declaracao.setdefault("parameters", {"type": "OBJECT", "properties": {}})
-            carga.ferramentas[nome] = Automacao(nome, declaracao, executar, arquivo)
+            carga.ferramentas[nome] = Automacao(nome, declaracao, executar, arquivo,
+                                                bool(getattr(modulo, "USA_IA_NUVEM", False)))
             if iniciar is not None:
                 carga.inicios.append((arquivo.name, iniciar))
         except Exception as erro:
