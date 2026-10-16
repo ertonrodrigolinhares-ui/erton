@@ -338,6 +338,7 @@ class PonteTelaSemCerebroTests(unittest.TestCase):
         return recebidas
 
     def test_pedidos_enquanto_o_cerebro_religa_sao_entregues_quando_ele_conecta(self):
+        self.p._ja_conectou = True  # o cérebro já funcionou antes: é uma religada
         self.tela.on_text_command("que horas são?")
         self.p.jarvis.rodar_automacao_ultron("pc_protection", {})
         self.tela.on_quit_requested()  # fechar nunca fica guardado
@@ -385,6 +386,116 @@ class PonteTelaSemCerebroTests(unittest.TestCase):
         self.p.jarvis.atualizar({"modo_reserva": False, "conectado": True, "cerebro": "gemini"})
         self.p._falhou("o cérebro não respondeu a tempo")
         self.assertEqual(self._texto_voz(), ("Cérebro parado — feche e abra o Jarvis", False))
+
+    def test_na_primeira_abertura_sem_cerebro_o_pedido_vai_para_o_cerebro_local(self):
+        self.p.ao_falhar = lambda: None  # (main.py abre o cérebro local num fio)
+        self.tela.on_text_command("oi, Jarvis")
+        self.tela.on_voice_change("Kore")
+        self.p.jarvis.rodar_automacao_ultron("pc_protection", {})
+        avisos = [l for l in self.tela.logs if "entrego" in l]
+        self.assertEqual(len(avisos), 1)
+        self.assertIn("abrindo", avisos[0])  # ainda não conectou nenhuma vez: não é "religando"
+        self.p._falhou("o cérebro não respondeu a tempo")  # volta ao modo de um programa só
+        self.assertFalse(any(l.startswith("ERR:") for l in self.tela.logs), self.tela.logs)
+        # o cérebro local registra as funções dele e, no fim, rodar_cerebro chama ligar_jarvis
+        recebidos = []
+        self.tela.on_text_command = lambda t: recebidos.append(("texto", t))
+        self.tela.on_voice_change = lambda v: recebidos.append(("voz", v))
+        self.tela.ligar_jarvis(NS(rodar_automacao_ultron=lambda n, a: recebidos.append(("ultron", n))))
+        self.assertTrue(_esperar(lambda: len(recebidos) == 3), recebidos)
+        self.assertEqual(recebidos, [("texto", "oi, Jarvis"), ("voz", "Kore"), ("ultron", "pc_protection")])
+        self.assertFalse(hasattr(self.tela, "ligar_jarvis"))  # uma vez só
+        self.assertEqual(list(self.p._pendentes), [])
+
+    def test_quando_a_tela_desiste_avisa_que_o_guardado_nao_foi_entregue(self):
+        self.p._ja_conectou = True
+        self.tela.on_text_command("oi")
+        self.p._falhou("o cérebro não respondeu a tempo")
+        erros = [l for l in self.tela.logs if l.startswith("ERR:")]
+        self.assertEqual(len(erros), 1)
+        self.assertIn("não foi entregue", erros[0])
+        self.assertEqual(list(self.p._pendentes), [])
+
+    def test_quando_o_cerebro_cai_varias_vezes_avisa_que_o_guardado_nao_foi_entregue(self):
+        self.p._ja_conectou = True
+        self.p._cerebro_caiu(1)
+        self.tela.on_text_command("oi")  # religando: fica guardado
+        for _ in range(ponte.MAX_RELIGADAS):
+            self.p._cerebro_caiu(1)
+        self.assertIsNone(self.p._processo)
+        self.assertIn("não foi entregue", self.tela.logs[-1])
+        self.assertEqual(list(self.p._pendentes), [])
+
+
+class TextoAntesDoGeminiConectarTests(unittest.TestCase):
+    """O cérebro acabou de abrir (ou a tela entregou o que guardou) e o Gemini ainda não conectou."""
+
+    def _jarvis(self):
+        import main
+
+        jarvis = object.__new__(main.JarvisLive)
+        logs = []
+        jarvis.ui = NS(logs=logs, write_log=logs.append, set_state=lambda estado: None)
+        jarvis.session, jarvis._loop, jarvis._reserva, jarvis._modo_reserva = None, None, None, False
+        jarvis.cloud_safe, jarvis.external_audio, jarvis._api_key = True, True, "chave-de-teste"
+        jarvis.runtime_limit_seconds, jarvis.required_unlock_path = None, None
+        jarvis._falhas_seguidas = 0
+        jarvis._shutdown_requested = threading.Event()
+        return jarvis
+
+    def _rodar_ate_mandar(self, jarvis, quantos):
+        """Roda o run() com um Gemini falso; devolve os textos que chegaram à sessão."""
+        import contextlib
+        import asyncio
+        import main
+
+        enviados, conexoes = [], []
+
+        class Sessao:
+            async def send_client_content(self, turns, turn_complete):
+                enviados.append(turns["parts"][0]["text"])
+                if len(enviados) >= quantos:
+                    jarvis._shutdown_requested.set()
+
+        @contextlib.asynccontextmanager
+        async def conectar(model, config):
+            conexoes.append(model)
+            if len(conexoes) > 1:  # não mandou o que devia: encerra em vez de travar o teste
+                jarvis._shutdown_requested.set()
+                raise RuntimeError("segunda conexão")
+            yield Sessao()
+
+        async def nada():
+            return None
+
+        jarvis._build_config = lambda modelo: None
+        jarvis._send_realtime = jarvis._receive_audio = jarvis._play_audio = nada
+        cliente = NS(aio=NS(live=NS(connect=conectar)))
+        with patch.object(main.genai, "Client", return_value=cliente), \
+                patch.object(main, "pick_live_model", return_value="models/voz-teste"), \
+                patch("core.modelos.resolver", side_effect=lambda pedido: pedido):
+            asyncio.run(jarvis.run())
+        return enviados
+
+    def test_texto_antes_de_conectar_fica_guardado_e_vai_quando_conecta(self):
+        jarvis = self._jarvis()
+        with patch.dict(os.environ):
+            for nome in ("JARVIS_CEREBRO", "JARVIS_SEM_GEMINI"):
+                os.environ.pop(nome, None)
+            jarvis._on_text_command("que horas são?")  # antes: sumia calado (sem log, sem nada)
+            jarvis._on_text_command("e o tempo amanhã?")
+            self.assertEqual(sum("conectando ao Gemini" in l for l in jarvis.ui.logs), 1, jarvis.ui.logs)
+            enviados = self._rodar_ate_mandar(jarvis, 2)
+        # na ordem, e sem a saudação na frente (o Erton já pediu algo)
+        self.assertEqual(enviados, ["que horas são?", "e o tempo amanhã?"])
+        self.assertEqual(jarvis._textos_esperando, [])
+
+    def test_no_modo_privado_sem_gemma_o_texto_nao_fica_guardado_para_a_nuvem(self):
+        jarvis = self._jarvis()
+        with patch.dict(os.environ, {"JARVIS_CEREBRO": "gemma"}):
+            jarvis._on_text_command("dados do cliente")
+        self.assertEqual(getattr(jarvis, "_textos_esperando", []), [])
+        self.assertTrue(any("não vai para a nuvem" in l for l in jarvis.ui.logs), jarvis.ui.logs)
 
 
 class PonteDeVerdadeTests(unittest.TestCase):

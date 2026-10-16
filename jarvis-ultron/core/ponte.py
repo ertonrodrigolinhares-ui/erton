@@ -454,7 +454,7 @@ class PonteTela:
             self._processo = None
             self.jarvis.parado = True
             self.ui.write_log("ERR: O cérebro do Jarvis parou várias vezes. Feche e abra o Jarvis "
-                              "(ou rode o autodiagnóstico).")
+                              f"(ou rode o autodiagnóstico).{self._sem_entregar()}")
             return
         self._religadas.append(agora)
         self.ui.write_log(f"SYS: O cérebro do Jarvis parou (código {codigo}). Religando...")
@@ -467,14 +467,49 @@ class PonteTela:
         if self._ja_conectou:
             # já funcionou antes (é uma religada): não troca de modo no meio do uso
             self.jarvis.parado = True
-            self.ui.write_log(f"ERR: Não consegui religar o cérebro: {motivo}. Feche e abra o Jarvis.")
+            self.ui.write_log(f"ERR: Não consegui religar o cérebro: {motivo}. Feche e abra o Jarvis."
+                              f"{self._sem_entregar()}")
             return
         print(f"[Ponte] {motivo}. Voltando ao modo de um programa só.")
         self._relogio.stop()
         for nome in CHAMADAS_DO_CEREBRO:  # o cérebro local registra as dele
             setattr(self.ui, nome, None)
+        # o que o usuário pediu enquanto a tela esperava o cérebro vai para o cérebro local:
+        # rodar_cerebro chama ligar_jarvis depois de registrar as funções dele
+        self.ui.ligar_jarvis = self._entregar_ao_cerebro_local
         if callable(self.ao_falhar):
             self.ao_falhar()
+
+    def _entregar_ao_cerebro_local(self, jarvis) -> None:
+        """Modo de um programa só (o cérebro separado não abriu): entrega ao cérebro local, na ordem,
+        o que ficou guardado em _pendentes. Chamado uma vez, por rodar_cerebro."""
+        try:
+            del self.ui.ligar_jarvis
+        except AttributeError:
+            pass
+        with self._trava_envio:
+            pendentes = list(self._pendentes)
+            self._pendentes.clear()
+
+        def entregar():
+            for tipo, nome, args in pendentes:
+                if tipo == "rodar_ultron":
+                    _sem_derrubar(jarvis.rodar_automacao_ultron, (nome, args))
+                    continue
+                funcao = getattr(self.ui, nome, None)
+                if callable(funcao):
+                    _sem_derrubar(funcao, tuple(args))
+
+        if pendentes:  # em outro fio: responder pode demorar e o cérebro precisa seguir abrindo
+            threading.Thread(target=entregar, daemon=True, name="PontePendentes").start()
+
+    def _sem_entregar(self) -> str:
+        """A tela desistiu do cérebro: o que estava guardado não tem mais para quem ir. Limpa e
+        devolve o aviso para o fim da mensagem de erro (nada some calado)."""
+        with self._trava_envio:
+            havia = bool(self._pendentes)
+            self._pendentes.clear()
+        return " O que você pediu enquanto ele religava não foi entregue; repita depois." if havia else ""
 
     def _fim_do_teste(self) -> None:
         """O cérebro saiu com SAIDA_FIM_DO_TESTE: fecha o Jarvis inteiro (não religa)."""
@@ -531,9 +566,12 @@ class PonteTela:
             avisar = not parado and len(self._pendentes) == 1
         if parado:
             self.ui.write_log("ERR: O cérebro do Jarvis está parado. Feche e abra o Jarvis.")
-        elif avisar:
+        elif avisar and self._ja_conectou:
             self.ui.write_log("SYS: O cérebro do Jarvis está religando; entrego o seu pedido assim que "
                               "ele voltar.")
+        elif avisar:  # primeira abertura: o cérebro ainda não conectou nenhuma vez
+            self.ui.write_log("SYS: O cérebro do Jarvis ainda está abrindo; entrego o seu pedido assim "
+                              "que ele ficar pronto.")
 
     def _repassar(self, nome):
         def repassar(*args):

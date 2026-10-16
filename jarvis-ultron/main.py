@@ -1360,6 +1360,8 @@ class JarvisLive:
         # optional path that must exist (e.g. a mounted encrypted volume)
         self.required_unlock_path: str | None = None
         self.required_unlock_secret: str | None = None
+        self._textos_trava = threading.Lock()  # texto digitado antes de o Gemini conectar
+        self._textos_esperando = []
         self.ui.on_text_command = self._on_text_command
         self._voice_changed  = threading.Event()
         self._turn_done_event: asyncio.Event | None = None
@@ -1445,7 +1447,9 @@ class JarvisLive:
                     self._last_input_transcript_at = time.monotonic()
                     self._nova_fala(texto)
                 threading.Thread(target=self._responder_pela_reserva, args=(text,), daemon=True).start()
-            return
+                return
+            if not str(text or "").strip() or self._guardar_ate_conectar(text):
+                return
         asyncio.run_coroutine_threadsafe(self.send_text(text), self._loop)
 
     def _nova_fala(self, texto: str, em_pedacos: bool = False) -> int:
@@ -1455,6 +1459,41 @@ class JarvisLive:
         from core.aprovacao import nova_fala
 
         return nova_fala(self, texto, em_pedacos)
+
+    def _trava_textos(self):
+        if not hasattr(self, "_textos_trava"):
+            self._textos_trava = threading.Lock()
+            self._textos_esperando = []
+        return self._textos_trava
+
+    def _guardar_ate_conectar(self, text: str) -> bool:
+        """Jarvis Ultron: texto que chegou antes de o Gemini conectar e sem reserva (o cérebro acabou
+        de abrir, ou a tela entregou o que ficou guardado enquanto ele religava). Guarda (até 20) e
+        run() manda assim que a sessão abrir: nada some calado. False se a sessão abriu agora mesmo."""
+        from core.cerebro_gemma import cerebro_gemma
+
+        if cerebro_gemma():  # modo privado sem o Gemma pronto: o pedido não vai para a nuvem depois
+            self.ui.write_log("SYS: O Gemma 4 ainda não está pronto; no modo privado o seu pedido não vai "
+                              "para a nuvem. Repita daqui a pouco.")
+            return True
+        with self._trava_textos():
+            if self._loop and self.session:
+                return False
+            if len(self._textos_esperando) >= 20:
+                return True
+            self._textos_esperando.append(str(text))
+            primeiro = len(self._textos_esperando) == 1
+        if primeiro:
+            self.ui.write_log("SYS: Ainda estou conectando ao Gemini; respondo assim que conectar.")
+        return True
+
+    async def _mandar_textos_esperando(self, textos) -> None:
+        """Jarvis Ultron: manda ao Gemini, na ordem, o que foi digitado antes de ele conectar."""
+        for texto in textos:
+            try:
+                await self.send_text(texto)
+            except Exception as erro:
+                print(f"[JARVIS] ⚠️ Texto guardado não foi enviado: {erro}")
 
     async def send_text(self, text: str) -> bool:
         """Send a text turn from either the desktop callback or a web client."""
@@ -3032,6 +3071,11 @@ class JarvisLive:
                     self.audio_in_queue = asyncio.Queue()
                     self.out_queue      = asyncio.Queue(maxsize=10)
                     self._turn_done_event = asyncio.Event()
+                    # Jarvis Ultron: o que foi digitado antes de conectar (_guardar_ate_conectar)
+                    with self._trava_textos():
+                        esperando, self._textos_esperando = self._textos_esperando, []
+                    if esperando:
+                        self._ja_cumprimentou = True  # o Erton já pediu algo: responde isso, sem saudação
 
                     print("[JARVIS] ✅ Connected.")
                     conectou = True
@@ -3056,6 +3100,8 @@ class JarvisLive:
                     tg.create_task(self._receive_audio())
                     tg.create_task(self._play_audio())
                     tg.create_task(self._announce_startup())
+                    if esperando:
+                        tg.create_task(self._mandar_textos_esperando(esperando))
 
             except Exception as e:
                 if self._shutdown_requested.is_set():
@@ -3255,7 +3301,8 @@ def rodar_cerebro(ui):
     ligar = getattr(ui, "ligar_jarvis", None)
     if callable(ligar):  # cérebro em programa próprio: manda o estado dele para os painéis da tela
         # Só agora, com a troca de voz/TTS já ligada: o que o usuário mudou na tela enquanto o
-        # cérebro abria é entregue aqui (e vale por cima do padrão do ElevenLabs acima).
+        # cérebro abria é entregue aqui (e vale por cima do padrão do ElevenLabs acima). Num programa
+        # só, depois de o cérebro separado não abrir, a ponte da tela entrega aqui o que ficou guardado.
         ligar(jarvis)
     try:
         asyncio.run(jarvis.run())
