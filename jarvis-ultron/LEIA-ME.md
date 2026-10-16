@@ -118,6 +118,69 @@ Bom saber:
   `JARVIS_VOZ_PRIVADA=1` no `.env`, usa a voz do Windows e nada sai do PC.
 - Ferramentas que usam a internet (pesquisa, clima, sites) continuam usando a internet.
 
+### Modo privado por voz (sem fechar o Jarvis)
+
+Com o Gemma 4 instalado, diga **"Jarvis, modo privado"**: o Jarvis troca o cérebro para o Gemma
+na hora (aparece o selo 🔒 MODO PRIVADO no alto da tela) e nada mais vai para a nuvem — nem para o
+Gemini, nem para o Claude. Use para falar de clientes. Para voltar: **"Jarvis, modo normal"** (ou
+"sair do modo privado"). A escolha fica gravada para a próxima vez que abrir.
+
+## Claude como chefe de tarefas (pesquisas, relatórios, agentes e o próprio código)
+
+O Gemini continua sendo a **voz** do Jarvis. Quando o pedido é grande, o Jarvis entrega para o
+**Claude Code** rodando no seu PC, com a sua assinatura do Claude (Pro ou Max), sem chave de API.
+
+1. Dê dois cliques em **"Instalar Claude"**. Ele instala o Claude Code (instalador oficial, sem
+   administrador), prepara a pasta `Documentos\Jarvis Ultron\Claude` com os 22 agentes e abre o
+   Claude para você **entrar com a sua conta** (no fim, digite `/exit`).
+2. Reabra o Jarvis e peça, por exemplo:
+   - "Jarvis, pede para o Claude pesquisar as novidades da reforma tributária para holdings."
+   - "Jarvis, manda o Claude analisar a planilha que deixei na pasta Entrada."
+   - "Jarvis, usa o agente proposta-comercial para o grupo tal."
+   - "Jarvis, e sobre o ITCMD?" (continua a mesma pesquisa)
+
+O Claude trabalha em segundo plano (dá para continuar conversando). Quando termina, o Jarvis fala
+o resumo e abre o relatório completo (fica em `Claude\Relatorios`).
+
+**Mudar o código do Jarvis**: "Jarvis, pede para o Claude mudar o seu código para ...".
+1. O Claude **só lê e faz um plano** (ele não tem permissão para editar nessa hora).
+2. O Jarvis conta o plano e espera o seu **"ok, pode fazer"** (conferido no código, numa fala sua
+   depois do plano; um "pode fazer" dito junto com o pedido não vale).
+3. O Jarvis faz um **backup** (`Documentos\Jarvis Ultron\Backups`), roda os testes, o Claude
+   aplica, e o Jarvis confere a escrita do código e roda os testes de novo.
+4. Se algo quebrar, o Jarvis **desfaz sozinho**, arquivo por arquivo. As mudanças valem quando
+   você reabrir o Jarvis. O registro de cada mudança fica em `Claude\Mudancas`.
+
+Travas (no código, conferidas com o Claude Code de verdade):
+- O Claude só **escreve** em `Documentos\Jarvis Ultron\Claude` e só **lê** a pasta
+  `Documentos\Jarvis Ultron` (clientes.txt, carteira.txt, Faturas...).
+- Não roda comandos no PC e não usa conectores (Gmail, Agenda, Metricool, Meta): **não consegue
+  publicar, enviar, comprar nem apagar nada**. Publicar continua com o Hermes, com o seu "ok".
+- Nunca lê o `.env`, as chaves, a memória do Jarvis nem as suas senhas.
+- No **modo privado** nada vai para o Claude.
+- Se existir `ANTHROPIC_API_KEY` no Windows, o Jarvis a tira quando chama o Claude (com ela o
+  Claude cobraria pela API em vez de usar a sua assinatura).
+
+Bom saber:
+- O uso conta no limite do seu plano do Claude; se acabar, o Jarvis avisa quando ele volta.
+- Privacidade: em claude.ai → Configurações → Privacidade, desligue "Ajudar a melhorar o Claude"
+  se não quiser que as conversas sejam usadas para treinar modelos. Para dados sensíveis de
+  clientes, prefira o modo privado (Gemma 4).
+- Uso pessoal: o Jarvis usa o Claude Code que **você** instalou, com a **sua** conta. Não
+  distribua o Jarvis para outras pessoas usarem as contas delas por ele.
+- Os agentes que publicam ou usam o navegador sozinhos (anúncios, Geekie, painéis, publicar
+  aprovados) continuam no Hermes.
+
+## Vídeos com IA (Google Veo)
+
+"Jarvis, faz um vídeo de 8 segundos de um triatleta cruzando a linha de chegada no Havaí" (ou
+"vertical para o Instagram"). O Jarvis **diz o preço antes** (mais ou menos US$ 0,96 / R$ 5 por um
+vídeo de 8 segundos na qualidade padrão) e só faz com o seu **"ok, pode fazer"** dito depois de
+ouvir o preço. O vídeo fica pronto em 1 a alguns minutos, em segundo plano; ele salva em
+`Documentos\Jarvis Ultron\Videos`, abre e avisa. Qualidades: econômico, rápido (padrão) e máximo.
+Precisa da chave do Gemini com **faturamento ativado** no Google (o Veo não tem uso grátis). O
+preço falado é uma estimativa; o valor certo é o da sua conta do Google Cloud.
+
 ## Chave do Gemini que começa com "AQ." (conversa natural)
 
 Desde 2026 o Google AI Studio só cria chaves que começam com **"AQ."**, e para muitas contas o
