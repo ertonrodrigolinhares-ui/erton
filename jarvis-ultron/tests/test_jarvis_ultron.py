@@ -1119,6 +1119,8 @@ class EnvArquivoTests(unittest.TestCase):
         raiz = Path(__file__).resolve().parents[1]
         for nome in ("gemma/instalar_gemma.ps1", "gemma/voltar_gemini.ps1", "claude/instalar_claude.ps1"):
             texto = (raiz / nome).read_bytes().decode("ascii")  # o PowerShell 5.1 lê sem BOM como ANSI
+            # no Windows o git (core.autocrlf=true) entrega os .ps1 com CRLF: a conferência não depende disso
+            texto = texto.replace("\r\n", "\n")
             self.assertNotIn("ReadAllLines", texto, nome)
             self.assertIn("function Ler-Linhas-Env", texto, nome)
             self.assertIn("New-Object System.Text.UTF8Encoding $false, $true", texto, nome)  # UTF-8 estrito
