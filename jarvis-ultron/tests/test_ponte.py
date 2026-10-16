@@ -119,6 +119,19 @@ class UIRemotaTests(unittest.TestCase):
         self.lado_tela.send(("rodar_ultron", "pc_protection", {}))
         self.assertTrue(_esperar(lambda: feitos == [("pc_protection", {})]))
 
+    def test_botao_do_ultron_antes_do_cerebro_ficar_pronto_nao_se_perde(self):
+        feitos = []
+        self.ui.iniciar()
+        self._proxima()
+        self.lado_tela.send(("rodar_ultron", "pc_protection", {}))
+        aviso = self._proxima()  # a tela fica sabendo que vai rodar quando o cérebro abrir
+        self.assertEqual(aviso[:2], ("chamar", "write_log"))
+        self.assertIn("pc_protection", aviso[2][0])
+        self.assertEqual(feitos, [])
+        self.ui.ligar_jarvis(NS(_modo_reserva=False, session=None, _reserva=None,
+                                rodar_automacao_ultron=lambda n, a: feitos.append((n, a))))
+        self.assertTrue(_esperar(lambda: feitos == [("pc_protection", {})]))
+
     def test_estado_do_cerebro_vai_para_a_tela(self):
         self.ui.ligar_jarvis(NS(_modo_reserva=True, session=None, _reserva=None))
         mensagens = []
@@ -164,7 +177,7 @@ class AutomacoesDeTelaTests(unittest.TestCase):
 
     def test_jarvis_na_tela_manda_botao_pela_ponte(self):
         enviados = []
-        jarvis = JarvisNaTela(ui=None, ponte=NS(enviar=enviados.append))
+        jarvis = JarvisNaTela(ui=None, ponte=NS(entregar=enviados.append))
         jarvis.rodar_automacao_ultron("wifi_watch", {"action": "both"})
         self.assertEqual(enviados, [("rodar_ultron", "wifi_watch", {"action": "both"})])
         jarvis.atualizar({"modo_reserva": False, "conectado": True, "cerebro": "gemma"})
@@ -173,22 +186,81 @@ class AutomacoesDeTelaTests(unittest.TestCase):
         spec = util.spec_from_file_location("ps", RAIZ / "automacoes" / "painel_stark.py")
         mod = util.module_from_spec(spec); spec.loader.exec_module(mod)
         self.assertEqual(mod.texto_voz(jarvis), ("Cérebro: Gemma 4 (no PC)", True))
+        jarvis.parado = True  # a tela desistiu de religar o cérebro: nada de verde
+        self.assertEqual(mod.texto_voz(jarvis), ("Cérebro parado — feche e abra o Jarvis", False))
+        jarvis.atualizar({"modo_reserva": False, "conectado": True, "cerebro": "gemini"})
+        self.assertEqual(mod.texto_voz(jarvis), ("Voz: Gemini ao vivo", True))
+
+
+class RodarCerebroTests(unittest.TestCase):
+    def test_voz_trocada_enquanto_o_cerebro_abria_chega_ao_cerebro(self):
+        import main
+
+        lado_cerebro, lado_tela = Pipe()
+        ui = UIRemota(lado_cerebro)
+        ui._pronto.set()
+        # o usuário trocou a voz e o TTS na tela antes de o cérebro ficar pronto
+        ui._tratar(("chamada", "on_voice_change", ("Kore",)))
+        ui._tratar(("chamada", "on_tts_provider_change", ("gemini", "", "Puck")))
+        vozes = []
+
+        class JarvisFalso:
+            def __init__(self, tela, voz):
+                self.ui, self.session, self._loop, self._modo_reserva, self._reserva = tela, None, None, False, None
+
+            def update_voice(self, voz):
+                vozes.append(voz)
+
+            def request_shutdown(self):
+                pass
+
+            async def run(self):
+                pass
+
+        sem = ("JARVIS_TRIAL_KEYWORD", "JARVIS_LOCKED_KEY_SECRET", "JARVIS_LOCKED_VOLUME", "ELEVENLABS_API_KEY")
+        try:
+            with patch.object(main, "JarvisLive", JarvisFalso), \
+                    patch.object(main, "_load_voice_name", return_value="Charon"), patch.dict(os.environ):
+                for nome in sem:
+                    os.environ.pop(nome, None)
+                main.rodar_cerebro(ui)
+            self.assertTrue(_esperar(lambda: sorted(vozes) == ["Kore", "Puck"]), vozes)
+        finally:
+            ui._fechada.set()
+            lado_tela.close()
+
+    def test_fim_do_tempo_de_teste_usa_o_codigo_proprio_no_cerebro_separado(self):
+        import main
+
+        jarvis = object.__new__(main.JarvisLive)
+        jarvis.runtime_limit_seconds = 3600
+        with patch.object(main.jarvis_status, "write_status"), patch.object(main.os, "_exit") as sair:
+            jarvis.ui = NS(remota=True)  # cérebro em programa próprio
+            jarvis._encerrar_fim_do_teste()
+            jarvis.ui = NS()  # programa único: sai sem "erro" para o .bat
+            jarvis._encerrar_fim_do_teste()
+        self.assertEqual([c.args for c in sair.call_args_list], [(ponte.SAIDA_FIM_DO_TESTE,), (0,)])
 
 
 CEREBRO_FALSO = textwrap.dedent("""
     import os, sys, time
     from multiprocessing.connection import Client
+    modo = sys.argv[1]
+    if modo == "devagar":
+        time.sleep(1.5)  # dá tempo de outro programa bater na porta antes do cérebro
     c = Client(("127.0.0.1", int(os.environ["JARVIS_PONTE_PORTA"])),
                authkey=bytes.fromhex(os.environ["JARVIS_PONTE_CHAVE"]))
     c.send(("ola", os.getpid()))
     c.send(("chamar", "write_log", ("SYS: cérebro falso no ar",), {}))
-    modo = sys.argv[1]
     c.send(("chamar", "write_log", ("SYS: nasci com cerebro=" + os.environ.get("JARVIS_CEREBRO", "?"),), {}))
     if modo == "troca" and os.environ.get("JARVIS_CEREBRO") != "gemma":
         c.send(("trocar_cerebro", "gemma"))
     if modo == "cai":
         time.sleep(0.3)
         sys.exit(7)
+    if modo == "fim":
+        time.sleep(0.3)
+        sys.exit(int(os.environ["CODIGO_FIM"]))
     while True:
         try:
             m = c.recv()
@@ -208,7 +280,7 @@ CEREBRO_FALSO = textwrap.dedent("""
 
 class TelaFalsa:
     def __init__(self):
-        self.logs, self.estados, self.volumes = [], [], []
+        self.logs, self.estados, self.volumes, self.comandos = [], [], [], []
         self.muted = False
         self.current_file = None
         self._win = NS(_ready=True)
@@ -223,6 +295,96 @@ class TelaFalsa:
 
     def set_voice_level(self, nivel):
         self.volumes.append(nivel)
+
+    def handle_ui_command(self, acao):
+        self.comandos.append(acao)
+
+
+class PonteTelaSemCerebroTests(unittest.TestCase):
+    """A ponte da tela enquanto o cérebro abre, religa ou desiste (sem programa de verdade)."""
+
+    @classmethod
+    def setUpClass(cls):
+        from PyQt6.QtWidgets import QApplication
+        cls.app = QApplication.instance() or QApplication([])
+
+    def setUp(self):
+        self.tela = TelaFalsa()
+        self.p = PonteTela(self.tela, comando=["nao-roda"], pasta=RAIZ)
+        self.p._relogio.stop()  # aqui o teste faz o papel do relógio
+        self.p.iniciar = lambda: None  # "religar" não abre programa nenhum
+        self.p._processo = NS(poll=lambda: None, returncode=None, pid=1)  # cérebro abrindo
+        self.canais = []
+
+    def tearDown(self):
+        self.p._processo = None
+        self.p.encerrar()
+        for canal in self.canais:
+            canal.close()
+
+    def _conectar(self):
+        """O cérebro novo conecta: devolve o lado do cérebro do canal."""
+        lado_cerebro, lado_tela = Pipe()
+        self.canais += [lado_cerebro, lado_tela]
+        ouvinte = NS(accept=lambda: lado_tela)
+        self.p._ouvinte = ouvinte
+        self.p._aceitar(ouvinte)
+        return lado_cerebro
+
+    def _recebidas(self, canal):
+        recebidas = []
+        while canal.poll(0.3):
+            recebidas.append(canal.recv())
+        return recebidas
+
+    def test_pedidos_enquanto_o_cerebro_religa_sao_entregues_quando_ele_conecta(self):
+        self.tela.on_text_command("que horas são?")
+        self.p.jarvis.rodar_automacao_ultron("pc_protection", {})
+        self.tela.on_quit_requested()  # fechar nunca fica guardado
+        self.assertEqual(sum("religando" in l for l in self.tela.logs), 1)  # avisa uma vez, não some calado
+        cerebro = self._conectar()
+        self.assertEqual(self._recebidas(cerebro), [("chamada", "on_text_command", ("que horas são?",)),
+                                                    ("rodar_ultron", "pc_protection", {})])
+        self.tela.on_text_command("e agora?")  # conectado: vai direto
+        self.assertEqual(self._recebidas(cerebro), [("chamada", "on_text_command", ("e agora?",))])
+
+    def test_na_troca_de_cerebro_o_pedido_vai_para_o_novo(self):
+        antigo = self._conectar()
+        self.p._religando_desde = time.monotonic()  # pediu "modo privado": o antigo está saindo
+        self.tela.on_text_command("pergunta depois do modo privado")
+        self.assertEqual(self._recebidas(antigo), [])
+        self.p._religando_desde = None
+        self.p._fechar_conexao()
+        novo = self._conectar()
+        self.assertEqual(self._recebidas(novo),
+                         [("chamada", "on_text_command", ("pergunta depois do modo privado",))])
+
+    def test_cerebro_parado_avisa_em_vez_de_sumir_com_o_pedido(self):
+        self.p._processo = None  # a tela desistiu de religar
+        self.tela.on_text_command("oi")
+        self.assertTrue(any(l.startswith("ERR:") and "Feche e abra" in l for l in self.tela.logs))
+        self.assertEqual(list(self.p._pendentes), [])
+
+    def _texto_voz(self):
+        from importlib import util
+        spec = util.spec_from_file_location("ps", RAIZ / "automacoes" / "painel_stark.py")
+        mod = util.module_from_spec(spec); spec.loader.exec_module(mod)
+        return mod.texto_voz(self.p.jarvis)
+
+    def test_painel_nao_fica_verde_com_o_cerebro_caido(self):
+        self.p.jarvis.atualizar({"modo_reserva": False, "conectado": True, "cerebro": "gemma"})
+        self.p._cerebro_caiu(1)  # religando: "conectando...", não "Gemma 4" em verde
+        self.assertEqual(self._texto_voz(), ("Voz: conectando...", False))
+        for _ in range(ponte.MAX_RELIGADAS):
+            self.p._cerebro_caiu(1)
+        self.assertIsNone(self.p._processo)  # desistiu
+        self.assertEqual(self._texto_voz(), ("Cérebro parado — feche e abra o Jarvis", False))
+
+    def test_painel_mostra_parado_quando_a_religada_falha(self):
+        self.p._ja_conectou = True
+        self.p.jarvis.atualizar({"modo_reserva": False, "conectado": True, "cerebro": "gemini"})
+        self.p._falhou("o cérebro não respondeu a tempo")
+        self.assertEqual(self._texto_voz(), ("Cérebro parado — feche e abra o Jarvis", False))
 
 
 class PonteDeVerdadeTests(unittest.TestCase):
@@ -270,6 +432,30 @@ class PonteDeVerdadeTests(unittest.TestCase):
         self.assertTrue(_esperar(lambda: any("parou várias vezes" in l for l in tela.logs), 40, self.app),
                         tela.logs)
         self.assertEqual(sum("Religando" in l for l in tela.logs), ponte.MAX_RELIGADAS)
+        p.encerrar()
+
+    def test_conexao_estranha_na_porta_nao_trava_o_cerebro(self):
+        import socket
+        from multiprocessing import AuthenticationError
+        from multiprocessing.connection import Client
+
+        tela, p = self._ponte("devagar")
+        p.iniciar()
+        endereco = ("127.0.0.1", p._ouvinte.address[1])
+        with self.assertRaises(AuthenticationError):
+            Client(endereco, authkey=b"senha-errada")  # outro programa, sem a senha
+        socket.create_connection(endereco, timeout=2).close()  # abre e fecha
+        self.assertTrue(_esperar(lambda: "SYS: cérebro falso no ar" in tela.logs, 20, self.app), tela.logs)
+        p.encerrar()
+
+    def test_fim_do_tempo_de_teste_fecha_o_jarvis_sem_religar(self):
+        tela, p = self._ponte("fim")
+        with patch.dict(os.environ, {"CODIGO_FIM": str(ponte.SAIDA_FIM_DO_TESTE)}):
+            p.iniciar()
+        self.assertTrue(_esperar(lambda: tela.comandos == ["quit jarvis"], 20, self.app), tela.logs)
+        _esperar(lambda: False, 0.6, self.app)
+        self.assertIsNone(p._processo)
+        self.assertFalse(any("Religando" in l for l in tela.logs), tela.logs)
         p.encerrar()
 
     def test_sem_cerebro_volta_ao_modo_de_um_programa(self):

@@ -54,6 +54,10 @@ PREFIXOS_AMBIENTE = ("GEMINI_", "JARVIS_", "GROQ_", "ELEVENLABS_", "HERMES_", "O
 INTERVALO_VOLUME = 0.025      # no máximo 40 avisos de volume da voz por segundo
 ESPERA_CONEXAO = 90           # segundos para o cérebro abrir e se conectar (1ª vez é mais lenta)
 MAX_RELIGADAS = 3             # religadas automáticas a cada 5 minutos
+MAX_GUARDADAS = 20            # pedidos do usuário guardados enquanto o cérebro abre ou religa
+# O cérebro saiu de propósito (acabou o tempo de teste, JARVIS_TRIAL_KEYWORD): a tela fecha o
+# Jarvis inteiro, como no programa único, em vez de religar o cérebro com um tempo novo.
+SAIDA_FIM_DO_TESTE = 75
 
 
 def modo_separado() -> bool:
@@ -87,7 +91,7 @@ class UIRemota:
         self._current_file = None
         self._ultimo_volume = 0.0
         self._jarvis = None
-        self._guardadas = []  # chamadas da tela que chegaram antes de o cérebro ficar pronto
+        self._guardadas = []  # pedidos da tela (texto, botões do Ultron) antes de o cérebro ficar pronto
         self._trava_guardadas = threading.Lock()
         self.on_text_command = None
         self.on_voice_change = None
@@ -170,8 +174,11 @@ class UIRemota:
         self._jarvis = jarvis
         with self._trava_guardadas:
             guardadas, self._guardadas = self._guardadas, None
-        for nome, args in guardadas or ():
-            self._chamar(nome, args)
+        for tipo, nome, args in guardadas or ():
+            if tipo == "rodar_ultron":
+                _sem_derrubar(jarvis.rodar_automacao_ultron, (nome, args))
+            else:
+                self._chamar(nome, args)
 
         def laco():
             ultimo = None
@@ -208,17 +215,25 @@ class UIRemota:
             nome, args = mensagem[1], tuple(mensagem[2])
             if nome not in CHAMADAS_DO_CEREBRO:
                 return
-            with self._trava_guardadas:
-                if self._guardadas is not None and nome != "on_quit_requested":
-                    # o cérebro ainda está abrindo: guarda (até 20) e entrega quando ficar pronto
-                    if len(self._guardadas) < 20:
-                        self._guardadas.append((nome, args))
-                    return
+            if nome != "on_quit_requested" and self._guardar(("chamada", nome, args)):
+                return
             self._chamar(nome, args)
         elif tipo == "rodar_ultron":
-            jarvis = self._jarvis
-            if jarvis is not None:
-                jarvis.rodar_automacao_ultron(str(mensagem[1]), dict(mensagem[2] or {}))
+            nome, args = str(mensagem[1]), dict(mensagem[2] or {})
+            if self._guardar(("rodar_ultron", nome, args)):
+                self.write_log(f"SYS: O cérebro do Jarvis ainda está abrindo; rodo {nome} assim que ele "
+                               "ficar pronto.")
+                return
+            self._jarvis.rodar_automacao_ultron(nome, args)
+
+    def _guardar(self, pedido) -> bool:
+        """O cérebro ainda está abrindo: guarda (até 20) e entrega quando ficar pronto (ligar_jarvis)."""
+        with self._trava_guardadas:
+            if self._guardadas is None:
+                return False
+            if len(self._guardadas) < MAX_GUARDADAS:
+                self._guardadas.append(pedido)
+            return True
 
     def _chamar(self, nome, args) -> None:
         funcao = getattr(self, nome, None)
@@ -272,11 +287,13 @@ class JarvisNaTela:
         self._modo_reserva = False
         self._cerebro_nome = "gemini"
         self.session = None  # só diz se o cérebro está conectado à IA (não é usado para enviar)
+        self.parado = False  # o cérebro caiu e a tela desistiu de religar (o painel avisa)
 
     def rodar_automacao_ultron(self, nome: str, args: dict | None = None) -> None:
-        self._ponte.enviar(("rodar_ultron", str(nome), dict(args or {})))
+        self._ponte.entregar(("rodar_ultron", str(nome), dict(args or {})))
 
     def atualizar(self, estado: dict) -> None:
+        self.parado = False
         self._modo_reserva = bool(estado.get("modo_reserva"))
         self._cerebro_nome = str(estado.get("cerebro", "gemini"))
         self.session = object() if estado.get("conectado") else None
@@ -304,6 +321,7 @@ class PonteTela:
         self._encerrando = False
         self._aberto_em = 0.0
         self._religadas = deque()
+        self._pendentes = deque(maxlen=MAX_GUARDADAS)  # o que o usuário fez sem cérebro conectado
         self._pronto_enviado = False
         self._ultimo_estado_tela = None
         self._religando_desde = None  # troca de cérebro pedida: o fim do cérebro antigo é esperado
@@ -341,12 +359,28 @@ class PonteTela:
         print(f"[Ponte] Cérebro aberto em outro programa (pid {self._processo.pid}).")
 
     def _aceitar(self, ouvinte) -> None:
-        try:
-            conexao = ouvinte.accept()
-        except Exception:
-            return  # ouvinte fechado (encerrando ou desistindo)
+        # Outro programa do PC pode bater na porta antes do cérebro (sem a senha, ou abre e fecha).
+        # Isso não pode encerrar a espera: o cérebro de verdade ficaria travado tentando conectar.
+        while True:
+            try:
+                conexao = ouvinte.accept()
+                break
+            except Exception:
+                if self._encerrando or ouvinte is not self._ouvinte:
+                    return  # ouvinte fechado (encerrando ou desistindo)
+                time.sleep(0.05)  # conexão estranha (sem a senha): ignora e espera o cérebro
+        if self._encerrando or ouvinte is not self._ouvinte:
+            conexao.close()  # chegou depois de a tela desistir deste ouvinte
+            return
         with self._trava_envio:
             self._conexao = conexao
+            # o que o usuário fez enquanto o cérebro abria ou religava: entrega agora
+            while self._pendentes:
+                try:
+                    conexao.send(self._pendentes[0])
+                except (OSError, EOFError, ValueError):
+                    break
+                self._pendentes.popleft()
         self._pronto_enviado = False
         self._ultimo_estado_tela = None
         threading.Thread(target=self._receber, args=(conexao,), daemon=True, name="PonteTela").start()
@@ -374,6 +408,9 @@ class PonteTela:
             except Exception:
                 pass
         self._conexao = None
+        self._ouvinte = None
+        # sem cérebro conectado: o painel não pode continuar mostrando a voz "ao vivo"
+        self.jarvis.atualizar({"conectado": False, "modo_reserva": False, "cerebro": ""})
 
     def _vigiar(self) -> None:
         """A cada 1/4 de segundo: manda o que mudou na tela e confere se o cérebro está vivo."""
@@ -381,6 +418,9 @@ class PonteTela:
         if processo is None or self._encerrando:
             return
         if processo.poll() is not None:
+            if processo.returncode == SAIDA_FIM_DO_TESTE:
+                self._fim_do_teste()
+                return
             if self._religando_desde is not None:  # troca de cérebro: não é queda
                 self._religando_desde = None
                 self._fechar_conexao()
@@ -412,6 +452,7 @@ class PonteTela:
             self._religadas.popleft()
         if len(self._religadas) >= MAX_RELIGADAS:
             self._processo = None
+            self.jarvis.parado = True
             self.ui.write_log("ERR: O cérebro do Jarvis parou várias vezes. Feche e abra o Jarvis "
                               "(ou rode o autodiagnóstico).")
             return
@@ -425,6 +466,7 @@ class PonteTela:
         self._processo = None
         if self._ja_conectou:
             # já funcionou antes (é uma religada): não troca de modo no meio do uso
+            self.jarvis.parado = True
             self.ui.write_log(f"ERR: Não consegui religar o cérebro: {motivo}. Feche e abra o Jarvis.")
             return
         print(f"[Ponte] {motivo}. Voltando ao modo de um programa só.")
@@ -433,6 +475,13 @@ class PonteTela:
             setattr(self.ui, nome, None)
         if callable(self.ao_falhar):
             self.ao_falhar()
+
+    def _fim_do_teste(self) -> None:
+        """O cérebro saiu com SAIDA_FIM_DO_TESTE: fecha o Jarvis inteiro (não religa)."""
+        self._processo = None
+        self._fechar_conexao()
+        self.ui.write_log("SYS: O tempo de teste do Jarvis acabou. Fechando...")
+        self.ui.handle_ui_command("quit jarvis")  # o mesmo caminho do botão de sair
 
     def trocar_cerebro(self, destino: str) -> None:
         """Modo privado (gemma) ou normal (gemini): grava no .env e religa só o programa do cérebro."""
@@ -462,9 +511,36 @@ class PonteTela:
             except (OSError, EOFError, ValueError):
                 return False
 
+    def entregar(self, mensagem) -> None:
+        """O que o usuário fez na janela (texto, botão do Ultron, troca de voz...). Se o cérebro está
+        abrindo ou religando, guarda (até 20) e entrega assim que ele conectar: nada some calado."""
+        if self._encerrando:
+            return
+        with self._trava_envio:
+            # troca de cérebro pedida: o antigo está saindo, então o pedido é para o novo
+            conexao = self._conexao if self._religando_desde is None else None
+            if conexao is not None:
+                try:
+                    conexao.send(mensagem)
+                    return
+                except (OSError, EOFError, ValueError):
+                    pass  # o cérebro acabou de cair: guarda para o próximo
+            parado = self._processo is None
+            if not parado:
+                self._pendentes.append(mensagem)
+            avisar = not parado and len(self._pendentes) == 1
+        if parado:
+            self.ui.write_log("ERR: O cérebro do Jarvis está parado. Feche e abra o Jarvis.")
+        elif avisar:
+            self.ui.write_log("SYS: O cérebro do Jarvis está religando; entrego o seu pedido assim que "
+                              "ele voltar.")
+
     def _repassar(self, nome):
         def repassar(*args):
-            self.enviar(("chamada", nome, args))
+            if nome == "on_quit_requested":
+                self.enviar(("chamada", nome, args))  # fechar nunca fica guardado para depois
+            else:
+                self.entregar(("chamada", nome, args))
         repassar.__name__ = f"repassar_{nome}"
         return repassar
 

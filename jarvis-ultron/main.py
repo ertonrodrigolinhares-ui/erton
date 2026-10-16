@@ -1600,6 +1600,19 @@ class JarvisLive:
         self.ui.handle_ui_command("Quit JARVIS")
         return True
 
+    def _encerrar_fim_do_teste(self) -> None:
+        """Acabou o tempo de teste (JARVIS_TRIAL_KEYWORD): fecha o Jarvis."""
+        print(f"[JARVIS] ⏱️ Runtime limit reached ({self.runtime_limit_seconds}s). Exiting.")
+        try:
+            jarvis_status.write_status({"state": "expired"})
+        except Exception:
+            pass
+        from core.ponte import SAIDA_FIM_DO_TESTE
+
+        # Cérebro em programa próprio: o código diz à tela para fechar tudo (e não religar o
+        # cérebro com um tempo novo). Num programa só, sai com 0 (o .bat não acusa erro).
+        os._exit(SAIDA_FIM_DO_TESTE if getattr(self.ui, "remota", False) else 0)
+
     def request_shutdown(self) -> None:
         """Stop live tasks and make the process exit after the UI closes."""
         shutdown_requested = getattr(self, "_shutdown_requested", None)
@@ -2978,12 +2991,7 @@ class JarvisLive:
             if self.runtime_limit_seconds is not None:
                 elapsed = time.time() - start_time
                 if elapsed >= float(self.runtime_limit_seconds):
-                    print(f"[JARVIS] ⏱️ Runtime limit reached ({self.runtime_limit_seconds}s). Exiting.")
-                    try:
-                        jarvis_status.write_status({"state": "expired"})
-                    except Exception:
-                        pass
-                    os._exit(0)
+                    self._encerrar_fim_do_teste()
 
             # enforce presence of required unlock path (e.g. mounted encrypted volume)
             if getattr(self, "required_unlock_path", None):
@@ -3190,9 +3198,6 @@ def rodar_cerebro(ui):
     voice_name = _load_voice_name()
     jarvis = JarvisLive(ui, voice_name)
     ui.on_quit_requested = jarvis.request_shutdown
-    ligar = getattr(ui, "ligar_jarvis", None)
-    if callable(ligar):  # cérebro em programa próprio: manda o estado dele para os painéis da tela
-        ligar(jarvis)
     _contar_mudanca_desfeita(jarvis)
 
     # Trial/keyword runtime limiting: set via env `JARVIS_TRIAL_KEYWORD`.
@@ -3247,6 +3252,11 @@ def rodar_cerebro(ui):
     if chave_eleven and os.environ.get("JARVIS_USAR_ELEVENLABS", "1").strip() != "0":
         _on_tts_change("elevenlabs", chave_eleven,
                        os.environ.get("JARVIS_VOZ_ELEVENLABS", "").strip() or "pNInz6obpgDQGcFmaJgB")
+    ligar = getattr(ui, "ligar_jarvis", None)
+    if callable(ligar):  # cérebro em programa próprio: manda o estado dele para os painéis da tela
+        # Só agora, com a troca de voz/TTS já ligada: o que o usuário mudou na tela enquanto o
+        # cérebro abria é entregue aqui (e vale por cima do padrão do ElevenLabs acima).
+        ligar(jarvis)
     try:
         asyncio.run(jarvis.run())
     except KeyboardInterrupt:

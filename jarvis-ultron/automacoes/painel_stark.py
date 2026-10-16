@@ -92,6 +92,8 @@ def texto_geekie(hoje: date | None = None) -> str:
 
 
 def texto_voz(jarvis) -> tuple[str, bool]:
+    if getattr(jarvis, "parado", False) is True:  # o cérebro caiu e a tela desistiu de religar
+        return "Cérebro parado — feche e abra o Jarvis", False
     if getattr(jarvis, "_cerebro_nome", "") == "gemma":
         return "Cérebro: Gemma 4 (no PC)", True
     if getattr(jarvis, "_modo_reserva", False):
