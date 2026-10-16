@@ -86,6 +86,21 @@ def cor(h: str, a: float = 255) -> QColor:
     return c
 
 
+# Verde/âmbar/vermelho dos avisos (ok, atenção, problema) não giram nas folhas de estilo: no laranja do
+# Ultron eles virariam rosa/azul/verde e perderiam o sentido (ex.: "OFFLINE" verde).
+_AVISOS = (VERDE, AMBAR, VERMELHO)
+
+
+def _cor_estilo(h: str) -> QColor:
+    """Cor para folha de estilo do Qt: segue o tema (laranja no modo Ultron), menos as cores de aviso."""
+    return QColor(h) if h in _AVISOS else cor(h)
+
+
+def _rgba(h: str, a: float) -> str:
+    c = _cor_estilo(h)
+    return f"rgba({c.red()},{c.green()},{c.blue()},{int(a)})"
+
+
 def definir_ultron(win, ligado: bool) -> None:
     """Liga/desliga o laranja do Ultron e manda a tela redesenhar."""
     global _ULTRON
@@ -101,8 +116,10 @@ def definir_ultron(win, ligado: bool) -> None:
         orbe = getattr(win, "_orbe", None)
         cena = getattr(orbe, "cena", None) if orbe is not None else None
         if cena is not None:
-            if hasattr(cena, "acender_modo"):
-                cena.acender_modo(getattr(cena, "_maos_livres", True))
+            # as cores das folhas de estilo (textos, chips, campo, botões) não passam pelo desenho:
+            # precisam ser refeitas com o tom novo
+            if hasattr(cena, "retingir"):
+                cena.retingir()
             cena.update()
             for w in cena.findChildren(QWidget):
                 w.update()
@@ -415,8 +432,14 @@ def rotulo(texto: str, tom: str = TEXTO2, pt: float = 9, peso=QFont.Weight.Norma
     l = QLabel(texto)
     l.setWordWrap(quebra)
     l.setFont(fonte(familia, pt, peso))
-    l.setStyleSheet(f"color:{tom}; background: transparent;")
+    tingir(l, tom)
     return l
+
+
+def tingir(l: QLabel, tom: str) -> None:
+    """Cor do texto pelo tema; guarda o tom original para refazer quando o Ultron liga/desliga."""
+    l.setProperty("tom_base", tom)
+    l.setStyleSheet(f"color:{_cor_estilo(tom).name()}; background: transparent;")
 
 
 # ---------------------------------------------------------------- painéis da cena
@@ -514,9 +537,9 @@ class Chip(QLabel):
 
     def definir(self, texto: str, tom: str):
         self.setText(texto)
-        c = QColor(tom)
-        self.setStyleSheet(f"color:{tom}; background: rgba({c.red()},{c.green()},{c.blue()},38);"
-                           f"border:1px solid rgba({c.red()},{c.green()},{c.blue()},120); border-radius:4px; padding:1px 7px;")
+        self._tom = tom
+        self.setStyleSheet(f"color:{_cor_estilo(tom).name()}; background: {_rgba(tom, 38)};"
+                           f"border:1px solid {_rgba(tom, 120)}; border-radius:4px; padding:1px 7px;")
 
 
 class Canal(Vidro):
@@ -532,12 +555,18 @@ class Canal(Vidro):
         self.entrada = QLineEdit()
         self.entrada.setPlaceholderText("Converse com o JARVIS...")
         self.entrada.setFont(fonte(SANS, 9.5))
-        self.entrada.setStyleSheet(
-            "QLineEdit{color:#e8f8ff; background: rgba(4,20,56,190); border:1px solid rgba(95,180,255,90);"
-            "border-radius:6px; padding:7px 10px;} QLineEdit:focus{border-color:#29d4ff;}")
         self.entrada.returnPressed.connect(self._enviar)
         self.corpo.addWidget(self.entrada)
         self._falas = deque(maxlen=7)
+        self.retingir()
+
+    def retingir(self):
+        """Refaz as cores do campo e das falas (o modo Ultron troca o tom)."""
+        self.entrada.setStyleSheet(
+            f"QLineEdit{{color:{cor(TEXTO).name()}; background: {_rgba('#041438', 190)};"
+            f" border:1px solid {_rgba('#5fb4ff', 90)}; border-radius:6px; padding:7px 10px;}}"
+            f" QLineEdit:focus{{border-color:{cor(CIANO).name()};}}")
+        self._mostrar()
 
     def _enviar(self):
         txt = self.entrada.text().strip()
@@ -551,17 +580,20 @@ class Canal(Vidro):
 
     def adicionar(self, quem: str, texto: str):
         self._falas.append((quem, texto))
+        self._mostrar()
+
+    def _mostrar(self):
         while self.lista.count():
             w = self.lista.takeAt(0).widget()
             if w is not None:
                 w.hide()
                 w.deleteLater()
         for quem, texto in self._falas:
-            tom = VERDE if quem == "VOCÊ" else CIANO
+            tom = _cor_estilo(VERDE if quem == "VOCÊ" else CIANO).name()
             curto = texto if len(texto) < 160 else texto[:157] + "..."
             l = rotulo(f'<span style="color:{tom}; font-weight:700">{quem}</span>'
-                       f'<span style="color:{TEXTO2}"> • </span>'
-                       f'<span style="color:{TEXTO}">{_escapar(curto)}</span>', TEXTO, 9)
+                       f'<span style="color:{cor(TEXTO2).name()}"> • </span>'
+                       f'<span style="color:{cor(TEXTO).name()}">{_escapar(curto)}</span>', TEXTO, 9)
             l.setTextFormat(Qt.TextFormat.RichText)
             self.lista.addWidget(l)
 
@@ -649,9 +681,11 @@ class Cena(QWidget):
             self.st[nome] = chip
             self.p_status.corpo.addLayout(linha)
 
-        # Ultron: botões de automação na própria lateral (preenchidos pelo painel_ultron)
+        # Ultron: botões de automação na própria lateral (preenchidos pelo painel_ultron; sem ele, o
+        # painel nem aparece)
         self.p_ultron = Vidro("Ultron · automações", self, etiqueta="RÁPIDO")
         self._acao_ultron = None
+        self._botoes_ultron = []
         self._grade_ultron = QGridLayout()
         self._grade_ultron.setSpacing(6)
         self.p_ultron.corpo.addLayout(self._grade_ultron)
@@ -733,10 +767,17 @@ class Cena(QWidget):
         y = y0
         for w, h in esq:
             w.setGeometry(m, y, L, h); w.setVisible(mostrar_lados); y += h + 12
-        # o painel do Ultron ocupa o espaço que sobra na coluna esquerda
-        alt_ultron = max(150, H - y - 66)
+        # o painel do Ultron ocupa o espaço que sobra na coluna esquerda, mas nunca menos do que os
+        # botões precisam: com menos, o Qt põe uma linha de botões por cima da outra (telas baixas,
+        # como o notebook 1366x768). Faltando espaço, tira a dica e depois baixa os botões.
+        for nivel in (0, 1, 2):
+            self._ultron_compacto(nivel)
+            precisa = self._altura_ultron(L)
+            if y + precisa <= H - 8:
+                break
+        alt_ultron = max(150, H - y - 66, precisa)
         self.p_ultron.setGeometry(m, y, L, alt_ultron)
-        self.p_ultron.setVisible(mostrar_lados)
+        self.p_ultron.setVisible(mostrar_lados and self._acao_ultron is not None)
         dir_ = [(self.p_ativ, 92), (self.p_hist, 92), (self.p_rede, 86)]
         y = y0
         for w, h in dir_:
@@ -756,9 +797,33 @@ class Cena(QWidget):
         for w in (self.topo_esq, self.topo_dir):  # textos dos cantos (somiam depois do F2)
             w.raise_()
         self.botao.raise_()
+        painel = self._painel_ultron()
+        if painel is not None and painel.parentWidget() is self and not painel.isHidden():
+            painel.setGeometry(self.rect())  # o painel ULTRON aberto fica por cima de tudo da cena
+            painel.raise_()
         ctl = getattr(self.win, "_orbe", None)
         if ctl is not None:
             ctl.reencaixar()
+
+    def _painel_ultron(self):
+        """A sobreposição ULTRON (automação painel_ultron), se estiver instalada."""
+        return getattr(getattr(self.win, "_tela_stark", None), "_painel_ultron", None)
+
+    def _ultron_compacto(self, nivel: int) -> None:
+        """0 = normal; 1 = sem a dica; 2 = sem a dica e com botões mais baixos."""
+        self._dica_ultron.setVisible(nivel == 0)
+        for b in self._botoes_ultron:
+            b.setMinimumHeight(38 if nivel < 2 else 28)
+
+    def _altura_ultron(self, largura: int) -> int:
+        """Altura mínima do painel do Ultron para os botões não ficarem uns por cima dos outros."""
+        corpo = self.p_ultron.corpo
+        self._grade_ultron.invalidate()
+        corpo.invalidate()
+        altura = corpo.minimumSize().height()
+        if corpo.hasHeightForWidth():
+            altura = max(altura, corpo.heightForWidth(largura))
+        return altura
 
     # ----- dados
     def registrar(self, texto: str):
@@ -815,7 +880,7 @@ class Cena(QWidget):
         self.l_pedidos_sub.setText("pedidos nesta sessão" + (
             f" · último {dt.datetime.fromtimestamp(self._ultimo):%H:%M}" if self._ultimo else ""))
         nome, tom, lat = self._rede
-        self.l_rede.setText(nome); self.l_rede.setStyleSheet(f"color:{tom}; background: transparent;")
+        self.l_rede.setText(nome); tingir(self.l_rede, tom)
         self.l_lat.setText(lat)
         self.l_rede_sub.setText("Internet ok · voz e IA disponíveis" if nome == "ONLINE"
                                 else ("Sem internet: a IA não responde" if nome == "OFFLINE" else "Testando a conexão..."))
@@ -837,12 +902,24 @@ class Cena(QWidget):
         for b, aceso in ((self.b_chamada, not maos_livres), (self.b_maos, maos_livres)):
             tom = d if aceso else cor(TEXTO2).name()
             fundo = (f"rgba({destaque.red()},{destaque.green()},{destaque.blue()},40)" if aceso
-                     else "rgba(4,20,56,150)")
-            borda = d if aceso else "rgba(95,180,255,90)"
+                     else _rgba("#041438", 150))
+            borda = d if aceso else _rgba("#5fb4ff", 90)
             b.setStyleSheet(
                 f"QPushButton{{color:{tom}; background:{fundo}; border:1px solid {borda};"
                 f" border-radius:15px; padding:4px 12px;}}"
-                f" QPushButton:hover{{color:{TEXTO}; border-color:{d};}}")
+                f" QPushButton:hover{{color:{cor(TEXTO).name()}; border-color:{d};}}")
+
+    def retingir(self):
+        """Refaz as cores das folhas de estilo (o modo Ultron troca o tom de tudo para laranja)."""
+        for l in self.findChildren(QLabel):
+            tom = l.property("tom_base")
+            if tom:
+                tingir(l, tom)
+        for chip in self.findChildren(Chip):
+            chip.definir(chip.text(), chip._tom)
+        self.canal.retingir()
+        self._estilo_botoes_ultron()
+        self.acender_modo(getattr(self, "_maos_livres", True))
 
     # ----- botões do Ultron na lateral
     def montar_botoes_ultron(self, itens, acao):
@@ -854,19 +931,26 @@ class Cena(QWidget):
             w = it.widget()
             if w is not None:
                 w.setParent(None)
+        self._botoes_ultron = []
         for i, (nome, emoji, titulo, args) in enumerate(itens):
             b = QPushButton(f"{emoji}  {titulo}")
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             b.setMinimumHeight(38)
             b.setFont(fonte(SANS, 8.5, QFont.Weight.Bold))
-            b.setStyleSheet(
-                "QPushButton { color:%s; background: rgba(0,200,255,20); text-align:left;"
-                " border:1px solid rgba(58,120,216,120); border-radius:9px; padding:4px 8px; }"
-                " QPushButton:hover { color:%s; border-color:%s; background: rgba(0,229,255,45); }"
-                % (TEXTO, CIANO, CIANO))
             b.clicked.connect(lambda _=False, n=nome, a=args: self._disparar_ultron(n, a))
             self._grade_ultron.addWidget(b, i // 2, i % 2)
+            self._botoes_ultron.append(b)
+        self._estilo_botoes_ultron()
         self._dica_ultron.setText('Toque para rodar na hora — sem depender da internet.')
+        self._organizar()  # agora o painel aparece, com a altura que os botões precisam
+
+    def _estilo_botoes_ultron(self):
+        ciano = cor(CIANO).name()
+        estilo = (f"QPushButton {{ color:{cor(TEXTO).name()}; background: {_rgba('#00c8ff', 20)}; text-align:left;"
+                  f" border:1px solid {_rgba('#3a78d8', 120)}; border-radius:9px; padding:4px 8px; }}"
+                  f" QPushButton:hover {{ color:{ciano}; border-color:{ciano}; background: {_rgba('#00e5ff', 45)}; }}")
+        for b in self._botoes_ultron:
+            b.setStyleSheet(estilo)
 
     def _disparar_ultron(self, nome, args):
         if callable(self._acao_ultron):
@@ -892,6 +976,9 @@ class Cena(QWidget):
             self.show(); self.raise_()
             self._organizar()
             self._trazer_janelas()
+        painel = self._painel_ultron()
+        if painel is not None and not painel.isHidden() and hasattr(painel, "abrir"):
+            painel.abrir(True)  # o painel ULTRON aberto vai junto para a tela que ficou na frente
 
 
 # ---------------------------------------------------------------- câmera

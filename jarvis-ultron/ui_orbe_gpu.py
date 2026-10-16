@@ -10,17 +10,22 @@ As contas (tamanho, agitação com a voz, brilho, cores do Ultron) são as mesma
 desenhado por cima, do jeito normal.
 
 Proteções (a tela nunca pode ficar preta nem fechar por causa disto):
-  - placa de vídeo sem OpenGL 2.0, programa que não compila, qualquer erro ao desenhar -> volta
-    sozinho para o desenho normal;
+  - antes de pôr a camada na janela, liga o OpenGL num teste: se não ligar, ou se for OpenGL feito
+    pelo processador (sem driver de vídeo, área de trabalho remota, máquina virtual: llvmpipe e
+    parecidos), usa o desenho normal nesta abertura (na próxima tenta de novo);
+  - placa de vídeo sem OpenGL 2.0, programa que não compila, qualquer erro ao desenhar, ou a camada
+    na tela e a placa sem desenhar nada por alguns segundos -> volta sozinho para o desenho normal;
   - se o Jarvis fechar sozinho na hora de ligar a placa de vídeo (driver com defeito), na próxima
-    abertura ele percebe e não tenta mais (arquivo ~/.jarvis/orbe_gpu_falhou; apague para tentar de novo);
-  - JARVIS_ORBE_GPU=0 no .env desliga.
+    abertura ele percebe e não tenta mais (arquivo ~/.jarvis/orbe_gpu_falhou; apague para tentar de novo).
+    Outro Jarvis abrindo ao mesmo tempo (dois cliques no iniciador) não conta como queda;
+  - JARVIS_ORBE_GPU=0 no .env desliga; JARVIS_ORBE_GPU=forcar tenta sempre (até com OpenGL por software).
 """
 
 from __future__ import annotations
 
 import math
 import os
+import time
 from pathlib import Path
 
 PASTA = Path.home() / ".jarvis"
@@ -29,6 +34,13 @@ FALHOU = PASTA / "orbe_gpu_falhou"       # a placa de vídeo deu problema: usar 
 
 MAX_FIOS = 18
 FAISCAS = 14
+
+# OpenGL feito pelo processador (Mesa llvmpipe/softpipe, o opengl32sw.dll que vem com o Qt, SwiftShader,
+# o OpenGL 1.1 do Windows sem driver): o anel rodaria a 60 quadros no processador e travaria o resto.
+SOFTWARE = ("llvmpipe", "softpipe", "swiftshader", "software", "gdi generic", "basic render")
+LIGANDO_MAX_S = 120   # marca de outro Jarvis vivo e mais nova que isso = ele está abrindo agora
+VIGIA_MS = 2000       # de quanto em quanto tempo confere se a placa de vídeo já desenhou
+VIGIA_VEZES = 3       # vezes seguidas com a camada na tela e nada desenhado = a placa não desenha
 
 VERTICES = """
 attribute vec2 pos;
@@ -135,9 +147,23 @@ void main() {
 """
 
 
+def _escolha() -> str:
+    return os.environ.get("JARVIS_ORBE_GPU", "1").strip().lower()
+
+
+def _forcar() -> bool:
+    return _escolha() in ("forcar", "forçar", "force")
+
+
+def por_software(renderer: str) -> bool:
+    """O OpenGL é feito pelo processador (e não pela placa de vídeo)? Vem do nome do GL_RENDERER."""
+    nome = (renderer or "").lower()
+    return any(s in nome for s in SOFTWARE)
+
+
 def gpu_permitida() -> bool:
     """Pode tentar a placa de vídeo? (env, tela de teste, e se a última tentativa não derrubou o Jarvis)."""
-    escolha = os.environ.get("JARVIS_ORBE_GPU", "1").strip().lower()
+    escolha = _escolha()
     if escolha in ("0", "nao", "não", "off", "false"):
         return False
     try:
@@ -147,24 +173,96 @@ def gpu_permitida() -> bool:
             return False  # sem placa de vídeo de verdade (testes)
     except Exception:
         return False
-    if escolha in ("forcar", "forçar", "force"):
+    if _forcar():
         return True
     if TESTANDO.exists():
+        if _outro_jarvis_ligando():
+            # outro Jarvis aberto agora mesmo está ligando a placa de vídeo: não é queda, só não usa desta vez
+            print("[Orbe GPU] Outro Jarvis está abrindo agora; desta vez uso o desenho normal.")
+            return False
         # a última abertura começou a ligar a placa de vídeo e não terminou: o Jarvis fechou ali.
         _marcar_falha("o Jarvis fechou ao ligar a placa de vídeo na última vez")
         return False
     return not FALHOU.exists()
 
 
-def _marcar_falha(motivo: str) -> None:
-    print(f"[Orbe GPU] Usando o desenho normal: {motivo}.")
+def _ler_testando():
+    """(número do processo, segundos desde que foi escrita) da marca de teste, ou None se não der."""
     try:
-        PASTA.mkdir(parents=True, exist_ok=True)
-        FALHOU.write_text(motivo + "\nApague este arquivo para tentar a placa de vídeo de novo.\n",
-                          encoding="utf-8")
+        pid, quando = TESTANDO.read_text(encoding="utf-8").split()[:2]
+        return int(pid), time.time() - float(quando)
+    except (OSError, ValueError):
+        return None
+
+
+def _outro_jarvis_ligando() -> bool:
+    """A marca de teste é de OUTRO Jarvis que está vivo e abriu há pouco? Então não houve queda."""
+    dono = _ler_testando()
+    if dono is None:
+        return False
+    pid, idade = dono
+    if pid == os.getpid() or abs(idade) >= LIGANDO_MAX_S:
+        return False
+    try:
+        import psutil
+
+        return psutil.pid_exists(pid)  # no Windows, nunca os.kill(pid, 0): lá ele FECHA o processo
+    except Exception:
+        return False
+
+
+def _apagar_testando() -> None:
+    """Apaga a marca de teste (menos a de outro Jarvis que está abrindo agora)."""
+    if _outro_jarvis_ligando():
+        return
+    try:
         TESTANDO.unlink(missing_ok=True)
     except OSError:
         pass
+
+
+def _marcar_falha(motivo: str, lembrar: bool = True) -> None:
+    """Volta ao desenho normal. lembrar=False: só nesta abertura (na próxima tenta a placa de novo)."""
+    print(f"[Orbe GPU] Usando o desenho normal: {motivo}.")
+    if lembrar:
+        try:
+            PASTA.mkdir(parents=True, exist_ok=True)
+            FALHOU.write_text(motivo + "\nApague este arquivo para tentar a placa de vídeo de novo.\n",
+                              encoding="utf-8")
+        except OSError:
+            pass
+    _apagar_testando()
+
+
+def _testar_opengl() -> str:
+    """Liga o OpenGL fora da janela e devolve o problema ("" = pode usar a placa de vídeo).
+
+    Sem isto, uma camada que o Qt não consegue ligar deixa a tela preta (o Qt nem chama o desenho, então
+    não há erro para voltar ao normal), e o OpenGL por software roda o anel inteiro no processador."""
+    from PyQt6.QtGui import QOffscreenSurface, QOpenGLContext
+    from PyQt6.QtOpenGL import QOpenGLVersionFunctionsFactory, QOpenGLVersionProfile
+
+    superficie = QOffscreenSurface()
+    superficie.create()
+    ctx = QOpenGLContext()
+    try:
+        if not ctx.create() or not ctx.makeCurrent(superficie):
+            return "não consegui ligar o OpenGL nesta placa de vídeo"
+        try:
+            perfil = QOpenGLVersionProfile()
+            perfil.setVersion(2, 0)
+            gl = QOpenGLVersionFunctionsFactory.get(perfil, ctx)
+            if gl is None:
+                return "placa de vídeo sem OpenGL 2.0"
+            gl.initializeOpenGLFunctions()
+            renderer = str(gl.glGetString(0x1F01) or "")  # GL_RENDERER: quem desenha de verdade
+            if por_software(renderer) and not _forcar():
+                return f"OpenGL feito pelo processador ({renderer}), sem placa de vídeo de verdade"
+            return ""
+        finally:
+            ctx.doneCurrent()
+    finally:
+        superficie.destroy()
 
 
 def criar(hud, orbe):
@@ -172,7 +270,7 @@ def criar(hud, orbe):
     if not gpu_permitida():
         return None
     try:
-        from PyQt6.QtCore import Qt
+        from PyQt6.QtCore import Qt, QTimer
         from PyQt6.QtGui import QPainter, QVector2D, QVector3D, QVector4D
         from PyQt6.QtOpenGL import (QOpenGLShader, QOpenGLShaderProgram, QOpenGLVersionFunctionsFactory,
                                     QOpenGLVersionProfile)
@@ -193,6 +291,12 @@ def criar(hud, orbe):
             self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
             self.setGeometry(hud.rect())
             self.lower()  # fica atrás da câmera e do briefing (filhos do HUD)
+            # vigia: se o Qt não conseguir ligar a placa nesta janela, ele nunca chama o desenho
+            # (e não dá erro nenhum); sem isto a tela ficaria preta em toda abertura
+            self._sem_desenho = 0
+            self._vigia = QTimer(self)
+            self._vigia.timeout.connect(self._vigiar)
+            self._vigia.start(VIGIA_MS)
 
         # ----- placa de vídeo
         def initializeGL(self):
@@ -233,10 +337,21 @@ def criar(hud, orbe):
                 return
             if self._primeiro:
                 self._primeiro = False
-                try:
-                    TESTANDO.unlink(missing_ok=True)  # ligou e desenhou: a placa de vídeo é confiável
-                except OSError:
-                    pass
+                self._vigia.stop()
+                _apagar_testando()  # ligou e desenhou: a placa de vídeo é confiável
+
+        def _vigiar(self):
+            """A camada está à vista na tela e a placa de vídeo nunca desenhou: ela não funciona aqui."""
+            if not self.ativo or not self._primeiro:
+                self._vigia.stop()
+                return
+            janela = self.window()
+            alca = janela.windowHandle()
+            a_vista = (self.isVisible() and alca is not None and alca.isExposed() and not janela.isMinimized()
+                       and not self.visibleRegion().isEmpty())
+            self._sem_desenho = self._sem_desenho + 1 if a_vista else 0
+            if self._sem_desenho >= VIGIA_VEZES:
+                self._desistir("a placa de vídeo não começou a desenhar")
 
         def _desenhar_anel(self) -> dict:
             q = orbe.estado_quadro(hud)
@@ -295,6 +410,7 @@ def criar(hud, orbe):
             if not self.ativo:
                 return
             self.ativo = False
+            self._vigia.stop()
             _marcar_falha(motivo)
             hud._orbe_gpu = None
             self.hide()
@@ -307,16 +423,25 @@ def criar(hud, orbe):
 
     try:
         PASTA.mkdir(parents=True, exist_ok=True)
-        TESTANDO.write_text("ligando a placa de vídeo\n", encoding="utf-8")
+        # quem está ligando e quando: outro Jarvis abrindo ao mesmo tempo não confunde isto com uma queda
+        TESTANDO.write_text(f"{os.getpid()} {time.time():.0f}\nligando a placa de vídeo\n", encoding="utf-8")
     except OSError:
         pass
+    try:
+        problema = _testar_opengl()
+    except Exception as erro:
+        problema = f"não consegui ligar o OpenGL ({erro})"
+    if problema:
+        # é desta máquina/sessão (ex.: área de trabalho remota, sem driver): na próxima abertura tenta de novo
+        _marcar_falha(problema, lembrar=False)
+        return None
     camada = OrbeGPU()
     camada.show()
     try:
         from PyQt6.QtWidgets import QApplication
 
         # fechou normalmente (mesmo sem ter chegado a desenhar): não foi a placa de vídeo que derrubou
-        QApplication.instance().aboutToQuit.connect(lambda: TESTANDO.unlink(missing_ok=True))
+        QApplication.instance().aboutToQuit.connect(_apagar_testando)
     except Exception:
         pass
     print("[Orbe GPU] Anel desenhado pela placa de vídeo.")

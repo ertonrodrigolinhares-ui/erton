@@ -61,6 +61,52 @@ class PermissaoDaPlacaDeVideoTests(unittest.TestCase):
             self.assertFalse(gpu.gpu_permitida())
         self.plataforma.start()
 
+    def _outro_jarvis(self):
+        """Um processo vivo de verdade (faz o papel do outro Jarvis que está abrindo)."""
+        outro = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+        self.addCleanup(outro.wait)
+        self.addCleanup(outro.kill)
+        return outro
+
+    def test_outro_jarvis_abrindo_ao_mesmo_tempo_nao_e_queda(self):
+        # dois cliques no iniciador: o 2º vê a marca do 1º (vivo) e não pode culpar a placa de vídeo
+        import time
+        outro = self._outro_jarvis()
+        gpu.TESTANDO.write_text(f"{outro.pid} {time.time():.0f}\nligando a placa de vídeo\n")
+        with patch.dict(os.environ, {"JARVIS_ORBE_GPU": ""}):
+            self.assertFalse(gpu.gpu_permitida())      # nesta abertura, desenho normal
+            self.assertFalse(gpu.FALHOU.exists())       # mas não marca a placa como defeituosa
+            self.assertTrue(gpu.TESTANDO.exists())      # e não apaga a marca do outro
+            gpu._apagar_testando()                      # (nem ao fechar este)
+            self.assertTrue(gpu.TESTANDO.exists())
+            outro.kill(); outro.wait()
+            gpu.TESTANDO.unlink()
+            self.assertTrue(gpu.gpu_permitida())        # o outro abriu e desenhou: na próxima, placa de vídeo
+
+    def test_marca_de_processo_morto_ou_velha_e_queda(self):
+        import time
+        outro = self._outro_jarvis()
+        outro.kill(); outro.wait()
+        gpu.TESTANDO.write_text(f"{outro.pid} {time.time():.0f}\n")   # o processo que ligava morreu
+        with patch.dict(os.environ, {"JARVIS_ORBE_GPU": ""}):
+            self.assertFalse(gpu.gpu_permitida())
+            self.assertTrue(gpu.FALHOU.exists())
+            self.assertFalse(gpu.TESTANDO.exists())
+        gpu.FALHOU.unlink()
+        vivo = self._outro_jarvis()
+        gpu.TESTANDO.write_text(f"{vivo.pid} {time.time() - 3600:.0f}\n")  # vivo, mas de uma hora atrás
+        with patch.dict(os.environ, {"JARVIS_ORBE_GPU": ""}):
+            self.assertFalse(gpu.gpu_permitida())
+            self.assertTrue(gpu.FALHOU.exists())
+
+    def test_opengl_por_software_e_reconhecido(self):
+        for nome in ("llvmpipe (LLVM 20.1.2, 256 bits)", "softpipe", "Google SwiftShader", "GDI Generic",
+                     "Microsoft Basic Render Driver", "Mesa Software Rasterizer"):
+            self.assertTrue(gpu.por_software(nome), nome)
+        for nome in ("Intel(R) UHD Graphics 620", "NVIDIA GeForce GTX 1650/PCIe/SSE2",
+                     "AMD Radeon(TM) Graphics", "Mesa Intel(R) Xe Graphics (TGL GT2)", ""):
+            self.assertFalse(gpu.por_software(nome), nome)
+
 
 JANELA = textwrap.dedent("""
     import os, sys
@@ -72,8 +118,14 @@ JANELA = textwrap.dedent("""
     import ui_orbe_gpu
     if sys.argv[3] == "quebrado":
         ui_orbe_gpu.FRAGMENTOS = "isto não é um programa de placa de vídeo"
+    if sys.argv[3] == "sem_desenho":
+        ui_orbe_gpu.VIGIA_MS = 300
     import ui
     win = ui.MainWindow("face.png"); win.resize(1000, 640)
+    if sys.argv[3] == "sem_desenho":
+        # o Qt ligou a camada, mas nunca chama o desenho (como quando ele não cria o contexto na janela)
+        camada = win.hud._orbe_gpu
+        type(camada).paintGL = lambda self: None
     ov = getattr(win, "_overlay", None)
     if ov: ov.hide()
     win.move(0, 0); win.show()
@@ -97,11 +149,13 @@ JANELA = textwrap.dedent("""
 class PlacaDeVideoDeVerdadeTests(unittest.TestCase):
     """Abre a janela do Jarvis numa tela virtual com OpenGL e confere o anel na tela de verdade."""
 
-    def _abrir(self, modo):
+    # A tela virtual só tem OpenGL feito pelo processador (llvmpipe). O Jarvis normal (JARVIS_ORBE_GPU=1)
+    # não usa isso; "forcar" liga mesmo assim, para testar o desenho pela placa de vídeo.
+    def _abrir(self, modo, escolha="forcar", **env_extra):
         casa = tempfile.mkdtemp()
         script = Path(casa) / "janela.py"
         script.write_text(JANELA, encoding="utf-8")
-        env = dict(os.environ, QT_QPA_PLATFORM="xcb", JARVIS_ORBE_GPU="1")
+        env = dict(os.environ, QT_QPA_PLATFORM="xcb", JARVIS_ORBE_GPU=escolha, **env_extra)
         r = subprocess.run(["xvfb-run", "-a", "-s", "-screen 0 1280x800x24", sys.executable, str(script),
                             casa, str(RAIZ), modo], capture_output=True, text=True, timeout=120, env=env)
         saida = r.stdout + r.stderr
@@ -130,6 +184,33 @@ class PlacaDeVideoDeVerdadeTests(unittest.TestCase):
         self.assertEqual(self._valor(saida, "CAMADA"), "nao")
         self.assertGreater(int(self._valor(saida, "BRILHO_NO_ANEL")), 120)  # o desenho normal assumiu
         self.assertTrue(falhou)  # e lembra para não tentar de novo
+
+    def test_opengl_por_software_usa_o_desenho_normal(self):
+        # sem driver de vídeo / área remota / máquina virtual: o anel não pode rodar no processador
+        codigo, saida, falhou, testando = self._abrir("normal", escolha="1")
+        self.assertEqual(codigo, 0, saida[-2000:])
+        self.assertEqual(self._valor(saida, "CAMADA"), "nao")
+        self.assertIn("OpenGL feito pelo processador", saida)
+        self.assertGreater(int(self._valor(saida, "BRILHO_NO_ANEL")), 120)  # o desenho normal assumiu
+        self.assertFalse(falhou)    # só nesta abertura: com o driver certo, na próxima usa a placa
+        self.assertFalse(testando)
+
+    def test_sem_contexto_opengl_a_tela_nao_fica_preta(self):
+        # o Qt não consegue ligar o OpenGL: antes, a camada ficava "ativa" e a tela inteira preta
+        codigo, saida, falhou, testando = self._abrir("normal", escolha="1", QT_XCB_GL_INTEGRATION="none")
+        self.assertEqual(codigo, 0, saida[-2000:])
+        self.assertEqual(self._valor(saida, "CAMADA"), "nao")
+        self.assertGreater(int(self._valor(saida, "BRILHO_NO_ANEL")), 120)  # o anel aparece
+        self.assertFalse(testando)
+
+    def test_camada_que_nunca_desenha_volta_ao_desenho_normal(self):
+        codigo, saida, falhou, testando = self._abrir("sem_desenho")
+        self.assertEqual(codigo, 0, saida[-2000:])
+        self.assertIn("a placa de vídeo não começou a desenhar", saida)
+        self.assertEqual(self._valor(saida, "CAMADA"), "nao")
+        self.assertGreater(int(self._valor(saida, "BRILHO_NO_ANEL")), 120)
+        self.assertTrue(falhou)     # na próxima abertura já começa no desenho normal
+        self.assertFalse(testando)
 
 
 if __name__ == "__main__":

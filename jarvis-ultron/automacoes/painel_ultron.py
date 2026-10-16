@@ -9,7 +9,8 @@ Cada botão do painel RODA a automação na hora, direto, sem depender do Gemini
 funciona rápido e até sem internet (as que não precisam da web). O resultado aparece na tela e é
 falado. Nada é publicado, enviado ou alterado: são só as automações de sempre, com as regras de sempre.
 
-Para tirar o painel, apague este arquivo (o botão ⚙ ULTRON some junto).
+Para tirar o painel, apague este arquivo (o botão ⚙ ULTRON e o quadro "Ultron · automações" da
+lateral somem junto).
 """
 
 from __future__ import annotations
@@ -109,7 +110,15 @@ def _construir(jarvis):
 
         def abrir(self, mostrar=True):
             if mostrar:
-                self.setGeometry(self.parent().rect())
+                # Na tela do orbe (o padrão), a cena cobre a tela Stark inteira: o painel tem de abrir
+                # por cima da cena, senão só a cor muda e o painel (e o "Fechar") ficam escondidos.
+                orbe = getattr(janela, "_orbe", None)
+                cena = getattr(orbe, "cena", None) if orbe is not None else None
+                na_cena = cena is not None and getattr(cena, "ativa", False) and not cena.isHidden()
+                pai = cena if na_cena else tela
+                if self.parentWidget() is not pai:
+                    self.setParent(pai)
+                self.setGeometry(pai.rect())
                 self.raise_()
             self.setVisible(bool(mostrar))
             # Ultron ligado = a interface inteira fica LARANJA; Jarvis = volta ao azul.
@@ -122,6 +131,9 @@ def _construir(jarvis):
     painel = PainelUltron(tela)
     tela._painel_ultron = painel
     tela.ao_abrir_ultron = lambda: painel.abrir(not painel.isVisible())
+    botao = getattr(tela, "botao_ultron", None)
+    if botao is not None:
+        botao.setVisible(True)  # o botão ⚙ ULTRON só aparece com o painel instalado
 
     # comando de voz "modo ultron"/"modo jarvis" (chamado pelo main, no fio da tela)
     from core.na_tela import executar as _na_tela

@@ -90,10 +90,14 @@ como a Intel de notebook: fica a 30 quadros por segundo parado e 60 falando, com
 completos e um brilho suave a mais, e quase não usa o processador. Na janela preta aparece
 `[Orbe GPU] Anel desenhado pela placa de vídeo.`
 
-- Se a placa de vídeo não aceitar o desenho, o Jarvis volta sozinho para o desenho normal.
+- Se a placa de vídeo não aceitar o desenho (ou não desenhar nada), o Jarvis volta sozinho para o
+  desenho normal.
+- Sem driver de vídeo, na Área de Trabalho Remota ou numa máquina virtual, o "OpenGL" é feito pelo
+  processador: aí o Jarvis usa o desenho normal naquela abertura (para não pesar) e tenta a placa
+  de vídeo de novo na próxima.
 - Se o Jarvis fechar sozinho na hora de ligar a placa de vídeo, na próxima abertura ele usa o
   desenho normal (cria o arquivo `orbe_gpu_falhou` na pasta `.jarvis` do seu usuário; apague para
-  tentar de novo).
+  tentar de novo). Abrir o Jarvis duas vezes seguidas não conta como queda.
 - Para desligar: `JARVIS_ORBE_GPU=0` no `.env`.
 
 ## Cérebro Gemma 4 no seu PC (sem Gemini, privado)

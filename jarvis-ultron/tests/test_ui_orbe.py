@@ -95,5 +95,142 @@ class CenaTests(unittest.TestCase):
             win.deleteLater()
 
 
+ITENS_ULTRON = [(f"ferramenta_{i}", "✚", f"Automação {i}", {}) for i in range(8)]
+
+
+class UltronNaCenaTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    def setUp(self):
+        os.environ.pop("JARVIS_VISUAL", None)
+        os.environ.pop("JARVIS_CENA", None)
+        self.win = ui.MainWindow("face.png")
+        for nome in ("_overlay", "_name_overlay"):
+            w = getattr(self.win, nome, None)
+            if w is not None:
+                w.hide()
+        self.cena = self.win._orbe.cena
+
+    def tearDown(self):
+        ui_orbe.definir_ultron(self.win, False)
+        self.win.close()
+        self.win.deleteLater()
+
+    def _eventos(self):
+        for _ in range(10):
+            self.app.processEvents()
+
+    def test_modo_ultron_deixa_textos_campo_e_botoes_laranja(self):
+        cena = self.cena
+        cena.montar_botoes_ultron(ITENS_ULTRON, lambda n, a: None)
+        cena.canal.adicionar("JARVIS", "Às ordens.")
+        cena.st["Câmera local"].definir("EM USO", ui_orbe.CIANO)
+        ui_orbe.definir_ultron(self.win, True)
+        laranja_texto = ui_orbe.cor(ui_orbe.TEXTO2).name()
+        laranja_ciano = ui_orbe.cor(ui_orbe.CIANO).name()
+        self.assertNotEqual(laranja_texto, ui_orbe.TEXTO2)
+        self.assertIn(laranja_texto, cena.topo_esq.styleSheet())           # barra do topo
+        self.assertIn(laranja_texto, cena.l_pedidos_sub.styleSheet())      # "pedidos nesta sessão"
+        self.assertIn(laranja_ciano, cena.st["Câmera local"].styleSheet())  # chip
+        entrada = cena.canal.entrada.styleSheet()
+        self.assertIn(laranja_ciano, entrada)                               # campo de digitar
+        self.assertNotIn("95,180,255", entrada)
+        botao = cena._botoes_ultron[0].styleSheet()                        # botões do Ultron na lateral
+        self.assertIn(laranja_ciano, botao)
+        self.assertNotIn("58,120,216", botao)
+        self.assertNotIn("95,180,255", cena.b_chamada.styleSheet() + cena.b_maos.styleSheet())
+        fala = cena.canal.lista.itemAt(0).widget().text()                  # nome JARVIS no canal
+        self.assertIn(laranja_ciano, fala)
+        self.assertNotIn(ui_orbe.CIANO, fala)
+        # avisos mantêm o sentido (verde = ok), não viram rosa/azul
+        self.assertIn(ui_orbe.VERDE, cena.st["Voz"].styleSheet())
+        ui_orbe.definir_ultron(self.win, False)                             # "modo Jarvis": volta ao azul
+        self.assertIn(ui_orbe.TEXTO2, cena.topo_esq.styleSheet())
+        self.assertIn("58,120,216", cena._botoes_ultron[0].styleSheet())
+        self.assertIn(ui_orbe.CIANO, cena.canal.entrada.styleSheet())
+
+    def test_botoes_do_ultron_nao_se_sobrepoem_em_tela_baixa(self):
+        cena = self.cena
+        self.win.show()
+        self._eventos()
+        cena.montar_botoes_ultron(ITENS_ULTRON, lambda n, a: None)
+        for altura in (700, 728, 820):  # 700 = janela maximizada num notebook 1366x768
+            cena.setGeometry(0, 0, 1366, altura)
+            cena._organizar()
+            cena.p_ultron.corpo.activate()
+            self._eventos()
+            self.assertTrue(cena.p_ultron.isVisible())
+            caixas = [b.geometry() for b in cena._botoes_ultron]
+            for i, a in enumerate(caixas):
+                for b in caixas[i + 1:]:
+                    self.assertFalse(a.intersects(b), f"botões um por cima do outro com altura {altura}")
+            dica = cena._dica_ultron
+            if dica.isVisible():
+                self.assertFalse(any(dica.geometry().intersects(c) for c in caixas))
+            self.assertLessEqual(cena.p_ultron.geometry().bottom(), altura)
+
+    def _instalar_painel(self):
+        import importlib.util
+        import types
+        from unittest.mock import patch
+
+        from core import na_tela
+        na_tela.preparar()
+        falso_main = types.ModuleType("main")
+        falso_main.carregar_automacoes = lambda: types.SimpleNamespace(ferramentas={"pc_protection": 1})
+
+        class J:
+            ui = types.SimpleNamespace(_win=self.win)
+
+            def rodar_automacao_ultron(self, nome, args=None):
+                pass
+
+        spec = importlib.util.spec_from_file_location("pu_cena", "automacoes/painel_ultron.py")
+        m = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(m)
+        with patch.dict(sys.modules, {"main": falso_main}):
+            m._construir(J())
+
+    def test_sem_o_painel_ultron_nao_ha_botao_nem_quadro_vazio(self):
+        self.win.resize(1400, 900)
+        self.win.show()
+        self._eventos()
+        tela = self.win._tela_stark
+        self.assertTrue(tela.botao_ultron.isHidden())       # apagou painel_ultron.py: o botão some
+        self.assertFalse(self.cena.p_ultron.isVisible())    # e o quadro da lateral também
+        self._instalar_painel()
+        self._eventos()
+        self.assertFalse(tela.botao_ultron.isHidden())
+        self.assertTrue(self.cena.p_ultron.isVisible())
+
+    def test_painel_ultron_abre_por_cima_da_cena(self):
+        self.win.resize(1400, 900)
+        self.win.show()
+        self._eventos()
+        self._instalar_painel()
+        tela = self.win._tela_stark
+        painel = tela._painel_ultron
+        central = self.win.centralWidget()
+        tela.ao_abrir_ultron()                               # mesmo caminho do "modo Ultron"
+        self._eventos()
+        self.assertTrue(ui_orbe._ULTRON)
+        w = central.childAt(central.rect().center())
+        self.assertTrue(w is painel or painel.isAncestorOf(w), f"o painel ficou escondido atrás de {w}")
+        self.cena.alternar()                                 # F2: o painel aberto vai junto
+        self._eventos()
+        self.assertIs(painel.parentWidget(), tela)
+        self.assertTrue(painel.isVisible())
+        self.cena.alternar()
+        self._eventos()
+        self.assertIs(painel.parentWidget(), self.cena)
+        from PyQt6.QtWidgets import QPushButton
+        fechar = next(b for b in painel.findChildren(QPushButton) if "Fechar" in b.text())
+        fechar.click()                                       # o "Fechar" está ao alcance
+        self.assertFalse(painel.isVisible())
+        self.assertFalse(ui_orbe._ULTRON)
+
+
 if __name__ == "__main__":
     unittest.main()
