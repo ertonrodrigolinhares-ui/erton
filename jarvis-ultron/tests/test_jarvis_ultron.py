@@ -1079,6 +1079,71 @@ class EnvArquivoTests(unittest.TestCase):
         atualizar_env(arquivo, "NOVA", "x")
         self.assertTrue(arquivo.read_text(encoding="utf-8").rstrip().endswith('NOVA="x"'))
 
+    def test_env_gravado_pelo_console_do_windows_nao_trava_nem_estraga(self):
+        # O iniciador grava a cidade pelo console (cp850): "ã" vira o byte 0xC6, que não é UTF-8.
+        import tempfile
+        from pathlib import Path
+        from core.env_arquivo import atualizar_env, ler_texto_env
+        arquivo = Path(tempfile.mkdtemp()) / ".env"
+        arquivo.write_bytes('GEMINI_API_KEY="velha"\r\nJARVIS_CIDADE="João Pessoa"\r\n'.encode("cp850"))
+        self.assertIn(b"Jo\xc6o", arquivo.read_bytes())
+        self.assertIn('JARVIS_CIDADE="João Pessoa"', ler_texto_env(arquivo))
+        atualizar_env(arquivo, "JARVIS_CEREBRO", "gemma")  # antes: UnicodeDecodeError e nada gravado
+        texto = arquivo.read_bytes().decode("utf-8")  # agora é UTF-8 de verdade
+        self.assertIn('JARVIS_CIDADE="João Pessoa"', texto)
+        self.assertIn('GEMINI_API_KEY="velha"', texto)
+        self.assertIn('JARVIS_CEREBRO="gemma"', texto)
+        # UTF-8 com BOM (Bloco de Notas antigo) continua certo, sem o BOM grudar na 1ª chave
+        arquivo.write_bytes(b"\xef\xbb\xbf" + 'JARVIS_CIDADE="São Paulo"\n'.encode("utf-8"))
+        self.assertTrue(ler_texto_env(arquivo).startswith('JARVIS_CIDADE="São Paulo"'))
+        with self.assertRaises(FileNotFoundError):
+            ler_texto_env(arquivo.parent / "nao-existe.env")
+
+    def test_main_le_env_do_console_com_a_mesma_regra(self):
+        import os
+        import tempfile
+        from pathlib import Path
+        import main
+        pasta = Path(tempfile.mkdtemp())
+        (pasta / ".env").write_bytes('JARVIS_TESTE_CIDADE="João Pessoa"\n'.encode("cp850"))
+        with patch.object(main, "BASE_DIR", pasta), patch.dict("os.environ", {}, clear=False):
+            os.environ.pop("JARVIS_TESTE_CIDADE", None)
+            main._load_dotenv()
+            self.assertEqual(os.environ.get("JARVIS_TESTE_CIDADE"), "João Pessoa")
+
+    def test_instaladores_leem_o_env_sem_estragar_acentos(self):
+        # Os .ps1 não podem ler o .env com ReadAllLines (UTF-8 que troca o byte 0xC6 por "?" e
+        # regrava assim): usam a mesma regra do core/env_arquivo.py e gravam UTF-8 sem BOM.
+        import re
+        from pathlib import Path
+        raiz = Path(__file__).resolve().parents[1]
+        for nome in ("gemma/instalar_gemma.ps1", "gemma/voltar_gemini.ps1", "claude/instalar_claude.ps1"):
+            texto = (raiz / nome).read_bytes().decode("ascii")  # o PowerShell 5.1 lê sem BOM como ANSI
+            self.assertNotIn("ReadAllLines", texto, nome)
+            self.assertIn("function Ler-Linhas-Env", texto, nome)
+            self.assertIn("New-Object System.Text.UTF8Encoding $false, $true", texto, nome)  # UTF-8 estrito
+            self.assertIn("GetEncoding(850)", texto, nome)
+            self.assertIn("TrimStart([char]0xFEFF)", texto, nome)
+            self.assertRegex(texto, re.compile(r"\$linhas = @\(Ler-Linhas-Env"), nome)
+            self.assertIn("New-Object System.Text.UTF8Encoding $false\n", texto, nome)  # grava sem BOM
+
+    def test_voltar_para_o_gemini_nao_diz_que_deu_certo_quando_falha(self):
+        from pathlib import Path
+        raiz = Path(__file__).resolve().parents[1]
+        texto = (raiz / "gemma/voltar_gemini.ps1").read_text(encoding="ascii")
+        self.assertIn('$ErrorActionPreference = "Stop"', texto)
+        inicio_try = texto.index("try {\n")
+        catch = texto.index("} catch {", inicio_try)
+        fim_catch = texto.index("\n}\n", catch)
+        # ler e gravar ficam dentro do mesmo try: falha na leitura nunca grava um .env só com uma linha
+        self.assertLess(inicio_try, texto.index("Ler-Linhas-Env |"))
+        self.assertLess(texto.index("WriteAllText"), catch)
+        self.assertIn("exit 1", texto[catch:fim_catch])
+        self.assertIn("Read-Host", texto[catch:fim_catch])
+        self.assertGreater(texto.index("O Jarvis voltou a usar o Gemini"), fim_catch)  # sucesso só depois
+        bat = (raiz / "Voltar para o Gemini.bat").read_bytes().decode("ascii")
+        self.assertIn("if errorlevel 1 pause\r\n", bat)
+
     def test_chave_nova_do_google_passa_na_conferencia_basica(self):
         from core.api_key_validator import _basic_key_check, normalize_gemini_api_key
         chave = "AQ.ExemploFalso0000000000000000000000"

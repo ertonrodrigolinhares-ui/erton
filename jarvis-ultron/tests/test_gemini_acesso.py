@@ -200,6 +200,70 @@ class TestadorTests(unittest.TestCase):
         self.assertEqual(env.read_text(), "")  # não grava nada que não funcionou
         os.environ.pop("GEMINI_API_KEY", None)
 
+    def test_testador_le_e_grava_env_gravado_pelo_console_do_windows(self):
+        # O iniciador grava a cidade pelo console (cp850): "ã" vira o byte 0xC6, que não é UTF-8.
+        pasta = Path(tempfile.mkdtemp())
+        env = pasta / ".env"
+        env.write_bytes(f'GEMINI_API_KEY="{CHAVE_AQ}"\r\nJARVIS_CIDADE="João Pessoa"\r\n'.encode("cp850"))
+        saida = io.StringIO()
+        with patch.object(ga, "_arquivo_env", lambda: env), \
+                patch("getpass.getpass", lambda prompt="": ""), \
+                patch.object(ga, "cliente", lambda chave, via_, timeout_ms=15000: ClienteFalso(via_)), \
+                patch.dict(os.environ, {"GEMINI_LIVE_MODEL": ""}), \
+                contextlib.redirect_stdout(saida):
+            os.environ.pop("GEMINI_API_KEY", None)
+            os.environ.pop("JARVIS_GEMINI_VIA", None)
+            codigo = ga.principal()
+        texto = saida.getvalue()
+        self.assertEqual(codigo, 0, texto)
+        self.assertNotIn("Chave no .env: nenhuma", texto)  # a chave do .env foi lida
+        self.assertIn("Chave no .env: começa com AQ.", texto)
+        self.assertNotIn(CHAVE_AQ, texto)
+        conteudo = env.read_bytes().decode("utf-8")  # regravado em UTF-8
+        self.assertIn('JARVIS_GEMINI_VIA="vertex"', conteudo)
+        self.assertIn('GEMINI_LIVE_MODEL="gemini-live-2.5-flash"', conteudo)
+        self.assertIn('JARVIS_CIDADE="João Pessoa"', conteudo)  # o acento não estraga
+        self.assertIn(f'GEMINI_API_KEY="{CHAVE_AQ}"', conteudo)
+
+    def test_testador_avisa_quando_nao_consegue_gravar(self):
+        pasta = Path(tempfile.mkdtemp())
+        env = pasta / ".env"
+        env.write_text("")
+        saida = io.StringIO()
+
+        def sem_permissao(*a, **kw):
+            raise PermissionError("acesso negado")
+
+        with patch.object(ga, "_arquivo_env", lambda: env), \
+                patch("getpass.getpass", lambda prompt="": CHAVE_AQ), \
+                patch.object(ga, "cliente", lambda chave, via_, timeout_ms=15000: ClienteFalso(via_)), \
+                patch("core.env_arquivo.atualizar_env", sem_permissao), \
+                patch.dict(os.environ, {"GEMINI_API_KEY": "", "GEMINI_LIVE_MODEL": ""}), \
+                contextlib.redirect_stdout(saida):
+            codigo = ga.principal()
+        texto = saida.getvalue()
+        self.assertEqual(codigo, 1, texto)
+        self.assertIn("NÃO consegui gravar no arquivo .env", texto)
+        self.assertNotIn("Gravei no .env", texto)
+        self.assertNotIn(CHAVE_AQ, texto)
+
+    def test_janela_do_testador_nao_fecha_sozinha_quando_da_erro(self):
+        pedidos = []
+
+        def quebra():
+            raise UnicodeDecodeError("utf-8", b"\xc6", 0, 1, f"chave {CHAVE_AQ}")
+
+        saida = io.StringIO()
+        with patch.object(ga, "principal", quebra), \
+                patch("builtins.input", lambda texto="": pedidos.append(texto) or ""), \
+                contextlib.redirect_stdout(saida):
+            codigo = ga.rodar_no_console()
+        self.assertEqual(codigo, 1)
+        self.assertEqual(len(pedidos), 1)  # ainda espera o Enter
+        self.assertIn("Aperte Enter", pedidos[0])
+        self.assertIn("UnicodeDecodeError", saida.getvalue())
+        self.assertNotIn(CHAVE_AQ, saida.getvalue())  # a mensagem do erro (que pode ter a chave) não sai
+
 
 if __name__ == "__main__":
     unittest.main()

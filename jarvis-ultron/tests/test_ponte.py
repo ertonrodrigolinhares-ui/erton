@@ -596,6 +596,20 @@ class PonteDeVerdadeTests(unittest.TestCase):
         self.assertTrue(any("Modo privado ligado" in l for l in tela.logs))
         p.encerrar()
 
+    def test_modo_privado_avisa_na_tela_quando_nao_grava_no_env(self):
+        import tempfile
+        pasta = Path(tempfile.mkdtemp())
+        (pasta / ".env").mkdir()  # .env que não dá para ler nem gravar
+        tela = TelaFalsa()
+        p = PonteTela(tela, comando=["/caminho/que/nao/existe"], pasta=pasta)
+        try:
+            with patch.dict(os.environ, {"JARVIS_CEREBRO": "gemini"}):
+                p.trocar_cerebro("gemma")
+                self.assertEqual(os.environ["JARVIS_CEREBRO"], "gemma")  # vale para agora
+        finally:
+            p.encerrar()
+        self.assertTrue(any(l.startswith("ERR:") and ".env" in l for l in tela.logs), tela.logs)
+
     def test_modo_separado_e_o_padrao(self):
         with patch.dict(os.environ, {"JARVIS_UM_PROCESSO": ""}):
             self.assertTrue(ponte.modo_separado())

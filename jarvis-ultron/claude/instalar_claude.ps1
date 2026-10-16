@@ -35,12 +35,24 @@ function Sair-Com-Erro($texto) {
     exit 1
 }
 
+function Ler-Linhas-Env {
+    # Le o .env sem estragar acentos (a mesma regra do core\env_arquivo.py): tenta UTF-8 e, se o
+    # arquivo nao for UTF-8 valido (o iniciador grava a cidade na pagina de codigo do console, cp850),
+    # le como cp850. Quem grava depois grava sempre UTF-8 sem BOM.
+    if (-not (Test-Path $envArq)) { return @() }
+    $bytes = [System.IO.File]::ReadAllBytes($envArq)
+    try { $texto = (New-Object System.Text.UTF8Encoding $false, $true).GetString($bytes) }
+    catch { $texto = [System.Text.Encoding]::GetEncoding(850).GetString($bytes) }
+    $texto = $texto.TrimStart([char]0xFEFF).TrimEnd([char]13, [char]10)
+    if ($texto -eq "") { return @() }
+    return ($texto -split "`r?`n")
+}
+
 function Definir-Env($chave, $valor) {
     # Troca (ou acrescenta) uma linha CHAVE="valor" no .env, sem mexer nas outras.
     # Entre aspas, o Jarvis le "\b", "\n", "\t"... como letras especiais: a barra e a aspa vao dobradas.
     $valor = ([string]$valor).Replace('\', '\\').Replace('"', '\"')
-    $linhas = @()
-    if (Test-Path $envArq) { $linhas = [System.IO.File]::ReadAllLines($envArq) }
+    $linhas = @(Ler-Linhas-Env)
     $nova = "$chave=`"$valor`""
     $achou = $false
     $saida = foreach ($linha in $linhas) {

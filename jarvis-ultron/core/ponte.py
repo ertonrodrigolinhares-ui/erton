@@ -528,6 +528,8 @@ class PonteTela:
             atualizar_env(self._pasta / ".env", "JARVIS_CEREBRO", valor)
         except Exception as erro:
             print(f"[Ponte] Não gravei o modo no .env: {erro}")
+            self.ui.write_log("ERR: Não consegui gravar o modo no .env; ao abrir o Jarvis de novo, "
+                              "ele volta ao modo anterior.")
         self.ui.write_log("SYS: 🔒 Modo privado ligado (Gemma 4 no PC). Religando o cérebro..." if valor == "gemma"
                           else "SYS: Modo normal (Gemini). Religando o cérebro...")
         self._religando_desde = time.monotonic()

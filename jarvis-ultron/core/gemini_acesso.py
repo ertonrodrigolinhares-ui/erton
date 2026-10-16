@@ -228,13 +228,17 @@ def principal() -> int:
     import getpass
 
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from core.env_arquivo import atualizar_env, ler_texto_env
+
     try:
+        import io
+
         from dotenv import load_dotenv
 
-        load_dotenv(_arquivo_env())
+        # o .env pode estar na página de código do console (cidade com acento gravada pelo iniciador)
+        load_dotenv(stream=io.StringIO(ler_texto_env(_arquivo_env())))
     except Exception:
         pass
-    from core.env_arquivo import atualizar_env
 
     print("=" * 62)
     print(" Testar a chave do Gemini (a chave nunca aparece na tela)")
@@ -281,11 +285,16 @@ def principal() -> int:
             print(f"        {modelo}: {motivo}")
 
     env = _arquivo_env()
-    if nova:
-        atualizar_env(env, "GEMINI_API_KEY", nova)
-    atualizar_env(env, "JARVIS_GEMINI_VIA", vencedor.via)
-    if modelo_vivo and (vencedor.via == "vertex" or os.environ.get("GEMINI_LIVE_MODEL")):
-        atualizar_env(env, "GEMINI_LIVE_MODEL", modelo_vivo)
+    try:
+        if nova:
+            atualizar_env(env, "GEMINI_API_KEY", nova)
+        atualizar_env(env, "JARVIS_GEMINI_VIA", vencedor.via)
+        if modelo_vivo and (vencedor.via == "vertex" or os.environ.get("GEMINI_LIVE_MODEL")):
+            atualizar_env(env, "GEMINI_LIVE_MODEL", modelo_vivo)
+    except OSError as erro:
+        print(f"\nNÃO consegui gravar no arquivo .env ({type(erro).__name__}). Ele pode estar somente leitura")
+        print("ou aberto em outro programa. Feche o Jarvis e o Bloco de Notas e rode este teste de novo.")
+        return 1
     print("\nGravei no .env:", ", ".join(
         (["a chave nova"] if nova else []) + [f"o caminho ({vencedor.via})"]
         + ([f"o modelo de voz ({modelo_vivo})"] if modelo_vivo and (vencedor.via == "vertex" or os.environ.get("GEMINI_LIVE_MODEL")) else [])))
@@ -298,13 +307,22 @@ def principal() -> int:
     return 2
 
 
-if __name__ == "__main__":
+def rodar_no_console() -> int:
+    """O testador na janela preta: nunca fecha sozinho, nem quando algo dá errado."""
     try:
         codigo = principal()
     except KeyboardInterrupt:
+        codigo = 1
+    except Exception as erro:
+        # só o tipo do erro: a mensagem pode trazer pedaços da chave, que nunca vai para a tela
+        print(f"\nDeu um erro inesperado ({type(erro).__name__}). Tire um print desta janela e mande para o suporte.")
         codigo = 1
     try:
         input("\nAperte Enter para fechar.")
     except EOFError:
         pass
-    sys.exit(codigo)
+    return codigo
+
+
+if __name__ == "__main__":
+    sys.exit(rodar_no_console())

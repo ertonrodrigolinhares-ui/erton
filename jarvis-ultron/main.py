@@ -75,21 +75,16 @@ def _load_dotenv():
         # python-dotenv not installed — rely on already-set env vars
         return
     # Jarvis Ultron: o iniciador do Windows grava o .env na página de código do console (ex.: a cidade
-    # "João Pessoa"); o Bloco de Notas grava em UTF-8. Aceita os dois em vez de travar na abertura.
+    # "João Pessoa"); o Bloco de Notas grava em UTF-8. Aceita os dois em vez de travar na abertura
+    # (a mesma leitura do testador de chave e de quem grava no .env: core/env_arquivo.py).
     import io
 
+    from core.env_arquivo import ler_texto_env
+
     try:
-        bruto = (BASE_DIR / ".env").read_bytes()
+        texto = ler_texto_env(BASE_DIR / ".env")
     except OSError:
         return
-    for codificacao in ("utf-8-sig", "cp850", "cp1252"):
-        try:
-            texto = bruto.decode(codificacao)
-            break
-        except UnicodeDecodeError:
-            continue
-    else:
-        texto = bruto.decode("utf-8", errors="replace")
     load_dotenv(stream=io.StringIO(texto))
 
 
