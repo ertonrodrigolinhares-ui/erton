@@ -400,6 +400,38 @@ class ModoPrivadoPorVozTests(unittest.TestCase):
         self.assertIn("transcrição local", jarvis.avisos[0])
         self.assertFalse(jarvis._trocando_cerebro)
 
+    def test_recusa_aparece_na_tela_mesmo_com_o_microfone_desligado_e_sem_o_gemini(self):
+        # digitando numa reunião (microfone desligado), Gemini fora do ar (reserva Groq): a voz não sai,
+        # então a recusa tem de aparecer na tela; senão ficava só o "espere o selo"
+        jarvis = self._jarvis()
+        del jarvis._falar_aviso  # o de verdade
+        jarvis.ui.muted = True
+        jarvis.session, jarvis._loop, jarvis._modo_reserva = None, None, True
+        with patch("core.cerebro_gemma.modelo_instalado", return_value=True), \
+                patch("core.cerebro_gemma.whisper_instalado", return_value=False):
+            self.assertTrue(jarvis._pedido_de_cerebro("modo privado"))
+            self._esperar_troca()
+        self.assertEqual(jarvis.ui.trocas, [])
+        self.assertFalse(jarvis._trocando_cerebro)
+        recusas = [l for l in jarvis.ui.logs if "NÃO ligado" in l]
+        self.assertEqual(len(recusas), 1, jarvis.ui.logs)
+        self.assertIn("transcrição local", recusas[0])
+
+    def test_recusas_da_troca_sempre_vao_para_a_tela(self):
+        for nome, modelo, whisper, aplicando, trecho in (
+                ("gemini", False, True, False, "primeiro rode o Instalar Gemma 4"),
+                ("gemini", True, True, True, "O Claude está mudando o meu código"),
+                ("gemma", True, True, False, "Já estou no modo privado")):
+            jarvis = self._jarvis(nome)
+            with patch("core.cerebro_gemma.modelo_instalado", return_value=modelo), \
+                    patch("core.cerebro_gemma.whisper_instalado", return_value=whisper), \
+                    patch("core.claude_chefe.aplicando", return_value=aplicando):
+                jarvis._pedido_de_cerebro("modo privado")
+                self._esperar_troca()
+            self.assertEqual(jarvis.ui.trocas, [])
+            self.assertTrue(any(trecho in l for l in jarvis.ui.logs), (trecho, jarvis.ui.logs))
+            self.assertIn(trecho, jarvis.avisos[0])  # e continua falando em voz alta quando dá
+
     def test_durante_a_troca_nada_vai_para_a_nuvem(self):
         import numpy as np
         from core.palavra_ativacao import PortaoDeVoz

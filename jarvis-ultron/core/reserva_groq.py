@@ -17,6 +17,7 @@ import io
 import json
 import os
 import threading
+import time
 import wave
 
 MODELOS_PREFERIDOS = [
@@ -224,6 +225,7 @@ BLOCO = 1280  # 80 ms a 16 kHz
 VOLUME_FALA = 450  # acima disso consideramos que alguém está falando
 SILENCIO_FIM = 1.2  # segundos de silêncio que encerram a frase
 FALA_MAXIMA = 15.0
+PAUSA_LONGA = 0.5  # segundos sem ler o microfone (cuidando de uma fala): o áudio guardado é antigo
 
 
 def separar_falas(blocos, portao, pode_ouvir=lambda: True, taxa: int = 16000):
@@ -266,6 +268,17 @@ def capturar_falas(continuar, pode_ouvir, portao, taxa: int = 16000):
         with sd.InputStream(samplerate=taxa, channels=1, dtype="int16", blocksize=BLOCO) as entrada:
             while continuar():
                 dados, _ = entrada.read(BLOCO)
+                lido_em = time.monotonic()
                 yield dados[:, 0].copy()
+                if time.monotonic() - lido_em > PAUSA_LONGA:
+                    # Ficou parado (transcrevendo, respondendo, falando): o que o microfone guardou nesse
+                    # meio tempo é antigo e pode ter a voz do próprio Jarvis (um aviso sigiloso lido pela
+                    # voz do PC). Joga fora, para não ir depois para a transcrição.
+                    try:
+                        sobra = int(entrada.read_available)
+                        if sobra > 0:
+                            entrada.read(sobra)
+                    except Exception as erro:
+                        print(f"[Reserva] Não consegui limpar o áudio antigo do microfone: {erro}")
 
     yield from separar_falas(blocos(), portao, pode_ouvir, taxa)

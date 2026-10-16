@@ -8,6 +8,9 @@ aprovou_depois(jarvis, marca) só é True se veio uma fala nova depois da marca 
 
 Comparar o texto da fala (como antes) não servia: no Gemini ao vivo a transcrição chega em pedaços e
 atrasada, e o próprio pedido ("faz o vídeo, pode fazer") parecia uma fala nova na segunda chamada.
+Por isso, no Gemini ao vivo, um pedaço só abre uma fala nova se o microfone mandou áudio depois do
+último turno do Jarvis (enquanto ele fala, o microfone fica fechado); o que chega antes disso é o
+resto atrasado da fala anterior e só faz o texto dela crescer.
 
 Pelo mesmo motivo, a ferramenta pode chegar quando só o começo da resposta foi transcrito: de
 "Ok, pode cancelar, tá caro" pode ter chegado só o "Ok,". Por isso, antes do que é pago ou não tem

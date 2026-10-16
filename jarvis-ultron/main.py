@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import os
 import re
 import threading
@@ -1349,6 +1350,7 @@ class JarvisLive:
         self._loop          = None
         self._is_speaking   = False
         self._speaking_lock = threading.Lock()
+        self._falando_no_pc = 0  # Jarvis Ultron: a voz do Windows falando (trava própria do microfone)
         self.voice_name     = voice_name
         # optional runtime limit in seconds (set by main)
         self.runtime_limit_seconds: int | None = None
@@ -1370,6 +1372,7 @@ class JarvisLive:
         # Jarvis Ultron: número e texto da fala atual do Erton (o "ok" das aprovações: core/aprovacao.py)
         self._fala_n = 0
         self._fala_texto = ""
+        self._ouviu_depois_do_turno = True  # o microfone mandou áudio depois do último turno do Jarvis
         self._pending_self_quit = False
         self._pending_self_quit_farewell_received = False
         self._self_quit_timer = None
@@ -1428,7 +1431,8 @@ class JarvisLive:
         if getattr(self, "_trocando_cerebro", False):  # indo para o modo privado: não manda para a nuvem
             self.ui.write_log("SYS: 🔒 Trocando para o modo privado: espere o selo e mande de novo.")
             return
-        if not self._loop or not self.session:
+        # no modo reserva vai para a reserva mesmo que sobre uma sessão do Gemini (o "ok" digitado também)
+        if not self._loop or not self.session or getattr(self, "_modo_reserva", False):
             texto = str(text or "").strip()
             if getattr(self, "_reserva", None) is not None and texto:
                 if not texto.startswith("["):  # [UI EVENT], [FILE_UPLOADED]: não são falas do Erton
@@ -1440,7 +1444,19 @@ class JarvisLive:
                 return
             if not str(text or "").strip() or self._guardar_ate_conectar(text):
                 return
-        asyncio.run_coroutine_threadsafe(self.send_text(text), self._loop)
+        envio = asyncio.run_coroutine_threadsafe(self.send_text(text), self._loop)
+        envio.add_done_callback(lambda feito: self._avisar_se_nao_enviou(feito, text))
+
+    def _avisar_se_nao_enviou(self, envio, text: str) -> None:
+        """Jarvis Ultron: a conexão caiu bem na hora de mandar o texto digitado. Avisa na tela em vez
+        de o texto sumir calado."""
+        try:
+            enviado = not envio.cancelled() and envio.exception() is None and envio.result() is not False
+        except Exception:
+            enviado = False
+        if not enviado and str(text or "").strip():
+            self.ui.write_log("ERR: Não consegui mandar o seu texto: a conexão com o Gemini caiu. "
+                              "Mande de novo daqui a pouco.")
 
     def _nova_fala(self, texto: str, em_pedacos: bool = False) -> int:
         """Jarvis Ultron: uma fala NOVA do Erton (falada ou digitada). As aprovações só aceitam o
@@ -1449,6 +1465,11 @@ class JarvisLive:
         from core.aprovacao import nova_fala
 
         return nova_fala(self, texto, em_pedacos)
+
+    def _trava_da_fala(self):
+        if not hasattr(self, "_speaking_lock"):
+            self._speaking_lock = threading.Lock()
+        return self._speaking_lock
 
     def _trava_textos(self):
         if not hasattr(self, "_textos_trava"):
@@ -1473,6 +1494,10 @@ class JarvisLive:
                 return True
             self._textos_esperando.append(str(text))
             primeiro = len(self._textos_esperando) == 1
+            if not str(text).strip().startswith("["):  # [UI EVENT], [FILE_UPLOADED] não contam
+                # conta a fala agora, quando ele digitou (e não quando for mandada): um "ok" digitado
+                # antes de ouvir uma proposta não pode valer como resposta a ela
+                self._nova_fala(str(text).strip())
         if primeiro:
             self.ui.write_log("SYS: Ainda estou conectando ao Gemini; respondo assim que conectar.")
         return True
@@ -1481,12 +1506,13 @@ class JarvisLive:
         """Jarvis Ultron: manda ao Gemini, na ordem, o que foi digitado antes de ele conectar."""
         for texto in textos:
             try:
-                await self.send_text(texto)
+                await self.send_text(texto, contar=False)  # já contou quando ele digitou
             except Exception as erro:
                 print(f"[JARVIS] ⚠️ Texto guardado não foi enviado: {erro}")
 
-    async def send_text(self, text: str) -> bool:
-        """Send a text turn from either the desktop callback or a web client."""
+    async def send_text(self, text: str, contar: bool = True) -> bool:
+        """Send a text turn from either the desktop callback or a web client.
+        contar=False: texto guardado até conectar, já contado como fala quando foi digitado."""
         if not self.session:
             return False
         self._current_input_transcript = str(text or "").strip()
@@ -1494,7 +1520,7 @@ class JarvisLive:
             return False
         self._last_input_transcript = self._current_input_transcript
         self._last_input_transcript_at = time.monotonic()
-        if not self._current_input_transcript.startswith("["):  # [UI EVENT], [FILE_UPLOADED] não contam
+        if contar and not self._current_input_transcript.startswith("["):  # [UI EVENT], [FILE_UPLOADED] não contam
             self._nova_fala(self._current_input_transcript)
         self._checar_pedido_de_modo(self._current_input_transcript)
         outgoing_text = self._current_input_transcript
@@ -1523,10 +1549,22 @@ class JarvisLive:
                 or getattr(self, "_trocando_cerebro", False):
             return False
         await self.out_queue.put({"data": data, "mime_type": mime_type})
+        self._microfone_mandou_audio()
         return True
 
+    def _microfone_mandou_audio(self) -> None:
+        """Jarvis Ultron: o microfone mandou áudio ao Gemini com o Jarvis calado. Só depois disso a
+        transcrição que chegar pode ser uma fala NOVA do Erton (core/aprovacao.py): enquanto o Jarvis
+        fala, o microfone fica fechado."""
+        with self._trava_da_fala():
+            if not getattr(self, "_is_speaking", False):
+                self._ouviu_depois_do_turno = True
+
     def set_speaking(self, value: bool):
-        with self._speaking_lock:
+        with self._trava_da_fala():
+            # Jarvis Ultron: enquanto a voz do PC fala (avisos sigilosos, _falar_no_pc), o fim da fala do
+            # Gemini ou da voz reserva não reabre o microfone: senão o resto do texto sigiloso ia para a nuvem
+            value = bool(value) or getattr(self, "_falando_no_pc", 0) > 0
             self._is_speaking = value
         if value:
             self.ui.set_state("SPEAKING")
@@ -1836,14 +1874,29 @@ class JarvisLive:
             return "falado"
         return "na_tela"
 
-    def _falar_no_pc(self, texto: str) -> None:
-        """Voz do próprio Windows: o texto não sai do PC (avisos sigilosos)."""
+    VOZ_DO_PC_ESPERA = 30.0  # no máximo isso esperando a outra voz terminar antes de ler o aviso sigiloso
+
+    def _falar_no_pc(self, texto: str, esperar: bool = True) -> None:
+        """Voz do próprio Windows: o texto não sai do PC (avisos sigilosos).
+
+        Enquanto ela fala, o microfone fica fechado por uma trava só dela (_falando_no_pc): o fim da
+        fala do Gemini ou da voz reserva não o reabre no meio da leitura (sem isso, o resto do texto
+        ia pelo microfone para o Gemini ou para o Groq). esperar: antes de começar, espera a outra voz
+        terminar, para as duas não falarem juntas."""
         from actions.tts_engine import falar_com_voz_do_windows
 
+        if esperar:
+            limite = time.monotonic() + self.VOZ_DO_PC_ESPERA
+            while getattr(self, "_is_speaking", False) and time.monotonic() < limite:
+                time.sleep(0.1)
+        with self._trava_da_fala():
+            self._falando_no_pc = getattr(self, "_falando_no_pc", 0) + 1
         self.set_speaking(True)
         try:
             falar_com_voz_do_windows(texto)
         finally:
+            with self._trava_da_fala():
+                self._falando_no_pc = max(0, getattr(self, "_falando_no_pc", 1) - 1)
             self.set_speaking(False)
 
     def _falar_avisos_guardados(self) -> None:
@@ -2131,15 +2184,16 @@ class JarvisLive:
         atual = "gemma" if getattr(self, "_cerebro_nome", "gemini") == "gemma" else "gemini"
         if destino == atual:
             self._trocando_cerebro = False
-            self._falar_aviso("Já estou no modo privado." if destino == "gemma" else "Já estou no modo normal.")
+            texto = "Já estou no modo privado." if destino == "gemma" else "Já estou no modo normal."
+            self.ui.write_log(f"SYS: {texto}")
+            self._falar_aviso(texto)
             return
         from core.claude_chefe import aplicando
 
         if aplicando():
             # religar o cérebro agora mataria a mudança do Claude no meio (sem testes e sem desfazer)
-            self._trocando_cerebro = False  # não vai trocar: o microfone volta a funcionar
-            self._falar_aviso("O Claude está mudando o meu código agora. Espere ele terminar para trocar de "
-                              "modo; eu aviso quando acabar.")
+            self._recusar_troca(destino, "O Claude está mudando o meu código agora. Espere ele terminar para "
+                                         "trocar de modo; eu aviso quando acabar.")
             return
         trocar = getattr(self.ui, "trocar_cerebro", None)
         if not callable(trocar):
@@ -2147,19 +2201,29 @@ class JarvisLive:
             self._troca_pela_voz_indisponivel(destino)
             return
         if destino == "gemma" and not whisper_instalado():
-            self._trocando_cerebro = False  # sem ouvir no PC, a voz não pode ir para a nuvem: não liga
-            self._falar_aviso("O modo privado não foi ligado: falta a transcrição local da sua voz. "
-                              "Rode o Instalar Gemma 4 de novo na pasta do Jarvis.")
+            # sem ouvir no PC, a voz não pode ir para a nuvem: não liga
+            self._recusar_troca(destino, "O modo privado não foi ligado: falta a transcrição local da sua voz. "
+                                         "Rode o Instalar Gemma 4 de novo na pasta do Jarvis.")
             return
         if destino == "gemma" and not modelo_instalado():
-            self._trocando_cerebro = False
-            self._falar_aviso("Para o modo privado, primeiro rode o Instalar Gemma 4 na pasta do Jarvis.")
+            self._recusar_troca(destino, "Para o modo privado, primeiro rode o Instalar Gemma 4 na pasta do Jarvis.")
             return
         if destino == "gemma":
             self.ui.write_log("SYS: 🔒 Entrando no modo privado: o cérebro passa a ser o Gemma 4, no seu PC...")
         else:
             self.ui.write_log("SYS: Voltando ao modo normal (Gemini)...")
         trocar(destino)  # a tela religa o programa do cérebro já com o cérebro novo
+
+    def _recusar_troca(self, destino: str, texto: str) -> None:
+        """A troca de cérebro não vai acontecer: libera o microfone e o texto (não vai trocar) e avisa na
+        tela e em voz alta. Na tela sempre: com o microfone desligado e sem o Gemini, a voz não sai, e
+        sem isso ficava só o "espere o selo" (e o próximo texto ia para a nuvem sem ele saber)."""
+        self._trocando_cerebro = False
+        if destino == "gemma":
+            self.ui.write_log(f"SYS: 🔒 Modo privado NÃO ligado: {texto}")
+        else:
+            self.ui.write_log(f"SYS: Modo normal NÃO ligado: {texto}")
+        self._falar_aviso(texto)
 
     def _troca_pela_voz_indisponivel(self, destino: str) -> None:
         """Tela e cérebro no mesmo programa (JARVIS_UM_PROCESSO, app empacotado ou a volta automática para
@@ -2359,13 +2423,7 @@ class JarvisLive:
 
         if os.environ.get("JARVIS_VOZ_PRIVADA", "").strip() in ("1", "sim", "true"):
             # Jarvis Ultron: voz do próprio Windows; o texto da resposta não sai do PC.
-            from actions.tts_engine import falar_com_voz_do_windows
-
-            self.set_speaking(True)
-            try:
-                falar_com_voz_do_windows(texto)
-            finally:
-                self.set_speaking(False)
+            self._falar_no_pc(texto, esperar=False)
             return
         motor = TTSEngine(
             provider="edge",
@@ -2377,14 +2435,8 @@ class JarvisLive:
         if motor.speak_sync(texto):
             return
         # Jarvis Ultron: a voz da internet (Microsoft Edge) falhou; usa a voz que vem no Windows.
-        from actions.tts_engine import falar_com_voz_do_windows
-
         print("[Reserva] Voz da internet falhou; usando a voz do Windows.")
-        self.set_speaking(True)
-        try:
-            falar_com_voz_do_windows(texto)
-        finally:
-            self.set_speaking(False)
+        self._falar_no_pc(texto, esperar=False)
 
     def _escutar_reserva(self) -> None:
         """No modo reserva: ouve (depois do "Hey Jarvis"), transcreve e responde pelo Groq."""
@@ -2795,6 +2847,7 @@ class JarvisLive:
                         self.out_queue.put_nowait,
                         {"data": data, "mime_type": "audio/pcm"}
                     )
+                    self._microfone_mandou_audio()
 
         try:
             with sd.InputStream(
@@ -2814,7 +2867,7 @@ class JarvisLive:
 
     async def _receive_audio(self):
         print("[JARVIS] 👂 Recv started")
-        from core.aprovacao import fechar_fala, mais_um_pedaco
+        from core.aprovacao import fechar_fala, mais_um_pedaco, marca
 
         out_buf, in_buf = [], []
         _new_turn = True
@@ -2822,6 +2875,7 @@ class JarvisLive:
         # Jarvis Ultron: contagem das falas do Erton para o "ok" das aprovações (core/aprovacao.py)
         ferramenta_no_turno = False  # já rodou ferramenta neste turno do modelo
         fala_do_buf = None  # número da fala que está em in_buf (None: não contou como fala nova)
+        resto_atrasado, texto_antes = False, ""  # in_buf é o resto atrasado da fala anterior (e o texto dela)
 
         try:
             while True:
@@ -2860,13 +2914,21 @@ class JarvisLive:
                             self._ultima_fala_em = time.monotonic()
                             txt = _clean_transcript(sc.input_transcription.text)
                             if txt:
+                                # o microfone fica fechado enquanto o Jarvis fala: sem áudio mandado
+                                # depois do fim do último turno dele, isto não pode ser uma fala nova
+                                ouviu = getattr(self, "_ouviu_depois_do_turno", True)
+                                if in_buf and resto_atrasado and ouviu:
+                                    # depois do resto atrasado ele voltou a falar: isto já é fala nova
+                                    self.ui.write_log(f"You: {self._current_input_transcript}")
+                                    in_buf = []
                                 fala_nova = not in_buf
                                 if fala_nova:
                                     self._current_input_transcript = ""
                                 in_buf.append(txt)
                                 self._current_input_transcript = " ".join(in_buf).strip()
-                                if fala_nova and not ferramenta_no_turno:
+                                if fala_nova and not ferramenta_no_turno and ouviu:
                                     fala_do_buf = self._nova_fala(self._current_input_transcript, em_pedacos=True)
+                                    resto_atrasado, texto_antes = False, ""
                                 else:
                                     # Transcrição que chega DEPOIS de uma ferramenta, no mesmo turno do
                                     # modelo, é o pedido chegando atrasado (ou ele falando por cima): não
@@ -2875,8 +2937,16 @@ class JarvisLive:
                                     # ("Ok," ... "pode cancelar") faz o texto dela crescer: a aprovação
                                     # confere de novo com a fala inteira (aprovacao.ainda_aprovado).
                                     if fala_nova:
-                                        fala_do_buf = None
-                                    mais_um_pedaco(self, fala_do_buf, self._current_input_transcript)
+                                        fala_do_buf, resto_atrasado, texto_antes = None, False, ""
+                                        if not ferramenta_no_turno and getattr(self, "_fala_em_pedacos", False):
+                                            # Chegou depois do fim do turno sem o microfone ter mandado
+                                            # nada desde então: é o resto atrasado da última fala (ex.: o
+                                            # ", pode fazer" do pedido, chegando durante o preço). Ela cresce;
+                                            # não vira uma fala nova depois da proposta.
+                                            fala_do_buf, resto_atrasado = marca(self), True
+                                            texto_antes = self._fala_texto
+                                    mais_um_pedaco(self, fala_do_buf,
+                                                   f"{texto_antes} {self._current_input_transcript}".strip())
                                 if (
                                     not getattr(self, "_pending_self_quit", False)
                                     and self._is_explicit_self_quit_transcript(self._current_input_transcript)
@@ -2903,8 +2973,10 @@ class JarvisLive:
                                 self.ui.write_log(f"You: {full_in}")
                             in_buf = []
                             fechar_fala(self, fala_do_buf)  # o que chegar depois já é outra fala
-                            fala_do_buf = None
+                            fala_do_buf, resto_atrasado, texto_antes = None, False, ""
                             ferramenta_no_turno = False
+                            # fala nova, agora, só com áudio do microfone mandado depois deste turno
+                            self._ouviu_depois_do_turno = False
 
                             full_out = " ".join(out_buf).strip()
                             if full_out:
@@ -3010,6 +3082,18 @@ class JarvisLive:
                 stream.stop()
                 stream.close()
 
+    @contextlib.asynccontextmanager
+    async def _esquecer_sessao_ao_sair(self):
+        """Jarvis Ultron: quando a conexão com o Gemini acaba (caiu ou fechou), esquece a sessão velha
+        na hora. Sem isso, o texto digitado (até no modo reserva) e os avisos iam para a conexão morta e
+        sumiam calados; sem sessão, vão para a reserva, ficam guardados até religar ou aparecem na tela."""
+        try:
+            yield
+        finally:
+            with self._trava_textos():
+                self.session = None
+                self.out_queue = None
+
     async def run(self):
         # Jarvis Ultron: cérebro Gemma 4 no PC. Não usa o Gemini: liga o cérebro local e fica de pé.
         # No modo nuvem (cloud_safe, o servidor web) o Gemma não é usado (igual ao __init__): vai ao Gemini.
@@ -3087,6 +3171,7 @@ class JarvisLive:
 
                 async with (
                     client.aio.live.connect(model=live_model_id, config=config) as session,
+                    self._esquecer_sessao_ao_sair(),
                     asyncio.TaskGroup() as tg,
                 ):
                     self.session        = session

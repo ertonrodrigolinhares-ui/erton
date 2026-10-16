@@ -219,6 +219,16 @@ def _fim_do_turno():
               tool_call=None)
 
 
+def _microfone(jarvis):
+    """O microfone mandou áudio ao Gemini com o Jarvis calado (o Erton falando depois do preço)."""
+    jarvis._microfone_mandou_audio()
+
+
+def _jarvis_falando(valor):
+    """O Jarvis começou (True) ou terminou (False) de falar; enquanto fala, o microfone fica fechado."""
+    return lambda jarvis: jarvis.set_speaking(valor)
+
+
 class OkNoGeminiAoVivoTests(unittest.TestCase):
     """No Gemini ao vivo a transcrição chega em pedaços e atrasada: o "pode fazer" dito junto com o
     pedido não pode aprovar o vídeo na segunda chamada do mesmo turno."""
@@ -233,14 +243,16 @@ class OkNoGeminiAoVivoTests(unittest.TestCase):
         self.addCleanup(silencio.stop)
 
     def _rodar(self, mensagens):
-        """mensagens: o que o Gemini manda, na ordem; um número é uma pausa (segundos) na conexão."""
+        """mensagens: o que o Gemini manda, na ordem; um número é uma pausa (segundos) na conexão e
+        uma função é algo que acontece no PC nessa hora (_microfone, _jarvis_falando)."""
         import asyncio
 
         import main
 
         jarvis = object.__new__(main.JarvisLive)
         jarvis.ui = NS(muted=False, write_log=lambda t: None, clear_subtitle=lambda: None,
-                       show_subtitle=lambda t: None)
+                       show_subtitle=lambda t: None, set_state=lambda estado: None)
+        self.jarvis = jarvis
         jarvis._portao = NS(estender=lambda: None, estado="ouvindo")
         jarvis._turn_done_event = None
         jarvis._shutdown_requested = threading.Event()
@@ -262,6 +274,9 @@ class OkNoGeminiAoVivoTests(unittest.TestCase):
                 for mensagem in mensagens:
                     if isinstance(mensagem, (int, float)):
                         await asyncio.sleep(mensagem)
+                        continue
+                    if callable(mensagem):
+                        mensagem(jarvis)
                         continue
                     yield mensagem
                 jarvis._shutdown_requested.set()
@@ -294,7 +309,7 @@ class OkNoGeminiAoVivoTests(unittest.TestCase):
         # "Ok, pode cancelar, tá caro": a ferramenta chega quando só o "Ok," foi transcrito; o resto
         # chega depois. O vídeo pago não pode começar com o pedaço "Ok,".
         gerar = self._rodar([_pedaco("Jarvis, faz um vídeo de 8 segundos do meu treino"), _video(False),
-                             _fim_do_turno(), _pedaco("Ok,"), _video(True), 0.2,
+                             _fim_do_turno(), _microfone, _pedaco("Ok,"), _video(True), 0.2,
                              _pedaco("pode cancelar, tá caro"), _fim_do_turno()])
         gerar.assert_not_called()
         self.assertTrue(any("Não fiz o vídeo" in a for a in self.avisos), self.avisos)
@@ -302,15 +317,45 @@ class OkNoGeminiAoVivoTests(unittest.TestCase):
     def test_resto_da_fala_que_chega_depois_do_fim_do_turno_tambem_conta(self):
         # o resto da fala chega só depois do fim do turno do modelo (vira uma fala nova): não faz
         gerar = self._rodar([_pedaco("Jarvis, faz um vídeo de 8 segundos do meu treino"), _video(False),
-                             _fim_do_turno(), _pedaco("Ok,"), _video(True), _fim_do_turno(), 0.2,
+                             _fim_do_turno(), _microfone, _pedaco("Ok,"), _video(True), _fim_do_turno(), 0.2,
                              _pedaco("pode cancelar, tá caro"), _fim_do_turno()])
         gerar.assert_not_called()
+        # o resto chegou sem áudio novo do microfone: é a mesma fala, que cresceu (e deixou de ser um "ok")
+        self.assertEqual(self.jarvis._fala_n, 2)
+        self.assertIn("pode cancelar", self.jarvis._fala_texto)
 
     def test_ok_numa_fala_nova_depois_do_preco_vale(self):
         gerar = self._rodar([_pedaco("Jarvis, faz um vídeo de 8 segundos do meu treino"), _video(False),
-                             _fim_do_turno(), _pedaco("ok, pode fazer"), _video(True), _fim_do_turno()])
+                             _jarvis_falando(True), _fim_do_turno(), _jarvis_falando(False), _microfone,
+                             _pedaco("ok, pode fazer"), _video(True), _fim_do_turno()])
         gerar.assert_called_once()
         self.assertIn("background", self.respostas[1])
+
+    def test_resto_do_pedido_que_chega_depois_do_turno_do_preco_nao_vale(self):
+        # o ", pode fazer" do pedido chega atrasado, já depois do fim do turno do preço (o Jarvis ainda
+        # falando o preço, o microfone fechado); o turno seguinte é aberto por um aviso, sem fala dele
+        gerar = self._rodar([_pedaco("Jarvis, faz um vídeo de 8 segundos do meu treino"), _video(False),
+                             _jarvis_falando(True), _fim_do_turno(), _pedaco(", pode fazer"),
+                             _jarvis_falando(False), _fim_do_turno(), _video(True), _fim_do_turno()])
+        gerar.assert_not_called()
+        self.assertIn("Not confirmed", self.respostas[1])
+        self.assertEqual(self.jarvis._fala_n, 1)  # o resto fez a fala do pedido crescer
+        self.assertTrue(self.jarvis._fala_texto.endswith(", pode fazer"), self.jarvis._fala_texto)
+
+    def test_resto_do_pedido_mais_uma_pergunta_nao_vale(self):
+        gerar = self._rodar([_pedaco("Jarvis, faz um vídeo de 8 segundos do meu treino"), _video(False),
+                             _fim_do_turno(), _pedaco(", pode fazer"), _microfone,
+                             _pedaco("e em dólar quanto dá?"), _video(True), _fim_do_turno()])
+        gerar.assert_not_called()
+        self.assertIn("Not confirmed", self.respostas[1])
+
+    def test_ok_de_verdade_depois_do_resto_atrasado_vale(self):
+        # depois do resto atrasado, o microfone volta a mandar áudio: o "ok" dele é uma fala nova
+        gerar = self._rodar([_pedaco("Jarvis, faz um vídeo de 8 segundos do meu treino"), _video(False),
+                             _fim_do_turno(), _pedaco(", pode fazer"), _microfone,
+                             _pedaco("ok, pode fazer"), _video(True), _fim_do_turno()])
+        gerar.assert_called_once()
+        self.assertEqual(self.jarvis._fala_texto, "ok, pode fazer")
 
 
 class Operacao:

@@ -1680,6 +1680,251 @@ class AvisosFaladosTests(unittest.TestCase):
         self.assertEqual(falados, ["beber água"])
 
 
+class VozDoPcFechaOMicrofoneTests(unittest.TestCase):
+    """Aviso sigiloso (ex.: resultado do Claude) lido pela voz do PC: o microfone fica fechado até ela
+    terminar, mesmo que a fala do Gemini (ou da voz reserva) acabe no meio da leitura."""
+
+    def _jarvis(self):
+        import threading
+        import main
+
+        class UI(UIFalsa):
+            def set_state(self, estado):
+                pass
+
+        jarvis = object.__new__(main.JarvisLive)
+        jarvis.ui = UI()
+        jarvis._speaking_lock, jarvis._is_speaking = threading.Lock(), False
+        jarvis._portao = PortaoDeVoz(None, ativo=False)
+        jarvis._shutdown_requested = threading.Event()
+        jarvis._modo_reserva = True
+        return jarvis
+
+    def test_fim_da_fala_do_gemini_nao_reabre_o_microfone_no_meio_do_aviso_sigiloso(self):
+        import threading
+
+        jarvis = self._jarvis()
+        lendo, terminar = threading.Event(), threading.Event()
+
+        def voz_do_windows(texto):
+            lendo.set()
+            terminar.wait(5)
+            return True
+
+        microfone, ouvir = {}, {}
+
+        class Microfone:
+            def __init__(s, callback=None, **k):
+                microfone["callback"] = callback
+
+            def __enter__(s):
+                return s
+
+            def __exit__(s, *a):
+                return False
+
+        def capturar(continuar, pode_ouvir, portao):
+            ouvir["pode"] = pode_ouvir
+            return iter(())
+
+        fala = np.ones((160, 1), dtype=np.int16)
+
+        async def cenario():
+            jarvis.out_queue = asyncio.Queue()
+            tarefa = asyncio.ensure_future(jarvis._listen_audio())
+            await asyncio.sleep(0.2)
+            with patch("actions.tts_engine.falar_com_voz_do_windows", voz_do_windows):
+                leitura = threading.Thread(target=jarvis._falar_no_pc, args=("Grupo Silva deve R$ 42.000",))
+                leitura.start()
+                await asyncio.to_thread(lendo.wait, 5)
+                jarvis.set_speaking(False)  # o turno do Gemini acabou (_play_audio) no meio da leitura
+                self.assertTrue(jarvis._is_speaking)
+                microfone["callback"](fala, 160, None, None)
+                await asyncio.sleep(0.1)
+                self.assertTrue(jarvis.out_queue.empty())  # o resto da leitura não foi para o Gemini
+                with patch("core.reserva_groq.capturar_falas", capturar):
+                    jarvis._escutar_reserva()
+                self.assertFalse(ouvir["pode"]())  # nem para a transcrição do Groq (modo reserva)
+                terminar.set()
+                await asyncio.to_thread(leitura.join, 5)
+            self.assertFalse(jarvis._is_speaking)  # a leitura acabou: o microfone volta
+            self.assertTrue(ouvir["pode"]())
+            microfone["callback"](fala, 160, None, None)
+            await asyncio.sleep(0.1)
+            self.assertFalse(jarvis.out_queue.empty())
+            jarvis._shutdown_requested.set()
+            await asyncio.wait_for(tarefa, 2)
+
+        with patch("main.sd.InputStream", Microfone):
+            asyncio.run(cenario())
+
+    def test_aviso_sigiloso_espera_a_outra_voz_terminar(self):
+        import threading
+
+        jarvis = self._jarvis()
+        jarvis.set_speaking(True)  # o Gemini (ou a voz reserva) ainda está falando
+        with patch("actions.tts_engine.falar_com_voz_do_windows") as voz:
+            leitura = threading.Thread(target=jarvis._falar_no_pc, args=("Grupo Silva deve R$ 42.000",))
+            leitura.start()
+            _time.sleep(0.3)
+            voz.assert_not_called()  # as duas vozes não falam juntas
+            jarvis.set_speaking(False)
+            leitura.join(5)
+        voz.assert_called_once_with("Grupo Silva deve R$ 42.000")
+        self.assertFalse(jarvis._is_speaking)
+
+    def test_reserva_joga_fora_o_audio_guardado_enquanto_cuidava_da_fala(self):
+        lidos = []
+
+        class Entrada:
+            read_available = 0
+
+            def __init__(s, **k):
+                pass
+
+            def __enter__(s):
+                return s
+
+            def __exit__(s, *a):
+                return False
+
+            def read(s, quantos):
+                lidos.append(quantos)
+                return np.zeros((quantos, 1), dtype=np.int16), False
+
+        bloco = reserva_groq.BLOCO
+        with patch.dict(sys.modules, {"sounddevice": SimpleNamespace(InputStream=Entrada)}), \
+                patch.object(reserva_groq, "separar_falas", lambda blocos, *a: blocos), \
+                patch.object(reserva_groq, "PAUSA_LONGA", 0.05):
+            blocos = reserva_groq.capturar_falas(lambda: True, lambda: True, None)
+            next(blocos)
+            Entrada.read_available = 3000
+            next(blocos)  # lido logo em seguida: nada a jogar fora
+            self.assertEqual(lidos, [bloco, bloco])
+            _time.sleep(0.1)  # transcrevendo, respondendo e falando (pode ter lido um aviso sigiloso)
+            next(blocos)
+        self.assertEqual(lidos, [bloco, bloco, 3000, bloco])  # o áudio antigo foi jogado fora
+
+
+class SessaoQueCaiuTests(unittest.TestCase):
+    """O Gemini caiu: o texto digitado não pode ir para a sessão morta e sumir calado."""
+
+    def _jarvis(self):
+        import threading
+        import main
+
+        jarvis = object.__new__(main.JarvisLive)
+        jarvis.ui = UIFalsa()
+        jarvis._portao = PortaoDeVoz(None, ativo=False)
+        jarvis._shutdown_requested = threading.Event()
+        jarvis._fala_n, jarvis._fala_texto = 0, ""
+        return jarvis
+
+    def test_no_modo_reserva_o_texto_vai_para_a_reserva_mesmo_com_sessao_velha(self):
+        class SessaoMorta:
+            async def send_client_content(self, turns, turn_complete=True):
+                raise ConnectionResetError("a conexão caiu")
+
+        jarvis = self._jarvis()
+        jarvis.session, jarvis._modo_reserva = SessaoMorta(), True
+        jarvis._reserva = object()
+        respondidos = []
+        jarvis._responder_pela_reserva = respondidos.append
+
+        async def cenario():
+            jarvis._loop = asyncio.get_running_loop()
+            await asyncio.to_thread(jarvis._on_text_command, "ok, pode fazer")
+            for _ in range(40):
+                if respondidos:
+                    break
+                await asyncio.sleep(0.05)
+        asyncio.run(cenario())
+        self.assertEqual(respondidos, ["ok, pode fazer"])
+        self.assertEqual((jarvis._fala_n, jarvis._fala_texto), (1, "ok, pode fazer"))
+
+    def test_quando_a_conexao_cai_esquece_a_sessao_antes_de_religar(self):
+        import contextlib
+        import os
+        import main
+
+        jarvis = self._jarvis()
+        jarvis.ui.set_state = lambda estado: None
+        jarvis._loop, jarvis._reserva, jarvis._modo_reserva = None, None, False
+        jarvis.cloud_safe, jarvis.external_audio, jarvis._api_key = True, True, "chave-de-teste"
+        jarvis.runtime_limit_seconds, jarvis.required_unlock_path = None, None
+        jarvis._falhas_seguidas = 0
+        no_religar = {}
+
+        @contextlib.asynccontextmanager
+        async def conectar(model, config):
+            yield SessaoFalsa()
+
+        async def caiu():
+            await asyncio.sleep(0.05)
+            raise ConnectionResetError("a conexão caiu")
+
+        async def nada():
+            return None
+
+        async def esperar_para_religar(segundos):
+            no_religar["sessao"], no_religar["fila"] = jarvis.session, jarvis.out_queue
+            jarvis._on_text_command("que horas são?")  # sem reserva: fica guardado até religar
+            jarvis._shutdown_requested.set()
+
+        jarvis._build_config = lambda modelo: None
+        jarvis._send_realtime = jarvis._play_audio = nada
+        jarvis._receive_audio = caiu
+        jarvis._wait_before_reconnect = esperar_para_religar
+        cliente = SimpleNamespace(aio=SimpleNamespace(live=SimpleNamespace(connect=conectar)))
+        with patch.dict(os.environ), patch.object(main.genai, "Client", return_value=cliente), \
+                patch.object(main, "pick_live_model", return_value="models/voz-teste"), \
+                patch("core.modelos.resolver", side_effect=lambda pedido: pedido), \
+                patch("core.modelos.pular"):
+            for nome in ("JARVIS_CEREBRO", "JARVIS_SEM_GEMINI"):
+                os.environ.pop(nome, None)
+            asyncio.run(jarvis.run())
+        self.assertEqual(no_religar, {"sessao": None, "fila": None})
+        self.assertEqual(jarvis._textos_esperando, ["que horas são?"])
+        self.assertTrue(any("conectando ao Gemini" in l for l in jarvis.ui.logs), jarvis.ui.logs)
+
+    def test_texto_guardado_conta_como_fala_quando_foi_digitado(self):
+        import os
+
+        jarvis = self._jarvis()
+        jarvis.session, jarvis._loop, jarvis._reserva, jarvis._modo_reserva = None, None, None, False
+        with patch.dict(os.environ):
+            os.environ.pop("JARVIS_CEREBRO", None)
+            jarvis._on_text_command("ok, pode fazer")
+        self.assertEqual((jarvis._fala_n, jarvis._fala_texto), (1, "ok, pode fazer"))
+        # depois, já conectado, o texto guardado é mandado ao Gemini sem contar de novo: um plano lido
+        # entre o "ok" e a conexão não pode ser aprovado por ele
+        jarvis._fala_n = 5  # uma proposta foi contada depois do "ok" digitado
+        jarvis.session = SessaoFalsa()
+        jarvis._checar_pedido_de_modo = lambda texto: None
+        asyncio.run(jarvis._mandar_textos_esperando(jarvis._textos_esperando))
+        self.assertEqual(jarvis.session.textos, ["ok, pode fazer"])
+        self.assertEqual(jarvis._fala_n, 5)
+
+    def test_texto_que_nao_chegou_ao_gemini_avisa_na_tela(self):
+        class SessaoMorta:
+            async def send_client_content(self, turns, turn_complete=True):
+                raise ConnectionResetError("a conexão caiu")
+
+        jarvis = self._jarvis()
+        jarvis.session, jarvis._modo_reserva, jarvis._reserva = SessaoMorta(), False, None
+        jarvis._checar_pedido_de_modo = lambda texto: None
+
+        async def cenario():
+            jarvis._loop = asyncio.get_running_loop()
+            await asyncio.to_thread(jarvis._on_text_command, "que horas são?")
+            for _ in range(40):
+                if jarvis.ui.logs:
+                    break
+                await asyncio.sleep(0.05)
+        asyncio.run(cenario())
+        self.assertTrue(any(l.startswith("ERR:") and "conexão" in l for l in jarvis.ui.logs), jarvis.ui.logs)
+
+
 class TextoDigitadoSemGeminiTests(unittest.TestCase):
     """Gemma/modo reserva: o texto digitado também é a fala atual do Erton para o "ok"."""
 

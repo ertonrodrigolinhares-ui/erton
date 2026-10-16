@@ -134,7 +134,7 @@ na hora (aparece o selo 🔒 MODO PRIVADO no alto da tela) e nada mais vai para 
 Gemini, nem para o Claude. Use para falar de clientes. Para voltar: **"Jarvis, modo normal"** (ou
 "sair do modo privado"), dito sozinho; uma frase com "não" ("não quero sair do modo privado") não
 troca nada. A escolha fica gravada para a próxima vez que abrir. Até o selo 🔒 aparecer, o microfone
-não manda nada para a nuvem; se a troca não der certo, o Jarvis avisa em voz alta.
+não manda nada para a nuvem; se a troca não der certo, o Jarvis avisa na tela e em voz alta.
 
 ## Claude como chefe de tarefas (pesquisas, relatórios, agentes e o próprio código)
 
