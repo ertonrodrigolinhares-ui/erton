@@ -2357,8 +2357,9 @@ class JarvisLive:
             )
 
         # Jarvis Ultron: modo privado. Trava no código (não só no prompt do Gemma): vale também para o
-        # painel Ultron e para chamadas que o modelo inventar.
-        bloqueio = bloqueio_do_modo_privado(name, args)
+        # painel Ultron e para chamadas que o modelo inventar. No modo nuvem (cloud_safe) a conversa já é
+        # o Gemini e o Gemma não é usado (igual ao __init__), então não há modo privado para travar.
+        bloqueio = None if getattr(self, "cloud_safe", False) else bloqueio_do_modo_privado(name, args)
         if bloqueio is not None:
             self.ui.write_log(f"SYS: 🔒 {name} não é usado no modo privado (usa IA na nuvem).")
             return types.FunctionResponse(id=fc.id, name=name, response={"result": bloqueio})
@@ -2877,9 +2878,10 @@ class JarvisLive:
 
     async def run(self):
         # Jarvis Ultron: cérebro Gemma 4 no PC. Não usa o Gemini: liga o cérebro local e fica de pé.
+        # No modo nuvem (cloud_safe, o servidor web) o Gemma não é usado (igual ao __init__): vai ao Gemini.
         from core.cerebro_gemma import cerebro_gemma
 
-        if cerebro_gemma():
+        if not getattr(self, "cloud_safe", False) and cerebro_gemma():
             if self._reserva is not None:
                 self._ativar_modo_reserva()
             else:

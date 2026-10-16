@@ -253,6 +253,36 @@ class GemmaNoJarvisTests(unittest.TestCase):
                         jarvis.ui.logs)
         voz.assert_called_once()
 
+    def test_modo_nuvem_ignora_o_gemma_e_vai_ao_gemini(self):
+        # servidor web (cloud_safe): o __init__ não usa o Gemma, então o run() também não pode parar nele
+        jarvis = self._jarvis(None)
+        jarvis.cloud_safe = True
+        jarvis._api_key = "chave-falsa"
+        jarvis._ativar_modo_reserva = lambda: self.fail("no modo nuvem não há reserva para ligar")
+
+        class ChegouNoGemini(Exception):
+            pass
+
+        with patch.dict(os.environ, {"JARVIS_CEREBRO": "gemma"}), \
+                patch("main.genai.Client", side_effect=ChegouNoGemini) as cliente, \
+                patch("actions.tts_engine.falar_com_voz_do_windows") as voz:
+            with self.assertRaises(ChegouNoGemini):
+                asyncio.run(asyncio.wait_for(jarvis.run(), 5))
+        cliente.assert_called_once()
+        voz.assert_not_called()
+        self.assertFalse(any("🔒" in l for l in jarvis.ui.logs), jarvis.ui.logs)
+
+    def test_modo_nuvem_nao_recusa_como_modo_privado(self):
+        import main
+
+        jarvis = self._jarvis(None)
+        jarvis.cloud_safe = True
+        with patch.dict(os.environ, {"JARVIS_CEREBRO": "gemma"}), \
+                patch("main.web_search_action", return_value="resultado da busca") as busca:
+            resposta = asyncio.run(jarvis._execute_tool(NS(name="web_search", args={"query": "x"}, id="1")))
+        busca.assert_called_once()
+        self.assertNotEqual(resposta.response["result"], main.AVISO_MODO_PRIVADO)
+
     def _nomes(self, jarvis):
         ferramentas, _ = jarvis._ferramentas_da_reserva()
         return {f["function"]["name"] for f in ferramentas}
@@ -447,11 +477,14 @@ class ModoPrivadoPorVozTests(unittest.TestCase):
 
     def test_sem_gemma_instalado_avisa_e_nao_troca(self):
         jarvis = self._jarvis()
-        with patch("core.cerebro_gemma.modelo_instalado", return_value=False):
+        # com o Whisper local pronto, para testar o aviso do Gemma (e não o da transcrição local)
+        with patch("core.cerebro_gemma.modelo_instalado", return_value=False), \
+                patch("core.cerebro_gemma.whisper_instalado", return_value=True):
             jarvis._pedido_de_cerebro("modo privado")
             self._esperar_troca()
         self.assertEqual(jarvis.ui.trocas, [])
-        self.assertIn("Instalar Gemma 4", jarvis.avisos[0])
+        self.assertIn("primeiro rode o Instalar Gemma 4", jarvis.avisos[0])
+        self.assertFalse(jarvis._trocando_cerebro)
 
     def test_ja_no_modo_pedido(self):
         jarvis = self._jarvis("gemma")
