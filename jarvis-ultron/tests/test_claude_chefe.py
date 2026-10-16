@@ -432,6 +432,25 @@ class DesfazerSoOQueEDoClaudeTests(Base):
         with zipfile.ZipFile(copias[0]) as z:
             self.assertIn("return 0", z.read("modulo.py").decode())
 
+    def test_o_que_o_erton_salvou_durante_o_claude_volta_mas_ele_fica_sabendo_onde_esta(self):
+        minha = self.jarvis_dir / "automacoes" / "minha_nova.py"
+
+        def claude(*args, **kwargs):
+            (self.jarvis_dir / "modulo.py").write_text("def soma(a, b):\n    return 0\n", encoding="utf-8")
+            minha.parent.mkdir(exist_ok=True)  # o Erton salva uma automação enquanto o Claude trabalha
+            minha.write_text("# do Erton\n", encoding="utf-8")
+            return chefe.Resposta(True, "FALA: Mudei soma.")
+
+        with patch.object(chefe, "rodar", side_effect=claude), \
+                patch.object(chefe, "rodar_testes", side_effect=[set(), {"tests/x.py::soma"}]):
+            r = chefe.aplicar_plano("trocar", None, "mude a soma")
+        self.assertFalse(r.ok)
+        self.assertNotIn("ficou como estava", r.fala)
+        copia = next(chefe.pasta_backups().glob("jarvis-desfeito-*.zip"))
+        self.assertIn(copia.name, r.fala)
+        with zipfile.ZipFile(copia) as z:
+            self.assertEqual(z.read("automacoes/minha_nova.py").decode(), "# do Erton\n")
+
 
 class MudancaInterrompidaTests(Base):
     """O Jarvis fechou, o cérebro foi religado ou caiu no meio de uma mudança do Claude no código."""
@@ -529,6 +548,114 @@ class MudancaInterrompidaTests(Base):
         self.assertIn("a - b", (self.jarvis_dir / "modulo.py").read_text(encoding="utf-8"))
         self.assertFalse(chefe.aplicando())
 
+    def _outro_jarvis(self, codigo: str) -> str:
+        """Roda 'codigo' num programa à parte (outro Jarvis aberto, ou o "Iniciar Jarvis Ultron") com as
+        mesmas pastas; devolve o que ele imprimiu."""
+        import subprocess
+
+        prefixo = ("import os, sys; from pathlib import Path; sys.path.insert(0, sys.argv[1]);"
+                   "from core import claude_chefe as c; c.pasta_jarvis = lambda: Path(sys.argv[2]);"
+                   "c.pasta_dados = lambda: Path(sys.argv[3]); c.rodar_testes = lambda pasta: set()\n")
+        feito = subprocess.run([sys.executable, "-c", prefixo + codigo, str(RAIZ), str(self.jarvis_dir),
+                                str(chefe.pasta_dados())], capture_output=True, text=True, timeout=120)
+        return feito.stdout.strip()
+
+    def test_outro_jarvis_aberto_nao_desfaz_a_mudanca_em_andamento(self):
+        # a janela foi fechada (o Jarvis segue na bandeja com o Claude trabalhando) e o Erton abriu outro
+        outro = self.jarvis_dir / "outro.py"
+        outro.write_text("X = 1\n", encoding="utf-8")
+        visto = {}
+
+        def claude(*args, **kwargs):
+            (self.jarvis_dir / "modulo.py").write_text("def soma(a, b):\n    return a - b\n", encoding="utf-8")
+            visto["outro"] = self._outro_jarvis(
+                "aviso = c.desfazer_interrompida(); c.esquecer_interrompida(); print(repr(aviso))")
+            visto["modulo"] = (self.jarvis_dir / "modulo.py").read_text(encoding="utf-8")
+            visto["anotacao"] = chefe._anotacao().is_file()
+            visto["aplicar"] = self._outro_jarvis("print(c.aplicar_plano('outro plano', None, 'mude').fala)")
+            outro.write_text("X = 2\n", encoding="utf-8")
+            return chefe.Resposta(True, "FALA: Mudei soma e outro.")
+
+        with patch.object(chefe, "rodar", side_effect=claude), patch.object(chefe, "rodar_testes", return_value=set()):
+            r = chefe.aplicar_plano("plano", None, "mude")
+        self.assertEqual(visto["outro"], "''")  # não desfez nem avisou nada
+        self.assertIn("a - b", visto["modulo"])
+        self.assertTrue(visto["anotacao"])  # e não apagou a anotação de quem está mudando
+        self.assertIn("Outro Jarvis", visto["aplicar"])  # nem começou outra mudança por cima
+        self.assertTrue(r.ok, r.fala)
+        self.assertIn("2 arquivo", r.fala)
+        self.assertIn("a - b", (self.jarvis_dir / "modulo.py").read_text(encoding="utf-8"))
+        self.assertFalse(chefe._anotacao().exists())
+
+    def test_jarvis_que_caiu_de_verdade_nao_segura_a_trava(self):
+        # o cérebro morre de verdade (os._exit, como no kill) no meio da mudança: a trava some com ele
+        saida = self._outro_jarvis(
+            "def morrer(*a, **k):\n"
+            "    (Path(sys.argv[2]) / 'modulo.py').write_text('def soma(a, b)\\n')\n"
+            "    print('mudando', c._anotacao().is_file(), flush=True); os._exit(1)\n"
+            "c.rodar = morrer\nc.aplicar_plano('plano', None, 'mude')\n")
+        self.assertEqual(saida, "mudando True")
+        self.assertIn("desfiz", chefe.desfazer_interrompida())
+        self.assertIn("a + b", (self.jarvis_dir / "modulo.py").read_text(encoding="utf-8"))
+
+    def test_mudanca_anotada_em_outra_pasta_do_jarvis_fica_para_ela(self):
+        self._interromper()
+        nova = self.tmp / "jarvis-v2"  # no dia seguinte ele abre outra cópia (outra pasta)
+        (nova / "core").mkdir(parents=True)
+        (nova / "modulo.py").write_text("VERSAO = 2\n", encoding="utf-8")
+        (nova / "core" / "novidade.py").write_text("X = 1\n", encoding="utf-8")
+        with patch.object(chefe, "pasta_jarvis", lambda: nova):
+            self.assertEqual(chefe.desfazer_interrompida(), "")
+        self.assertEqual((nova / "modulo.py").read_text(encoding="utf-8"), "VERSAO = 2\n")
+        self.assertTrue((nova / "core" / "novidade.py").exists())
+        self.assertTrue(chefe._anotacao().is_file())  # fica para a pasta dela
+        self.assertIn("desfiz", chefe.desfazer_interrompida())
+        self._voltou()
+
+    def test_backup_sumido_ou_estragado_avisa_uma_vez_e_nao_mexe_em_nada(self):
+        for estrago in ("sumiu", "estragou"):
+            with self.subTest(estrago):
+                self._interromper()
+                backup = Path(json.loads(chefe._anotacao().read_text(encoding="utf-8"))["backup"])
+                if estrago == "sumiu":
+                    backup.unlink()
+                else:
+                    backup.write_bytes(b"isto nao e um zip")
+                do_erton = self.jarvis_dir / "automacoes" / f"do_erton_{estrago}.py"
+                do_erton.parent.mkdir(exist_ok=True)
+                do_erton.write_text("# minha\n", encoding="utf-8")
+                aviso = chefe.desfazer_interrompida()
+                self.assertIn("não consegui desfazer", aviso)
+                self.assertIn(backup.name, aviso)
+                self.assertTrue(do_erton.exists())  # nada foi apagado antes de ver que o backup não serve
+                self.assertTrue((self.jarvis_dir / "pela_metade.py").exists())
+                self.assertEqual(list(chefe.pasta_backups().glob("jarvis-desfeito-*.zip")), [])
+                self.assertEqual(chefe.desfazer_interrompida(), aviso)  # não tenta de novo: é o mesmo aviso
+                chefe.esquecer_interrompida(aviso)
+                self.assertFalse(chefe._anotacao().exists())  # contado uma vez, não repete a cada abertura
+                (self.jarvis_dir / "modulo.py").write_text("def soma(a, b):\n    return a + b\n", encoding="utf-8")
+                (self.jarvis_dir / "pela_metade.py").unlink()
+
+    def test_nova_tentativa_nao_mexe_no_que_apareceu_depois(self):
+        self._interromper()
+        with patch.object(chefe, "_guardar_como_esta", side_effect=PermissionError("arquivo em uso")):
+            self.assertIn("Tento de novo", chefe.desfazer_interrompida())
+        self.assertFalse((self.jarvis_dir / "modulo.py").read_text(encoding="utf-8").endswith("a + b\n"))
+        do_erton = self.jarvis_dir / "automacoes" / "minha_nova.py"  # o Erton cria uma automação depois
+        do_erton.parent.mkdir()
+        do_erton.write_text("# minha\n", encoding="utf-8")
+        self.assertIn("desfiz", chefe.desfazer_interrompida())
+        self._voltou()
+        self.assertTrue(do_erton.exists())
+
+    def test_esquecer_so_apaga_a_anotacao_do_aviso_dado(self):
+        self._interromper()
+        aviso = chefe.desfazer_interrompida()
+        chefe.esquecer_interrompida("outro aviso")
+        self.assertTrue(chefe._anotacao().exists())
+        chefe.esquecer_interrompida(aviso)
+        self.assertFalse(chefe._anotacao().exists())
+
 
 class TrocaDeModoComOClaudeMudandoTests(unittest.TestCase):
     def test_nao_religa_o_cerebro_no_meio_da_mudanca(self):
@@ -622,6 +749,18 @@ class TestesSemMexerNoErtonTests(unittest.TestCase):
         self.assertEqual(falhas, {"tests/test_b.py::B::test_ruim"})
         self.assertFalse((casa / "tema.json").exists())
         self.assertEqual((pasta / "memory" / "task_history.json").read_text(encoding="utf-8"), "[1]")
+
+    def test_copia_leva_o_env_example_mas_nao_o_env(self):
+        pasta, destino = Path(tempfile.mkdtemp()), Path(tempfile.mkdtemp()) / "jarvis"
+        (pasta / "web").mkdir()
+        for nome in (".env", ".env.local", ".env.example", "web/.env.example", "main.py"):
+            (pasta / nome).write_text("X=1\n", encoding="utf-8")
+        chefe._copiar_codigo(pasta, destino)
+        self.assertTrue((destino / ".env.example").is_file())  # só exemplo, sem chaves (um teste lê)
+        self.assertTrue((destino / "web" / ".env.example").is_file())
+        self.assertFalse((destino / ".env").exists())
+        self.assertFalse((destino / ".env.local").exists())
+        self.assertNotIn(".env.example", chefe.fotografar(pasta))  # a foto e o backup continuam sem ele
 
 
 class InstaladorDoClaudeTests(unittest.TestCase):

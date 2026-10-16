@@ -2972,7 +2972,7 @@ def _contar_mudanca_desfeita(jarvis, espera: float = 8.0) -> None:
     def contar():
         time.sleep(espera)  # deixa a conversa abrir antes de falar
         jarvis.anunciar(aviso, "Claude")
-        claude_chefe.esquecer_interrompida()
+        claude_chefe.esquecer_interrompida(aviso)  # só a anotação deste aviso
 
     threading.Thread(target=contar, daemon=True, name="ClaudeDesfeita").start()
 

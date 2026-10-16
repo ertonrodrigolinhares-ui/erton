@@ -24,6 +24,7 @@ Ajustes no .env (opcionais): JARVIS_CLAUDE_EXE (caminho do claude.exe), JARVIS_C
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import importlib.util
 import json
@@ -38,6 +39,7 @@ import tempfile
 import threading
 import time
 import zipfile
+import zlib
 from dataclasses import dataclass, field
 from datetime import datetime
 from functools import lru_cache
@@ -485,11 +487,14 @@ def planejar(pedido: str) -> Resposta:
     return rodar(texto, [*LEITURA, *_ler(pasta)], pasta)  # sem Edit: no plano ele não consegue mudar nada
 
 
-def _arquivos_de_codigo(pasta: Path):
+def _arquivos_de_codigo(pasta: Path, exemplos: bool = False):
+    """Com exemplos=True vêm também os .env.example (só exemplo, sem chaves)."""
     for raiz, pastas, arquivos in os.walk(pasta):
         pastas[:] = [p for p in pastas if p not in PASTAS_FORA and not p.startswith(".")]
         for nome in arquivos:
-            if nome in ARQUIVOS_FORA or nome.startswith(".env") or nome.endswith((".pyc", ".zip", ".log")):
+            if exemplos and nome == ".env.example":
+                pass
+            elif nome in ARQUIVOS_FORA or nome.startswith(".env") or nome.endswith((".pyc", ".zip", ".log")):
                 continue
             caminho = Path(raiz) / nome
             yield caminho.relative_to(pasta).as_posix(), caminho
@@ -532,6 +537,11 @@ def _nome_seguro(nome: str) -> bool:
     return bool(nome) and not caminho.is_absolute() and ".." not in caminho.parts and ":" not in nome
 
 
+class BackupEstragado(Exception):
+    """O backup .zip da mudança sumiu ou estragou: com ele não dá para voltar nada (e não adianta tentar
+    de novo)."""
+
+
 @dataclass
 class Restauro:
     mexidos: list = field(default_factory=list)   # voltaram ao que eram (ou foram apagados)
@@ -572,6 +582,16 @@ def restaurar(pasta: Path, backup: Path, antes: dict[str, str], nomes=None,
             feito.deixados.append(nome)
             continue
         alvos.append(nome)
+    voltar = {}
+    if any(n in antes for n in alvos):
+        # lê o backup ANTES de mexer em qualquer arquivo: se ele sumiu ou estragou, nada é apagado nem trocado
+        try:
+            with zipfile.ZipFile(backup) as zipado:
+                guardados = set(zipado.namelist())
+                # o que não está nele (grande demais) fica como está e aparece como "não consegui"
+                voltar = {n: zipado.read(n) for n in alvos if n in antes and n in guardados}
+        except (FileNotFoundError, zipfile.BadZipFile, zlib.error, EOFError, ValueError) as erro:
+            raise BackupEstragado(f"{backup.name}: {erro}") from erro
     feito.copia = _guardar_como_esta(pasta, alvos)
     for nome in [n for n in alvos if n not in antes]:  # criados durante a mudança
         try:
@@ -579,16 +599,10 @@ def restaurar(pasta: Path, backup: Path, antes: dict[str, str], nomes=None,
             feito.mexidos.append(nome)
         except OSError:
             pass
-    voltar = [n for n in alvos if n in antes]
-    if voltar:
-        with zipfile.ZipFile(backup) as zipado:
-            guardados = set(zipado.namelist())
-            for nome in voltar:
-                if nome not in guardados:
-                    continue  # grande demais para o backup: fica como está (e aparece como "não consegui")
-                (pasta / nome).parent.mkdir(parents=True, exist_ok=True)
-                (pasta / nome).write_bytes(zipado.read(nome))
-                feito.mexidos.append(nome)
+    for nome, conteudo in voltar.items():
+        (pasta / nome).parent.mkdir(parents=True, exist_ok=True)
+        (pasta / nome).write_bytes(conteudo)
+        feito.mexidos.append(nome)
     return feito
 
 
@@ -598,8 +612,9 @@ def mudancas(antes: dict[str, str], depois: dict[str, str]) -> list[str]:
 
 def _copiar_codigo(pasta: Path, destino: Path) -> None:
     """Cópia do código para os testes: sem .env, sem a memória e sem os dados do Erton (da pasta
-    memory vão só os .py, que são código). Arquivos maiores que 5 MB não vão."""
-    arquivos = list(_arquivos_de_codigo(pasta))
+    memory vão só os .py, que são código). Arquivos maiores que 5 MB não vão. O .env.example vai: é só
+    exemplo, sem chaves, e um teste lê."""
+    arquivos = list(_arquivos_de_codigo(pasta, exemplos=True))
     memoria = pasta / "memory"
     if memoria.is_dir():
         arquivos += [(f"memory/{c.name}", c) for c in memoria.iterdir()
@@ -707,13 +722,73 @@ def _apagar_anotacao() -> None:
         pass
 
 
+def _travar_codigo() -> int | None:
+    """Trava Backups/aplicando.lock sem esperar: enquanto travada, um Jarvis aberto está mudando ou
+    desfazendo o código. aplicando() só enxerga este programa, e fechar a janela deixa o Jarvis na
+    bandeja: um segundo Jarvis aberto (dois cliques em "Iniciar Jarvis Ultron") não pode desfazer a
+    mudança que o primeiro ainda está fazendo. A trava fica com quem travou até _soltar_codigo() ou até
+    o programa fechar ou cair (aí o próprio Windows solta). None = outro Jarvis está com ela agora."""
+    arquivo = pasta_backups() / "aplicando.lock"  # nunca é apagado (só travado e solto)
+    arquivo.parent.mkdir(parents=True, exist_ok=True)
+    descritor = os.open(arquivo, os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        if sys.platform == "win32":
+            import msvcrt
+
+            os.lseek(descritor, 0, os.SEEK_SET)
+            msvcrt.locking(descritor, msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(descritor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError as erro:
+        if isinstance(erro, BlockingIOError) or erro.errno in (errno.EACCES, errno.EAGAIN):
+            os.close(descritor)
+            return None  # outro Jarvis está com ela
+        print(f"[Claude] A trava entre dois Jarvis abertos não funciona nesta pasta: {erro}")
+    return descritor
+
+
+def _soltar_codigo(descritor: int) -> None:
+    try:
+        if sys.platform == "win32":
+            import msvcrt
+
+            os.lseek(descritor, 0, os.SEEK_SET)
+            msvcrt.locking(descritor, msvcrt.LK_UNLCK, 1)
+    except OSError:
+        pass
+    os.close(descritor)  # fechar também solta (fora do Windows)
+
+
+def _mesma_pasta(uma, outra) -> bool:
+    def normal(caminho) -> str:
+        try:
+            caminho = Path(caminho).resolve()
+        except OSError:
+            caminho = Path(caminho).absolute()
+        return os.path.normcase(str(caminho))  # no Windows, sem diferenciar maiúsculas
+
+    return normal(uma) == normal(outra)
+
+
 def desfazer_interrompida() -> str:
     """Na abertura do Jarvis (e do cérebro): uma mudança do Claude no código ficou pela metade porque o
     Jarvis fechou, o cérebro foi religado ou o PC desligou no meio? Volta os arquivos ao que eram
     antes dela (guardando a versão pela metade em Backups). Devolve o aviso para o Erton ("" se não
     havia nada); o aviso continua valendo até esquecer_interrompida()."""
-    if aplicando():
-        return ""  # a mudança está rodando agora, neste programa
+    if aplicando() or _ler_anotacao() is None:
+        return ""  # nada anotado, ou a mudança está rodando agora, neste programa
+    trava = _travar_codigo()
+    if trava is None:
+        return ""  # outro Jarvis aberto está mudando (ou desfazendo) o código agora: a anotação é dele
+    try:
+        return _desfazer_interrompida()
+    finally:
+        _soltar_codigo(trava)
+
+
+def _desfazer_interrompida() -> str:
     dados = _ler_anotacao()
     if dados is None:
         return ""
@@ -722,30 +797,41 @@ def desfazer_interrompida() -> str:
     try:
         backup = Path(str(dados["backup"]))
         antes = {str(k): str(v) for k, v in dict(dados["antes"]).items()}
+        anotada = Path(str(dados["pasta"]))
     except (KeyError, TypeError, ValueError):
         _apagar_anotacao()
         return ("Uma mudança do Claude no meu código foi interrompida, mas a anotação dela estragou e eu não "
                 f"consegui conferir. Os backups estão em {pasta_backups()}.")
-    pedido, plano = str(dados.get("pedido") or "mudança no código"), str(dados.get("plano") or "")
     pasta = pasta_jarvis()
-    mudados = mudancas(antes, fotografar(pasta))
+    if not _mesma_pasta(anotada, pasta):
+        return ""  # foi em outro Jarvis (outra pasta): a anotação fica para quando ele abrir
+    pedido, plano = str(dados.get("pedido") or "mudança no código"), str(dados.get("plano") or "")
+    if not isinstance(dados.get("pela_metade"), dict):
+        # primeira tentativa: anota como o Claude deixou cada arquivo. Se não der para desfazer agora, as
+        # próximas aberturas só mexem nisso (o que mudar ou aparecer depois na pasta é de outra pessoa)
+        agora = fotografar(pasta)
+        dados["pela_metade"] = {n: agora.get(n) for n in mudancas(antes, agora)}
+        try:
+            _anotar(dados)
+        except OSError:
+            pass
+    mudados = sorted(str(n) for n in dados["pela_metade"])
+    como_ficou = {str(n): str(v) for n, v in dados["pela_metade"].items() if v is not None}
     try:
-        feito = restaurar(pasta, backup, antes, mudados)
-    except (OSError, zipfile.BadZipFile) as erro:  # a anotação fica: tento de novo na próxima abertura
+        feito = restaurar(pasta, backup, antes, mudados, como_ficou)
+    except BackupEstragado as erro:  # não adianta tentar de novo: avisa uma vez só e não mexe em nada
+        aviso = ("Uma mudança do Claude no meu código ficou pela metade e eu não consegui desfazer, porque o "
+                 f"backup dela sumiu ou estragou ({backup.name}). Não mexi em nada; os arquivos que ele mudou "
+                 f"são {', '.join(mudados[:3]) or 'nenhum'}.")
+        registrar(pedido, plano, mudados, f"NÃO DESFEITO: o Jarvis fechou no meio e o backup estragou ({erro})",
+                  backup)
+    except OSError as erro:  # a anotação fica: tento de novo na próxima abertura
         return (f"Uma mudança do Claude no meu código ficou pela metade e eu não consegui desfazer ({erro}). "
-                f"O backup está em {backup}.")
-    if not mudados:
-        aviso = ("Uma mudança do Claude no meu código foi interrompida porque o Jarvis fechou ou foi religado no "
-                 "meio, mas ele ainda não tinha mudado nenhum arquivo.")
+                f"Tento de novo na próxima vez que eu abrir. O backup está em {backup}.")
     else:
-        sobrou = [n for n in mudancas(antes, fotografar(pasta)) if n in mudados]
-        aviso = ("Uma mudança do Claude no meu código ficou pela metade porque o Jarvis fechou ou foi religado no "
-                 "meio, e eu desfiz: o código voltou a ser como era antes dela.")
-        if sobrou:
-            aviso += f" Atenção: não consegui voltar {', '.join(sobrou[:3])}; o backup está em {backup}."
-        registrar(pedido, plano, mudados, "DESFEITO: o Jarvis fechou no meio da mudança", backup)
-    if feito.copia:
-        print(f"[Claude] A versão pela metade ficou guardada em {feito.copia}")
+        aviso = _aviso_de_desfeita(pasta, antes, mudados, feito, backup)
+        if mudados:
+            registrar(pedido, plano, mudados, "DESFEITO: o Jarvis fechou no meio da mudança", backup)
     dados["aviso"] = aviso
     try:
         _anotar(dados)
@@ -754,18 +840,51 @@ def desfazer_interrompida() -> str:
     return aviso
 
 
-def esquecer_interrompida() -> None:
-    """O aviso de desfazer_interrompida() já foi dado ao Erton."""
-    dados = _ler_anotacao()
-    if dados is not None and dados.get("aviso") and not aplicando():
-        _apagar_anotacao()
+def _aviso_de_desfeita(pasta: Path, antes: dict[str, str], mudados: list[str], feito: Restauro,
+                       backup: Path) -> str:
+    if not mudados:
+        return ("Uma mudança do Claude no meu código foi interrompida porque o Jarvis fechou ou foi religado no "
+                "meio, mas ele ainda não tinha mudado nenhum arquivo.")
+    agora = fotografar(pasta)
+    sobrou = [n for n in mudados if n not in feito.deixados and agora.get(n) != antes.get(n)]
+    aviso = ("Uma mudança do Claude no meu código ficou pela metade porque o Jarvis fechou ou foi religado no "
+             "meio, e eu desfiz: o código voltou a ser como era antes dela.")
+    if feito.deixados:
+        aviso += f" Não mexi em {', '.join(feito.deixados[:3])}, que mudou depois."
+    if sobrou:
+        aviso += f" Atenção: não consegui voltar {', '.join(sobrou[:3])}; o backup está em {backup}."
+    if feito.copia:
+        aviso += f" A versão pela metade ficou guardada em Backups, no arquivo {feito.copia.name}."
+    return aviso
+
+
+def esquecer_interrompida(aviso: str | None = None) -> None:
+    """O aviso de desfazer_interrompida() já foi dado ao Erton: apaga a anotação, mas só a desse aviso
+    (nunca a de uma mudança que este ou outro Jarvis aberto está fazendo agora)."""
+    if aplicando() or not (_ler_anotacao() or {}).get("aviso"):
+        return
+    trava = _travar_codigo()
+    if trava is None:
+        return  # outro Jarvis aberto está mudando o código: a anotação agora é dele
+    try:
+        dados = _ler_anotacao() or {}
+        if dados.get("aviso") and (aviso is None or dados["aviso"] == aviso):
+            _apagar_anotacao()
+    finally:
+        _soltar_codigo(trava)
 
 
 def aplicar_plano(plano: str, sessao: str | None, pedido: str) -> Resultado:
     if not _aplicando.acquire(blocking=False):
         return Resultado(False, "Já tem uma mudança do Claude no código em andamento; espere ela terminar.")
     try:
-        return _aplicar_plano(plano, sessao, pedido)
+        trava = _travar_codigo()  # e nenhum outro Jarvis aberto mexe no código até o fim
+        if trava is None:
+            return Resultado(False, "Outro Jarvis aberto neste PC está mudando o código agora; espere ele terminar.")
+        try:
+            return _aplicar_plano(plano, sessao, pedido)
+        finally:
+            _soltar_codigo(trava)
     finally:
         _aplicando.release()
 
@@ -775,8 +894,10 @@ def _aplicar_plano(plano: str, sessao: str | None, pedido: str) -> Resultado:
     falhas_antes = rodar_testes(pasta)
     antes = fotografar(pasta)  # logo antes do Claude: o que mudar antes disso não é dele
     backup = fazer_backup(pasta, antes)
-    # se o Jarvis fechar ou cair daqui até o fim, a próxima abertura desfaz (desfazer_interrompida)
-    _anotar({"backup": str(backup), "antes": antes, "pedido": pedido, "plano": plano, "desde": time.time()})
+    # se o Jarvis fechar ou cair daqui até o fim, a próxima abertura desfaz (desfazer_interrompida), só
+    # nesta pasta do Jarvis
+    _anotar({"backup": str(backup), "antes": antes, "pedido": pedido, "plano": plano, "desde": time.time(),
+             "pasta": str(pasta)})
     try:
         return _aplicar_e_conferir(pasta, antes, backup, falhas_antes, plano, sessao, pedido)
     except Exception:
@@ -801,12 +922,16 @@ def _aplicar_e_conferir(pasta: Path, antes: dict[str, str], backup: Path, falhas
         _apagar_anotacao()
         agora = fotografar(pasta)
         sobrou = [n for n in mudados if n not in feito.deixados and agora.get(n) != antes.get(n)]
-        fala = f"Desfiz a mudança porque {motivo}. O Jarvis ficou como estava."
+        fala = f"Desfiz a mudança porque {motivo}. O código voltou a ser como era antes dela."
         if feito.deixados:
             fala = (f"Desfiz a mudança porque {motivo}. O que o Claude mudou voltou a ser como era; não mexi em "
                     f"{', '.join(feito.deixados[:3])}, que mudou depois dele.")
         if sobrou:
             fala += f" Atenção: não consegui voltar {', '.join(sobrou)}; o backup está em {backup}."
+        if feito.copia:
+            # o que alguém salvou na pasta do Jarvis enquanto o Claude trabalhava também voltou: fica guardado
+            fala += (f" A versão que estava no lugar ficou guardada em Backups, no arquivo {feito.copia.name}, "
+                     "caso você tenha mexido em algum arquivo do Jarvis enquanto o Claude trabalhava.")
         registro = registrar(pedido, plano, mudados, f"DESFEITO: {motivo}", backup)
         guardado = f". O que estava no lugar ficou guardado em {feito.copia}" if feito.copia else ""
         return Resultado(False, fala, f"Registro: {registro}{guardado}")
