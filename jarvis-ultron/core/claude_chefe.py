@@ -6,13 +6,15 @@ Jarvis — o Jarvis entrega para o Claude Code (o programa 'claude' instalado pe
 que usa a assinatura do Erton (Pro/Max), sem chave de API.
 
 Travas (no código, não só nas instruções):
-- Tarefas: o Claude só lê, pesquisa na internet e escreve DENTRO de Documentos/Jarvis Ultron/Claude.
-  Não roda comandos no PC e não usa conectores (Gmail, Metricool, Agenda...), então não consegue
-  publicar, enviar, comprar nem apagar nada.
+- Tarefas: o Claude só lê as pastas dele (Documentos/Jarvis Ultron), pesquisa na internet e escreve
+  DENTRO de Documentos/Jarvis Ultron/Claude. Não roda comandos no PC e não usa conectores (Gmail,
+  Metricool, Agenda...: ele abre sem nenhum servidor MCP), então não consegue publicar, enviar,
+  comprar nem apagar nada.
 - Código do Jarvis: primeiro o Claude só faz o PLANO (sem permissão para editar). O Jarvis conta o
   plano e só continua com o "ok" do Erton, conferido aqui, numa fala nova depois do plano. Antes de
   mexer: backup .zip e testes; depois: confere a sintaxe e roda os testes de novo. Se algo quebrar,
-  o Jarvis desfaz sozinho, arquivo por arquivo.
+  o Jarvis desfaz sozinho, arquivo por arquivo. Se o Jarvis fechar ou cair no meio, o Claude morre
+  junto e a próxima abertura desfaz a mudança que ficou pela metade (anotada em Backups).
 - Modo privado (Gemma): nada vai para o Claude, porque ele roda na nuvem da Anthropic.
 - A chave ANTHROPIC_API_KEY é tirada do ambiente: com ela o Claude cobraria pela API em vez de usar
   a assinatura. As chaves do Jarvis (Gemini, Groq...) também não vão para o Claude.
@@ -28,32 +30,43 @@ import json
 import os
 import re
 import shutil
+import signal
+import site
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime
-from pathlib import Path
+from functools import lru_cache
+from pathlib import Path, PurePosixPath
 
 TEMPO_TAREFA = 20 * 60    # uma tarefa do Claude pode levar alguns minutos
 TEMPO_TESTES = 10 * 60
 VALIDADE_PLANO = 15 * 60  # o "ok" vale para o plano contado nos últimos 15 minutos
 MAX_TURNOS = 40
+LIMITE_BACKUP = 5 * 1024 * 1024  # arquivos maiores não vão para o backup .zip
 
 # Nunca disponíveis para o Claude chamado pelo Jarvis: comandos no PC (um script escreveria fora
-# das pastas liberadas) e conectores (Gmail, Metricool... poderiam enviar ou publicar).
+# das pastas liberadas). Os conectores (Gmail, Metricool... poderiam enviar ou publicar) ficam de
+# fora porque o Claude abre sem nenhum servidor MCP (--strict-mcp-config); "mcp__*" é só reforço.
 PROIBIDAS = ("Bash", "PowerShell", "NotebookEdit", "mcp__*")
-LEITURA = ("Read", "Glob", "Grep", "WebSearch", "WebFetch", "Skill")
+# Sem "Read"/"Glob"/"Grep" soltos (valeriam para o PC inteiro, até as senhas do Hermes): ler arquivos
+# só nas pastas de cada modo, com Read(<pasta>/**) (veja _ler).
+LEITURA = ("WebSearch", "WebFetch", "Skill")
 SEGREDOS_PREFIXOS = ("GEMINI_", "GROQ_", "ELEVENLABS_", "HERMES_", "OPENAI_", "GOOGLE_GENAI_",
                      "JARVIS_PONTE_", "TELEGRAM_", "METRICOOL_")
 SEGREDOS = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "GOOGLE_API_KEY")
 
 # O que o Claude nunca lê nem muda na pasta do Jarvis (chaves e memória do Erton)
 PROTEGIDOS = (".env", ".env.*", "config/api_keys.json", "config/ui_settings.json", "memory/**", ".git/**",
-              ".github/**", ".claude/**")
-CREDENCIAIS = (".claude/.credentials.json", ".ssh/**", ".aws/**", ".hermes/**", ".jarvis/**")
+              ".github/**", ".claude/**", ".mcp.json")
+# Fora da pasta do Jarvis (em ~): logins e senhas. AppData guarda as do Hermes no Windows.
+CREDENCIAIS = (".claude/.credentials.json", ".ssh/**", ".aws/**", ".hermes/**", ".jarvis/**", "AppData/**")
+# O Claude pode ler, mas nunca mudar: as travas dele e o que desfaz uma mudança interrompida.
+TRAVAS = ("core/claude_chefe.py",)
 PASTAS_FORA = {".git", "__pycache__", ".venv", "venv", "env", "ENV", "node_modules", ".pytest_cache",
                ".mypy_cache", ".ruff_cache", "tmp", "outputs", "memory", "build", "dist", ".qa-artifacts"}
 ARQUIVOS_FORA = {".env", "api_keys.json", "ui_settings.json"}
@@ -80,7 +93,9 @@ REGRAS_PLANO = """
 TAREFA: planejar uma mudança no código do próprio Jarvis Ultron (pasta atual). NÃO altere nada agora:
 leia o código e escreva o PLANO: o que vai mudar, em quais arquivos, os riscos, e como testar.
 Na linha "FALA:" resuma o plano em 2 frases simples (o Erton não é programador) e termine perguntando
-se ele aprova. Não mexa em .env, chaves, memória nem na pasta .git."""
+se ele aprova. Não mexa em .env, chaves, memória nem na pasta .git. Você não pode mudar a .venv, pastas
+que começam com ponto, tmp/outputs/build/dist nem core/claude_chefe.py (as suas travas): se o pedido
+precisar disso, diga no plano que não dá."""
 
 REGRAS_APLICAR = """
 O Erton APROVOU o plano abaixo. Aplique exatamente esse plano, com mudanças pequenas e cuidadosas,
@@ -123,10 +138,16 @@ def pasta_jarvis() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
+_LETRAS_DO_ENV = str.maketrans({"\a": "\\a", "\b": "\\b", "\f": "\\f", "\n": "\\n", "\r": "\\r", "\t": "\\t",
+                                "\v": "\\v"})
+
+
 def achar_claude() -> str | None:
     """O claude.exe do instalador oficial; senão o do PATH (menos o Claude Desktop da Microsoft Store,
     que também se chama Claude.exe e abre a janela do app em vez do Claude Code)."""
-    escolhido = os.environ.get("JARVIS_CLAUDE_EXE", "").strip().strip('"')
+    # o "Instalar Claude" antigo gravava o caminho sem dobrar a barra, e o .env lido virava "\b" em
+    # outra letra (C:\...\.local\bin): aqui ela volta a ser barra
+    escolhido = os.environ.get("JARVIS_CLAUDE_EXE", "").translate(_LETRAS_DO_ENV).strip().strip('"')
     if escolhido and Path(escolhido).is_file():
         return escolhido
     oficial = Path.home() / ".local" / "bin" / ("claude.exe" if sys.platform == "win32" else "claude")
@@ -149,6 +170,7 @@ def ambiente() -> dict:
     env = {k: v for k, v in os.environ.items()
            if k.upper() not in SEGREDOS and not k.upper().startswith(SEGREDOS_PREFIXOS)}
     env["PYTHONIOENCODING"] = "utf-8"
+    env["ENABLE_CLAUDEAI_MCP_SERVERS"] = "false"  # reforço do --strict-mcp-config: sem conectores
     return env
 
 
@@ -160,12 +182,41 @@ def regra_de_pasta(caminho: Path | str) -> str:
     return "/" + texto
 
 
+def _ler(*pastas) -> list[str]:
+    """Leitura só nessas pastas (e o que estiver dentro delas)."""
+    return [f"Read({regra_de_pasta(p)}/**)" for p in pastas]
+
+
+def _pastas_do_hermes() -> list[str]:
+    """Onde o Hermes guarda as senhas dele (token do Telegram, senha de app do Gmail...). No Windows é
+    %LOCALAPPDATA%\\hermes, que Read(~/.hermes/**) não pega. (Lidas aqui, antes de ambiente() tirar
+    as variáveis HERMES_ do Claude.)"""
+    pastas = [os.environ.get(nome, "").strip().strip('"') for nome in ("HERMES_HOME", "HERMES_JARVIS_HOME")]
+    local = os.environ.get("LOCALAPPDATA", "").strip().strip('"')
+    if local:
+        pastas.append(str(Path(local) / "hermes"))
+    return list(dict.fromkeys(p for p in pastas if p))
+
+
+def _fora_da_foto(raiz: str) -> list[str]:
+    """Na pasta do Jarvis, o que fotografar() não cobre também não pode ser mudado: senão não iria
+    para o backup, não seria conferido nem desfeito (.venv, pastas com ponto, tmp, .zip, .log...).
+    E as TRAVAS, que o Claude só lê."""
+    regras = [f"Edit({raiz}/**/{nome}/**)" for nome in sorted(PASTAS_FORA) if not nome.startswith(".")]
+    regras += [f"Edit({raiz}/**/.*/**)", f"Edit({raiz}/**/.env*)"]
+    regras += [f"Edit({raiz}/**/*{fim})" for fim in (".pyc", ".zip", ".log")]
+    regras += [f"Edit({raiz}/**/{nome})" for nome in sorted(ARQUIVOS_FORA) if not nome.startswith(".")]
+    return regras + [f"Edit({raiz}/{item})" for item in TRAVAS]
+
+
 def _proibidas_na(pasta: Path) -> list[str]:
     regras = list(PROIBIDAS)
     for raiz in dict.fromkeys([regra_de_pasta(pasta), regra_de_pasta(pasta_jarvis())]):
         for item in PROTEGIDOS:
             regras += [f"Read({raiz}/{item})", f"Edit({raiz}/{item})"]
-    return regras + [f"Read(~/{item})" for item in CREDENCIAIS]
+    regras += _fora_da_foto(regra_de_pasta(pasta_jarvis()))
+    regras += [f"Read(~/{item})" for item in CREDENCIAIS]
+    return list(dict.fromkeys(regras + _ler(*_pastas_do_hermes())))
 
 
 def preparar_pasta() -> Path:
@@ -198,7 +249,8 @@ def comando(exe: str, permitir, pasta: Path, sessao: str | None = None, turnos: 
             pastas_extras=()) -> list[str]:
     """O pedido vai pela entrada padrão (não pela linha de comando), porque no Windows um claude.cmd
     estragaria textos com acentos, aspas ou '&'."""
-    cmd = [exe, "-p", "--output-format", "json", "--permission-mode", "dontAsk", "--max-turns", str(turnos)]
+    cmd = [exe, "-p", "--output-format", "json", "--permission-mode", "dontAsk", "--max-turns", str(turnos),
+           "--strict-mcp-config"]  # nenhum servidor MCP: sem os conectores da conta (Gmail, Agenda...)
     modelo = os.environ.get("JARVIS_CLAUDE_MODELO", "").strip()
     if modelo:
         cmd += ["--model", modelo]
@@ -248,28 +300,136 @@ def explicar(texto: str, subtipo: str = "") -> str:
     return (texto or "erro desconhecido").strip()[:200]
 
 
+@lru_cache(maxsize=1)
+def _estruturas_do_job():
+    """JOBOBJECT_EXTENDED_LIMIT_INFORMATION do Windows (para o "job" que morre junto com o Jarvis)."""
+    import ctypes
+
+    class Basico(ctypes.Structure):
+        _fields_ = [("PerProcessUserTimeLimit", ctypes.c_int64), ("PerJobUserTimeLimit", ctypes.c_int64),
+                    ("LimitFlags", ctypes.c_uint32), ("MinimumWorkingSetSize", ctypes.c_size_t),
+                    ("MaximumWorkingSetSize", ctypes.c_size_t), ("ActiveProcessLimit", ctypes.c_uint32),
+                    ("Affinity", ctypes.c_size_t), ("PriorityClass", ctypes.c_uint32),
+                    ("SchedulingClass", ctypes.c_uint32)]
+
+    class Contadores(ctypes.Structure):
+        _fields_ = [(nome, ctypes.c_uint64) for nome in (
+            "ReadOperationCount", "WriteOperationCount", "OtherOperationCount",
+            "ReadTransferCount", "WriteTransferCount", "OtherTransferCount")]
+
+    class Estendido(ctypes.Structure):
+        _fields_ = [("BasicLimitInformation", Basico), ("IoInfo", Contadores),
+                    ("ProcessMemoryLimit", ctypes.c_size_t), ("JobMemoryLimit", ctypes.c_size_t),
+                    ("PeakProcessMemoryUsed", ctypes.c_size_t), ("PeakJobMemoryUsed", ctypes.c_size_t)]
+
+    return Estendido
+
+
+@lru_cache(maxsize=1)
+def _kernel32():
+    import ctypes
+    from ctypes import wintypes
+
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    k32.CreateJobObjectW.restype = wintypes.HANDLE
+    k32.CreateJobObjectW.argtypes = (ctypes.c_void_p, wintypes.LPCWSTR)
+    k32.SetInformationJobObject.argtypes = (wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD)
+    k32.AssignProcessToJobObject.argtypes = (wintypes.HANDLE, wintypes.HANDLE)
+    k32.TerminateJobObject.argtypes = (wintypes.HANDLE, wintypes.UINT)
+    k32.CloseHandle.argtypes = (wintypes.HANDLE,)
+    return k32
+
+
+def _job_que_morre_com_o_jarvis(processo):
+    """No Windows, põe o programa num "job" com KILL_ON_JOB_CLOSE: se o Jarvis fechar, cair ou for
+    encerrado no meio, o Windows encerra o programa (e o que ele abriu) junto. Sem isso o claude.exe
+    continuaria mudando o código sozinho, sem testes e sem desfazer. None se não deu (ou fora do Windows)."""
+    if sys.platform != "win32":
+        return None
+    try:
+        import ctypes
+
+        k32 = _kernel32()
+        job = k32.CreateJobObjectW(None, None)
+        if not job:
+            return None
+        info = _estruturas_do_job()()
+        info.BasicLimitInformation.LimitFlags = 0x2000  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        if (k32.SetInformationJobObject(job, 9, ctypes.byref(info), ctypes.sizeof(info))  # 9 = estendida
+                and k32.AssignProcessToJobObject(job, int(processo._handle))):
+            return job
+        k32.CloseHandle(job)
+    except Exception as erro:
+        print(f"[Claude] Não consegui prender o programa ao Jarvis: {erro}")
+    return None
+
+
+def _encerrar_tudo(processo, job) -> None:
+    """Encerra o programa e tudo o que ele abriu (o claude.cmd do npm abre um node.exe)."""
+    try:
+        if sys.platform == "win32":
+            # a árvore toda, enquanto o primeiro ainda existe (depois não dá para achar os "netos")
+            subprocess.run(["taskkill", "/T", "/F", "/PID", str(processo.pid)], capture_output=True, timeout=30,
+                           creationflags=subprocess.CREATE_NO_WINDOW)
+        else:
+            os.killpg(processo.pid, signal.SIGKILL)
+    except (OSError, subprocess.SubprocessError):
+        pass
+    if job:
+        _kernel32().TerminateJobObject(job, 1)  # e o que ainda estiver no job
+    try:
+        processo.kill()
+    except OSError:
+        pass
+
+
+def _executar(cmd: list[str], entrada: bytes | None, tempo: float, pasta: Path, env: dict) -> tuple[int, bytes, bytes]:
+    """Roda um programa e devolve (código, saída, erros). Passando do tempo, encerra o programa E o que
+    ele abriu, e levanta subprocess.TimeoutExpired (o subprocess.run só encerrava o primeiro: com o
+    claude.cmd do npm, o node.exe seguia trabalhando e segurando a tarefa)."""
+    if sys.platform == "win32":
+        extra = {"creationflags": subprocess.CREATE_NO_WINDOW}
+    else:
+        extra = {"start_new_session": True}  # grupo próprio: dá para encerrar os "netos" também
+    processo = subprocess.Popen(cmd, stdin=subprocess.PIPE if entrada is not None else subprocess.DEVNULL,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=str(pasta), env=env, **extra)
+    job = _job_que_morre_com_o_jarvis(processo)
+    try:
+        saida, erros = processo.communicate(entrada, timeout=tempo)
+    except subprocess.TimeoutExpired:
+        _encerrar_tudo(processo, job)
+        try:
+            processo.communicate(timeout=15)
+        except subprocess.TimeoutExpired:
+            pass  # algo ainda segura a saída: desiste dela
+        raise
+    finally:
+        if job:
+            _kernel32().CloseHandle(job)  # o que sobrou no job é encerrado aqui
+    return processo.returncode, saida, erros
+
+
 def rodar(pedido: str, permitir, pasta: Path, sessao: str | None = None, tempo: float = TEMPO_TAREFA,
           turnos: int = MAX_TURNOS, pastas_extras=()) -> Resposta:
     exe = achar_claude()
     if not exe:
         return Resposta(False, erro="o Claude Code não está instalado. Dê dois cliques em 'Instalar Claude' "
                                     "na pasta do Jarvis")
-    extra = {"creationflags": subprocess.CREATE_NO_WINDOW} if sys.platform == "win32" else {}
     try:
-        feito = subprocess.run(comando(exe, permitir, pasta, sessao, turnos, pastas_extras), input=pedido.encode("utf-8"),
-                               capture_output=True, timeout=tempo, cwd=str(pasta), env=ambiente(), **extra)
+        codigo, saida, problemas = _executar(comando(exe, permitir, pasta, sessao, turnos, pastas_extras),
+                                             pedido.encode("utf-8"), tempo, pasta, ambiente())
     except subprocess.TimeoutExpired:
         return Resposta(False, erro=f"o Claude passou de {int(tempo // 60)} minutos e eu parei a tarefa")
     except OSError as erro:
         return Resposta(False, erro=f"não consegui abrir o Claude Code: {erro}")
-    saida = feito.stdout.decode("utf-8", "replace")
-    problemas = feito.stderr.decode("utf-8", "replace")
+    saida = saida.decode("utf-8", "replace")
+    problemas = problemas.decode("utf-8", "replace")
     dados = _ler_json(saida)
     if dados is None:
-        return Resposta(False, erro=explicar(problemas.strip() or saida.strip() or f"saída {feito.returncode}"))
+        return Resposta(False, erro=explicar(problemas.strip() or saida.strip() or f"saída {codigo}"))
     texto = str(dados.get("result") or "")
     negadas = list(dados.get("permission_denials") or [])
-    if dados.get("is_error") or str(dados.get("subtype", "success")) != "success" or feito.returncode != 0:
+    if dados.get("is_error") or str(dados.get("subtype", "success")) != "success" or codigo != 0:
         detalhe = texto or " ".join(map(str, dados.get("errors") or [])) or problemas
         return Resposta(False, texto, dados.get("session_id"), explicar(detalhe, str(dados.get("subtype", ""))), negadas)
     return Resposta(True, texto, dados.get("session_id"), negadas=negadas)
@@ -314,7 +474,7 @@ def fazer_tarefa(pedido: str, agente: str | None = None, sessao: str | None = No
         texto += (f"\nSiga as instruções do agente '{agente}' (arquivo .claude/skills/{agente}/SKILL.md "
                   "nesta pasta). Onde ele falar em publicar, enviar ou usar conectores, prepare só o rascunho.")
     texto += f"\n\nPEDIDO DO ERTON:\n{pedido.strip()}"
-    permitir = [*LEITURA, f"Edit({regra_de_pasta(pasta)}/**)"]
+    permitir = [*LEITURA, *_ler(pasta, pasta_dados()), f"Edit({regra_de_pasta(pasta)}/**)"]
     return rodar(texto, permitir, pasta, sessao=sessao, pastas_extras=[pasta_dados()])
 
 
@@ -322,7 +482,7 @@ def fazer_tarefa(pedido: str, agente: str | None = None, sessao: str | None = No
 def planejar(pedido: str) -> Resposta:
     pasta = pasta_jarvis()
     texto = REGRAS + REGRAS_PLANO + f"\n\nPEDIDO DO ERTON:\n{pedido.strip()}"
-    return rodar(texto, LEITURA, pasta)  # sem Edit: no plano ele não consegue mudar nada
+    return rodar(texto, [*LEITURA, *_ler(pasta)], pasta)  # sem Edit: no plano ele não consegue mudar nada
 
 
 def _arquivos_de_codigo(pasta: Path):
@@ -332,62 +492,135 @@ def _arquivos_de_codigo(pasta: Path):
             if nome in ARQUIVOS_FORA or nome.startswith(".env") or nome.endswith((".pyc", ".zip", ".log")):
                 continue
             caminho = Path(raiz) / nome
-            try:
-                if caminho.stat().st_size <= 5 * 1024 * 1024:
-                    yield caminho.relative_to(pasta).as_posix(), caminho
-            except OSError:
-                continue
+            yield caminho.relative_to(pasta).as_posix(), caminho
 
 
 def fotografar(pasta: Path) -> dict[str, str]:
-    """{arquivo: impressão digital} de tudo o que o Claude pode mudar."""
+    """{arquivo: impressão digital} de tudo o que o Claude pode mudar. Os maiores que 5 MB (e os que
+    não deu para ler) não vão para o backup, mas entram aqui com tamanho e data: assim nunca são
+    apagados como se fossem novos, e uma mudança neles aparece."""
     foto = {}
     for nome, caminho in _arquivos_de_codigo(pasta):
         try:
-            foto[nome] = hashlib.sha1(caminho.read_bytes()).hexdigest()
+            info = caminho.stat()
+            if info.st_size > LIMITE_BACKUP:
+                foto[nome] = f"grande:{info.st_size}:{info.st_mtime_ns}"
+            else:
+                foto[nome] = hashlib.sha1(caminho.read_bytes()).hexdigest()
         except OSError:
-            continue
+            foto[nome] = "ilegivel"
     return foto
+
+
+def _vai_no_backup(impressao: str) -> bool:
+    return len(impressao) == 40  # sha1 de verdade (não "grande:..." nem "ilegivel")
 
 
 def fazer_backup(pasta: Path, foto: dict[str, str]) -> Path:
     destino = pasta_backups() / f"jarvis-antes-do-claude-{datetime.now():%Y%m%d-%H%M%S}.zip"
     destino.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(destino, "w", zipfile.ZIP_DEFLATED) as zipado:
-        for nome in foto:
+        for nome, impressao in foto.items():
+            if _vai_no_backup(impressao):
+                zipado.write(pasta / nome, nome)
+    return destino
+
+
+def _nome_seguro(nome: str) -> bool:
+    """Um nome (da foto ou da anotação) nunca aponta para fora da pasta do Jarvis."""
+    caminho = PurePosixPath(nome)
+    return bool(nome) and not caminho.is_absolute() and ".." not in caminho.parts and ":" not in nome
+
+
+@dataclass
+class Restauro:
+    mexidos: list = field(default_factory=list)   # voltaram ao que eram (ou foram apagados)
+    deixados: list = field(default_factory=list)  # mudaram de novo depois do Claude: não eram dele
+    copia: Path | None = None                      # .zip com o que estava no lugar antes de desfazer
+
+
+def _guardar_como_esta(pasta: Path, nomes: list[str]) -> Path | None:
+    """Antes de sobrescrever ou apagar, guarda a versão atual: desfazer nunca perde nada de ninguém."""
+    nomes = [n for n in nomes if (pasta / n).is_file()]
+    if not nomes:
+        return None
+    destino = pasta_backups() / f"jarvis-desfeito-{datetime.now():%Y%m%d-%H%M%S}.zip"
+    n = 2
+    while destino.exists():
+        destino = destino.with_name(f"jarvis-desfeito-{datetime.now():%Y%m%d-%H%M%S}-{n}.zip")
+        n += 1
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(destino, "w", zipfile.ZIP_DEFLATED) as zipado:
+        for nome in nomes:
             zipado.write(pasta / nome, nome)
     return destino
 
 
-def restaurar(pasta: Path, backup: Path, antes: dict[str, str]) -> list[str]:
-    """Volta cada arquivo mudado ao que era; apaga os que o Claude criou. Devolve o que mexeu."""
+def restaurar(pasta: Path, backup: Path, antes: dict[str, str], nomes=None,
+              claude: dict[str, str] | None = None) -> Restauro:
+    """Volta ao que era cada arquivo de 'nomes' (padrão: tudo o que mudou desde 'antes') e apaga os
+    que não existiam antes. Com 'claude' (a foto logo depois do Claude), só mexe no que continua como
+    o Claude deixou: o que mudou depois foi outra pessoa e fica como está. Nunca apaga um arquivo que
+    já existia, e guarda a versão atual de tudo o que sobrescreve ou apaga (Restauro.copia)."""
     depois = fotografar(pasta)
-    mexidos = []
-    with zipfile.ZipFile(backup) as zipado:
-        for nome, impressao in antes.items():
-            if depois.get(nome) != impressao:
-                (pasta / nome).parent.mkdir(parents=True, exist_ok=True)
-                (pasta / nome).write_bytes(zipado.read(nome))
-                mexidos.append(nome)
-    for nome in depois.keys() - antes.keys():
+    feito = Restauro()
+    alvos = []
+    for nome in (mudancas(antes, depois) if nomes is None else nomes):
+        if depois.get(nome) == antes.get(nome) or not _nome_seguro(nome):
+            continue
+        if claude is not None and depois.get(nome) != claude.get(nome):
+            feito.deixados.append(nome)
+            continue
+        alvos.append(nome)
+    feito.copia = _guardar_como_esta(pasta, alvos)
+    for nome in [n for n in alvos if n not in antes]:  # criados durante a mudança
         try:
             (pasta / nome).unlink()
-            mexidos.append(nome)
+            feito.mexidos.append(nome)
         except OSError:
             pass
-    return mexidos
+    voltar = [n for n in alvos if n in antes]
+    if voltar:
+        with zipfile.ZipFile(backup) as zipado:
+            guardados = set(zipado.namelist())
+            for nome in voltar:
+                if nome not in guardados:
+                    continue  # grande demais para o backup: fica como está (e aparece como "não consegui")
+                (pasta / nome).parent.mkdir(parents=True, exist_ok=True)
+                (pasta / nome).write_bytes(zipado.read(nome))
+                feito.mexidos.append(nome)
+    return feito
 
 
 def mudancas(antes: dict[str, str], depois: dict[str, str]) -> list[str]:
     return sorted(n for n in antes.keys() | depois.keys() if antes.get(n) != depois.get(n))
 
 
+def _copiar_codigo(pasta: Path, destino: Path) -> None:
+    """Cópia do código para os testes: sem .env, sem a memória e sem os dados do Erton (da pasta
+    memory vão só os .py, que são código). Arquivos maiores que 5 MB não vão."""
+    arquivos = list(_arquivos_de_codigo(pasta))
+    memoria = pasta / "memory"
+    if memoria.is_dir():
+        arquivos += [(f"memory/{c.name}", c) for c in memoria.iterdir()
+                     if c.is_file() and (c.suffix in (".py", ".md") or ".example." in c.name)]
+    for nome, caminho in arquivos:
+        alvo = destino / nome
+        try:
+            if caminho.stat().st_size > LIMITE_BACKUP:
+                continue
+            alvo.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(caminho, alvo)
+        except OSError:
+            continue
+
+
 def rodar_testes(pasta: Path, tempo: float = TEMPO_TESTES) -> set[str] | None:
-    """Roda os testes do Jarvis. Devolve o conjunto de testes que falharam (None = não deu para rodar)."""
+    """Roda os testes do Jarvis. Devolve o conjunto de testes que falharam (None = não deu para rodar).
+    Os testes rodam numa cópia do código e com uma "pasta do usuário" de mentira: assim não mexem no
+    tema, no histórico, no diagnóstico nem nas chaves do Erton (e o .env dele não é lido)."""
     if not (pasta / "tests").is_dir():
         return None
-    env = ambiente()
-    env.update(QT_QPA_PLATFORM="offscreen", JARVIS_UM_PROCESSO="1", JARVIS_ORBE_GPU="0")
     if importlib.util.find_spec("pytest") is not None:
         cmd = [sys.executable, "-m", "pytest", "tests", "-q", "-rfE", "-p", "no:cacheprovider"]
         falhou = re.compile(r"^(?:FAILED|ERROR) (\S+)", re.MULTILINE)
@@ -396,12 +629,21 @@ def rodar_testes(pasta: Path, tempo: float = TEMPO_TESTES) -> set[str] | None:
         cmd = [sys.executable, "-m", "unittest", "discover", "-s", "tests", "-t", "."]
         falhou = re.compile(r"^(?:FAIL|ERROR): (\S+ \([^)]+\))", re.MULTILINE)
         terminou = re.compile(r"^Ran \d+ tests?", re.MULTILINE)
-    extra = {"creationflags": subprocess.CREATE_NO_WINDOW} if sys.platform == "win32" else {}
-    try:
-        feito = subprocess.run(cmd, cwd=str(pasta), env=env, capture_output=True, timeout=tempo, **extra)
-    except (subprocess.TimeoutExpired, OSError):
-        return None
-    saida = feito.stdout.decode("utf-8", "replace") + "\n" + feito.stderr.decode("utf-8", "replace")
+    with tempfile.TemporaryDirectory(prefix="jarvis-testes-", ignore_cleanup_errors=True) as temporaria:
+        copia, casa = Path(temporaria) / "jarvis", Path(temporaria) / "casa"
+        _copiar_codigo(pasta, copia)
+        for sub in ("AppData/Roaming", "AppData/Local", "Documents"):
+            (casa / sub).mkdir(parents=True, exist_ok=True)
+        env = ambiente()
+        env.setdefault("PYTHONUSERBASE", site.getuserbase())  # os pacotes do usuário continuam achados
+        env.update(QT_QPA_PLATFORM="offscreen", JARVIS_UM_PROCESSO="1", JARVIS_ORBE_GPU="0",
+                   HOME=str(casa), USERPROFILE=str(casa), APPDATA=str(casa / "AppData" / "Roaming"),
+                   LOCALAPPDATA=str(casa / "AppData" / "Local"))
+        try:
+            _codigo, saida, erros = _executar(cmd, None, tempo, copia, env)
+        except (subprocess.TimeoutExpired, OSError):
+            return None
+    saida = saida.decode("utf-8", "replace") + "\n" + erros.decode("utf-8", "replace")
     if not terminou.search(saida):
         return None
     return set(falhou.findall(saida))
@@ -426,32 +668,156 @@ class Resultado:
     detalhes: str = ""
 
 
-def aplicar_plano(plano: str, sessao: str | None, pedido: str) -> Resultado:
-    pasta = pasta_jarvis()
-    antes = fotografar(pasta)
-    backup = fazer_backup(pasta, antes)
-    falhas_antes = rodar_testes(pasta)
+_aplicando = threading.Lock()  # preso enquanto o Claude muda o código do Jarvis (do backup ao fim)
 
-    permitir = [*LEITURA, f"Edit({regra_de_pasta(pasta)}/**)"]
+
+def aplicando() -> bool:
+    """True enquanto o Claude aplica uma mudança no código do Jarvis (neste programa). Quem religa o
+    cérebro ou mexe na pasta do Jarvis confere isto antes."""
+    return _aplicando.locked()
+
+
+def _anotacao() -> Path:
+    """A mudança em andamento fica anotada fora da pasta do Jarvis (e fora do alcance do Claude)."""
+    return pasta_backups() / "aplicando.json"
+
+
+def _anotar(dados: dict) -> None:
+    arquivo = _anotacao()
+    arquivo.parent.mkdir(parents=True, exist_ok=True)
+    novo = arquivo.with_name(arquivo.name + ".novo")
+    novo.write_text(json.dumps(dados, ensure_ascii=False), encoding="utf-8")
+    os.replace(novo, arquivo)  # de uma vez: nunca fica uma anotação pela metade
+
+
+def _ler_anotacao() -> dict | None:
+    try:
+        dados = json.loads(_anotacao().read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return None
+    except (OSError, ValueError):
+        return {}
+    return dados if isinstance(dados, dict) else {}
+
+
+def _apagar_anotacao() -> None:
+    try:
+        _anotacao().unlink()
+    except FileNotFoundError:
+        pass
+
+
+def desfazer_interrompida() -> str:
+    """Na abertura do Jarvis (e do cérebro): uma mudança do Claude no código ficou pela metade porque o
+    Jarvis fechou, o cérebro foi religado ou o PC desligou no meio? Volta os arquivos ao que eram
+    antes dela (guardando a versão pela metade em Backups). Devolve o aviso para o Erton ("" se não
+    havia nada); o aviso continua valendo até esquecer_interrompida()."""
+    if aplicando():
+        return ""  # a mudança está rodando agora, neste programa
+    dados = _ler_anotacao()
+    if dados is None:
+        return ""
+    if dados.get("aviso"):
+        return str(dados["aviso"])  # já desfeita (por exemplo pelo "Iniciar Jarvis Ultron"); falta contar
+    try:
+        backup = Path(str(dados["backup"]))
+        antes = {str(k): str(v) for k, v in dict(dados["antes"]).items()}
+    except (KeyError, TypeError, ValueError):
+        _apagar_anotacao()
+        return ("Uma mudança do Claude no meu código foi interrompida, mas a anotação dela estragou e eu não "
+                f"consegui conferir. Os backups estão em {pasta_backups()}.")
+    pedido, plano = str(dados.get("pedido") or "mudança no código"), str(dados.get("plano") or "")
+    pasta = pasta_jarvis()
+    mudados = mudancas(antes, fotografar(pasta))
+    try:
+        feito = restaurar(pasta, backup, antes, mudados)
+    except (OSError, zipfile.BadZipFile) as erro:  # a anotação fica: tento de novo na próxima abertura
+        return (f"Uma mudança do Claude no meu código ficou pela metade e eu não consegui desfazer ({erro}). "
+                f"O backup está em {backup}.")
+    if not mudados:
+        aviso = ("Uma mudança do Claude no meu código foi interrompida porque o Jarvis fechou ou foi religado no "
+                 "meio, mas ele ainda não tinha mudado nenhum arquivo.")
+    else:
+        sobrou = [n for n in mudancas(antes, fotografar(pasta)) if n in mudados]
+        aviso = ("Uma mudança do Claude no meu código ficou pela metade porque o Jarvis fechou ou foi religado no "
+                 "meio, e eu desfiz: o código voltou a ser como era antes dela.")
+        if sobrou:
+            aviso += f" Atenção: não consegui voltar {', '.join(sobrou[:3])}; o backup está em {backup}."
+        registrar(pedido, plano, mudados, "DESFEITO: o Jarvis fechou no meio da mudança", backup)
+    if feito.copia:
+        print(f"[Claude] A versão pela metade ficou guardada em {feito.copia}")
+    dados["aviso"] = aviso
+    try:
+        _anotar(dados)
+    except OSError:
+        pass
+    return aviso
+
+
+def esquecer_interrompida() -> None:
+    """O aviso de desfazer_interrompida() já foi dado ao Erton."""
+    dados = _ler_anotacao()
+    if dados is not None and dados.get("aviso") and not aplicando():
+        _apagar_anotacao()
+
+
+def aplicar_plano(plano: str, sessao: str | None, pedido: str) -> Resultado:
+    if not _aplicando.acquire(blocking=False):
+        return Resultado(False, "Já tem uma mudança do Claude no código em andamento; espere ela terminar.")
+    try:
+        return _aplicar_plano(plano, sessao, pedido)
+    finally:
+        _aplicando.release()
+
+
+def _aplicar_plano(plano: str, sessao: str | None, pedido: str) -> Resultado:
+    pasta = pasta_jarvis()
+    falhas_antes = rodar_testes(pasta)
+    antes = fotografar(pasta)  # logo antes do Claude: o que mudar antes disso não é dele
+    backup = fazer_backup(pasta, antes)
+    # se o Jarvis fechar ou cair daqui até o fim, a próxima abertura desfaz (desfazer_interrompida)
+    _anotar({"backup": str(backup), "antes": antes, "pedido": pedido, "plano": plano, "desde": time.time()})
+    try:
+        return _aplicar_e_conferir(pasta, antes, backup, falhas_antes, plano, sessao, pedido)
+    except Exception:
+        restaurar(pasta, backup, antes)  # erro inesperado no meio: volta já (a anotação fica se nem isso der)
+        _apagar_anotacao()
+        raise
+
+
+def _aplicar_e_conferir(pasta: Path, antes: dict[str, str], backup: Path, falhas_antes, plano: str,
+                        sessao: str | None, pedido: str) -> Resultado:
+    permitir = [*LEITURA, *_ler(pasta), f"Edit({regra_de_pasta(pasta)}/**)"]
     texto = REGRAS + REGRAS_APLICAR.format(plano=plano.strip())
     resposta = rodar(texto, permitir, pasta, sessao=sessao, turnos=MAX_TURNOS + 20)
     if not resposta.ok and sessao and "session" in resposta.erro.lower():
         resposta = rodar(texto, permitir, pasta, turnos=MAX_TURNOS + 20)  # a conversa do plano sumiu
-    mudados = mudancas(antes, fotografar(pasta))
+    depois_claude = fotografar(pasta)
+    mudados = mudancas(antes, depois_claude)
 
     def desfazer(motivo: str) -> Resultado:
-        restaurar(pasta, backup, antes)
-        sobrou = mudancas(antes, fotografar(pasta))
-        fim = "" if not sobrou else f" Atenção: não consegui voltar {', '.join(sobrou)}; o backup está em {backup}."
+        # só o que continua como o Claude deixou; o que alguém mudou depois fica como está
+        feito = restaurar(pasta, backup, antes, mudados, depois_claude)
+        _apagar_anotacao()
+        agora = fotografar(pasta)
+        sobrou = [n for n in mudados if n not in feito.deixados and agora.get(n) != antes.get(n)]
+        fala = f"Desfiz a mudança porque {motivo}. O Jarvis ficou como estava."
+        if feito.deixados:
+            fala = (f"Desfiz a mudança porque {motivo}. O que o Claude mudou voltou a ser como era; não mexi em "
+                    f"{', '.join(feito.deixados[:3])}, que mudou depois dele.")
+        if sobrou:
+            fala += f" Atenção: não consegui voltar {', '.join(sobrou)}; o backup está em {backup}."
         registro = registrar(pedido, plano, mudados, f"DESFEITO: {motivo}", backup)
-        return Resultado(False, f"Desfiz a mudança porque {motivo}. O Jarvis ficou como estava.{fim}",
-                         f"Registro: {registro}")
+        guardado = f". O que estava no lugar ficou guardado em {feito.copia}" if feito.copia else ""
+        return Resultado(False, fala, f"Registro: {registro}{guardado}")
 
     if not resposta.ok:
         if mudados:
             return desfazer(f"o Claude parou no meio ({resposta.erro})")
+        _apagar_anotacao()
         return Resultado(False, f"O Claude não conseguiu aplicar: {resposta.erro}.")
     if not mudados:
+        _apagar_anotacao()
         return Resultado(False, "O Claude terminou sem mudar nenhum arquivo. " + resposta.fala)
 
     ruins = conferir_sintaxe(pasta, mudados)
@@ -468,6 +834,7 @@ def aplicar_plano(plano: str, sessao: str | None, pedido: str) -> Resultado:
     else:
         situacao = "não consegui rodar os testes neste PC, mas a sintaxe está certa"
 
+    _apagar_anotacao()  # deu certo: a próxima abertura não desfaz
     registro = registrar(pedido, plano, mudados, f"APLICADO ({situacao})", backup)
     fala = (f"Pronto: o Claude mudou {len(mudados)} arquivo(s) e {situacao}. As mudanças valem quando você "
             f"reabrir o Jarvis. {resposta.fala}").strip()
@@ -484,3 +851,20 @@ def registrar(pedido: str, plano: str, mudados: list[str], situacao: str, backup
     except OSError as erro:
         print(f"[Claude] Não consegui salvar o registro: {erro}")
     return arquivo
+
+
+def _principal(argumentos: list[str]) -> int:
+    """'python -m core.claude_chefe --desfazer-interrompida': o "Iniciar Jarvis Ultron" roda isto ANTES de
+    abrir o Jarvis, porque uma mudança pela metade pode impedir até a tela de abrir."""
+    if "--desfazer-interrompida" in argumentos:
+        aviso = desfazer_interrompida()
+        if aviso:
+            try:
+                print(aviso)
+            except (OSError, UnicodeError):
+                pass
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(_principal(sys.argv[1:]))

@@ -10,6 +10,21 @@ import os
 import sys
 
 
+def desfazer_mudanca_interrompida() -> None:
+    """Uma mudança do Claude no código ficou pela metade (o cérebro antigo foi religado ou caiu no meio)?
+    Desfaz ANTES de importar o resto do Jarvis, que pode estar com o código pela metade. O aviso ao
+    Erton é dado depois, pelo cérebro já aberto (main._contar_mudanca_desfeita)."""
+    try:
+        from core import claude_chefe
+
+        aviso = claude_chefe.desfazer_interrompida()
+    except Exception as erro:
+        print(f"[Cérebro] Não consegui conferir a mudança do Claude: {erro}")
+        return
+    if aviso:
+        print(f"[Cérebro] {aviso}")
+
+
 def principal() -> int:
     porta = os.environ.get("JARVIS_PONTE_PORTA", "").strip()
     chave = os.environ.get("JARVIS_PONTE_CHAVE", "").strip()
@@ -30,6 +45,7 @@ def principal() -> int:
 
     ui = UIRemota(conexao)
     ui.iniciar()
+    desfazer_mudanca_interrompida()
     import main
 
     try:

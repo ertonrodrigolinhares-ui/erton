@@ -150,13 +150,17 @@ o resumo e abre o relatório completo (fica em `Claude\Relatorios`).
    aplica, e o Jarvis confere a escrita do código e roda os testes de novo.
 4. Se algo quebrar, o Jarvis **desfaz sozinho**, arquivo por arquivo. As mudanças valem quando
    você reabrir o Jarvis. O registro de cada mudança fica em `Claude\Mudancas`.
+5. Enquanto o Claude muda o código, o Jarvis não troca de modo (privado/normal). Se o Jarvis fechar
+   ou o PC desligar no meio, o Claude para junto e, na próxima vez que você abrir, o Jarvis desfaz
+   a mudança que ficou pela metade e avisa.
 
 Travas (no código, conferidas com o Claude Code de verdade):
 - O Claude só **escreve** em `Documentos\Jarvis Ultron\Claude` e só **lê** a pasta
   `Documentos\Jarvis Ultron` (clientes.txt, carteira.txt, Faturas...).
 - Não roda comandos no PC e não usa conectores (Gmail, Agenda, Metricool, Meta): **não consegue
   publicar, enviar, comprar nem apagar nada**. Publicar continua com o Hermes, com o seu "ok".
-- Nunca lê o `.env`, as chaves, a memória do Jarvis nem as suas senhas.
+- Nunca lê o `.env`, as chaves, a memória do Jarvis nem as suas senhas (nem as do Hermes, em
+  `AppData`): fora das pastas dele, não lê nada.
 - No **modo privado** nada vai para o Claude.
 - Se existir `ANTHROPIC_API_KEY` no Windows, o Jarvis a tira quando chama o Claude (com ela o
   Claude cobraria pela API em vez de usar a sua assinatura).

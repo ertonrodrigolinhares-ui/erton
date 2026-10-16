@@ -14,6 +14,10 @@ $binDir = Join-Path $env:USERPROFILE ".local\bin"
 $oficial = Join-Path $binDir "claude.exe"
 $dados = Join-Path $env:USERPROFILE "Documents\Jarvis Ultron"
 $pasta = Join-Path $dados "Claude"
+# Sem chave de API aqui, como no Jarvis (que tira essas duas quando chama o Claude). Com a chave, o
+# "auth status" diria "conectado" e o login com a sua conta (Pro/Max) seria pulado.
+$env:ANTHROPIC_API_KEY = $null
+$env:ANTHROPIC_AUTH_TOKEN = $null
 
 function Titulo($texto) {
     Write-Host ""
@@ -33,6 +37,8 @@ function Sair-Com-Erro($texto) {
 
 function Definir-Env($chave, $valor) {
     # Troca (ou acrescenta) uma linha CHAVE="valor" no .env, sem mexer nas outras.
+    # Entre aspas, o Jarvis le "\b", "\n", "\t"... como letras especiais: a barra e a aspa vao dobradas.
+    $valor = ([string]$valor).Replace('\', '\\').Replace('"', '\"')
     $linhas = @()
     if (Test-Path $envArq) { $linhas = [System.IO.File]::ReadAllLines($envArq) }
     $nova = "$chave=`"$valor`""
@@ -129,7 +135,8 @@ if (Logado $exe) {
     }
     Write-Host "Conectado!" -ForegroundColor Green
 }
-if ([Environment]::GetEnvironmentVariable("ANTHROPIC_API_KEY", "User")) {
+if ([Environment]::GetEnvironmentVariable("ANTHROPIC_API_KEY", "User") -or
+    [Environment]::GetEnvironmentVariable("ANTHROPIC_API_KEY", "Machine")) {
     Write-Host ""
     Write-Host "Aviso: existe uma ANTHROPIC_API_KEY nas variaveis do Windows. O Jarvis tira essa chave" -ForegroundColor Yellow
     Write-Host "quando chama o Claude (para usar a sua assinatura), mas o Claude aberto por voce no" -ForegroundColor Yellow
@@ -139,7 +146,6 @@ if ([Environment]::GetEnvironmentVariable("ANTHROPIC_API_KEY", "User")) {
 # ---------------------------------------------------------------- 4
 Titulo "4/4  Teste"
 $ErrorActionPreference = "Continue"
-$env:ANTHROPIC_API_KEY = $null
 Push-Location $pasta
 try {
     $saida = ("Responda apenas com a palavra: pronto" | & $exe -p --output-format json --max-turns 1 --permission-mode dontAsk 2>$null | Out-String)
@@ -151,7 +157,11 @@ if ($r -and -not $r.is_error) {
 } else {
     $motivo = if ($r) { $r.result } else { $saida }
     Write-Host "O teste nao passou: $motivo" -ForegroundColor Yellow
-    Write-Host "(Se for limite do plano, e so esperar; o resto ja esta instalado.)" -ForegroundColor Yellow
+    if ("$motivo" -match "log ?in") {
+        Write-Host "O Claude nao esta conectado na sua conta. Abra o 'Instalar Claude' de novo e entre com a sua conta." -ForegroundColor Yellow
+    } else {
+        Write-Host "(Se for limite do plano, e so esperar; o resto ja esta instalado.)" -ForegroundColor Yellow
+    }
 }
 Definir-Env "JARVIS_CLAUDE_EXE" $exe
 

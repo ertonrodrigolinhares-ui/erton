@@ -6,7 +6,9 @@ import sys
 import tempfile
 import textwrap
 import threading
+import time
 import unittest
+import zipfile
 from pathlib import Path
 from types import SimpleNamespace as NS
 from unittest.mock import patch
@@ -23,8 +25,15 @@ FALSO = textwrap.dedent('''\
     pedido = sys.stdin.read()
     with open(os.environ["FAKE_CLAUDE_LOG"], "a", encoding="utf-8") as f:
         f.write(json.dumps({{"argv": sys.argv[1:], "pedido": pedido, "cwd": os.getcwd(),
-                             "env": sorted(os.environ)}}) + "\\n")
+                             "env": sorted(os.environ),
+                             "mcp": os.environ.get("ENABLE_CLAUDEAI_MCP_SERVERS")}}) + "\\n")
     modo = os.environ.get("FAKE_CLAUDE_MODO", "ok")
+    if modo == "demora":  # abre um "neto" (como o node.exe do claude.cmd) e não termina
+        import subprocess, time
+        subprocess.Popen([sys.executable, "-c",
+                          "import sys, time; time.sleep(1.5); open(sys.argv[1], 'w').write('vivo')",
+                          os.environ["FAKE_CLAUDE_NETO"]])
+        time.sleep(30)
     def fim(texto, erro=False, subtipo="success", codigo=0):
         print(json.dumps({{"type": "result", "subtype": subtipo, "is_error": erro, "result": texto,
                            "session_id": "sessao-1", "permission_denials": []}}))
@@ -327,6 +336,348 @@ class FerramentaClaudeTests(Base):
         from core.automacoes import carregar_ferramentas
 
         self.assertIn("claude_task", carregar_ferramentas(RAIZ / "automacoes").ferramentas)
+
+
+def _permitidas_e_proibidas(argv):
+    i, j = argv.index("--allowedTools"), argv.index("--disallowedTools")
+    return argv[i + 1:j], argv[j + 1:]
+
+
+class TravasDeLeituraEConectoresTests(Base):
+    """Sem leitura solta (as senhas do Hermes ficam em %LOCALAPPDATA%) e sem conectores."""
+
+    def test_nenhum_modo_le_fora_das_pastas_dele(self):
+        local = self.tmp / "AppData" / "Local"
+        perfil = local / "hermes" / "profiles" / "jarvis"
+        with patch.dict(os.environ, {"LOCALAPPDATA": str(local), "HERMES_JARVIS_HOME": str(perfil)}):
+            chefe.fazer_tarefa("pesquise")
+            chefe.planejar("mude a cor")
+            with patch.object(chefe, "rodar_testes", return_value=set()):
+                chefe.aplicar_plano("plano", None, "mude")
+        chamadas = self.chamadas()
+        self.assertEqual(len(chamadas), 3)
+        for chamada in chamadas:
+            argv = chamada["argv"]
+            permitidas, proibidas = _permitidas_e_proibidas(argv)
+            for solta in ("Read", "Glob", "Grep"):
+                self.assertNotIn(solta, permitidas)
+            leituras = [p for p in permitidas if p.startswith("Read(")]
+            self.assertTrue(leituras and all(p.endswith("/**)") for p in leituras), leituras)
+            self.assertIn("Read(~/AppData/**)", proibidas)
+            self.assertIn(f"Read({chefe.regra_de_pasta(local / 'hermes')}/**)", proibidas)
+            self.assertIn(f"Read({chefe.regra_de_pasta(perfil)}/**)", proibidas)
+            self.assertIn(f"Edit({chefe.regra_de_pasta(self.jarvis_dir)}/.mcp.json)", proibidas)
+            # conectores: o Claude abre sem nenhum servidor MCP ("mcp__*" sozinho não bloqueava nada)
+            self.assertIn("--strict-mcp-config", argv)
+            self.assertEqual(chamada["mcp"], "false")
+        tarefa, plano, _aplicar = (_permitidas_e_proibidas(c["argv"])[0] for c in chamadas)
+        self.assertIn(f"Read({chefe.regra_de_pasta(chefe.pasta_dados())}/**)", tarefa)
+        self.assertEqual([p for p in plano if p.startswith("Read(")],
+                         [f"Read({chefe.regra_de_pasta(self.jarvis_dir)}/**)"])
+
+
+class ForaDaFotoTests(Base):
+    """O Claude não muda o que o backup não cobre, e o que já existia nunca é apagado."""
+
+    def test_claude_nao_muda_o_que_o_backup_nao_cobre(self):
+        with patch.object(chefe, "rodar_testes", return_value=set()):
+            chefe.aplicar_plano("plano", None, "mude")
+        _permitidas, proibidas = _permitidas_e_proibidas(self.chamadas()[0]["argv"])
+        raiz = chefe.regra_de_pasta(self.jarvis_dir)
+        for regra in (f"Edit({raiz}/**/.*/**)", f"Edit({raiz}/**/venv/**)", f"Edit({raiz}/**/tmp/**)",
+                      f"Edit({raiz}/**/*.zip)", f"Edit({raiz}/**/*.log)", f"Edit({raiz}/core/claude_chefe.py)"):
+            self.assertIn(regra, proibidas)
+
+    def test_arquivo_grande_que_encolheu_nao_e_apagado(self):
+        grande = self.jarvis_dir / "dados" / "grande.bin"
+        grande.parent.mkdir()
+        grande.write_bytes(b"x" * (chefe.LIMITE_BACKUP + 10))
+        antes = chefe.fotografar(self.jarvis_dir)
+        self.assertIn("dados/grande.bin", antes)
+        backup = chefe.fazer_backup(self.jarvis_dir, antes)
+        grande.write_bytes(b"pequeno")
+        (self.jarvis_dir / "novo.py").write_text("X = 1\n", encoding="utf-8")
+        self.assertIn("dados/grande.bin", chefe.mudancas(antes, chefe.fotografar(self.jarvis_dir)))
+        chefe.restaurar(self.jarvis_dir, backup, antes)
+        self.assertTrue(grande.exists())  # já existia: nunca é apagado
+        self.assertFalse((self.jarvis_dir / "novo.py").exists())
+
+
+class DesfazerSoOQueEDoClaudeTests(Base):
+    def test_o_que_mudou_depois_do_claude_fica_como_esta(self):
+        do_erton = self.jarvis_dir / "automacoes" / "minha_nova.py"
+        criado = self.jarvis_dir / "novo_arquivo.py"
+        rodadas = []
+
+        def testes(pasta):
+            rodadas.append(pasta)
+            if len(rodadas) == 2:  # enquanto os testes de depois rodam, o Erton salva coisas dele
+                do_erton.parent.mkdir(exist_ok=True)
+                do_erton.write_text("# do Erton\n", encoding="utf-8")
+                criado.write_text("X = 2  # o Erton mexeu depois do Claude\n", encoding="utf-8")
+                return {"tests/x.py::soma"}
+            return set()
+
+        with patch.dict(os.environ, {"FAKE_CLAUDE_CODIGO": "def soma(a, b):\n    return 0\n",
+                                     "FAKE_CLAUDE_CRIA": "1"}), \
+                patch.object(chefe, "rodar_testes", side_effect=testes):
+            r = chefe.aplicar_plano("trocar", None, "mude a soma")
+        self.assertFalse(r.ok)
+        self.assertIn("a + b", (self.jarvis_dir / "modulo.py").read_text(encoding="utf-8"))
+        self.assertEqual(do_erton.read_text(encoding="utf-8"), "# do Erton\n")
+        self.assertIn("o Erton mexeu", criado.read_text(encoding="utf-8"))
+        self.assertIn("novo_arquivo.py", r.fala)
+        copias = list(chefe.pasta_backups().glob("jarvis-desfeito-*.zip"))
+        self.assertEqual(len(copias), 1)  # a versão desfeita fica guardada: nada se perde
+        with zipfile.ZipFile(copias[0]) as z:
+            self.assertIn("return 0", z.read("modulo.py").decode())
+
+
+class MudancaInterrompidaTests(Base):
+    """O Jarvis fechou, o cérebro foi religado ou caiu no meio de uma mudança do Claude no código."""
+
+    class Morreu(BaseException):
+        """Como o os._exit/kill: o fio some sem rodar mais nada."""
+
+    def _quebrar_e_morrer(self, *args, **kwargs):
+        self.durante = (chefe.aplicando(), chefe._anotacao().is_file())
+        (self.jarvis_dir / "modulo.py").write_text("def soma(a, b)\n    return a -\n", encoding="utf-8")
+        (self.jarvis_dir / "pela_metade.py").write_text("X = (\n", encoding="utf-8")
+        raise self.Morreu()
+
+    def _interromper(self):
+        with patch.object(chefe, "rodar", side_effect=self._quebrar_e_morrer), \
+                patch.object(chefe, "rodar_testes", return_value=set()):
+            with self.assertRaises(self.Morreu):
+                chefe.aplicar_plano("plano", None, "mude a soma")
+
+    def _voltou(self):
+        self.assertIn("a + b", (self.jarvis_dir / "modulo.py").read_text(encoding="utf-8"))
+        self.assertFalse((self.jarvis_dir / "pela_metade.py").exists())
+
+    def test_desfaz_na_proxima_abertura_e_avisa_uma_vez(self):
+        self._interromper()
+        self.assertEqual(self.durante, (True, True))
+        self.assertTrue(chefe._anotacao().is_file())
+        aviso = chefe.desfazer_interrompida()
+        self.assertIn("desfiz", aviso)
+        self._voltou()
+        with zipfile.ZipFile(next(chefe.pasta_backups().glob("jarvis-desfeito-*.zip"))) as z:
+            self.assertIn("pela_metade.py", z.namelist())  # a versão pela metade fica guardada
+        registro = next((chefe.pasta_trabalho() / "Mudancas").glob("*.md")).read_text(encoding="utf-8")
+        self.assertIn("DESFEITO", registro)
+        self.assertEqual(chefe.desfazer_interrompida(), aviso)  # vale até ser contado ao Erton
+        chefe.esquecer_interrompida()
+        self.assertEqual(chefe.desfazer_interrompida(), "")
+        self.assertFalse(chefe._anotacao().exists())
+
+    def test_iniciar_jarvis_desfaz_antes_de_abrir(self):
+        import io
+
+        self._interromper()
+        with patch("sys.stdout", new_callable=io.StringIO) as saida:
+            chefe._principal(["--desfazer-interrompida"])
+        self.assertIn("desfiz", saida.getvalue())
+        self._voltou()
+        bat = (RAIZ / "Iniciar Jarvis Ultron.bat").read_text(encoding="utf-8")
+        self.assertLess(bat.index("-m core.claude_chefe --desfazer-interrompida"), bat.index('python.exe" main.py'))
+
+    def test_cerebro_novo_desfaz_antes_de_importar_o_main(self):
+        import inspect
+
+        from core import processo_cerebro
+
+        self._interromper()
+        processo_cerebro.desfazer_mudanca_interrompida()
+        self._voltou()
+        fonte = inspect.getsource(processo_cerebro.principal)
+        self.assertLess(fonte.index("desfazer_mudanca_interrompida()"), fonte.index("import main"))
+
+    def test_cerebro_conta_ao_erton(self):
+        import main
+
+        self._interromper()
+        avisos = []
+        jarvis = NS(anunciar=lambda texto, titulo="": avisos.append((titulo, texto)))
+        main._contar_mudanca_desfeita(jarvis, espera=0)
+        for t in threading.enumerate():
+            if t.name == "ClaudeDesfeita":
+                t.join(5)
+        self._voltou()
+        self.assertEqual(avisos[0][0], "Claude")
+        self.assertIn("desfiz", avisos[0][1])
+        self.assertFalse(chefe._anotacao().exists())
+
+    def test_erro_inesperado_no_meio_desfaz_na_hora(self):
+        def quebrar(*args, **kwargs):
+            (self.jarvis_dir / "modulo.py").write_text("quebrado\n", encoding="utf-8")
+            raise RuntimeError("falhou")
+
+        with patch.object(chefe, "rodar", side_effect=quebrar), patch.object(chefe, "rodar_testes", return_value=set()):
+            with self.assertRaises(RuntimeError):
+                chefe.aplicar_plano("plano", None, "mude")
+        self.assertIn("a + b", (self.jarvis_dir / "modulo.py").read_text(encoding="utf-8"))
+        self.assertFalse(chefe._anotacao().exists())
+        self.assertFalse(chefe.aplicando())
+
+    def test_mudanca_que_terminou_nao_e_desfeita_depois(self):
+        with patch.dict(os.environ, {"FAKE_CLAUDE_CODIGO": "def soma(a, b):\n    return a - b\n"}), \
+                patch.object(chefe, "rodar_testes", return_value=set()):
+            self.assertTrue(chefe.aplicar_plano("plano", None, "mude").ok)
+        self.assertFalse(chefe._anotacao().exists())
+        self.assertEqual(chefe.desfazer_interrompida(), "")
+        self.assertIn("a - b", (self.jarvis_dir / "modulo.py").read_text(encoding="utf-8"))
+        self.assertFalse(chefe.aplicando())
+
+
+class TrocaDeModoComOClaudeMudandoTests(unittest.TestCase):
+    def test_nao_religa_o_cerebro_no_meio_da_mudanca(self):
+        import main
+
+        class UI:
+            remota = True
+
+            def __init__(s):
+                s.logs, s.trocas, s.muted = [], [], False
+
+            def write_log(s, t):
+                s.logs.append(t)
+
+        ui = UI()
+        ui.trocar_cerebro = ui.trocas.append
+        jarvis = object.__new__(main.JarvisLive)
+        jarvis.ui, jarvis._cerebro_nome, jarvis.avisos = ui, "gemini", []
+        jarvis._falar_aviso = jarvis.avisos.append
+        with patch("core.cerebro_gemma.modelo_instalado", return_value=True):
+            with chefe._aplicando:
+                jarvis._trocar_cerebro("gemma")
+            self.assertEqual(ui.trocas, [])
+            self.assertIn("Claude", jarvis.avisos[0])
+            jarvis._trocar_cerebro("gemma")  # terminou: agora troca
+        self.assertEqual(ui.trocas, ["gemma"])
+
+
+class AutoconsertoDuranteAMudancaTests(unittest.TestCase):
+    def test_nao_renomeia_automacao_enquanto_o_claude_muda_o_codigo(self):
+        spec = importlib.util.spec_from_file_location("auto_conserto", RAIZ / "automacoes" / "autoconserto.py")
+        m = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(m)
+        pasta = Path(tempfile.mkdtemp())
+        (pasta / "foo.py").write_text("def x(:\n", encoding="utf-8")
+        with patch("core.automacoes.carregar_ferramentas", return_value=NS(erros=[("foo.py", "invalid syntax")])), \
+                patch("core.automacoes.pasta_padrao", return_value=pasta):
+            with chefe._aplicando:
+                self.assertEqual(m._desligar_automacao_com_defeito(), "")
+            self.assertTrue((pasta / "foo.py").exists())
+            self.assertIn("foo.py", m._desligar_automacao_com_defeito())
+        self.assertTrue((pasta / "_foo.py").exists())
+
+
+class TempoEsgotadoTests(Base):
+    def test_encerra_tambem_o_que_o_claude_abriu(self):
+        neto = self.tmp / "neto.txt"
+        inicio = time.monotonic()
+        with patch.dict(os.environ, {"FAKE_CLAUDE_MODO": "demora", "FAKE_CLAUDE_NETO": str(neto)}):
+            r = chefe.rodar("oi", list(chefe.LEITURA), chefe.preparar_pasta(), tempo=0.5)
+        self.assertLess(time.monotonic() - inicio, 10)
+        self.assertIn("parei a tarefa", r.erro)
+        time.sleep(2.5)
+        self.assertFalse(neto.exists())  # o "neto" morreu junto: não seguiu trabalhando
+
+    def test_estrutura_do_job_do_windows(self):
+        import ctypes
+
+        if ctypes.sizeof(ctypes.c_void_p) != 8:
+            self.skipTest("conta feita para 64 bits")
+        self.assertEqual(ctypes.sizeof(chefe._estruturas_do_job()), 144)  # JOBOBJECT_EXTENDED_LIMIT_INFORMATION
+
+
+class TestesSemMexerNoErtonTests(unittest.TestCase):
+    def test_testes_rodam_numa_copia_sem_os_arquivos_do_erton(self):
+        if importlib.util.find_spec("pytest") is None:
+            self.skipTest("pytest não instalado")
+        pasta, casa = Path(tempfile.mkdtemp()), Path(tempfile.mkdtemp())
+        (pasta / "tests").mkdir()
+        (pasta / "tests" / "__init__.py").write_text("", encoding="utf-8")
+        (pasta / ".env").write_text("GEMINI_API_KEY=segredo\n", encoding="utf-8")
+        (pasta / "memory").mkdir()
+        (pasta / "memory" / "__init__.py").write_text("", encoding="utf-8")
+        (pasta / "memory" / "historico.py").write_text("ITENS = []\n", encoding="utf-8")
+        (pasta / "memory" / "task_history.json").write_text("[1]", encoding="utf-8")
+        (pasta / "tests" / "test_b.py").write_text(textwrap.dedent('''\
+            import unittest
+            from pathlib import Path
+            RAIZ = Path(__file__).resolve().parents[1]
+            class B(unittest.TestCase):
+                def test_escreve(self):
+                    from memory import historico  # o código da pasta memory vai junto
+                    (Path.home() / "tema.json").write_text("vermelho")
+                    (RAIZ / "memory" / "task_history.json").write_text("[1, 2]")
+                    self.assertFalse((RAIZ / ".env").exists())
+                def test_ruim(self):
+                    self.assertTrue(False)
+            '''), encoding="utf-8")
+        with patch.dict(os.environ, {"HOME": str(casa), "USERPROFILE": str(casa)}):
+            falhas = chefe.rodar_testes(pasta)
+        self.assertEqual(falhas, {"tests/test_b.py::B::test_ruim"})
+        self.assertFalse((casa / "tema.json").exists())
+        self.assertEqual((pasta / "memory" / "task_history.json").read_text(encoding="utf-8"), "[1]")
+
+
+class InstaladorDoClaudeTests(unittest.TestCase):
+    SCRIPT = RAIZ / "claude" / "instalar_claude.ps1"
+
+    def test_so_ascii(self):
+        self.SCRIPT.read_bytes().decode("ascii")  # o PowerShell 5.1 lê sem BOM como ANSI
+
+    def test_tira_a_chave_antes_de_conferir_o_login(self):
+        texto = self.SCRIPT.read_text(encoding="ascii")
+        login = texto.index("(Logado $exe)")
+        self.assertLess(texto.index("$env:ANTHROPIC_API_KEY = $null"), login)
+        self.assertLess(texto.index("$env:ANTHROPIC_AUTH_TOKEN = $null"), login)
+
+    def test_caminho_gravado_no_env_volta_igual(self):
+        from dotenv import dotenv_values
+        import io
+
+        texto = self.SCRIPT.read_text(encoding="ascii")
+        corpo = texto[texto.index("function Definir-Env"):texto.index("function Atualizar-Path")]
+        self.assertIn(".Replace('\\', '\\\\').Replace('\"', '\\\"')", corpo)
+        caminho = r"C:\Users\Erton\.local\bin\claude.exe"  # "\b" sem escape vira outra letra
+        gravado = 'JARVIS_CLAUDE_EXE="' + caminho.replace("\\", "\\\\").replace('"', '\\"') + '"\n'
+        self.assertEqual(dotenv_values(stream=io.StringIO(gravado))["JARVIS_CLAUDE_EXE"], caminho)
+        exemplo = next(linha for linha in (RAIZ / ".env.example").read_text(encoding="utf-8").splitlines()
+                       if "JARVIS_CLAUDE_EXE=" in linha)
+        lido = dotenv_values(stream=io.StringIO(exemplo.lstrip("# ")))["JARVIS_CLAUDE_EXE"]
+        self.assertEqual(lido, r"C:\Users\voce\.local\bin\claude.exe")
+
+    def test_caminho_ja_estragado_no_env_ainda_e_achado(self):
+        pasta = Path(tempfile.mkdtemp()) / "local\\bin"  # no Linux a barra invertida vale como letra
+        pasta.mkdir()
+        (pasta / "claude").write_text("", encoding="utf-8")
+        estragado = str(pasta / "claude").replace("\\b", "\b")  # como o .env antigo era lido
+        with patch.dict(os.environ, {"JARVIS_CLAUDE_EXE": f'"{estragado}"'}):
+            self.assertEqual(chefe.achar_claude(), str(pasta / "claude"))
+
+    def test_definir_env_de_verdade(self):
+        import shutil
+        import subprocess
+
+        from dotenv import dotenv_values
+
+        powershell = shutil.which("powershell") or shutil.which("pwsh")
+        if not powershell:
+            self.skipTest("sem PowerShell neste PC")
+        texto = self.SCRIPT.read_text(encoding="ascii")
+        funcao = texto[texto.index("function Definir-Env"):texto.index("function Atualizar-Path")]
+        pasta = Path(tempfile.mkdtemp())
+        roteiro = pasta / "t.ps1"
+        roteiro.write_text(f"$envArq = '{pasta / '.env'}'\n$utf8 = New-Object System.Text.UTF8Encoding $false\n"
+                           f"{funcao}\nDefinir-Env 'JARVIS_CLAUDE_EXE' 'C:\\Users\\Erton\\.local\\bin\\claude.exe'\n",
+                           encoding="ascii")
+        subprocess.run([powershell, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(roteiro)],
+                       capture_output=True, timeout=120, check=True)
+        self.assertEqual(dotenv_values(pasta / ".env")["JARVIS_CLAUDE_EXE"], r"C:\Users\Erton\.local\bin\claude.exe")
 
 
 if __name__ == "__main__":

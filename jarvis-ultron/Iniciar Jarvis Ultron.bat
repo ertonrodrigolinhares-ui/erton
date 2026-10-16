@@ -81,6 +81,8 @@ if "%CIDADE%"=="" set "CIDADE=Campina Grande"
 
 :iniciar
 echo.
+rem ---- Mudanca do Claude no codigo que ficou pela metade (o Jarvis fechou no meio)? Desfaz antes de abrir ----
+".venv\Scripts\python.exe" -m core.claude_chefe --desfazer-interrompida 2>nul
 echo Iniciando o Jarvis Ultron... Deixe esta janela aberta enquanto usa.
 set JARVIS_CLI=1
 ".venv\Scripts\python.exe" main.py

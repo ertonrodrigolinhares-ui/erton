@@ -56,9 +56,21 @@ def _consertar_navegador() -> str:
     return "instalei o navegador das automações" if resultado.returncode == 0 else ""
 
 
+def _claude_mudando_codigo() -> bool:
+    try:
+        from core.claude_chefe import aplicando
+
+        return aplicando()
+    except Exception:
+        return False
+
+
 def _desligar_automacao_com_defeito() -> str:
     from core.automacoes import carregar_ferramentas, pasta_padrao
 
+    if _claude_mudando_codigo():
+        # renomear agora entraria na conferência do Claude como mudança dele (e seria desfeito junto)
+        return ""
     desligadas = []
     for arquivo, _motivo in carregar_ferramentas().erros:
         caminho = pasta_padrao() / arquivo
@@ -119,6 +131,9 @@ def executar(args: dict, jarvis) -> str:
     except OSError:
         pass
     pendentes = [f"{i.nome}: {i.detalhe}. {i.dica}".strip() for i in depois if i.estado != "ok"]
+    if any(i.nome == "Automações" and i.estado == "defeito" for i in depois) and _claude_mudando_codigo():
+        pendentes.append("a automação com defeito eu só desligo depois que o Claude terminar de mudar o meu "
+                         "código; peça o autoconserto de novo quando ele avisar")
     partes = []
     partes.append("Consertei: " + "; ".join(feitos) + "." if feitos else "Não havia nada que eu pudesse consertar sozinho.")
     if pendentes:

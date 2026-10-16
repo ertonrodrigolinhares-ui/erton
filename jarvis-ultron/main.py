@@ -1959,6 +1959,13 @@ class JarvisLive:
         if destino == atual:
             self._falar_aviso("Já estou no modo privado." if destino == "gemma" else "Já estou no modo normal.")
             return
+        from core.claude_chefe import aplicando
+
+        if aplicando():
+            # religar o cérebro agora mataria a mudança do Claude no meio (sem testes e sem desfazer)
+            self._falar_aviso("O Claude está mudando o meu código agora. Espere ele terminar para trocar de "
+                              "modo; eu aviso quando acabar.")
+            return
         trocar = getattr(self.ui, "trocar_cerebro", None)
         if not callable(trocar):
             self.ui.write_log("SYS: Para trocar de cérebro pela voz, o Jarvis precisa estar em dois programas "
@@ -2949,6 +2956,27 @@ def _modelo_indisponivel(erro: Exception) -> bool:
         "no longer available", "retired", "1008"))
 
 
+def _contar_mudanca_desfeita(jarvis, espera: float = 8.0) -> None:
+    """Jarvis Ultron: uma mudança do Claude no código ficou pela metade (o Jarvis fechou no meio)? Ela é
+    desfeita na abertura (pelo "Iniciar Jarvis Ultron" ou pelo cérebro); aqui o Erton fica sabendo."""
+    try:
+        from core import claude_chefe
+
+        aviso = claude_chefe.desfazer_interrompida()
+    except Exception as erro:
+        print(f"[Claude] Não consegui conferir a mudança interrompida: {erro}")
+        return
+    if not aviso:
+        return
+
+    def contar():
+        time.sleep(espera)  # deixa a conversa abrir antes de falar
+        jarvis.anunciar(aviso, "Claude")
+        claude_chefe.esquecer_interrompida()
+
+    threading.Thread(target=contar, daemon=True, name="ClaudeDesfeita").start()
+
+
 def rodar_cerebro(ui):
     """O cérebro do Jarvis (voz, IA, ferramentas). Roda num fio da tela (um programa só) ou
     no programa próprio do cérebro, com a UIRemota no lugar da tela (veja core/ponte.py)."""
@@ -2959,6 +2987,7 @@ def rodar_cerebro(ui):
     ligar = getattr(ui, "ligar_jarvis", None)
     if callable(ligar):  # cérebro em programa próprio: manda o estado dele para os painéis da tela
         ligar(jarvis)
+    _contar_mudanca_desfeita(jarvis)
 
     # Trial/keyword runtime limiting: set via env `JARVIS_TRIAL_KEYWORD`.
     # If set to any non-empty string, jarvis will run for 3600 seconds (1 hour).
