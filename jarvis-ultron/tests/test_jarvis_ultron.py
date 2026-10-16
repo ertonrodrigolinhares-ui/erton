@@ -2291,6 +2291,14 @@ class ModoUltronPorVozTests(unittest.TestCase):
         jarvis._on_text_command("Jarvis, sair do modo Ultron.")
         self.assertEqual(jarvis.pedidos, [False, True, True])
 
+    def test_desativar_ou_encerrar_o_modo_ultron_fecha(self):
+        jarvis = self._jarvis()
+        for fala in ("Jarvis, desativa o modo Ultron", "Desativar modo Ultron",
+                     "Jarvis, encerra o modo Ultron", "tira o modo Ultron"):
+            self.assertTrue(jarvis._pedido_de_ultron(fala))
+        jarvis._pedido_de_ultron("Jarvis, ativa o modo Ultron")  # "ativa" continua abrindo
+        self.assertEqual(jarvis.pedidos, [True, True, True, True, False])
+
     def test_conversa_que_so_cita_o_modo_nao_abre(self):
         jarvis = self._jarvis()
         self.assertFalse(jarvis._pedido_de_ultron("me explica direitinho o que faz o tal do modo ultron no painel"))

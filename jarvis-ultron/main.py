@@ -2117,7 +2117,8 @@ class JarvisLive:
             return False
         # "Jarvis, modo Ultron" tem "jarvis" no começo: quem decide fechar é "modo jarvis", não o nome
         fechar = "modo jarvis" in texto or bool(re.search(
-            r"\b(sai|sair|saia|fecha|fechar|feche|desliga|desligar|desligue)( do| o)? modo ultron\b", texto))
+            r"\b(sai|sair|saia|fecha|fechar|feche|desliga|desligar|desligue|desativa|desativar|desative"
+            r"|encerra|encerrar|encerre|tira|tirar|tire)( do| o)? modo ultron\b", texto))
         # o painel Ultron registra _abrir_ultron; com a tela em outro programa, vai pela ponte
         abrir = getattr(self, "_abrir_ultron", None) or getattr(self.ui, "abrir_ultron", None)
         if callable(abrir):
