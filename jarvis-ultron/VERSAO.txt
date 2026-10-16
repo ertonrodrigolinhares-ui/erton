@@ -1,6 +1,9 @@
 Jarvis Ultron - versão 2026-10-16
 
 Novidades desta versão:
+- Chaves "AQ." do Gemini: se o caminho normal recusar, o Jarvis usa o Vertex AI (Google Cloud)
+  com a mesma chave. Novo botão "Testar chave do Gemini": testa os dois caminhos e a conversa
+  ao vivo, explica em português e grava no .env o que funcionou (a chave nunca aparece).
 - Anel desenhado pela placa de vídeo: 60 quadros, 18 fios com brilho suave, quase sem processador
   (Python por quadro: de 23 ms para 0,6 ms). Volta sozinho ao desenho normal se a placa recusar.
   (JARVIS_ORBE_GPU=0 no .env desliga.)

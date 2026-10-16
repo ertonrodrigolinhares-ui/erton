@@ -51,11 +51,16 @@ def listar(forcar: bool = False) -> list[tuple[str, set[str]]]:
     try:
         from google import genai
 
-        cliente = genai.Client(api_key=chave, http_options={"api_version": "v1beta"})
+        from core.gemini_acesso import nome_curto, opcoes_http, via
+
+        cliente = genai.Client(api_key=chave, http_options=opcoes_http())
         modelos = []
         for modelo in _metodo_original(cliente.models, "list")():
-            nome = str(getattr(modelo, "name", "") or "").removeprefix("models/")
+            nome = nome_curto(getattr(modelo, "name", ""))
             acoes = {str(a).lower() for a in (getattr(modelo, "supported_actions", None) or [])}
+            if not acoes and via() == "vertex" and nome.startswith("gemini"):
+                # o Vertex AI não diz o que cada modelo faz: deduz pelo nome
+                acoes = {"bidigeneratecontent"} if ("live" in nome or "native-audio" in nome) else {"generatecontent"}
             if nome:
                 modelos.append((nome, acoes))
     except Exception as erro:

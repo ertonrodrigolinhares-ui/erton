@@ -8866,6 +8866,9 @@ class MainWindow(QMainWindow):
                 from core.env_arquivo import atualizar_env
                 atualizar_env(env_jarvis, "GEMINI_API_KEY", key.strip())
                 self._log.append_log("SYS: Chave do Gemini atualizada no arquivo .env.")
+                if os.environ.get("JARVIS_GEMINI_VIA", "").strip().lower() == "vertex":
+                    atualizar_env(env_jarvis, "JARVIS_GEMINI_VIA", "vertex")
+                    self._log.append_log("SYS: A chave funciona pelo caminho Vertex AI (gravado no .env).")
         except Exception as e:
             self._log.append_log(f"SYS: Não consegui atualizar a chave no .env: {e}")
         self._ready = True

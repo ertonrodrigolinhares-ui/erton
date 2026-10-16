@@ -49,7 +49,7 @@ CHAMADAS_DO_CEREBRO = ("on_text_command", "on_voice_change", "on_name_change",
                        "on_tts_provider_change", "on_quit_requested")
 
 # Configurações que a tela pode ter mudado depois de abrir (a chave digitada na tela, a voz...).
-PREFIXOS_AMBIENTE = ("GEMINI_", "JARVIS_", "GROQ_", "ELEVENLABS_", "HERMES_", "OPENAI_")
+PREFIXOS_AMBIENTE = ("GEMINI_", "JARVIS_", "GROQ_", "ELEVENLABS_", "HERMES_", "OPENAI_", "GOOGLE_GENAI_")
 
 INTERVALO_VOLUME = 0.025      # no máximo 40 avisos de volume da voz por segundo
 ESPERA_CONEXAO = 90           # segundos para o cérebro abrir e se conectar (1ª vez é mais lenta)

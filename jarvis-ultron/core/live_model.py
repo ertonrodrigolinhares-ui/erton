@@ -35,6 +35,10 @@ def _model_actions(model) -> set[str]:
     return {str(action).lower() for action in (actions or [])}
 
 
+def _via_vertex() -> bool:
+    return os.environ.get("JARVIS_GEMINI_VIA", "").strip().lower() == "vertex"
+
+
 def pick_live_model(client, config_path: Path) -> str:
     configured = configured_live_model(config_path)
     try:
@@ -51,6 +55,14 @@ def pick_live_model(client, config_path: Path) -> str:
         for model in models
         if LIVE_ACTION.lower() in _model_actions(model) and _model_name(model)
     ]
+    if not live_models and _via_vertex():
+        # Jarvis Ultron: o Vertex AI não diz quais modelos são de voz ao vivo; usa o testado/configurado
+        escolhido = os.environ.get("GEMINI_LIVE_MODEL", "").strip()
+        if not escolhido:
+            from core.gemini_acesso import VIVO_VERTEX
+            escolhido = VIVO_VERTEX[0]
+        print(f"[JARVIS] Vertex AI: modelo de voz {escolhido}")
+        return escolhido
     if not live_models:
         raise RuntimeError(
             "No Gemini Live-capable model is available for this API key. "

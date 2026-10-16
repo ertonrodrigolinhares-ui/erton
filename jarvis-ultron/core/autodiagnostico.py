@@ -59,14 +59,17 @@ def verificar_gemini() -> Item:
     try:
         from google import genai
 
-        cliente = genai.Client(api_key=chave, http_options={"api_version": "v1beta", "timeout": 8000})
+        from core.gemini_acesso import opcoes_http
+
+        cliente = genai.Client(api_key=chave, http_options=opcoes_http(timeout=8000))
         modelos_da_chave = list(cliente.models.list())
     except Exception as erro:
         texto = str(erro)
         if "ACCESS_TOKEN_TYPE_UNSUPPORTED" in texto:
             return Item("Chave do Gemini", "defeito",
                         "o Google recusou a chave (defeito do Google nas chaves 'AQ.')",
-                        "Crie a chave com outro Gmail de adulto, ou use o botão 'Continuar com a reserva (Groq)'.")
+                        "Dê dois cliques em 'Testar chave do Gemini': ele tenta o caminho do Vertex AI, "
+                        "que aceita as chaves 'AQ.'. Enquanto isso, a reserva (Groq) funciona.")
         if "401" in texto or "API_KEY_INVALID" in texto or "not valid" in texto.lower():
             return Item("Chave do Gemini", "defeito", "chave recusada (inválida, apagada ou antiga)",
                         "Crie uma chave nova em aistudio.google.com/apikey e cole na tela do Jarvis.")

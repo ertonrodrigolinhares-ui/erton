@@ -95,6 +95,9 @@ def _load_dotenv():
 
 BASE_DIR        = get_base_dir()
 _load_dotenv()
+# Jarvis Ultron: caminho do Gemini (normal ou Vertex AI, para as chaves "AQ."); vale para tudo
+from core.gemini_acesso import aplicar_via as _aplicar_via_gemini
+_aplicar_via_gemini()
 
 # Jarvis Ultron: escolhe sozinho os modelos do Gemini disponíveis para a chave
 from core.modelos import instalar as _instalar_central_de_modelos
@@ -2704,9 +2707,10 @@ class JarvisLive:
         if os.environ.get("JARVIS_SEM_GEMINI") == "1" and self._reserva is not None:
             self._ativar_modo_reserva()
         api_key = self._api_key or _get_api_key()
+        from core.gemini_acesso import opcoes_http
         client = genai.Client(
             api_key=api_key,
-            http_options={"api_version": "v1beta"}
+            http_options=opcoes_http()
         )
         live_model = await asyncio.to_thread(pick_live_model, client, API_CONFIG_PATH)
         live_model_id = live_model.removeprefix("models/")

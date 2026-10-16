@@ -1057,7 +1057,8 @@ class AutodiagnosticoTests(unittest.TestCase):
                 patch("google.genai.Client", Cliente):
             item = ad.verificar_gemini()
         self.assertEqual(item.estado, "defeito")
-        self.assertIn("outro Gmail", item.dica)
+        self.assertIn("Testar chave do Gemini", item.dica)  # o testador tenta o caminho do Vertex AI
+        self.assertIn("Vertex AI", item.dica)
 
     def test_uma_verificacao_quebrada_nao_derruba_as_outras(self):
         from core import autodiagnostico as ad

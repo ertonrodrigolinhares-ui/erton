@@ -116,6 +116,7 @@ def _validate_with_gemini(api_key: str, timeout_seconds: float) -> ApiKeyValidat
 
         client = genai.Client(
             api_key=api_key,
+            vertexai=False,  # caminho normal (AI Studio); o Vertex AI é tentado depois, se precisar
             http_options=types.HttpOptions(timeout=max(1000, int(timeout_seconds * 1000))),
         )
         models = list(client.models.list())
@@ -144,6 +145,11 @@ def _validate_with_gemini(api_key: str, timeout_seconds: float) -> ApiKeyValidat
     except Exception as e:
         text = str(e).strip() or e.__class__.__name__
         lowered = text.lower()
+        if "access_token_type_unsupported" in lowered or api_key.startswith("AQ."):
+            # Jarvis Ultron: chave "AQ." recusada pelo caminho normal -> tenta o Vertex AI
+            vertex = _validate_with_vertex(api_key)
+            if vertex is not None:
+                return vertex
         if "api key not valid" in lowered or "invalid api key" in lowered:
             return ApiKeyValidationResult(False, "API key is not valid.")
         if "api_key_invalid" in lowered or "api key invalid" in lowered:
@@ -161,6 +167,21 @@ def _validate_with_gemini(api_key: str, timeout_seconds: float) -> ApiKeyValidat
         )
 
 
+def _validate_with_vertex(api_key: str) -> ApiKeyValidationResult | None:
+    """Jarvis Ultron: a mesma chave pelo Vertex AI (modo expresso). Se funcionar, o Jarvis inteiro
+    passa a usar esse caminho (JARVIS_GEMINI_VIA=vertex). None = também não funcionou."""
+    try:
+        from core.gemini_acesso import aplicar_via, testar_via
+
+        resultado = testar_via(api_key, "vertex")
+    except Exception:
+        return None
+    if not resultado.ok:
+        return None
+    aplicar_via("vertex")
+    return ApiKeyValidationResult(True, "Gemini API key verified (Vertex AI).")
+
+
 def validate_gemini_api_key(api_key: str, timeout_seconds: float = 8.0) -> ApiKeyValidationResult:
     key = normalize_gemini_api_key(api_key)
     basic = _basic_key_check(key)
@@ -169,8 +190,10 @@ def validate_gemini_api_key(api_key: str, timeout_seconds: float = 8.0) -> ApiKe
 
     executor = ThreadPoolExecutor(max_workers=1)
     future = executor.submit(_validate_with_gemini, key, timeout_seconds)
+    # chave "AQ." pode precisar de uma segunda tentativa (Vertex AI): mais tempo para ela
+    espera = timeout_seconds * (3 if key.startswith("AQ.") else 1)
     try:
-        return future.result(timeout=timeout_seconds)
+        return future.result(timeout=espera)
     except TimeoutError:
         future.cancel()
         return ApiKeyValidationResult(

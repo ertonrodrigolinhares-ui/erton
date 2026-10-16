@@ -118,6 +118,23 @@ Bom saber:
   `JARVIS_VOZ_PRIVADA=1` no `.env`, usa a voz do Windows e nada sai do PC.
 - Ferramentas que usam a internet (pesquisa, clima, sites) continuam usando a internet.
 
+## Chave do Gemini que começa com "AQ." (conversa natural)
+
+Desde 2026 o Google AI Studio só cria chaves que começam com **"AQ."**, e para muitas contas o
+caminho normal recusa essas chaves (erro `ACCESS_TOKEN_TYPE_UNSUPPORTED`). O Jarvis agora sabe usar
+um **segundo caminho, o Vertex AI** (o Gemini do Google Cloud), que é do tipo dessas chaves.
+
+1. Crie a chave em https://aistudio.google.com/apikey ("Create API key") e copie.
+2. Dê dois cliques em **"Testar chave do Gemini"**, cole a chave (botão direito; ela fica
+   escondida) e aperte Enter. Ele testa o caminho normal, o Vertex AI e a conversa ao vivo, e
+   grava no `.env` o que funcionou.
+3. Se ele disser que a **"Vertex AI API" está desligada**: abra o link que ele mostra, escolha o
+   mesmo projeto da chave, clique em **ATIVAR** e rode o teste de novo.
+4. Se ele pedir **faturamento**: ative em https://console.cloud.google.com/billing (a conversa gasta
+   pouco; vídeos são cobrados).
+
+A chave nunca aparece na tela do testador: pode mandar print dela para o suporte.
+
 ## Trocar a chave do Gemini
 
 - **Jeito mais fácil:** apague o arquivo **`.env`** desta pasta e abra o `Iniciar Jarvis Ultron`.
