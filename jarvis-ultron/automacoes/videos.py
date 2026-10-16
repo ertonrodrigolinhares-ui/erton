@@ -221,6 +221,10 @@ def executar(args: dict, jarvis) -> str:
         else:
             _abrir(arquivo)
             aviso = f"O vídeo ficou pronto e já abri para você. Está salvo em {arquivo.parent}."
+        anunciar = getattr(jarvis, "anunciar", None)
+        if callable(anunciar):  # respeita o modo chamada: guarda o aviso até o "Hey Jarvis"
+            anunciar(aviso, "Vídeo")
+            return
         if ui is not None:
             ui.write_log(f"SYS: 🎬 {aviso}")
         falar = getattr(jarvis, "_falar_aviso", None)

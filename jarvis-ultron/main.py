@@ -491,8 +491,9 @@ TOOL_DECLARATIONS = [
             "Sends a task to Hermes, JARVIS's autonomous orchestrator with sub-agents. Use for: social media "
             "posts of the user's athlete profile (daily post proposals, Metricool, best time to post, "
             "performance), Meta/Facebook/Instagram ads reports, opening and reading web panels/dashboards "
-            "by itself, and long multi-step tasks. Examples: 'what are today's posts?', 'how are my ads "
-            "doing?', 'prepare 3 posts about my training'. Never use it to publish without approval."
+            "by itself. Examples: 'what are today's posts?', 'how are my ads doing?', 'publish the approved "
+            "posts'. For research, analysis, reports and other long multi-step tasks prefer claude_task "
+            "(when available). Never use it to publish without approval."
         ),
         "parameters": {
             "type": "OBJECT",
