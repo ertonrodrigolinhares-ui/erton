@@ -787,6 +787,10 @@ class Cena(QWidget):
     def _atualizar(self):
         if not self.isVisible():
             return
+        privado = os.environ.get("JARVIS_CEREBRO", "").strip().lower() in ("gemma", "gemma4", "gemma 4", "local")
+        titulo = ("🔒  JARVIS ULTRON  ·  MODO PRIVADO" if privado else "◉  JARVIS ULTRON  ·  PRINCIPAL")
+        if self.topo_esq.text() != titulo:
+            self.topo_esq.setText(titulo)
         agora = dt.datetime.now()
         rede = self._rede[0]
         self.topo_dir.setText(f"● SISTEMA {'ONLINE' if rede == 'ONLINE' else rede}   ·   "

@@ -183,6 +183,9 @@ CEREBRO_FALSO = textwrap.dedent("""
     c.send(("ola", os.getpid()))
     c.send(("chamar", "write_log", ("SYS: cérebro falso no ar",), {}))
     modo = sys.argv[1]
+    c.send(("chamar", "write_log", ("SYS: nasci com cerebro=" + os.environ.get("JARVIS_CEREBRO", "?"),), {}))
+    if modo == "troca" and os.environ.get("JARVIS_CEREBRO") != "gemma":
+        c.send(("trocar_cerebro", "gemma"))
     if modo == "cai":
         time.sleep(0.3)
         sys.exit(7)
@@ -276,6 +279,24 @@ class PonteDeVerdadeTests(unittest.TestCase):
         p.iniciar()
         self.assertEqual(falhou, [1])
         self.assertIsNone(tela.on_text_command)  # o cérebro local registra as dele
+        p.encerrar()
+
+    def test_modo_privado_religa_o_cerebro_no_gemma(self):
+        import tempfile
+        pasta = Path(tempfile.mkdtemp())
+        (pasta / ".env").write_text('GEMINI_API_KEY="x"\nJARVIS_CEREBRO="gemini"\n')
+        tela = TelaFalsa()
+        p = PonteTela(tela, comando=[sys.executable, str(self.script), "troca"], pasta=pasta)
+        with patch.dict(os.environ, {"JARVIS_CEREBRO": "gemini"}):
+            p.iniciar()
+            primeiro = p._processo.pid
+            self.assertTrue(_esperar(lambda: "SYS: nasci com cerebro=gemma" in tela.logs, 30, self.app), tela.logs)
+            self.assertEqual(os.environ["JARVIS_CEREBRO"], "gemma")
+        self.assertNotEqual(p._processo.pid, primeiro)  # é outro programa do cérebro
+        self.assertIn('JARVIS_CEREBRO="gemma"', (pasta / ".env").read_text())
+        self.assertIn('GEMINI_API_KEY="x"', (pasta / ".env").read_text())
+        self.assertFalse(any("parou" in l for l in tela.logs))  # troca não é contada como queda
+        self.assertTrue(any("Modo privado ligado" in l for l in tela.logs))
         p.encerrar()
 
     def test_modo_separado_e_o_padrao(self):

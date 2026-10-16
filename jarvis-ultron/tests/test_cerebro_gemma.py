@@ -190,6 +190,67 @@ class GemmaNoJarvisTests(unittest.TestCase):
         self.assertEqual(jarvis.falado, ["Estou aqui, Erton."])
 
 
+class ModoPrivadoPorVozTests(unittest.TestCase):
+    def _jarvis(self, cerebro_nome="gemini", com_ponte=True):
+        import main
+
+        class UI:
+            remota = True
+
+            def __init__(s):
+                s.logs, s.trocas, s.muted = [], [], False
+
+            def write_log(s, t):
+                s.logs.append(t)
+
+        ui = UI()
+        if com_ponte:
+            ui.trocar_cerebro = ui.trocas.append
+        jarvis = object.__new__(main.JarvisLive)
+        jarvis.ui = ui
+        jarvis._cerebro_nome = cerebro_nome
+        jarvis.avisos = []
+        jarvis._falar_aviso = jarvis.avisos.append
+        return jarvis
+
+    def _esperar_troca(self):
+        for t in threading.enumerate():
+            if t.name == "TrocarCerebro":
+                t.join(5)
+
+    def test_modo_privado_troca_para_o_gemma(self):
+        jarvis = self._jarvis()
+        with patch("core.cerebro_gemma.modelo_instalado", return_value=True):
+            self.assertTrue(jarvis._pedido_de_cerebro("Jarvis, modo privado"))
+            self._esperar_troca()
+        self.assertEqual(jarvis.ui.trocas, ["gemma"])
+
+    def test_sem_gemma_instalado_avisa_e_nao_troca(self):
+        jarvis = self._jarvis()
+        with patch("core.cerebro_gemma.modelo_instalado", return_value=False):
+            jarvis._pedido_de_cerebro("modo privado")
+            self._esperar_troca()
+        self.assertEqual(jarvis.ui.trocas, [])
+        self.assertIn("Instalar Gemma 4", jarvis.avisos[0])
+
+    def test_ja_no_modo_pedido(self):
+        jarvis = self._jarvis("gemma")
+        jarvis._pedido_de_cerebro("modo privado")
+        self._esperar_troca()
+        self.assertEqual(jarvis.ui.trocas, [])
+        self.assertIn("Já estou no modo privado", jarvis.avisos[0])
+
+    def test_modo_normal_volta_ao_gemini(self):
+        jarvis = self._jarvis("gemma")
+        jarvis._pedido_de_cerebro("sair do modo privado")
+        self._esperar_troca()
+        self.assertEqual(jarvis.ui.trocas, ["gemini"])
+
+    def test_conversa_comum_nao_troca(self):
+        jarvis = self._jarvis()
+        self.assertFalse(jarvis._pedido_de_cerebro("me fala sobre o modo privado do navegador que eu li ontem"))
+
+
 class TelaSemChaveNoModoGemmaTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

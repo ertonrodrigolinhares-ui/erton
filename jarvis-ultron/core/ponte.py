@@ -149,6 +149,10 @@ class UIRemota:
     def abrir_ultron(self, fechar: bool = False) -> None:
         self._enviar(("abrir_ultron", bool(fechar)))
 
+    def trocar_cerebro(self, destino: str) -> None:
+        """Pede à tela para religar o cérebro com outro "cérebro" (gemma = modo privado; gemini = normal)."""
+        self._enviar(("trocar_cerebro", "gemma" if destino == "gemma" else "gemini"))
+
     def wait_for_api_key(self) -> None:
         """Espera a tela terminar a configuração (chave do Gemini etc.)."""
         while not self._pronto.wait(0.2):
@@ -302,6 +306,7 @@ class PonteTela:
         self._religadas = deque()
         self._pronto_enviado = False
         self._ultimo_estado_tela = None
+        self._religando_desde = None  # troca de cérebro pedida: o fim do cérebro antigo é esperado
         self.jarvis = JarvisNaTela(ui, self)
 
         self._no_fio = _NoFioDaTela()
@@ -376,7 +381,15 @@ class PonteTela:
         if processo is None or self._encerrando:
             return
         if processo.poll() is not None:
+            if self._religando_desde is not None:  # troca de cérebro: não é queda
+                self._religando_desde = None
+                self._fechar_conexao()
+                self.iniciar()
+                return
             self._cerebro_caiu(processo.returncode)
+            return
+        if self._religando_desde is not None and time.monotonic() - self._religando_desde > 8:
+            processo.kill()  # o cérebro antigo demorou a sair: encerra (o próximo quarto de segundo religa)
             return
         if self._conexao is None:
             if time.monotonic() - self._aberto_em > ESPERA_CONEXAO:
@@ -421,6 +434,22 @@ class PonteTela:
         if callable(self.ao_falhar):
             self.ao_falhar()
 
+    def trocar_cerebro(self, destino: str) -> None:
+        """Modo privado (gemma) ou normal (gemini): grava no .env e religa só o programa do cérebro."""
+        valor = "gemma" if destino == "gemma" else "gemini"
+        os.environ["JARVIS_CEREBRO"] = valor
+        try:
+            from core.env_arquivo import atualizar_env
+
+            atualizar_env(self._pasta / ".env", "JARVIS_CEREBRO", valor)
+        except Exception as erro:
+            print(f"[Ponte] Não gravei o modo no .env: {erro}")
+        self.ui.write_log("SYS: 🔒 Modo privado ligado (Gemma 4 no PC). Religando o cérebro..." if valor == "gemma"
+                          else "SYS: Modo normal (Gemini). Religando o cérebro...")
+        self._religando_desde = time.monotonic()
+        if not self.enviar(("chamada", "on_quit_requested", ())) and self._processo is not None:
+            self._processo.kill()
+
     # ----- mensagens
     def enviar(self, mensagem) -> bool:
         with self._trava_envio:
@@ -460,6 +489,8 @@ class PonteTela:
                     getattr(self.ui, nome)(*args, **kwargs)
             elif tipo == "estado":
                 self.jarvis.atualizar(dict(mensagem[1]))
+            elif tipo == "trocar_cerebro":
+                self.trocar_cerebro(str(mensagem[1]))
             elif tipo == "abrir_ultron":
                 abrir = getattr(self.jarvis, "_abrir_ultron", None)
                 if callable(abrir):

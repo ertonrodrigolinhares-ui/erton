@@ -1374,6 +1374,9 @@ class JarvisLive:
         if modo and len(str(text).split()) <= 6:
             self._definir_modo_escuta(modo)  # o som e o selo confirmam
             return
+        # Jarvis Ultron: "modo privado" (Gemma no PC) / "modo normal" (Gemini) trocam o cérebro.
+        if self._pedido_de_cerebro(text):
+            return
         # Jarvis Ultron: "modo ultron" abre o painel de automações; "modo jarvis" fecha.
         baixo = " ".join(str(text or "").lower().split())
         if len(baixo.split()) <= 4 and ("modo ultron" in baixo or "modo jarvis" in baixo or baixo == "ultron"):
@@ -1938,6 +1941,37 @@ class JarvisLive:
         if callable(mostrar):
             mostrar(estado)
 
+    def _pedido_de_cerebro(self, fala: str) -> bool:
+        """Jarvis Ultron: "modo privado" -> Gemma 4 no PC; "modo normal" -> Gemini. True se era isso."""
+        from core.cerebro_gemma import pedido_de_privacidade
+
+        destino = pedido_de_privacidade(fala)
+        if destino is None:
+            return False
+        threading.Thread(target=self._trocar_cerebro, args=(destino,), daemon=True, name="TrocarCerebro").start()
+        return True
+
+    def _trocar_cerebro(self, destino: str) -> None:
+        from core.cerebro_gemma import modelo_instalado
+
+        atual = "gemma" if getattr(self, "_cerebro_nome", "gemini") == "gemma" else "gemini"
+        if destino == atual:
+            self._falar_aviso("Já estou no modo privado." if destino == "gemma" else "Já estou no modo normal.")
+            return
+        trocar = getattr(self.ui, "trocar_cerebro", None)
+        if not callable(trocar):
+            self.ui.write_log("SYS: Para trocar de cérebro pela voz, o Jarvis precisa estar em dois programas "
+                              "(tire JARVIS_UM_PROCESSO do .env). Ou use 'Instalar Gemma 4' / 'Voltar para o Gemini'.")
+            return
+        if destino == "gemma" and not modelo_instalado():
+            self._falar_aviso("Para o modo privado, primeiro rode o Instalar Gemma 4 na pasta do Jarvis.")
+            return
+        if destino == "gemma":
+            self.ui.write_log("SYS: 🔒 Entrando no modo privado: o cérebro passa a ser o Gemma 4, no seu PC...")
+        else:
+            self.ui.write_log("SYS: Voltando ao modo normal (Gemini)...")
+        trocar(destino)  # a tela religa o programa do cérebro já com o cérebro novo
+
     def _checar_pedido_de_modo(self, fala: str) -> None:
         """Troca o modo pela frase falada, mesmo que a IA não chame a ferramenta."""
         from core.palavra_ativacao import modo_pedido
@@ -2134,7 +2168,10 @@ class JarvisLive:
                 texto = self._reserva.transcrever(pcm)
                 if texto:
                     self.ui.write_log(f"You: {texto}")
+                    self._last_input_transcript = texto  # o "ok" das aprovações é conferido nesta fala
                     self._checar_pedido_de_modo(texto)
+                    if self._pedido_de_cerebro(texto):
+                        continue
                     self._portao.estender()
                     from core.autodiagnostico import pediu_diagnostico
                     if pediu_diagnostico(texto):
@@ -2577,6 +2614,7 @@ class JarvisLive:
                             full_in = " ".join(in_buf).strip()
                             if full_in:
                                 self._checar_pedido_de_modo(full_in)
+                                self._pedido_de_cerebro(full_in)
                                 self._current_input_transcript = full_in
                                 self._last_input_transcript = full_in
                                 self._last_input_transcript_at = time.monotonic()

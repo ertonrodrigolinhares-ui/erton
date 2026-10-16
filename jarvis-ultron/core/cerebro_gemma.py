@@ -49,6 +49,43 @@ def cerebro_gemma() -> bool:
     return os.environ.get("JARVIS_CEREBRO", "").strip().lower() in ("gemma", "gemma4", "gemma 4", "local")
 
 
+import re
+import unicodedata
+
+_PRIVADO = re.compile(r"\bmodo (privado|sigiloso|confidencial|seguro)\b")
+_NORMAL = re.compile(r"\b(modo normal|modo publico|sair do modo (privado|sigiloso|confidencial|seguro))\b")
+
+
+def pedido_de_privacidade(fala: str) -> str | None:
+    """"modo privado" -> "gemma"; "modo normal" / "sair do modo privado" -> "gemini"; senão None.
+    Só frases curtas (um pedido, não uma conversa que cita as palavras)."""
+    texto = unicodedata.normalize("NFKD", str(fala or "").lower())
+    texto = " ".join("".join(c for c in texto if not unicodedata.combining(c)).replace(",", " ").split())
+    if not texto or len(texto.split()) > 7:
+        return None
+    if _NORMAL.search(texto):
+        return "gemini"
+    if _PRIVADO.search(texto):
+        return "gemma"
+    return None
+
+
+def modelo_instalado(nome: str | None = None) -> bool:
+    """O Gemma do Jarvis está baixado no Ollama? (liga o Ollama se precisar)."""
+    import json
+
+    nome = nome or os.environ.get("JARVIS_GEMMA_MODELO", "").strip() or MODELO_PADRAO
+    if not garantir_ollama(espera_total=10):
+        return False
+    raiz = _url_base().rstrip("/").removesuffix("/v1")
+    try:
+        with urllib.request.urlopen(raiz + "/api/tags", timeout=3) as resposta:
+            modelos = json.loads(resposta.read().decode("utf-8")).get("models", [])
+    except Exception:
+        return False
+    return any(str(m.get("name", "")).split(":")[0] == nome.split(":")[0] for m in modelos)
+
+
 def _url_base() -> str:
     return os.environ.get("JARVIS_GEMMA_URL", "").strip() or URL_PADRAO
 
