@@ -1389,6 +1389,20 @@ class AutomacoesTests(unittest.TestCase):
         self.assertEqual(carga.ferramentas["say_hi"].declaracao["parameters"]["type"], "OBJECT")
         self.assertEqual(sorted(a for a, _ in carga.erros), ["quebrada.py", "repetida.py"])
 
+    def test_automacao_salva_em_ansi_com_coding_carrega(self):
+        # salva no Bloco de Notas antigo (ANSI/cp1252) com a linha "coding": o Python aceita, o Jarvis também
+        from core.automacoes import carregar_ferramentas
+        pasta = self._pasta()
+        (pasta / "cafe.py").write_bytes(
+            "# -*- coding: cp1252 -*-\n# lembrete do café\ndef iniciar(jarvis):\n    pass\n".encode("cp1252"))
+        (pasta / "tela.py").write_bytes(
+            "# -*- coding: cp1252 -*-\n# mexe na janela (usa core.na_tela) — atenção\n"
+            "def iniciar(jarvis):\n    pass\n".encode("cp1252"))
+        carga = carregar_ferramentas(pasta)
+        self.assertEqual(carga.erros, [])
+        self.assertEqual(sorted(nome for nome, _ in carga.inicios), ["cafe.py", "tela.py"])
+        self.assertEqual(carga.na_tela, {"tela.py"})
+
     def test_exemplo_da_pasta_funciona_quando_ativado(self):
         import shutil
         from pathlib import Path
@@ -2242,3 +2256,105 @@ class PainelUltronTests(unittest.TestCase):
         self.assertEqual(main._limpar_para_falar("Nota B. Tell the user this in Portuguese."), "Nota B.")
         self.assertEqual(main._limpar_para_falar("Feito. Confirm in Portuguese."), "Feito.")
         self.assertEqual(main._limpar_para_falar("Só português."), "Só português.")
+
+    def test_limpar_para_falar_nao_le_instrucao_nem_aviso_em_ingles(self):
+        import main
+        relatorio = ("Autodiagnóstico do Jarvis Ultron\n\n[OK] Internet: conectado\n\n"
+                     "Summarize for the user in Portuguese: only the problems (DEFEITO/ATENÇÃO).")
+        self.assertNotIn("Summarize", main._limpar_para_falar(relatorio))
+        hermes = main._limpar_para_falar("Hermes is still working on this long task in the background. "
+                                         "Tell the user, in one short sentence in Portuguese, that ...")
+        self.assertTrue(hermes.startswith("O Hermes ainda está trabalhando"))
+        geekie = main._limpar_para_falar("There is no Geekie list yet. Tell the user in Portuguese that ...")
+        self.assertTrue(geekie.startswith("Ainda não há lista do Geekie"))
+
+
+class ModoUltronPorVozTests(unittest.TestCase):
+    """'Jarvis, modo Ultron' abre o painel digitado E falado; 'modo Jarvis' fecha."""
+
+    def _jarvis(self):
+        import main
+        jarvis = object.__new__(main.JarvisLive)
+        jarvis.ui = UIFalsa()
+        jarvis._portao = PortaoDeVoz(None, ativo=False)
+        jarvis._loop = jarvis.session = None
+        jarvis._reserva = None
+        jarvis._fala_n, jarvis._fala_texto = 0, ""  # contador de falas das aprovações
+        jarvis.pedidos = []
+        jarvis._abrir_ultron = lambda fechar=False: jarvis.pedidos.append(fechar)
+        return jarvis
+
+    def test_digitado_jarvis_modo_ultron_abre_e_modo_jarvis_fecha(self):
+        jarvis = self._jarvis()
+        jarvis._on_text_command("Jarvis, modo Ultron")  # tem "jarvis", mas é para ABRIR
+        jarvis._on_text_command("modo Jarvis")
+        jarvis._on_text_command("Jarvis, sair do modo Ultron.")
+        self.assertEqual(jarvis.pedidos, [False, True, True])
+
+    def test_conversa_que_so_cita_o_modo_nao_abre(self):
+        jarvis = self._jarvis()
+        self.assertFalse(jarvis._pedido_de_ultron("me explica direitinho o que faz o tal do modo ultron no painel"))
+        self.assertFalse(jarvis._pedido_de_ultron("abre o navegador"))
+        self.assertEqual(jarvis.pedidos, [])
+
+    def test_falado_no_modo_reserva_abre_sem_ir_para_a_ia(self):
+        import threading
+        jarvis = self._jarvis()
+        jarvis._modo_reserva = True
+        jarvis._is_speaking = False
+        jarvis._shutdown_requested = threading.Event()
+        jarvis._reserva = SimpleNamespace(transcrever=lambda pcm: "Jarvis, modo Ultron.")
+        respondidas = []
+        jarvis._responder_pela_reserva = respondidas.append
+        with patch("core.reserva_groq.capturar_falas", return_value=iter([b"\x00\x00"])):
+            jarvis._escutar_reserva()
+        self.assertEqual(jarvis.pedidos, [False])
+        self.assertEqual(respondidas, [])
+
+    def test_falado_no_gemini_ao_vivo_abre_o_painel(self):
+        import threading
+        jarvis = self._jarvis()
+        jarvis._shutdown_requested = threading.Event()
+        jarvis._turn_done_event = None
+
+        def resposta(fala=None, fim=False):
+            entrada = SimpleNamespace(text=fala) if fala else None
+            return SimpleNamespace(tool_call=None, server_content=SimpleNamespace(
+                model_turn=None, output_transcription=None, input_transcription=entrada, turn_complete=fim))
+
+        class Sessao:
+            async def receive(self):
+                yield resposta("Jarvis, modo Ultron.")
+                yield resposta(fim=True)
+                jarvis._shutdown_requested.set()
+
+        jarvis.session = Sessao()
+        asyncio.run(jarvis._receive_audio())
+        self.assertEqual(jarvis.pedidos, [False])
+        self.assertIn("You: Jarvis, modo Ultron.", jarvis.ui.logs)
+
+
+class BotaoAutodiagnosticoTests(unittest.TestCase):
+    def test_botao_fala_so_o_resumo_e_nao_o_relatorio(self):
+        import main
+        from core import autodiagnostico as ad
+        itens = [ad.Item("Internet", "ok", "conectado"),
+                 ad.Item("Chave do Gemini", "defeito", "chave recusada", "Troque a chave no .env")]
+        jarvis = object.__new__(main.JarvisLive)
+        jarvis.ui = UIFalsa()
+        jarvis._portao = PortaoDeVoz(object())  # modo chamada esperando o "Hey Jarvis" (o padrão)
+        jarvis.session = jarvis._loop = None
+        falado = []
+        jarvis._falar_reserva = falado.append
+        with patch.object(ad, "diagnosticar", return_value=itens), \
+                patch.object(ad, "salvar", return_value=Path("diagnostico.txt")):
+            jarvis.rodar_automacao_ultron("self_diagnosis", {})
+            fim = _time.monotonic() + 5
+            while not falado and _time.monotonic() < fim:
+                _time.sleep(0.02)
+        self.assertEqual(falado, [ad.resumo_falado(itens)])
+        self.assertNotIn("Summarize", falado[0])
+        self.assertNotIn("[OK]", falado[0])
+        # o relatório completo continua na tela, uma vez só (linhas SYS)
+        self.assertTrue(any("Chave do Gemini" in l and l.startswith("SYS:") for l in jarvis.ui.logs))
+        self.assertFalse(any(l.startswith("Jarvis:") and "[OK]" in l for l in jarvis.ui.logs))

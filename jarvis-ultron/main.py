@@ -1418,12 +1418,7 @@ class JarvisLive:
         if self._pedido_de_cerebro(text):
             return
         # Jarvis Ultron: "modo ultron" abre o painel de automações; "modo jarvis" fecha.
-        baixo = " ".join(str(text or "").lower().split())
-        if len(baixo.split()) <= 4 and ("modo ultron" in baixo or "modo jarvis" in baixo or baixo == "ultron"):
-            # o painel Ultron registra _abrir_ultron; com a tela em outro programa, vai pela ponte
-            abrir = getattr(self, "_abrir_ultron", None) or getattr(self.ui, "abrir_ultron", None)
-            if callable(abrir):
-                abrir(fechar="jarvis" in baixo)
+        if self._pedido_de_ultron(text):
             return
         # Autodiagnóstico sem depender do Gemini (é justamente quando ele falha que mais precisa)
         from core.autodiagnostico import pediu_diagnostico
@@ -1727,8 +1722,9 @@ class JarvisLive:
                 return voice
         return _load_voice_name()
 
-    def _autodiagnostico(self, falar: bool = True) -> str:
-        """Jarvis Ultron: confere as próprias peças; mostra na tela, salva em Documentos e (se falar) diz."""
+    def _autodiagnostico(self, falar: bool = True, so_resumo: bool = False) -> str:
+        """Jarvis Ultron: confere as próprias peças; mostra na tela, salva em Documentos e (se falar) diz.
+        so_resumo=True devolve só a frase curta feita para a voz (botão do painel Ultron)."""
         from core import autodiagnostico
 
         self.ui.write_log("SYS: Fazendo o autodiagnóstico...")
@@ -1744,6 +1740,8 @@ class JarvisLive:
         print(texto)
         if falar:
             self._falar_reserva(autodiagnostico.resumo_falado(itens))
+        if so_resumo:
+            return autodiagnostico.resumo_falado(itens)
         return texto + "\n\nSummarize for the user in Portuguese: only the problems (DEFEITO/ATENÇÃO) and how to fix them."
 
     async def _geekie_pendencias(self, atualizar: bool = False) -> str:
@@ -2105,6 +2103,27 @@ class JarvisLive:
         threading.Thread(target=self._trocar_cerebro, args=(destino,), daemon=True, name="TrocarCerebro").start()
         return True
 
+    def _pedido_de_ultron(self, fala: str) -> bool:
+        """Jarvis Ultron: "modo ultron" abre o painel de automações; "modo jarvis" (ou "sair do modo
+        ultron") fecha. Vale digitado e falado (Gemini ao vivo e reserva). True se era isso."""
+        import unicodedata
+
+        texto = unicodedata.normalize("NFKD", str(fala or "").lower())
+        texto = "".join(c for c in texto if not unicodedata.combining(c))
+        texto = " ".join(re.sub(r"[^\w\s]", " ", texto).split())  # tira vírgula, ponto, "!" da transcrição
+        if not texto or len(texto.split()) > 6:  # só frases curtas (um pedido, não uma conversa)
+            return False
+        if not ("modo ultron" in texto or "modo jarvis" in texto or texto == "ultron"):
+            return False
+        # "Jarvis, modo Ultron" tem "jarvis" no começo: quem decide fechar é "modo jarvis", não o nome
+        fechar = "modo jarvis" in texto or bool(re.search(
+            r"\b(sai|sair|saia|fecha|fechar|feche|desliga|desligar|desligue)( do| o)? modo ultron\b", texto))
+        # o painel Ultron registra _abrir_ultron; com a tela em outro programa, vai pela ponte
+        abrir = getattr(self, "_abrir_ultron", None) or getattr(self.ui, "abrir_ultron", None)
+        if callable(abrir):
+            abrir(fechar=fechar)
+        return True
+
     def _trocar_cerebro(self, destino: str) -> None:
         from core.cerebro_gemma import modelo_instalado, whisper_instalado
 
@@ -2295,7 +2314,12 @@ class JarvisLive:
         def trabalhar():
             self.ui.write_log(f"SYS: ⚙ Ultron: {nome}...")
             try:
-                bruto = self._executar_ferramenta_reserva(nome, dict(args or {}))
+                if nome == "self_diagnosis":
+                    # o relatório inteiro já vai para a tela (linhas SYS) e para Documentos;
+                    # a voz diz só o resumo curto (antes lia o relatório todo e a instrução em inglês)
+                    bruto = self._autodiagnostico(falar=False, so_resumo=True)
+                else:
+                    bruto = self._executar_ferramenta_reserva(nome, dict(args or {}))
             except Exception as erro:
                 bruto = f"Não consegui rodar {nome}: {str(erro)[:150]}"
             texto = _limpar_para_falar(bruto)
@@ -2383,6 +2407,8 @@ class JarvisLive:
                     if self._pedido_de_cerebro(texto):
                         continue
                     self._portao.estender()
+                    if self._pedido_de_ultron(texto):  # "modo Ultron" abre o painel, sem ir para a IA
+                        continue
                     from core.autodiagnostico import pediu_diagnostico
                     if pediu_diagnostico(texto):
                         self._autodiagnostico()
@@ -2863,7 +2889,8 @@ class JarvisLive:
                             full_in = " ".join(in_buf).strip()
                             if full_in:
                                 self._checar_pedido_de_modo(full_in)
-                                self._pedido_de_cerebro(full_in)
+                                if not self._pedido_de_cerebro(full_in):
+                                    self._pedido_de_ultron(full_in)  # "modo Ultron" falado abre o painel
                                 self._current_input_transcript = full_in
                                 self._last_input_transcript = full_in
                                 self._last_input_transcript_at = time.monotonic()
@@ -3161,13 +3188,25 @@ class JarvisLive:
                     else:
                         await self._wait_before_reconnect(min(60, 2 ** min(self._falhas_seguidas, 6)))
 
+# Avisos que as ferramentas dão inteiros em inglês (são para a IA): o painel Ultron fala em português.
+_AVISOS_EM_PORTUGUES = {
+    "Hermes is still working": ("O Hermes ainda está trabalhando nisso; o resultado aparece na tela "
+                                "quando ficar pronto."),
+    "There is no Geekie list yet": ("Ainda não há lista do Geekie. O Hermes lê o Geekie One às 7h e às 18h; "
+                                    "entre uma vez no Geekie One pelo navegador do Hermes."),
+}
+
+
 def _limpar_para_falar(texto: str) -> str:
     """Tira as instruções em inglês que as ferramentas deixam para a IA (ex.: 'Tell the user...'),
     para o painel Ultron falar só a parte em português quando roda a automação direto."""
     texto = str(texto or "").strip()
+    for inicio, frase in _AVISOS_EM_PORTUGUES.items():
+        if texto.startswith(inicio):
+            return frase
     marcas = ["Tell the user", "Explique ao usuário", "Explique isso", "Answer the user", "Answer in",
               "Confirm to the user", "Confirm in", "Say this to the user", "Oriente o usuário",
-              "\nTell the user", "Then tell the user"]
+              "\nTell the user", "Then tell the user", "Summarize for the user"]
     corte = len(texto)
     for m in marcas:
         i = texto.find(m)

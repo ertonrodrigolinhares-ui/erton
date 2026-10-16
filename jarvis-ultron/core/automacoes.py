@@ -110,7 +110,9 @@ def _desenha_na_tela(modulo, arquivo: Path) -> bool:
     if marcado is not None:
         return bool(marcado)
     try:
-        return "core.na_tela" in arquivo.read_text(encoding="utf-8")
+        # errors="replace": um arquivo salvo em ANSI (com "# -*- coding: cp1252 -*-") carrega normal no
+        # Python; ler aqui não pode recusá-lo. "core.na_tela" é só ASCII, então ainda é achado.
+        return "core.na_tela" in arquivo.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return False
 
