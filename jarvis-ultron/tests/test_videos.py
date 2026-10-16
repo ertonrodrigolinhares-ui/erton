@@ -462,6 +462,47 @@ class GerarTests(unittest.TestCase):
                                    dormir=lambda s: None, agora=lambda: next(relogio))
         self.assertTrue(arquivo.exists())
 
+    def _pc_dorme_e_a_rede_demora(self, volta_em):
+        """Relógio falso: o PC dorme 30 min na 1ª pausa; a rede só volta `volta_em` s depois de acordar."""
+        relogio, consultas = [0.0], []
+        cliente = ClienteVeo(["veo-3.1-fast-generate-preview"])
+        andar = cliente._andar
+
+        def gerar(model, source, config):
+            cliente.pedidos.append((model, config))
+            return Operacao(1, VideoFalso())  # fica pronto na próxima consulta que der certo
+
+        def dormir(segundos):
+            relogio[0] += segundos + (30 * 60 if relogio[0] == 0 else 0)
+
+        def consultar(operacao):
+            consultas.append(relogio[0])
+            if relogio[0] < 30 * 60 + 10 + volta_em:
+                raise ConnectionError("Wi-Fi ainda voltando")
+            return andar(operacao)
+
+        cliente.models.generate_videos, cliente.operations = gerar, NS(get=consultar)
+        with patch.object(self.m, "pasta_videos", lambda: Path(self.casa)):
+            try:
+                return self.m.gerar("a runner", 8, "rapido", False, cliente=cliente,
+                                    dormir=dormir, agora=lambda: relogio[0]), consultas, cliente
+            except self.m.VideoJaPedido as erro:
+                return erro, consultas, cliente
+
+    def test_pc_acordou_e_o_wifi_demora_uns_segundos_ainda_salva_o_video(self):
+        arquivo, consultas, cliente = self._pc_dorme_e_a_rede_demora(volta_em=8)
+        self.assertIsInstance(arquivo, Path, consultas)
+        self.assertTrue(arquivo.exists())
+        self.assertEqual(len(cliente.pedidos), 1)  # não pediu (nem pagou) um segundo vídeo
+        self.assertGreater(consultas[-1], consultas[0])  # esperou a rede voltar antes de olhar de novo
+
+    def test_pc_acordou_sem_rede_desiste_depois_de_poucas_tentativas_e_avisa(self):
+        erro, consultas, cliente = self._pc_dorme_e_a_rede_demora(volta_em=10 ** 6)
+        self.assertIsInstance(erro, self.m.VideoJaPedido)
+        self.assertIn("pode cobrar", self.m._explicar(erro))
+        self.assertLessEqual(len(consultas), 6)  # não fica preso tentando para sempre
+        self.assertEqual(len(cliente.pedidos), 1)
+
     def test_sem_resposta_avisa_que_pode_ter_cobrado_e_anota_o_pedido(self):
         relogio = iter([0, 10 ** 6, 10 ** 6])
         cliente = ClienteVeo(["veo-3.1-fast-generate-preview"])

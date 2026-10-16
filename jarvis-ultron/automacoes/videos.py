@@ -209,9 +209,10 @@ def _passageiro(erro: Exception) -> bool:
         return False
 
 
-def _esperar(cliente, operacao, dormir, agora):
+def _esperar(cliente, operacao, dormir, agora, tentativas_finais: int = 3):
     """Acompanha o vídeo até o Google terminar; falhas passageiras de rede não interrompem a espera."""
     inicio = agora()
+    extras = 0  # tentativas depois do prazo
     while not operacao.done:
         vencido = agora() - inicio > ESPERA_MAXIMA
         if not vencido:
@@ -220,8 +221,13 @@ def _esperar(cliente, operacao, dormir, agora):
         try:
             operacao = cliente.operations.get(operacao)
         except Exception as erro:
-            if vencido or not _passageiro(erro):
+            if not _passageiro(erro):
                 raise
+            if vencido:  # o PC pode ter acabado de acordar e o Wi-Fi ainda estar voltando: espera um pouco
+                extras += 1
+                if extras > tentativas_finais:
+                    raise
+                dormir(10 * extras)
             print(f"[Vídeos] Falha passageira ao acompanhar o vídeo ({type(erro).__name__}); tento de novo.")
             continue
         if vencido and not operacao.done:
