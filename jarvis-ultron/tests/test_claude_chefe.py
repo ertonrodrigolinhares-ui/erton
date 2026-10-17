@@ -209,6 +209,13 @@ class MudarCodigoTests(Base):
         r = self._aplicar("def soma(a, b):\n    return b + a\n", falhas=({"tests/x.py::velho"}, {"tests/x.py::velho"}))
         self.assertTrue(r.ok, r.fala)
 
+    def test_pronto_diz_como_fechar_de_verdade(self):
+        # o X da janela só esconde o Jarvis perto do relógio: "reabrir" assim deixava dois Jarvis ouvindo
+        r = self._aplicar("def soma(a, b):\n    return a - b\n")
+        self.assertTrue(r.ok, r.fala)
+        self.assertIn("Quit JARVIS", r.fala)
+        self.assertNotIn("quando você reabrir", r.fala)
+
     def test_claude_sem_mudar_nada(self):
         r = self._aplicar(None, falhas=(set(),))
         self.assertFalse(r.ok)
@@ -455,6 +462,31 @@ class TravasDeLeituraEConectoresTests(Base):
         self.assertIn(f"Read({chefe.regra_de_pasta(chefe.pasta_dados())}/**)", tarefa)
         self.assertEqual([p for p in plano if p.startswith("Read(")],
                          [f"Read({chefe.regra_de_pasta(self.jarvis_dir)}/**)"])
+
+
+    def test_tarefa_nao_le_lembretes_nem_rotinas(self):
+        # podem ter sido ditos no modo privado: nunca vão para a nuvem, nem depois, no modo normal
+        chefe.fazer_tarefa("faça um resumo dos meus compromissos")
+        permitidas, proibidas = _permitidas_e_proibidas(self.chamadas()[0]["argv"])
+        dados = chefe.regra_de_pasta(chefe.pasta_dados())
+        self.assertIn(f"Read({dados}/**)", permitidas)  # o resto da pasta continua liberado
+        for nome in ("lembretes.json", "rotinas.json"):
+            self.assertIn(f"Read({dados}/{nome})", proibidas)
+
+    def test_mudar_o_codigo_nao_le_as_credenciais_do_gmail(self):
+        # no plano e ao aplicar, o Claude lê a pasta do programa: as credenciais do Gmail (config/) ficam fora
+        chefe.planejar("mude a cor")
+        with patch.object(chefe, "rodar_testes", return_value=set()):
+            chefe.aplicar_plano("plano", None, "mude")
+        raiz = chefe.regra_de_pasta(self.jarvis_dir)
+        chamadas = self.chamadas()
+        self.assertEqual(len(chamadas), 2)
+        for chamada in chamadas:
+            _permitidas, proibidas = _permitidas_e_proibidas(chamada["argv"])
+            for item in ("**/gmail_credentials.json", "**/credentials.json", "**/client_secret_*.json",
+                         "**/token.json"):
+                self.assertIn(f"Read({raiz}/{item})", proibidas)
+                self.assertIn(f"Edit({raiz}/{item})", proibidas)
 
 
 class ForaDaFotoTests(Base):

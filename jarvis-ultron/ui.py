@@ -7057,9 +7057,12 @@ class MainWindow(QMainWindow):
                 if self._vision_preview is not None:
                     self._vision_preview.stop()
                 self.hide()
+                # Jarvis Ultron: o X não fecha; em português, para o Erton saber que ele continua ouvindo
                 self._tray.showMessage(
-                    "JARVIS", "Running in background. Click tray icon to restore.",
-                    QSystemTrayIcon.MessageIcon.Information, 2000
+                    "Jarvis continua ligado",
+                    "Ele continua ouvindo, no ícone perto do relógio. Clique no ícone para voltar; para "
+                    "fechar de verdade: botão direito no ícone → Quit JARVIS.",
+                    QSystemTrayIcon.MessageIcon.Information, 6000
                 )
                 return
         except Exception:

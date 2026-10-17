@@ -125,6 +125,9 @@ REGRA_IDIOMA = (
 # Jarvis Ultron: a troca de modo já é avisada por um som e pelo selo na tela.
 QUIET_MODE_RESULT = ("Done. The user already heard a chime and sees the mode on screen: do not announce "
                      "or explain the listening mode. Say nothing at all.")
+# Jarvis Ultron: o selo 🔒 só existe na tela azul (a cena do orbe); na tela antiga (F2, JARVIS_VISUAL=classico,
+# JARVIS_CENA=0) o sinal é a linha "🔒 Modo privado ligado" que a ponte escreve no registro ao trocar.
+ESPERE_O_MODO_PRIVADO = "espere o aviso \"🔒 Modo privado ligado\" (na tela azul, o selo 🔒 MODO PRIVADO)"
 STARTUP_CLAPS_REQUIRED = 2
 STARTUP_CLAP_MAX_GAP_SECONDS = 4.0
 STARTUP_CLAP_COOLDOWN_SECONDS = 0.22
@@ -1430,7 +1433,7 @@ class JarvisLive:
             threading.Thread(target=self._autodiagnostico, daemon=True).start()
             return
         if getattr(self, "_trocando_cerebro", False):  # indo para o modo privado: não manda para a nuvem
-            self.ui.write_log("SYS: 🔒 Trocando para o modo privado: espere o selo e mande de novo.")
+            self.ui.write_log(f"SYS: 🔒 Trocando para o modo privado: {ESPERE_O_MODO_PRIVADO} e mande de novo.")
             return
         # no modo reserva vai para a reserva mesmo que sobre uma sessão do Gemini (o "ok" digitado também)
         if not self._loop or not self.session or getattr(self, "_modo_reserva", False):
@@ -2154,7 +2157,7 @@ class JarvisLive:
             # Até o cérebro novo subir (a checagem do Ollama pode levar segundos), nada do microfone
             # nem do texto vai para a nuvem. Se a troca não acontecer, _trocar_cerebro libera.
             self._trocando_cerebro = True
-            self.ui.write_log("SYS: 🔒 Preparando o modo privado: espere o selo antes de falar de clientes.")
+            self.ui.write_log(f"SYS: 🔒 Preparando o modo privado: {ESPERE_O_MODO_PRIVADO} antes de falar de clientes.")
         threading.Thread(target=self._trocar_cerebro, args=(destino,), daemon=True, name="TrocarCerebro").start()
         return True
 

@@ -400,6 +400,31 @@ class ModoPrivadoPorVozTests(unittest.TestCase):
         self.assertIn("transcrição local", jarvis.avisos[0])
         self.assertFalse(jarvis._trocando_cerebro)
 
+    def test_espera_do_modo_privado_vale_tambem_na_tela_antiga(self):
+        # o selo 🔒 só existe na tela azul; na tela antiga (F2, JARVIS_VISUAL=classico) o sinal é a linha
+        # que a ponte escreve ao trocar. "Espere o selo" deixava o Erton sem saber se ligou.
+        import tempfile
+        from core.ponte import PonteTela
+
+        jarvis = self._jarvis()
+        with patch("core.cerebro_gemma.modelo_instalado", return_value=True), \
+                patch("core.cerebro_gemma.whisper_instalado", return_value=True):
+            jarvis._pedido_de_cerebro("Jarvis, modo privado")
+            self._esperar_troca()
+        espera = jarvis.ui.logs[0]
+        self.assertNotIn("espere o selo antes", espera)
+        self.assertIn("🔒 Modo privado ligado", espera)
+
+        logs = []
+        ponte = object.__new__(PonteTela)
+        ponte.ui = NS(write_log=logs.append)
+        ponte._processo = None
+        ponte.enviar = lambda mensagem: True
+        with tempfile.TemporaryDirectory() as pasta, patch.dict(os.environ, {"JARVIS_CEREBRO": ""}):
+            ponte._pasta = Path(pasta)
+            ponte.trocar_cerebro("gemma")
+        self.assertTrue(any("🔒 Modo privado ligado" in l for l in logs), logs)  # a linha que ele espera
+
     def test_recusa_aparece_na_tela_mesmo_com_o_microfone_desligado_e_sem_o_gemini(self):
         # digitando numa reunião (microfone desligado), Gemini fora do ar (reserva Groq): a voz não sai,
         # então a recusa tem de aparecer na tela; senão ficava só o "espere o selo"

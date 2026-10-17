@@ -6,10 +6,10 @@ Jarvis — o Jarvis entrega para o Claude Code (o programa 'claude' instalado pe
 que usa a assinatura do Erton (Pro/Max), sem chave de API.
 
 Travas (no código, não só nas instruções):
-- Tarefas: o Claude só lê as pastas dele (Documentos/Jarvis Ultron), pesquisa na internet e escreve
-  DENTRO de Documentos/Jarvis Ultron/Claude. Não roda comandos no PC e não usa conectores (Gmail,
-  Metricool, Agenda...: ele abre sem nenhum servidor MCP), então não consegue publicar, enviar,
-  comprar nem apagar nada.
+- Tarefas: o Claude só lê as pastas dele (Documentos/Jarvis Ultron, menos lembretes e rotinas),
+  pesquisa na internet e escreve DENTRO de Documentos/Jarvis Ultron/Claude. Não roda comandos no PC
+  e não usa conectores (Gmail, Metricool, Agenda...: ele abre sem nenhum servidor MCP), então não
+  consegue publicar, enviar, comprar nem apagar nada.
 - Código do Jarvis: primeiro o Claude só faz o PLANO (sem permissão para editar). O Jarvis conta o
   plano e só continua com o "ok" do Erton, conferido aqui, numa fala nova depois do plano. Antes de
   mexer: backup .zip e testes; depois: confere a sintaxe e roda os testes de novo. Se algo quebrar,
@@ -62,9 +62,14 @@ SEGREDOS_PREFIXOS = ("GEMINI_", "GROQ_", "ELEVENLABS_", "HERMES_", "OPENAI_", "G
                      "JARVIS_PONTE_", "TELEGRAM_", "METRICOOL_")
 SEGREDOS = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "GOOGLE_API_KEY")
 
-# O que o Claude nunca lê nem muda na pasta do Jarvis (chaves e memória do Erton)
+# O que o Claude nunca lê nem muda na pasta do Jarvis (chaves e memória do Erton). As credenciais do
+# Gmail (o email_control procura em config/) e os tokens são os segredos que o .gitignore já tira.
 PROTEGIDOS = (".env", ".env.*", "config/api_keys.json", "config/ui_settings.json", "memory/**", ".git/**",
-              ".github/**", ".claude/**", ".mcp.json")
+              ".github/**", ".claude/**", ".mcp.json", "**/credentials.json", "**/gmail_credentials.json",
+              "**/client_secret_*.json", "**/token.json")
+# Em Documentos/Jarvis Ultron, o que o Claude das tarefas não lê: lembretes e rotinas podem ter sido
+# ditos no modo privado, e esses nunca vão para a nuvem.
+DADOS_PRIVADOS = ("lembretes.json", "rotinas.json")
 # Fora da pasta do Jarvis (em ~): logins e senhas. AppData guarda as do Hermes no Windows.
 CREDENCIAIS = (".claude/.credentials.json", ".ssh/**", ".aws/**", ".hermes/**", ".jarvis/**", "AppData/**")
 # O Claude pode ler, mas nunca mudar: as travas dele e o que desfaz uma mudança interrompida.
@@ -227,6 +232,7 @@ def _proibidas_na(pasta: Path) -> list[str]:
         for item in PROTEGIDOS:
             regras += [f"Read({raiz}/{item})", f"Edit({raiz}/{item})"]
     regras += _fora_da_foto(regra_de_pasta(pasta_jarvis()))
+    regras += [f"Read({regra_de_pasta(pasta_dados())}/{nome})" for nome in DADOS_PRIVADOS]
     regras += [f"Read(~/{item})" for item in CREDENCIAIS]
     return list(dict.fromkeys(regras + _ler(*_pastas_do_hermes())))
 
@@ -971,8 +977,10 @@ def _aplicar_e_conferir(pasta: Path, antes: dict[str, str], backup: Path, falhas
 
     _apagar_anotacao()  # deu certo: a próxima abertura não desfaz
     registro = registrar(pedido, plano, mudados, f"APLICADO ({situacao})", backup)
+    # o X da janela só esconde o Jarvis perto do relógio: reabrindo assim, o antigo continuaria ligado
     fala = (f"Pronto: o Claude mudou {len(mudados)} arquivo(s) e {situacao}. As mudanças valem quando você "
-            f"reabrir o Jarvis. {resposta.fala}").strip()
+            f"fechar o Jarvis de verdade, no ícone perto do relógio, em Quit JARVIS, e abrir de novo. "
+            f"{resposta.fala}").strip()
     return Resultado(True, fala, f"Arquivos: {', '.join(mudados)}. Backup: {backup}. Registro: {registro}")
 
 

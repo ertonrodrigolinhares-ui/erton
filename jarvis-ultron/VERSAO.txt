@@ -2,12 +2,13 @@ Jarvis Ultron - versão 2026-10-16
 
 Novidades desta versão:
 - Claude como chefe de tarefas ("Instalar Claude"): pesquisas, análises, relatórios e os 22
-  agentes (vindos do Hermes) rodam no Claude Code do seu PC, com a sua assinatura. Ele só escreve
-  na pasta Documentos\Jarvis Ultron\Claude, não roda comandos, não publica nem envia nada.
-- O Claude pode mudar o código do Jarvis: plano -> seu "ok" -> backup -> testes -> aplica ->
-  testes de novo; se algo quebrar, o Jarvis desfaz sozinho.
+  agentes (vindos do Hermes) rodam no Claude Code do seu PC, com a sua assinatura. Nas tarefas, ele
+  só escreve na pasta Documentos\Jarvis Ultron\Claude; não roda comandos, não publica nem envia nada.
+- O Claude pode mudar o código do Jarvis (lê e muda a pasta do programa, menos .env, chaves, memória
+  e .git): plano -> seu "ok" -> backup -> testes -> aplica -> testes de novo; se algo quebrar, o
+  Jarvis desfaz sozinho.
 - Modo privado por voz: "Jarvis, modo privado" troca para o Gemma 4 sem fechar o Jarvis (nada vai
-  para a nuvem); "Jarvis, modo normal" volta.
+  para IA na nuvem; com JARVIS_VOZ_PRIVADA=1 no .env nem a voz sai do PC); "Jarvis, modo normal" volta.
 - Vídeos com IA (Google Veo): o Jarvis diz o preço e só faz com o seu "ok" dito depois do preço.
 - Aprovações no modo reserva conferem a sua fala atual (antes podiam olhar uma fala antiga).
 - Chaves "AQ." do Gemini: se o caminho normal recusar, o Jarvis usa o Vertex AI (Google Cloud)

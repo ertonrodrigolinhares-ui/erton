@@ -33,8 +33,11 @@ Cópia do projeto **JARVIS-OS V.2** (licença MIT, veja `LICENSE`), com ajustes 
   - Ao abrir, ele começa no modo chamada (mude com `JARVIS_PALAVRA_ATIVACAO=0` para começar em mãos livres).
 - **IA reserva Groq** (`core/reserva_groq.py`): se o Gemini cair ou atingir o limite, o Jarvis
   entra no **modo reserva**: continua ouvindo (depois do "Hey Jarvis"), entende com o Whisper do
-  Groq, responde pelo Groq e fala com a voz grátis da Microsoft. No modo reserva ele **conversa,
-  mas não usa as ferramentas** (abrir apps, e-mail...). Quando o Gemini volta, tudo volta ao normal.
+  Groq, responde pelo Groq e fala com a voz grátis da Microsoft. No modo reserva ele **conversa e
+  executa as tarefas principais** (abrir apps e sites, e-mail, lembretes, Hermes, automações...);
+  com `JARVIS_RESERVA_FERRAMENTAS=0` no `.env` ele fica só na conversa. A sua voz e os pedidos vão
+  para o Groq (nuvem, nível grátis): para assunto de cliente, use o modo privado (Gemma 4).
+  Quando o Gemini volta, tudo volta ao normal.
 - Correção: quando a conexão falhava, o original tentava reconectar sem parar, várias vezes por
   segundo (gastando a cota). Agora ele espera entre as tentativas (2 s, 4 s, 8 s... até 1 minuto).
 
@@ -80,7 +83,11 @@ continua abrindo só o "Iniciar Jarvis Ultron": a tela abre o cérebro sozinha. 
 aparece `[Ponte] Cérebro conectado`.
 
 - Se o cérebro parar, a tela avisa e **religa ele sozinha** (até 3 vezes em 5 minutos).
-- Fechando a janela, o cérebro fecha junto.
+- O **X** da janela **não fecha** o Jarvis: ele fica escondido no ícone perto do relógio (se não
+  aparecer, clique na setinha ^ ao lado do relógio) e **continua ouvindo**. Para fechar de verdade:
+  botão direito nesse ícone → **Quit JARVIS** (ou o botão **QUIT** da tela antiga, ou feche a janela
+  preta). Aí o cérebro fecha junto. Feche assim antes de abrir o Jarvis de novo: senão ficam dois
+  Jarvis ouvindo e respondendo ao mesmo tempo.
 - Para voltar ao jeito antigo (um programa só), ponha `JARVIS_UM_PROCESSO=1` no `.env`.
 
 ## Anel desenhado pela placa de vídeo
@@ -125,18 +132,26 @@ Bom saber:
   Claude, imagens, vídeos, resumo de vídeos do YouTube e agentes. Nesse modo o Jarvis também não
   grava nada na memória (que depois iria para o Gemini). Lembretes e rotinas marcados no modo
   privado ficam marcados como privados: o lembrete é falado com a voz do Windows, e fora do modo
-  privado nenhum dos dois aparece nas listas nem vai para o Gemini.
+  privado nenhum dos dois aparece nas listas nem vai para o Gemini (e o Claude nunca lê os arquivos
+  de lembretes e rotinas).
 - Sem o Whisper local, a voz **não** vai para a internet: o Jarvis avisa e você digita. O instalador
   só liga o Gemma quando o Whisper ficou pronto.
 
 ### Modo privado por voz (sem fechar o Jarvis)
 
 Com o Gemma 4 instalado, diga **"Jarvis, modo privado"**: o Jarvis troca o cérebro para o Gemma
-na hora (aparece o selo 🔒 MODO PRIVADO no alto da tela) e nada mais vai para a nuvem — nem para o
-Gemini, nem para o Claude. Use para falar de clientes. Para voltar: **"Jarvis, modo normal"** (ou
-"sair do modo privado"), dito sozinho; uma frase com "não" ("não quero sair do modo privado") não
-troca nada. A escolha fica gravada para a próxima vez que abrir. Até o selo 🔒 aparecer, o microfone
-não manda nada para a nuvem; se a troca não der certo, o Jarvis avisa na tela e em voz alta.
+na hora e nada mais vai para IA na nuvem — nem para o Gemini, nem para o Claude. Só a **voz da
+Microsoft** (internet), se estiver ligada, ainda recebe o texto das respostas para falar. Para nada
+sair do PC (o certo para falar de clientes), ponha `JARVIS_VOZ_PRIVADA=1` no `.env`: ele fala com a
+voz do Windows. Para voltar: **"Jarvis, modo normal"** (ou "sair do modo privado"), dito sozinho;
+uma frase com "não" ("não quero sair do modo privado") não troca nada. A escolha fica gravada para a
+próxima vez que abrir.
+
+Como saber que ligou: na tela azul (a padrão) aparece o selo **🔒 MODO PRIVADO** no alto da tela. Na
+tela antiga (`JARVIS_VISUAL=classico`, `JARVIS_CENA=0` ou depois do **F2**) não tem selo: espere a
+linha **"🔒 Modo privado ligado"** no registro da tela (depois ele diz "Estou rodando no Gemma 4").
+Até isso aparecer, o microfone não manda nada para a nuvem; se a troca não der certo, o Jarvis avisa
+na tela e em voz alta.
 
 ## Claude como chefe de tarefas (pesquisas, relatórios, agentes e o próprio código)
 
@@ -146,7 +161,8 @@ O Gemini continua sendo a **voz** do Jarvis. Quando o pedido é grande, o Jarvis
 1. Dê dois cliques em **"Instalar Claude"**. Ele instala o Claude Code (instalador oficial, sem
    administrador), prepara a pasta `Documentos\Jarvis Ultron\Claude` com os 22 agentes e abre o
    Claude para você **entrar com a sua conta** (no fim, digite `/exit`).
-2. Reabra o Jarvis e peça, por exemplo:
+2. Abra o Jarvis (se ele estava aberto, feche de verdade, em **Quit JARVIS**, e abra de novo) e peça,
+   por exemplo:
    - "Jarvis, pede para o Claude pesquisar as novidades da reforma tributária para holdings."
    - "Jarvis, manda o Claude analisar a planilha que deixei na pasta Entrada."
    - "Jarvis, usa o agente proposta-comercial para o grupo tal."
@@ -162,18 +178,24 @@ o resumo e abre o relatório completo (fica em `Claude\Relatorios`).
 3. O Jarvis faz um **backup** (`Documentos\Jarvis Ultron\Backups`), roda os testes, o Claude
    aplica, e o Jarvis confere a escrita do código e roda os testes de novo.
 4. Se algo quebrar, o Jarvis **desfaz sozinho**, arquivo por arquivo. As mudanças valem quando
-   você reabrir o Jarvis. O registro de cada mudança fica em `Claude\Mudancas`.
+   você fechar o Jarvis de verdade (botão direito no ícone perto do relógio → **Quit JARVIS**; o X
+   só esconde) e abrir de novo. O registro de cada mudança fica em `Claude\Mudancas`.
 5. Enquanto o Claude muda o código, o Jarvis não troca de modo (privado/normal). Se o Jarvis fechar
    ou o PC desligar no meio, o Claude para junto e, na próxima vez que você abrir, o Jarvis desfaz
    a mudança que ficou pela metade e avisa.
 
 Travas (no código, conferidas com o Claude Code de verdade):
-- O Claude só **escreve** em `Documentos\Jarvis Ultron\Claude` e só **lê** a pasta
-  `Documentos\Jarvis Ultron` (clientes.txt, carteira.txt, Faturas...).
+- Nas **tarefas** (pesquisas, relatórios, agentes), o Claude só **escreve** em
+  `Documentos\Jarvis Ultron\Claude` e só **lê** a pasta `Documentos\Jarvis Ultron` (clientes.txt,
+  carteira.txt, Faturas...), menos os arquivos de lembretes e rotinas.
+- Para **mudar o código**, ele **lê** a pasta do programa do Jarvis (no plano) e, só depois do seu
+  "ok", **muda** essa pasta. Mesmo aí ele nunca lê o `.env`, as chaves (`config/api_keys.json`, as
+  credenciais do Gmail), a memória do Jarvis nem a pasta `.git`, e nunca muda a `.venv`, `tmp`,
+  `outputs` nem as travas dele. Não guarde arquivos seus (de clientes, senhas) na pasta do programa.
 - Não roda comandos no PC e não usa conectores (Gmail, Agenda, Metricool, Meta): **não consegue
   publicar, enviar, comprar nem apagar nada**. Publicar continua com o Hermes, com o seu "ok".
-- Nunca lê o `.env`, as chaves, a memória do Jarvis nem as suas senhas (nem as do Hermes, em
-  `AppData`): fora das pastas dele, não lê nada.
+- Nunca lê as suas senhas (nem as do Hermes, em `AppData`, nem o login do Claude): fora dessas
+  pastas, não lê nada.
 - No **modo privado** nada vai para o Claude.
 - Se existir `ANTHROPIC_API_KEY` no Windows, o Jarvis a tira quando chama o Claude (com ela o
   Claude cobraria pela API em vez de usar a sua assinatura).
@@ -225,10 +247,14 @@ A chave nunca aparece na tela do testador: pode mandar print dela para o suporte
 
 ## Trocar a chave do Gemini
 
-- **Jeito mais fácil:** apague o arquivo **`.env`** desta pasta e abra o `Iniciar Jarvis Ultron`.
-  Ele pede a chave de novo.
+- **Jeito mais fácil:** dê dois cliques em **"Testar chave do Gemini"** e cole a chave nova. Se ela
+  funcionar, ele grava no `.env` só a chave (e o caminho que funcionou); o resto fica como está.
 - **Ou:** abra o `.env` com o Bloco de Notas, troque o que está entre aspas na linha
   `GEMINI_API_KEY="..."` e salve.
+- **Não apague o `.env`** para trocar a chave: ele guarda também o modo privado (Gemma), a ligação
+  com o Hermes, a voz da ElevenLabs, o caminho do Claude e o do Vertex AI. Sem ele, o iniciador só
+  pergunta a chave do Gemini, a do Groq e a cidade, e você teria de rodar de novo o "Instalar
+  Gemma 4", o "Instalar Hermes", o "Instalar Claude" e o "Testar chave do Gemini".
 - **Atualizando para uma versão nova:** copie o arquivo `.env` da pasta antiga para a nova,
   assim ele não pede a chave de novo.
 - **Chave do Groq:** o iniciador pergunta uma vez. Para colocar ou trocar depois, abra o `.env`
@@ -323,6 +349,8 @@ Abra com o Bloco de Notas para mudar:
 | `JARVIS_JANELA_CONVERSA=20` | Segundos que ele continua ouvindo depois da última fala |
 | `GROQ_API_KEY="gsk_..."` | Chave do Groq (reserva grátis). O iniciador pergunta uma vez |
 | `JARVIS_VOZ_RESERVA=pt-BR-AntonioNeural` | Voz do modo reserva (ex.: `pt-BR-FranciscaNeural`) |
+| `JARVIS_RESERVA_FERRAMENTAS=1` | No modo reserva (Groq) ele executa as tarefas (padrão). `0` = só conversa |
+| `JARVIS_VOZ_PRIVADA=0` | Reserva e Gemma falam com a voz da Microsoft (internet). `1` = voz do Windows: nada sai do PC |
 | `JARVIS_MODELO_TEXTO=` | (Opcional) força um modelo de texto, ex.: `gemini-3.1-flash`. Vazio = automático |
 | `JARVIS_MODELO_LEVE=` | (Opcional) força o modelo das tarefas rápidas, ex.: `gemini-3.1-flash-lite` |
 | `JARVIS_MODELO_PRO=` | (Opcional) força o modelo "pro" |
