@@ -229,6 +229,29 @@ def _jarvis_falando(valor):
     return lambda jarvis: jarvis.set_speaking(valor)
 
 
+def _preco_falado():
+    """O que o Gemini diz no turno do preço (falado pela voz externa, quando ela está escolhida)."""
+    return NS(server_content=NS(input_transcription=None, output_transcription=NS(text="Custa 3 dólares. Faço?"),
+                                turn_complete=False), tool_call=None)
+
+
+class VozExternaLenta:
+    """Voz externa (ElevenLabs/OpenAI/Edge): demora para sintetizar e só quando começa a falar fecha o
+    microfone. O teste decide quando ela começa (comecar) e quando termina (terminar)."""
+
+    def __init__(self):
+        self.comecar, self.terminar = threading.Event(), threading.Event()
+        self.falas = []
+
+    def speak_sync(self, texto):
+        self.falas.append(texto)
+        self.comecar.wait(5)
+        self.on_speaking_start()
+        self.terminar.wait(5)
+        self.on_speaking_stop()
+        return True
+
+
 class OkNoGeminiAoVivoTests(unittest.TestCase):
     """No Gemini ao vivo a transcrição chega em pedaços e atrasada: o "pode fazer" dito junto com o
     pedido não pode aprovar o vídeo na segunda chamada do mesmo turno."""
@@ -242,9 +265,10 @@ class OkNoGeminiAoVivoTests(unittest.TestCase):
         silencio.start()
         self.addCleanup(silencio.stop)
 
-    def _rodar(self, mensagens):
+    def _rodar(self, mensagens, voz_externa=None):
         """mensagens: o que o Gemini manda, na ordem; um número é uma pausa (segundos) na conexão e
-        uma função é algo que acontece no PC nessa hora (_microfone, _jarvis_falando)."""
+        uma função é algo que acontece no PC nessa hora (_microfone, _jarvis_falando). voz_externa: a
+        resposta é falada por ela (VozExternaLenta), não pelo Gemini."""
         import asyncio
 
         import main
@@ -259,6 +283,9 @@ class OkNoGeminiAoVivoTests(unittest.TestCase):
         jarvis._fala_n, jarvis._fala_texto = 0, ""
         for nome in ("_checar_pedido_de_modo", "_pedido_de_cerebro", "_falar_com_voz_externa"):
             setattr(jarvis, nome, lambda t: None)
+        if voz_externa is not None:
+            del jarvis._falar_com_voz_externa  # a de verdade
+            jarvis._tts_engine, jarvis._ext_tts_provider = voz_externa, "elevenlabs"
         jarvis._is_explicit_self_quit_transcript = lambda t: False
         jarvis.anunciar = lambda texto, *a, **k: self.avisos.append(texto) or "falado"
         m, respostas = self.m, self.respostas
@@ -348,6 +375,40 @@ class OkNoGeminiAoVivoTests(unittest.TestCase):
                              _pedaco("e em dólar quanto dá?"), _video(True), _fim_do_turno()])
         gerar.assert_not_called()
         self.assertIn("Not confirmed", self.respostas[1])
+        # o resto ficou na fala do pedido; a pergunta é uma fala nova, sozinha (não "pode fazer e em...")
+        self.assertEqual((self.jarvis._fala_n, self.jarvis._fala_texto), (2, "e em dólar quanto dá?"))
+
+    def test_resto_do_pedido_mais_um_ajuste_nao_vale(self):
+        # depois do preço ele pede uma mudança ("mais curto"), não dá ok: o ", pode fazer" atrasado do
+        # pedido não pode se juntar à resposta dele e virar "pode fazer mais curto"
+        gerar = self._rodar([_pedaco("Jarvis, faz um vídeo de 8 segundos do meu treino"), _video(False),
+                             _fim_do_turno(), _pedaco(", pode fazer"), _microfone,
+                             _pedaco("mais curto"), _video(True), _fim_do_turno()])
+        gerar.assert_not_called()
+        self.assertIn("Not confirmed", self.respostas[1])
+        self.assertEqual(self.jarvis._fala_texto, "mais curto")
+
+    def test_resto_do_pedido_com_voz_externa_nao_vale(self):
+        # voz externa: no fim do turno do preço ela ainda está sintetizando (microfone aberto); o som do
+        # ambiente nesse meio tempo não é ele voltando a falar, e o ", pode fazer" atrasado não aprova
+        voz = VozExternaLenta()
+        gerar = self._rodar([_pedaco("Jarvis, faz um vídeo de 8 segundos do meu treino"), _video(False),
+                             _preco_falado(), _fim_do_turno(), _microfone, lambda j: voz.comecar.set(), 0.1,
+                             _pedaco(", pode fazer"), _fim_do_turno(), lambda j: voz.terminar.set(), 0.1,
+                             _video(True), _fim_do_turno()], voz_externa=voz)
+        gerar.assert_not_called()
+        self.assertIn("Not confirmed", self.respostas[1])
+        self.assertEqual(voz.falas, ["Custa 3 dólares. Faço?"])
+        self.assertEqual(self.jarvis._fala_n, 1)  # o resto fez a fala do pedido crescer
+
+    def test_ok_depois_da_voz_externa_vale(self):
+        voz = VozExternaLenta()
+        gerar = self._rodar([_pedaco("Jarvis, faz um vídeo de 8 segundos do meu treino"), _video(False),
+                             _preco_falado(), _fim_do_turno(), lambda j: voz.comecar.set(), 0.1,
+                             lambda j: voz.terminar.set(), 0.1, _microfone, _pedaco("ok, pode fazer"),
+                             _video(True), _fim_do_turno()], voz_externa=voz)
+        gerar.assert_called_once()
+        self.assertEqual(self.jarvis._voz_externa_pendente, 0)
 
     def test_ok_de_verdade_depois_do_resto_atrasado_vale(self):
         # depois do resto atrasado, o microfone volta a mandar áudio: o "ok" dele é uma fala nova

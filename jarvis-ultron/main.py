@@ -1351,6 +1351,7 @@ class JarvisLive:
         self._is_speaking   = False
         self._speaking_lock = threading.Lock()
         self._falando_no_pc = 0  # Jarvis Ultron: a voz do Windows falando (trava própria do microfone)
+        self._voz_externa_pendente = 0  # respostas que a voz externa (ElevenLabs...) ainda vai falar
         self.voice_name     = voice_name
         # optional runtime limit in seconds (set by main)
         self.runtime_limit_seconds: int | None = None
@@ -1555,9 +1556,10 @@ class JarvisLive:
     def _microfone_mandou_audio(self) -> None:
         """Jarvis Ultron: o microfone mandou áudio ao Gemini com o Jarvis calado. Só depois disso a
         transcrição que chegar pode ser uma fala NOVA do Erton (core/aprovacao.py): enquanto o Jarvis
-        fala, o microfone fica fechado."""
+        fala, o microfone fica fechado. Com voz externa, o som de antes de ela terminar a resposta
+        (a síntese demora, e só quando ela começa o microfone fecha) também não conta."""
         with self._trava_da_fala():
-            if not getattr(self, "_is_speaking", False):
+            if not getattr(self, "_is_speaking", False) and not getattr(self, "_voz_externa_pendente", 0):
                 self._ouviu_depois_do_turno = True
 
     def set_speaking(self, value: bool):
@@ -2267,7 +2269,20 @@ class JarvisLive:
         motor.on_speaking_start = lambda: self.set_speaking(True)
         motor.on_speaking_stop = lambda: self.set_speaking(False)
         motor.on_level = self._mostrar_volume
-        motor.speak(texto)
+        # Até ela terminar, o áudio do microfone não conta como ele ter voltado a falar: senão o som do
+        # ambiente enquanto ela sintetiza fazia o resto atrasado do pedido (", pode fazer", chegando
+        # durante o preço) virar uma fala nova depois da proposta (_microfone_mandou_audio).
+        with self._trava_da_fala():
+            self._voz_externa_pendente = getattr(self, "_voz_externa_pendente", 0) + 1
+
+        def falar():
+            try:
+                motor.speak_sync(texto)
+            finally:
+                with self._trava_da_fala():
+                    self._voz_externa_pendente = max(0, getattr(self, "_voz_externa_pendente", 1) - 1)
+
+        threading.Thread(target=falar, daemon=True, name="VozExterna").start()
 
     # ---------- Jarvis Ultron: modo reserva (Groq) ----------
 
@@ -2975,13 +2990,14 @@ class JarvisLive:
                             fechar_fala(self, fala_do_buf)  # o que chegar depois já é outra fala
                             fala_do_buf, resto_atrasado, texto_antes = None, False, ""
                             ferramenta_no_turno = False
-                            # fala nova, agora, só com áudio do microfone mandado depois deste turno
-                            self._ouviu_depois_do_turno = False
 
                             full_out = " ".join(out_buf).strip()
                             if full_out:
                                 self.ui.write_log(f"Jarvis: {full_out}")
                                 self._falar_com_voz_externa(full_out)
+                            # fala nova, agora, só com áudio do microfone mandado depois deste turno (e
+                            # da voz externa, se ela vai falar a resposta)
+                            self._ouviu_depois_do_turno = False
                             if (
                                 getattr(self, "_pending_self_quit", False)
                                 and (full_out or turn_had_audio)
@@ -3011,7 +3027,12 @@ class JarvisLive:
         except Exception as e:
             if isinstance(e, genai.errors.APIError) and "1000" in str(e):
                 print("[JARVIS] 🔌 Session closed normally.")
-                return
+                if self._shutdown_requested.is_set():
+                    return
+                # Jarvis Ultron: o Google encerrou a sessão (ou a voz foi trocada). Sem o erro, as outras
+                # tarefas ficavam esperando o microfone (mudo, ou o modo chamada esperando o "Hey
+                # Jarvis") e a sessão morta nunca era esquecida: nem religava, nem ia para a reserva.
+                raise
             print(f"[JARVIS] ❌ Recv: {e}")
             traceback.print_exc()
             raise
@@ -3255,6 +3276,8 @@ class JarvisLive:
                             jarvis_status.write_status({"state": "offline"})
                         except Exception:
                             pass
+                    # Jarvis Ultron: religa logo, mas sem ficar em laço se o Google fechar toda sessão nova
+                    await self._wait_before_reconnect(1)
                 else:
                     print(f"[JARVIS] ⚠️ {e}")
                     traceback.print_exc()

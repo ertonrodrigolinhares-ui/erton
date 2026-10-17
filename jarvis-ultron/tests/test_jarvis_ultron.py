@@ -654,14 +654,20 @@ class VozElevenLabsTests(unittest.TestCase):
             def __init__(self):
                 self.falas = []
 
-            def speak(self, texto):
+            def speak_sync(self, texto):
                 self.falas.append(texto)
+                return True
 
         jarvis = object.__new__(main.JarvisLive)
         jarvis.ui = UIFalsa()
         jarvis._tts_engine, jarvis._ext_tts_provider = Motor(), "elevenlabs"
         jarvis._falar_com_voz_externa("Bom dia, Erton.")
+        for _ in range(50):  # fala numa linha própria (a síntese demora)
+            if jarvis._tts_engine.falas and not jarvis._voz_externa_pendente:
+                break
+            _time.sleep(0.02)
         self.assertEqual(jarvis._tts_engine.falas, ["Bom dia, Erton."])
+        self.assertEqual(jarvis._voz_externa_pendente, 0)  # terminou: o microfone volta a contar
         jarvis._ext_tts_provider = "gemini"
         jarvis._falar_com_voz_externa("não deve falar")
         self.assertEqual(len(jarvis._tts_engine.falas), 1)
@@ -1886,6 +1892,68 @@ class SessaoQueCaiuTests(unittest.TestCase):
         self.assertEqual(no_religar, {"sessao": None, "fila": None})
         self.assertEqual(jarvis._textos_esperando, ["que horas são?"])
         self.assertTrue(any("conectando ao Gemini" in l for l in jarvis.ui.logs), jarvis.ui.logs)
+
+    def test_quando_o_google_encerra_a_sessao_esquece_e_religa(self):
+        # o Google encerra a sessão ao vivo (código 1000) com o microfone mudo (digitando numa reunião):
+        # o envio fica esperando o microfone e a voz não acaba sozinha; mesmo assim, run() tem que
+        # esquecer a sessão morta e religar
+        import contextlib
+        import os
+        import main
+
+        jarvis = self._jarvis()
+        jarvis.ui.set_state = lambda estado: None
+        jarvis.ui.muted = True
+        jarvis.session, jarvis._loop, jarvis._reserva, jarvis._modo_reserva = None, None, None, False
+        jarvis.cloud_safe, jarvis.external_audio, jarvis._api_key = True, True, "chave-de-teste"
+        jarvis.runtime_limit_seconds, jarvis.required_unlock_path = None, None
+        jarvis._falhas_seguidas = 0
+        sessao_ao_conectar, no_religar = [], {}
+
+        class SessaoEncerrada:
+            async def receive(self):
+                await asyncio.sleep(0.05)
+                main.genai.errors.APIError.raise_error(1000, "Session ended", None)
+                yield
+
+        @contextlib.asynccontextmanager
+        async def conectar(model, config):
+            sessao_ao_conectar.append(jarvis.session)
+            if len(sessao_ao_conectar) == 2:
+                jarvis._shutdown_requested.set()  # religou: o teste acaba aqui
+            yield SessaoEncerrada()
+
+        async def tocar_ate_fechar():
+            while not jarvis._shutdown_requested.is_set():
+                await asyncio.sleep(0.05)
+
+        async def nada():
+            return None
+
+        async def esperar_para_religar(segundos):
+            no_religar["sessao"], no_religar["fila"] = jarvis.session, jarvis.out_queue
+
+        async def cenario():
+            try:
+                await asyncio.wait_for(jarvis.run(), 5)
+            except TimeoutError:
+                pass  # ficou presa na sessão morta
+
+        jarvis._build_config = lambda modelo: None
+        jarvis._play_audio = tocar_ate_fechar
+        jarvis._announce_startup = nada
+        jarvis._wait_before_reconnect = esperar_para_religar
+        cliente = SimpleNamespace(aio=SimpleNamespace(live=SimpleNamespace(connect=conectar)))
+        with patch.dict(os.environ), patch.object(main.genai, "Client", return_value=cliente), \
+                patch.object(main, "pick_live_model", return_value="models/voz-teste"), \
+                patch("core.modelos.resolver", side_effect=lambda pedido: pedido), \
+                patch("core.modelos.pular"):
+            for nome in ("JARVIS_CEREBRO", "JARVIS_SEM_GEMINI"):
+                os.environ.pop(nome, None)
+            asyncio.run(cenario())
+        self.assertEqual(sessao_ao_conectar, [None, None])  # religou, já sem a sessão velha
+        self.assertEqual(no_religar, {"sessao": None, "fila": None})
+        self.assertEqual(jarvis._falhas_seguidas, 0)  # fim normal: não conta como falha
 
     def test_texto_guardado_conta_como_fala_quando_foi_digitado(self):
         import os
