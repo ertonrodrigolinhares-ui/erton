@@ -1,6 +1,26 @@
-Jarvis Ultron - versão 2026-10-16
+Jarvis Ultron - versão 2026-10-17
 
 Novidades desta versão:
+- Revisão final completa: 84 problemas encontrados; 83 corrigidos, cada um conferido por revisores
+  independentes, com testes (607 testes passando). O que ficou: às vezes um "ok" dito muito rápido
+  não é reconhecido e o Jarvis pede de novo (falha do lado seguro: nada é cobrado nem publicado).
+  Os principais, do seu ponto de vista:
+  - Modo privado fechado de verdade: o Gemma não recebe mais ferramentas que mandam para a nuvem;
+    sem o Whisper local ele não liga (antes mandava a voz para o Groq); memória, lembretes e
+    rotinas criados no modo privado não vão depois para o Gemini; "não quero sair do modo privado"
+    não desliga o modo; a voz do PC não é mais captada pelo microfone.
+  - Aprovações mais rígidas: "ok, pode cancelar", "ok, esquece", "sim, mas tá caro" e perguntas não
+    valem como "ok"; o "ok" tem que vir numa fala nova, depois de você ouvir o preço/o plano.
+  - Claude: se o Jarvis fechar ou trocar de modo no meio de uma mudança no código, ele desfaz na
+    próxima abertura (antes ficava pela metade); o Claude não lê mais as senhas do Hermes
+    (Telegram, Gmail) e fica sem conectores; os testes rodam numa cópia, sem mexer nos seus
+    arquivos; Claude instalado pelo npm volta a abrir.
+  - Vídeo pago não se perde se a internet piscar ou se você trocar de modo no meio.
+  - .env gravado pelo iniciador (acentos como "João Pessoa") não trava mais o testador de chave
+    nem os instaladores.
+  - Chave "AQ." pelo Vertex AI: voz, autodiagnóstico e tarefas de agente funcionando nesse caminho.
+  - Anel pela placa de vídeo: sem tela preta e sem rodar "de mentira" no processador.
+  - Texto digitado quando a conexão cai ou antes de o Gemini conectar não some mais.
 - Claude como chefe de tarefas ("Instalar Claude"): pesquisas, análises, relatórios e os 22
   agentes (vindos do Hermes) rodam no Claude Code do seu PC, com a sua assinatura. Nas tarefas, ele
   só escreve na pasta Documentos\Jarvis Ultron\Claude; não roda comandos, não publica nem envia nada.
