@@ -2260,6 +2260,27 @@ class PainelStarkTests(unittest.TestCase):
         (self.pasta / "rotinas.json").write_text(json.dumps({"rotinas": {"treino": {}}}), encoding="utf-8")
         self.assertEqual(self.m.nomes_rotinas(), ["treino"])
 
+    def test_rotina_do_modo_privado_so_tem_botao_no_modo_privado(self):
+        # o botão manda "rotina <nome>" ao cérebro como texto digitado: no modo normal, o nome (dito no
+        # modo privado) iria para o Gemini
+        import json
+        import os
+        from unittest import mock
+        (self.pasta / "rotinas.json").write_text(json.dumps({"rotinas": {
+            "treino": {"passos": ["abrir o spotify"]},
+            "cobrança joão silva holding x": {"passos": ["ligar"], "privado": True}}}), encoding="utf-8")
+        enviados = []
+        with mock.patch.dict(os.environ, {"JARVIS_CEREBRO": "gemini"}):
+            self.assertEqual(self.m.nomes_rotinas(), ["treino"])
+            # botão desenhado ainda no modo privado e clicado depois da troca: não manda nada
+            self.m.rodar_rotina(enviados.append, "cobrança joão silva holding x")
+            self.m.rodar_rotina(enviados.append, "treino")
+        self.assertEqual(enviados, ["rotina treino"])
+        with mock.patch.dict(os.environ, {"JARVIS_CEREBRO": "gemma"}):
+            self.assertEqual(self.m.nomes_rotinas(), ["cobrança joão silva holding x", "treino"])
+            self.m.rodar_rotina(enviados.append, "cobrança joão silva holding x")
+        self.assertEqual(enviados, ["rotina treino", "rotina cobrança joão silva holding x"])
+
     def test_estado_da_voz(self):
         class J:
             session, _modo_reserva = object(), False

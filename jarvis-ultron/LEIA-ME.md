@@ -201,8 +201,9 @@ Precisa da chave do Gemini com **faturamento ativado** no Google (o Veo não tem
 preço falado é uma estimativa; o valor certo é o da sua conta do Google Cloud.
 Se a internet cair enquanto o vídeo é feito, o Jarvis continua tentando. Se mesmo assim o vídeo não
 chegar, ele avisa que o Google pode cobrar por ele e anota o pedido em `Videos\pendentes.txt`:
-confira a conta do Google antes de pedir outro. Se o Jarvis fechar ou trocar de modo ("modo privado")
-no meio do vídeo, ele avisa antes e não perde o pedido: quando abrir de novo no modo normal, busca o
+confira a conta do Google antes de pedir outro. Se você trocar de modo ("modo privado") no meio do
+vídeo, ele avisa antes. Se o Jarvis fechar, cair ou trocar de modo no meio do vídeo, o pedido fica
+anotado (sem aviso na hora, quando ele fecha ou cai): quando abrir de novo no modo normal, busca o
 vídeo no Google, abre e avisa (no modo privado ele só lembra que o vídeo está esperando).
 
 ## Chave do Gemini que começa com "AQ." (conversa natural)

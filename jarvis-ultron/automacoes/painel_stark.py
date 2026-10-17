@@ -4,7 +4,8 @@ Acrescenta um painel na coluna da direita da tela Stark com:
   - o próximo lembrete (e o painel pisca em âmbar quando um lembrete toca);
   - as atividades pendentes do Geekie (quantas e quantas vencem logo);
   - o estado dos agentes: voz (Gemini ou reserva Groq) e Hermes (ligado ou desligado);
-  - um botão para cada rotina salva (clique para o Jarvis fazer a rotina).
+  - um botão para cada rotina salva (clique para o Jarvis fazer a rotina); a rotina salva no modo
+    privado só ganha botão no modo privado.
 
 Não fala nada e quase não gasta computador: atualiza a cada 5 segundos, e o Hermes a cada 1 minuto.
 Para tirar o painel, apague este arquivo (ou coloque "_" no começo do nome).
@@ -103,13 +104,33 @@ def texto_voz(jarvis) -> tuple[str, bool]:
     return "Voz: Gemini ao vivo", True
 
 
+def _escondida(rotina) -> bool:
+    """Rotina salva no modo privado, fora do modo privado (a mesma regra do rotinas.py). O botão manda
+    "rotina <nome>" ao cérebro como texto digitado: no modo normal, o nome (dito no modo privado) iria
+    para o Gemini."""
+    if not (isinstance(rotina, dict) and rotina.get("privado")):
+        return False
+    from core.cerebro_gemma import cerebro_gemma  # a tela acompanha a troca de modo (PonteTela)
+
+    return not cerebro_gemma()
+
+
 def nomes_rotinas() -> list[str]:
     rotinas = _json("rotinas.json").get("rotinas")
     if isinstance(rotinas, dict):
-        return sorted(rotinas)[:6]
+        return sorted(n for n, r in rotinas.items() if not _escondida(r))[:6]
     if not (pasta_dados() / "rotinas.json").exists():
         return ["bom dia", "fim do dia"]  # as prontas do rotinas.py
     return []
+
+
+def rodar_rotina(enviar_comando, nome: str) -> None:
+    """Clique num botão de rotina. Confere de novo na hora: o modo pode ter mudado depois do último
+    desenho do painel (ele só se refaz a cada 5 segundos)."""
+    rotinas = _json("rotinas.json").get("rotinas")
+    if isinstance(rotinas, dict) and _escondida(rotinas.get(nome)):
+        return
+    enviar_comando(f"rotina {nome}")
 
 
 # ---------------------------------------------------------------- painel
@@ -186,7 +207,7 @@ def _montar(jarvis) -> None:
                 f"QPushButton {{ color: {us.TEXTO}; background: transparent; border: 1px solid {us.AZUL_ESCURO};"
                 f" border-radius: 9px; padding: 1px 7px; }} QPushButton:hover {{ color: {us.AZUL_FORTE};"
                 f" border-color: {us.AZUL_FORTE}; }}")
-            botao.clicked.connect(lambda _=False, n=nome: tela.enviar_comando(f"rotina {n}"))
+            botao.clicked.connect(lambda _=False, n=nome: rodar_rotina(tela.enviar_comando, n))
             linha_botoes.addWidget(botao)
         linha_botoes.addStretch(1)
 
