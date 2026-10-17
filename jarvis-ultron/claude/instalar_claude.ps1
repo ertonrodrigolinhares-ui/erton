@@ -181,7 +181,8 @@ if ($r -and -not $r.is_error) {
 Definir-Env "JARVIS_CLAUDE_EXE" $exe
 
 Write-Host ""
-Write-Host "Pronto! Feche e abra o Jarvis de novo e diga, por exemplo:" -ForegroundColor Cyan
+Write-Host "Pronto! Se o Jarvis estiver aberto (ou no icone perto do relogio), feche de verdade: botao" -ForegroundColor Cyan
+Write-Host "direito no icone > Quit JARVIS. Depois abra o 'Iniciar Jarvis Ultron' e diga, por exemplo:" -ForegroundColor Cyan
 Write-Host "  'Jarvis, pede para o Claude pesquisar as novidades da reforma tributaria para holdings.'"
 Write-Host "  'Jarvis, usa o agente proposta-comercial para o grupo tal.'"
 Write-Host "Os relatorios ficam em: $pasta\Relatorios"

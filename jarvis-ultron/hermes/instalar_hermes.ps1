@@ -230,5 +230,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host ""
 Write-Host "Pronto! O Hermes do Jarvis liga sozinho com o Windows e roda a rotina todo dia as 8h." -ForegroundColor Green
-Write-Host "Abra o Jarvis Ultron e diga: 'Hey Jarvis, quais sao os posts de hoje?'"
+Write-Host "Se o Jarvis estiver aberto (ou no icone perto do relogio), feche de verdade: botao direito"
+Write-Host "no icone > Quit JARVIS. Depois abra o 'Iniciar Jarvis Ultron' e diga:"
+Write-Host "'Hey Jarvis, quais sao os posts de hoje?'"
 Read-Host "Aperte Enter para fechar"

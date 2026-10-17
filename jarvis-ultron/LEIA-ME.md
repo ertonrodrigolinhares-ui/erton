@@ -116,10 +116,12 @@ não sai do PC, então dá para usar com dados de clientes, sem limite e sem cha
    (26B com 32 GB ou mais, E4B com 16 GB, E2B abaixo disso), instala o Ollama, baixa o Gemma
    (10 a 18 GB, demora na primeira vez), instala o Whisper para transcrever sua voz no PC e liga
    o Jarvis no Gemma.
-2. Abra o **"Iniciar Jarvis Ultron"** normalmente.
+2. Se o Jarvis estiver aberto, feche de verdade: botão direito no ícone perto do relógio →
+   **Quit JARVIS** (o X só esconde, e o Jarvis que já estava aberto continuaria no Gemini,
+   ouvindo). Depois abra o **"Iniciar Jarvis Ultron"**.
 
-Para voltar ao Gemini: **"Voltar para o Gemini"**. Para usar o Gemma de novo: rode o "Instalar
-Gemma 4" (ele pula o que já está pronto).
+Para voltar ao Gemini: **"Voltar para o Gemini"** (e, do mesmo jeito, feche em **Quit JARVIS** e
+abra de novo). Para usar o Gemma de novo: rode o "Instalar Gemma 4" (ele pula o que já está pronto).
 
 Bom saber:
 - A voz e a conversa ficam como no modo reserva: ele ouve, pensa e responde em frases curtas, e
@@ -286,7 +288,8 @@ Depois é só mandar mensagens para o robô no Telegram. Só o **seu** usuário 
 ## Automações novas: um arquivo só
 
 Toda automação nova vem em **um arquivo**: salve na pasta **`automacoes`** (dentro da pasta do
-Jarvis) e abra o Jarvis de novo. Não precisa atualizar o resto do projeto. Veja
+Jarvis), feche o Jarvis de verdade (**Quit JARVIS**, no ícone perto do relógio) e abra de novo.
+Não precisa atualizar o resto do projeto. Veja
 `automacoes/LEIA-ME.md`. Para desligar, apague o arquivo da pasta.
 
 ## Escola: Geekie One (pendências, tutor e lembretes)
@@ -350,7 +353,7 @@ Abra com o Bloco de Notas para mudar:
 | `GROQ_API_KEY="gsk_..."` | Chave do Groq (reserva grátis). O iniciador pergunta uma vez |
 | `JARVIS_VOZ_RESERVA=pt-BR-AntonioNeural` | Voz do modo reserva (ex.: `pt-BR-FranciscaNeural`) |
 | `JARVIS_RESERVA_FERRAMENTAS=1` | No modo reserva (Groq) ele executa as tarefas (padrão). `0` = só conversa |
-| `JARVIS_VOZ_PRIVADA=0` | Reserva e Gemma falam com a voz da Microsoft (internet). `1` = voz do Windows: nada sai do PC |
+| `JARVIS_VOZ_PRIVADA=0` | Reserva e Gemma falam com a voz da Microsoft (internet). `1` = voz do Windows (no modo privado, nada sai do PC; no modo reserva os pedidos continuam indo para o Groq) |
 | `JARVIS_MODELO_TEXTO=` | (Opcional) força um modelo de texto, ex.: `gemini-3.1-flash`. Vazio = automático |
 | `JARVIS_MODELO_LEVE=` | (Opcional) força o modelo das tarefas rápidas, ex.: `gemini-3.1-flash-lite` |
 | `JARVIS_MODELO_PRO=` | (Opcional) força o modelo "pro" |
@@ -380,7 +383,8 @@ redes). Os **anúncios do Meta** ficam pelo app do Claude (veja "Limitações co
      e pede a chave da **ElevenLabs** (opcional);
    - abre o navegador para você autorizar o **Metricool**;
    - cria a **rotina diária das 8h** e faz o Hermes ligar sozinho com o Windows.
-2. Abra o Jarvis Ultron normalmente.
+2. Se o Jarvis estiver aberto, feche de verdade (botão direito no ícone perto do relógio →
+   **Quit JARVIS**) e abra o **"Iniciar Jarvis Ultron"**.
 
 **Se o Jarvis disser "O Hermes está desligado":** dê dois cliques em **`Ligar Hermes`**. Ele liga o
 serviço e testa a ligação; se o serviço automático não subir, ele liga o Hermes na própria janela

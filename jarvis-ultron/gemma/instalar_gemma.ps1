@@ -215,5 +215,8 @@ Definir-Env "JARVIS_VOZ_PRIVADA" ($(if ($privada -eq "S") { "1" } else { "0" }))
 
 Write-Host ""
 Write-Host "Pronto! O cerebro do Jarvis agora e o Gemma 4, rodando no seu computador." -ForegroundColor Green
-Write-Host "Abra o 'Iniciar Jarvis Ultron'. Para voltar ao Gemini: 'Voltar para o Gemini'."
+# O X da janela so esconde o Jarvis: o que ja estava aberto continuaria no Gemini, ouvindo
+Write-Host "Se o Jarvis estiver aberto (ou no icone perto do relogio), feche de verdade: botao direito"
+Write-Host "no icone > Quit JARVIS. Depois abra o 'Iniciar Jarvis Ultron'."
+Write-Host "Para voltar ao Gemini: 'Voltar para o Gemini'."
 Read-Host "Aperte Enter para fechar"

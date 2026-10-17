@@ -488,6 +488,46 @@ class TravasDeLeituraEConectoresTests(Base):
                 self.assertIn(f"Read({raiz}/{item})", proibidas)
                 self.assertIn(f"Edit({raiz}/{item})", proibidas)
 
+    def test_linha_de_comando_cabe_no_cmd_do_windows_com_pastas_compridas(self):
+        # com o Claude do npm (claude.cmd), o Windows passa a linha pelo cmd.exe, que recusa mais de 8191
+        # letras ("The command line is too long"): aí toda tarefa do Claude falhava
+        import subprocess
+        import uuid
+
+        casa = self.tmp / "Users" / "Erton Rodrigo Linhar"  # o Windows corta o nome do usuário em 20 letras
+        self.casa = casa
+        self.jarvis_dir = casa / "OneDrive" / "Área de Trabalho" / "Jarvis Ultron - versão 2026-10-16" / "jarvis-ultron"
+        (self.jarvis_dir / "tests").mkdir(parents=True)
+        (self.jarvis_dir / "modulo.py").write_text("def soma(a, b):\n    return a + b\n", encoding="utf-8")
+        sessao = str(uuid.uuid4())
+        linhas = []
+
+        def executar(cmd, entrada, tempo, pasta, env):
+            linhas.append(cmd)
+            return 0, json.dumps({"type": "result", "subtype": "success", "is_error": False,
+                                  "result": "FALA: Pronto.", "session_id": sessao}).encode(), b""
+
+        hermes = casa / "AppData" / "Local" / "hermes"
+        with patch.dict(os.environ, {"LOCALAPPDATA": str(casa / "AppData" / "Local"),
+                                     "HERMES_HOME": str(casa / ".hermes"),
+                                     "HERMES_JARVIS_HOME": str(hermes / "profiles" / "jarvis"),
+                                     "JARVIS_CLAUDE_MODELO": "um-modelo-com-nome-comprido"}), \
+                patch.object(chefe, "achar_claude", return_value=str(casa / "AppData" / "Roaming" / "npm" / "claude.cmd")), \
+                patch.object(chefe, "_executar", side_effect=executar), \
+                patch.object(chefe, "rodar_testes", return_value=set()):
+            chefe.fazer_tarefa("pesquise", sessao=sessao)
+            chefe.planejar("mude a cor")
+            chefe.aplicar_plano("plano", sessao, "mude")
+        self.assertEqual(len(linhas), 3)
+        self.assertIn("--add-dir", linhas[0])
+        for cmd in linhas:
+            # como no Windows: a pasta temporária do teste no lugar de "C:" (mesmo tamanho de cada caminho)
+            no_windows = [a.replace(str(self.tmp.resolve()), "/c").replace(str(self.tmp), "/c") for a in cmd]
+            self.assertTrue(any("//c/Users/Erton Rodrigo Linhar/" in a for a in no_windows))
+            tamanho = len(subprocess.list2cmdline(no_windows))
+            # folga para o que o cmd.exe e o claude.cmd acrescentam (o node.exe e o cli.js do npm)
+            self.assertLess(tamanho, 8191 - 500, cmd[cmd.index("-p") - 1:cmd.index("--allowedTools")])
+
 
 class ForaDaFotoTests(Base):
     """O Claude não muda o que o backup não cobre, e o que já existia nunca é apagado."""
@@ -500,6 +540,16 @@ class ForaDaFotoTests(Base):
         for regra in (f"Edit({raiz}/**/.*/**)", f"Edit({raiz}/**/venv/**)", f"Edit({raiz}/**/tmp/**)",
                       f"Edit({raiz}/**/*.zip)", f"Edit({raiz}/**/*.log)", f"Edit({raiz}/core/claude_chefe.py)"):
             self.assertIn(regra, proibidas)
+
+    def test_nas_tarefas_so_quando_o_jarvis_esta_na_pasta_do_claude(self):
+        # nas tarefas o Claude só muda a pasta de trabalho dele: as regras do backup só alongariam a linha
+        # de comando (o cmd.exe recusa mais de 8191 letras), a não ser que o Jarvis esteja lá dentro
+        trava = f"Edit({chefe.regra_de_pasta(self.jarvis_dir)}/core/claude_chefe.py)"
+        self.assertNotIn(trava, chefe._proibidas_na(chefe.preparar_pasta()))
+        self.jarvis_dir = chefe.pasta_trabalho() / "Entrada" / "jarvis"
+        self.jarvis_dir.mkdir(parents=True)
+        trava = f"Edit({chefe.regra_de_pasta(self.jarvis_dir)}/core/claude_chefe.py)"
+        self.assertIn(trava, chefe._proibidas_na(chefe.pasta_trabalho()))
 
     def test_arquivo_grande_que_encolheu_nao_e_apagado(self):
         grande = self.jarvis_dir / "dados" / "grande.bin"

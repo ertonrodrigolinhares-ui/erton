@@ -84,6 +84,26 @@ class LeiaMeBateComOCodigoTests(unittest.TestCase):
         self.assertIn("Nas tarefas, ele só escreve", linha)
         self.assertIn("lê e muda a pasta do programa", linha)
 
+    def test_instaladores_mandam_fechar_de_verdade_antes_de_abrir(self):
+        # o X só esconde o Jarvis perto do relógio, e ele não relê o .env: depois do "Instalar Gemma 4",
+        # o Jarvis antigo continuava no Gemini, ouvindo, ao lado do novo (conversa de cliente na nuvem)
+        for nome in ("gemma/instalar_gemma.ps1", "gemma/voltar_gemini.ps1", "claude/instalar_claude.ps1",
+                     "hermes/instalar_hermes.ps1"):
+            texto = (RAIZ / nome).read_text(encoding="ascii")  # .ps1 só em ASCII (PowerShell 5.1)
+            final = texto[texto.rindex("Pronto!" if "Pronto!" in texto else "voltou a usar o Gemini"):]
+            self.assertIn("Quit JARVIS", final, nome)
+            self.assertNotIn("Feche e abra o Jarvis de novo", texto, nome)
+        gemma = _secao("## Cérebro Gemma 4 no seu PC")
+        passo = gemma[gemma.index("2. "):gemma.index("Para voltar ao Gemini")]
+        self.assertIn("Quit JARVIS", passo)
+        self.assertNotIn("Abra o **\"Iniciar Jarvis Ultron\"** normalmente", gemma)
+
+    def test_voz_privada_na_reserva_nao_promete_que_nada_sai_do_pc(self):
+        # JARVIS_VOZ_PRIVADA=1 só troca a voz: na reserva, a voz do Erton e os pedidos seguem para o Groq
+        linha = next(l for l in LEIA_ME.splitlines() if l.startswith("| `JARVIS_VOZ_PRIVADA"))
+        self.assertNotIn("voz do Windows: nada sai do PC", linha)
+        self.assertIn("Groq", linha)
+
 
 class FecharNoXTests(unittest.TestCase):
     def test_aviso_da_bandeja_em_portugues_diz_que_continua_ouvindo(self):

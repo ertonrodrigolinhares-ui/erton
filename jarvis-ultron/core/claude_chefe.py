@@ -62,11 +62,13 @@ SEGREDOS_PREFIXOS = ("GEMINI_", "GROQ_", "ELEVENLABS_", "HERMES_", "OPENAI_", "G
                      "JARVIS_PONTE_", "TELEGRAM_", "METRICOOL_")
 SEGREDOS = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "GOOGLE_API_KEY")
 
-# O que o Claude nunca lê nem muda na pasta do Jarvis (chaves e memória do Erton). As credenciais do
-# Gmail (o email_control procura em config/) e os tokens são os segredos que o .gitignore já tira.
+# O que o Claude nunca lê nem muda na pasta do Jarvis (chaves e memória do Erton)
 PROTEGIDOS = (".env", ".env.*", "config/api_keys.json", "config/ui_settings.json", "memory/**", ".git/**",
-              ".github/**", ".claude/**", ".mcp.json", "**/credentials.json", "**/gmail_credentials.json",
-              "**/client_secret_*.json", "**/token.json")
+              ".github/**", ".claude/**", ".mcp.json")
+# Também nunca, mas só na pasta do programa (não existem na pasta de trabalho do Claude): as
+# credenciais do Gmail (o email_control procura em config/) e os tokens, que o .gitignore já tira.
+CREDENCIAIS_DO_PROGRAMA = ("**/credentials.json", "**/gmail_credentials.json", "**/client_secret_*.json",
+                           "**/token.json")
 # Em Documentos/Jarvis Ultron, o que o Claude das tarefas não lê: lembretes e rotinas podem ter sido
 # ditos no modo privado, e esses nunca vão para a nuvem.
 DADOS_PRIVADOS = ("lembretes.json", "rotinas.json")
@@ -227,11 +229,18 @@ def _fora_da_foto(raiz: str) -> list[str]:
 
 
 def _proibidas_na(pasta: Path) -> list[str]:
+    """As regras vão na linha de comando. Com o Claude do npm (claude.cmd), o Windows a passa pelo
+    cmd.exe, que recusa mais de 8191 letras ("The command line is too long") e toda tarefa falharia:
+    por isso cada regra só entra onde faz diferença."""
     regras = list(PROIBIDAS)
-    for raiz in dict.fromkeys([regra_de_pasta(pasta), regra_de_pasta(pasta_jarvis())]):
+    pasta, jarvis = regra_de_pasta(pasta), regra_de_pasta(pasta_jarvis())
+    for raiz in dict.fromkeys([pasta, jarvis]):
         for item in PROTEGIDOS:
             regras += [f"Read({raiz}/{item})", f"Edit({raiz}/{item})"]
-    regras += _fora_da_foto(regra_de_pasta(pasta_jarvis()))
+    for item in CREDENCIAIS_DO_PROGRAMA:
+        regras += [f"Read({jarvis}/{item})", f"Edit({jarvis}/{item})"]
+    if jarvis == pasta or jarvis.startswith(pasta + "/"):  # só onde o Claude pode mudar a pasta do Jarvis
+        regras += _fora_da_foto(jarvis)
     regras += [f"Read({regra_de_pasta(pasta_dados())}/{nome})" for nome in DADOS_PRIVADOS]
     regras += [f"Read(~/{item})" for item in CREDENCIAIS]
     return list(dict.fromkeys(regras + _ler(*_pastas_do_hermes())))
