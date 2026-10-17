@@ -10,7 +10,8 @@ Cada rotina é uma lista de passos que o Jarvis faz em sequência, com as ferram
 Para tarefas longas de pesquisa na internet, peça "salve como agente do Hermes": aí o Hermes faz
 em segundo plano e o Jarvis avisa quando terminar.
 Já vêm duas prontas: "bom dia" e "fim do dia" (pode mudar ou apagar).
-As rotinas ficam em Documentos/Jarvis Ultron/rotinas.json.
+As rotinas ficam em Documentos/Jarvis Ultron/rotinas.json. Rotina salva no modo privado só aparece e só
+roda no modo privado (os passos dela nunca vão para o Gemini).
 
 Segurança: a rotina segue as mesmas regras do Jarvis. Nada é publicado, enviado, comprado ou
 apagado sem o seu "ok" na hora.
@@ -69,6 +70,20 @@ REGRAS = ("Follow your usual safety rules: never publish, post, send messages or
           "Portuguese.")
 
 _trava = threading.Lock()
+
+SO_NO_MODO_PRIVADO = ("Essa rotina foi criada no modo privado, então só aparece e só roda no modo privado. "
+                      "Para usar, diga 'modo privado'. Tell the user in Portuguese.")
+
+
+def _modo_privado() -> bool:
+    from core.cerebro_gemma import cerebro_gemma
+
+    return cerebro_gemma()
+
+
+def _escondida(rotina) -> bool:
+    """Rotina salva no modo privado, fora do modo privado: nem o nome nem os passos vão para a nuvem."""
+    return isinstance(rotina, dict) and bool(rotina.get("privado")) and not _modo_privado()
 
 
 def arquivo() -> Path:
@@ -134,9 +149,13 @@ def salvar(args: dict, caminho: Path | None = None) -> str:
         dados = ler(caminho)
         existente = _achar(dados, nome)
         if existente and chave(existente) == chave(nome):
+            if _escondida(dados["rotinas"][existente]):
+                return SO_NO_MODO_PRIVADO
             nome = existente
         dados["rotinas"][nome] = {"passos": passos[:15], "agente": agente,
                                   "criada": datetime.now().isoformat(timespec="minutes")}
+        if _modo_privado():
+            dados["rotinas"][nome]["privado"] = True
         gravar(dados, caminho)
     quem = "pelo Hermes, em segundo plano" if agente == "hermes" else "por mim"
     return (f"Rotina '{nome}' salva com {len(passos[:15])} passos, feita {quem}. "
@@ -144,11 +163,15 @@ def salvar(args: dict, caminho: Path | None = None) -> str:
 
 
 def listar(caminho: Path | None = None) -> str:
-    rotinas = ler(caminho)["rotinas"]
+    todas = ler(caminho)["rotinas"]
+    rotinas = {n: r for n, r in todas.items() if not _escondida(r)}
+    privadas = len(todas) - len(rotinas)
+    extra = (f" Há também {privadas} rotina(s) do modo privado, que só aparecem no modo privado."
+             if privadas else "")
     if not rotinas:
-        return "Não há rotinas salvas. Tell the user in Portuguese and offer to create one."
+        return "Não há rotinas salvas." + extra + " Tell the user in Portuguese and offer to create one."
     partes = [f"{n} ({len(r.get('passos', []))} passos)" for n, r in sorted(rotinas.items())]
-    return "Rotinas salvas: " + ", ".join(partes) + ". Tell the user in Portuguese."
+    return "Rotinas salvas: " + ", ".join(partes) + "." + extra + " Tell the user in Portuguese."
 
 
 def apagar(args: dict, caminho: Path | None = None) -> str:
@@ -157,6 +180,8 @@ def apagar(args: dict, caminho: Path | None = None) -> str:
         nome = _achar(dados, args.get("name", ""))
         if nome is None:
             return "Não achei essa rotina. " + listar(caminho)
+        if _escondida(dados["rotinas"][nome]):
+            return SO_NO_MODO_PRIVADO
         del dados["rotinas"][nome]
         gravar(dados, caminho)
     return f"Rotina '{nome}' apagada. Confirm in Portuguese."
@@ -178,6 +203,8 @@ def rodar(args: dict, jarvis, caminho: Path | None = None) -> str:
     if nome is None:
         return "Não achei essa rotina. " + listar(caminho)
     rotina = dados["rotinas"][nome]
+    if _escondida(rotina):  # os passos foram ditos no modo privado: não vão para a nuvem
+        return SO_NO_MODO_PRIVADO
     passos = rotina.get("passos", [])
     lista = " ".join(f"{i}) {p}" for i, p in enumerate(passos, 1))
     if rotina.get("agente") == "hermes":

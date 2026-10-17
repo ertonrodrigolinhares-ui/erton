@@ -2214,7 +2214,38 @@ class JarvisLive:
             self.ui.write_log("SYS: 🔒 Entrando no modo privado: o cérebro passa a ser o Gemma 4, no seu PC...")
         else:
             self.ui.write_log("SYS: Voltando ao modo normal (Gemini)...")
+        self._avisar_o_que_para(destino)
         trocar(destino)  # a tela religa o programa do cérebro já com o cérebro novo
+
+    # Trabalhos em segundo plano (pelo nome do fio) que morrem quando o cérebro é religado
+    TRABALHOS_QUE_PARAM = {"VideoVeo": "video", "ClaudeTarefa": "claude", "ClaudePlano": "plano",
+                           "HermesPublicar": "hermes"}
+
+    def _avisar_o_que_para(self, destino: str) -> None:
+        """Religar o cérebro mata o que roda em segundo plano: o Erton fica sabendo ANTES (tela e voz do
+        PC; o texto não leva dados dele). A troca não é recusada: o modo privado sempre vem primeiro."""
+        rodando = {self.TRABALHOS_QUE_PARAM[t.name] for t in threading.enumerate()
+                   if t.name in self.TRABALHOS_QUE_PARAM and t.is_alive()}
+        partes = []
+        if "video" in rodando:  # automacoes/videos.py anotou o pedido: o cérebro novo busca o vídeo
+            partes.append("Um vídeo pago ainda está sendo feito. Ele não se perde: anotei o pedido e busco o vídeo "
+                          + ("quando você voltar ao modo normal." if destino == "gemma" else "assim que eu religar."))
+        if "claude" in rodando:
+            partes.append("A tarefa do Claude que estava rodando vai parar; peça de novo depois.")
+        if "plano" in rodando:
+            partes.append("O plano do Claude que estava sendo feito vai parar; peça de novo depois.")
+        if "hermes" in rodando:
+            partes.append("O Hermes está publicando o que você aprovou e eu não vou conseguir contar o resultado; "
+                          "confira antes de pedir de novo.")
+        if not partes:
+            return
+        aviso = " ".join(partes)
+        self.ui.write_log(f"SYS: ⚠️ {aviso}")
+        if not getattr(self.ui, "muted", False):
+            try:  # antes de religar (depois não dá mais); a nuvem já está calada para o modo privado
+                self._falar_no_pc(aviso)
+            except Exception as erro:
+                print(f"[Cérebro] Não consegui avisar em voz alta: {erro}")
 
     def _recusar_troca(self, destino: str, texto: str) -> None:
         """A troca de cérebro não vai acontecer: libera o microfone e o texto (não vai trocar) e avisa na
@@ -3150,13 +3181,12 @@ class JarvisLive:
         live_model_id = live_model.removeprefix("models/")
         from core import modelos as central_de_modelos
 
-        start_time = time.time()
         while True:
             if self._shutdown_requested.is_set():
                 return
-            # enforce runtime limit if configured
+            # enforce runtime limit if configured (contado desde a abertura da tela, não deste cérebro)
             if self.runtime_limit_seconds is not None:
-                elapsed = time.time() - start_time
+                elapsed = time.time() - _inicio_do_teste()
                 if elapsed >= float(self.runtime_limit_seconds):
                     self._encerrar_fim_do_teste()
 
@@ -3380,6 +3410,30 @@ def _contar_mudanca_desfeita(jarvis, espera: float = 8.0) -> None:
     threading.Thread(target=contar, daemon=True, name="ClaudeDesfeita").start()
 
 
+def _inicio_do_teste() -> float:
+    """Quando o tempo de teste (JARVIS_TRIAL_KEYWORD) começou. A tela marca JARVIS_TESTE_INICIO uma vez
+    e todo cérebro que ela abre herda: trocar de modo ou o cérebro cair e religar não dá uma hora nova."""
+    agora = time.time()
+    try:
+        inicio = float(os.environ.get("JARVIS_TESTE_INICIO", ""))
+    except ValueError:
+        inicio = 0.0
+    if not (0 < inicio <= agora):  # vazio, estragado ou no futuro: conta de agora
+        inicio = agora
+        os.environ["JARVIS_TESTE_INICIO"] = repr(inicio)
+    return inicio
+
+
+def _vigiar_fim_do_teste(jarvis) -> None:
+    """Fecha o Jarvis quando o tempo de teste acabar, qualquer que seja o cérebro (Gemini ao vivo
+    numa conversa longa, Gemma no modo privado ou a reserva): run() só conferia ao reconectar o Gemini."""
+    restante = float(jarvis.runtime_limit_seconds) - (time.time() - _inicio_do_teste())
+    relogio = threading.Timer(max(0.0, restante), jarvis._encerrar_fim_do_teste)
+    relogio.daemon = True
+    relogio.name = "FimDoTeste"
+    relogio.start()
+
+
 def rodar_cerebro(ui):
     """O cérebro do Jarvis (voz, IA, ferramentas). Roda num fio da tela (um programa só) ou
     no programa próprio do cérebro, com a UIRemota no lugar da tela (veja core/ponte.py)."""
@@ -3395,6 +3449,7 @@ def rodar_cerebro(ui):
     if trial_kw:
         jarvis.runtime_limit_seconds = int(os.environ.get("JARVIS_RUNTIME_SECONDS", "3600"))
         jarvis.ui.write_log(f"SYS: Trial keyword detected. Running for {jarvis.runtime_limit_seconds} seconds.")
+        _vigiar_fim_do_teste(jarvis)
 
     locked_secret = os.environ.get("JARVIS_LOCKED_KEY_SECRET")
     if locked_secret:
@@ -3505,6 +3560,9 @@ def main():
         print(f"[Automações] Tela: {exc}")
 
     from core.ponte import PonteTela, modo_separado
+
+    if os.environ.get("JARVIS_TRIAL_KEYWORD"):
+        _inicio_do_teste()  # marca a abertura uma vez; os cérebros que a tela abrir herdam (JARVIS_*)
 
     def no_mesmo_programa():
         threading.Thread(target=rodar_cerebro, args=(ui,), daemon=True, name="Cerebro").start()

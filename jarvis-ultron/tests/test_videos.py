@@ -644,5 +644,180 @@ class GerarTests(unittest.TestCase):
         self.assertNotIn("videos.py", carga.na_tela)
 
 
+class VideoPelaMetadeTests(unittest.TestCase):
+    """O Jarvis fechou ou religou o cérebro ("modo privado") com o vídeo pago sendo feito: o fio morre
+    sem exceção (os._exit), então o pedido precisa já estar anotado no disco, e o cérebro novo busca."""
+
+    def setUp(self):
+        self.m = _modulo()
+        self.casa = Path(tempfile.mkdtemp())
+        self.pasta = patch.object(self.m, "pasta_videos", lambda: self.casa)
+        self.pasta.start()
+        self.addCleanup(self.pasta.stop)
+
+    def test_pedido_fica_anotado_enquanto_o_google_faz_o_video(self):
+        cliente = ClienteVeo(["veo-3.1-fast-generate-preview"])
+        esperando, soltar = threading.Event(), threading.Event()
+
+        def dormir(segundos):  # o Jarvis "morre" aqui: o fio fica parado e nada depois roda
+            esperando.set()
+            soltar.wait(5)
+
+        fio = threading.Thread(target=self.m.gerar, args=("a runner", 8, "rapido", False),
+                               kwargs={"cliente": cliente, "dormir": dormir}, daemon=True)
+        fio.start()
+        self.assertTrue(esperando.wait(5))
+        anotados = self.m._ler_anotados()
+        self.assertEqual([p["nome"] for p in anotados], ["models/veo/operations/teste-123"])
+        soltar.set()
+        fio.join(5)
+        self.assertEqual(self.m._ler_anotados(), [])  # pronto: a anotação sai
+        self.assertFalse((self.casa / "em-andamento.json").exists())
+
+    def test_pedido_recusado_pelo_google_nao_fica_anotado(self):
+        cliente = ClienteVeo(["veo-3.1-fast-generate-preview"])
+        cliente.models.generate_videos = lambda model, source, config: (_ for _ in ()).throw(
+            RuntimeError("403 billing account not enabled"))
+        with self.assertRaises(RuntimeError):
+            self.m.gerar("a runner", 8, "rapido", False, cliente=cliente, dormir=lambda s: None)
+        self.assertEqual(self.m._ler_anotados(), [])
+
+    def test_ao_abrir_busca_o_video_que_ficou_pela_metade(self):
+        self.m._anotar(None, "models/veo/operations/teste-123")
+        cliente = ClienteVeo(["veo-3.1-fast-generate-preview"])
+        consultas = []
+        cliente.operations = NS(get=lambda op: consultas.append(op.name) or Operacao(0, VideoFalso()))
+        jarvis = JarvisFalso()
+        with patch.object(self.m, "_abrir") as abrir:
+            self.m._retomar(jarvis, self.m._ler_anotados(), cliente=cliente, dormir=lambda s: None)
+        self.assertEqual(consultas, ["models/veo/operations/teste-123"])  # o mesmo pedido, nada novo
+        self.assertEqual(cliente.pedidos, [])  # não pediu (nem pagou) outro vídeo
+        abrir.assert_called_once()
+        self.assertTrue(abrir.call_args.args[0].exists())
+        self.assertIn("ficou pronto", jarvis.avisos[-1])
+        self.assertEqual(self.m._ler_anotados(), [])
+
+    def test_iniciar_so_busca_quando_ha_anotacao(self):
+        with patch.object(self.m, "_retomar") as retomar:
+            self.m.iniciar(JarvisFalso())
+            _esperar_video()
+            retomar.assert_not_called()
+            self.m._anotar(None, "models/veo/operations/teste-123")
+            jarvis = JarvisFalso()
+            self.m.iniciar(jarvis)
+            _esperar_video()
+        retomar.assert_called_once()
+        self.assertEqual(retomar.call_args.args[1][0]["nome"], "models/veo/operations/teste-123")
+
+    def test_no_modo_privado_so_avisa_e_nao_fala_com_o_google(self):
+        import os
+
+        self.m._anotar(None, "models/veo/operations/teste-123")
+        jarvis = JarvisFalso()
+        with patch.dict(os.environ, {"JARVIS_CEREBRO": "gemma"}), \
+                patch.object(self.m, "_cliente", side_effect=AssertionError("Google no modo privado")):
+            self.m._retomar(jarvis, self.m._ler_anotados(), dormir=lambda s: None)
+        self.assertIn("modo normal", jarvis.avisos[-1])
+        self.assertEqual(len(self.m._ler_anotados()), 1)  # continua anotado para o modo normal
+
+    def test_fechou_enquanto_pedia_avisa_que_pode_ter_cobrado(self):
+        self.m._anotar()  # sem o número do pedido: fechou no meio do pedido ao Google
+        jarvis = JarvisFalso()
+        with patch.object(self.m, "_cliente", side_effect=AssertionError("não tem o que buscar")):
+            self.m._retomar(jarvis, self.m._ler_anotados(), dormir=lambda s: None)
+        self.assertIn("pode ter sido cobrado", jarvis.avisos[-1])
+        self.assertIn("sem número", (self.casa / "pendentes.txt").read_text(encoding="utf-8"))
+        self.assertEqual(self.m._ler_anotados(), [])
+
+    def test_video_que_nao_chega_ao_abrir_vai_para_pendentes_e_avisa(self):
+        self.m._anotar(None, "models/veo/operations/teste-123")
+        cliente = ClienteVeo(["veo-3.1-fast-generate-preview"])
+        cliente.operations = NS(get=lambda op: (_ for _ in ()).throw(ValueError("operation not found")))
+        jarvis = JarvisFalso()
+        self.m._retomar(jarvis, self.m._ler_anotados(), cliente=cliente, dormir=lambda s: None)
+        self.assertIn("pode cobrar", jarvis.avisos[-1])
+        self.assertIn("operations/teste-123", (self.casa / "pendentes.txt").read_text(encoding="utf-8"))
+        self.assertEqual(self.m._ler_anotados(), [])
+
+
+class TrocaDeModoComVideoTests(unittest.TestCase):
+    """Trocar de modo religa o cérebro: o Erton fica sabendo do que estava rodando, e a troca acontece."""
+
+    def _jarvis(self):
+        import main
+
+        class UI:
+            remota, muted = True, False
+
+            def __init__(s):
+                s.logs, s.trocas = [], []
+
+            def write_log(s, t):
+                s.logs.append(t)
+
+        jarvis = object.__new__(main.JarvisLive)
+        jarvis.ui = UI()
+        jarvis.ui.trocar_cerebro = jarvis.ui.trocas.append
+        jarvis._cerebro_nome, jarvis.avisos, jarvis.falado_no_pc = "gemini", [], []
+        jarvis._falar_aviso = jarvis.avisos.append
+        jarvis._falar_no_pc = lambda texto, esperar=True: jarvis.falado_no_pc.append(texto)
+        return jarvis
+
+    def _rodando(self, *nomes):
+        soltar = threading.Event()
+        self.addCleanup(soltar.set)
+        for nome in nomes:
+            threading.Thread(target=soltar.wait, args=(10,), daemon=True, name=nome).start()
+
+    def _trocar(self, jarvis, destino):
+        with patch("core.cerebro_gemma.modelo_instalado", return_value=True), \
+                patch("core.cerebro_gemma.whisper_instalado", return_value=True):
+            jarvis._trocar_cerebro(destino)
+
+    def test_avisa_do_video_pago_e_troca_mesmo_assim(self):
+        jarvis = self._jarvis()
+        self._rodando("VideoVeo")
+        self._trocar(jarvis, "gemma")
+        self.assertEqual(jarvis.ui.trocas, ["gemma"])  # o modo privado nunca é recusado por isso
+        self.assertEqual(len(jarvis.falado_no_pc), 1)
+        self.assertIn("vídeo pago", jarvis.falado_no_pc[0])
+        self.assertIn("modo normal", jarvis.falado_no_pc[0])
+        self.assertTrue(any("vídeo pago" in l for l in jarvis.ui.logs))
+
+    def test_avisa_da_tarefa_do_claude_e_da_publicacao_do_hermes(self):
+        jarvis = self._jarvis()
+        jarvis._cerebro_nome = "gemma"
+        self._rodando("ClaudeTarefa", "HermesPublicar")
+        self._trocar(jarvis, "gemini")
+        self.assertEqual(jarvis.ui.trocas, ["gemini"])
+        self.assertIn("Claude", jarvis.falado_no_pc[0])
+        self.assertIn("Hermes", jarvis.falado_no_pc[0])
+
+    def test_sem_nada_rodando_troca_calado(self):
+        jarvis = self._jarvis()
+        self._trocar(jarvis, "gemma")
+        self.assertEqual(jarvis.ui.trocas, ["gemma"])
+        self.assertEqual(jarvis.falado_no_pc, [])
+
+    def test_o_fio_do_video_tem_o_nome_que_a_troca_procura(self):
+        import main
+
+        m = _modulo()
+        jarvis = JarvisFalso("faz um vídeo de um triatleta no Havaí")
+        pedido = {"description": "a triathlete crossing the finish line in Hawaii at sunset", "seconds": 8}
+        soltar = threading.Event()
+        self.addCleanup(soltar.set)
+        with patch.object(m, "gerar", side_effect=lambda *a, **k: soltar.wait(5) and Path("/tmp/v.mp4")), \
+                patch.object(m, "_abrir"):
+            m.executar(dict(pedido), jarvis)
+            jarvis.falar("ok, pode fazer")
+            self.assertIn("background", m.executar(dict(pedido, confirm=True), jarvis))
+            nomes = {t.name for t in threading.enumerate()}
+            soltar.set()
+            _esperar_video()
+        self.assertIn("VideoVeo", nomes)
+        self.assertEqual(main.JarvisLive.TRABALHOS_QUE_PARAM["VideoVeo"], "video")
+
+
 if __name__ == "__main__":
     unittest.main()

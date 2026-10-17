@@ -123,7 +123,9 @@ Bom saber:
 - Ferramentas que usam a internet sem IA (clima, sites) continuam usando a internet. As que mandam
   o pedido para uma IA na nuvem ficam **desligadas** no modo Gemma: pesquisa pelo Gemini, Hermes,
   Claude, imagens, vídeos, resumo de vídeos do YouTube e agentes. Nesse modo o Jarvis também não
-  grava nada na memória (que depois iria para o Gemini).
+  grava nada na memória (que depois iria para o Gemini). Lembretes e rotinas marcados no modo
+  privado ficam marcados como privados: o lembrete é falado com a voz do Windows, e fora do modo
+  privado nenhum dos dois aparece nas listas nem vai para o Gemini.
 - Sem o Whisper local, a voz **não** vai para a internet: o Jarvis avisa e você digita. O instalador
   só liga o Gemma quando o Whisper ficou pronto.
 
@@ -199,7 +201,9 @@ Precisa da chave do Gemini com **faturamento ativado** no Google (o Veo não tem
 preço falado é uma estimativa; o valor certo é o da sua conta do Google Cloud.
 Se a internet cair enquanto o vídeo é feito, o Jarvis continua tentando. Se mesmo assim o vídeo não
 chegar, ele avisa que o Google pode cobrar por ele e anota o pedido em `Videos\pendentes.txt`:
-confira a conta do Google antes de pedir outro.
+confira a conta do Google antes de pedir outro. Se o Jarvis fechar ou trocar de modo ("modo privado")
+no meio do vídeo, ele avisa antes e não perde o pedido: quando abrir de novo no modo normal, busca o
+vídeo no Google, abre e avisa (no modo privado ele só lembra que o vídeo está esperando).
 
 ## Chave do Gemini que começa com "AQ." (conversa natural)
 

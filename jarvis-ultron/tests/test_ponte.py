@@ -229,6 +229,58 @@ class RodarCerebroTests(unittest.TestCase):
             ui._fechada.set()
             lado_tela.close()
 
+    def test_cerebro_religado_nao_ganha_hora_nova_de_teste_nem_no_modo_privado(self):
+        # A tela marcou o começo do teste há 61 minutos; o cérebro acabou de ser religado ("modo
+        # privado") e roda o Gemma, que nunca passa pela checagem de reconexão do Gemini.
+        import asyncio
+        import main
+
+        acabou = threading.Event()
+
+        class JarvisFalso:
+            runtime_limit_seconds = None
+
+            def __init__(self, tela, voz):
+                self.ui, self.session, self._loop = tela, None, None
+
+            def update_voice(self, voz):
+                pass
+
+            def request_shutdown(self):
+                pass
+
+            def _encerrar_fim_do_teste(self):
+                acabou.set()
+
+            async def run(self):  # o cérebro só fica de pé; quem fecha é o relógio do teste
+                for _ in range(100):
+                    if acabou.is_set():
+                        return
+                    await asyncio.sleep(0.02)
+
+        ui = NS(wait_for_api_key=lambda: None, write_log=lambda texto: None)
+        with patch.object(main, "JarvisLive", JarvisFalso), \
+                patch.object(main, "_load_voice_name", return_value="Charon"), patch.dict(os.environ):
+            for nome in ("JARVIS_LOCKED_KEY_SECRET", "JARVIS_LOCKED_VOLUME", "ELEVENLABS_API_KEY"):
+                os.environ.pop(nome, None)
+            os.environ.update({"JARVIS_TRIAL_KEYWORD": "trial", "JARVIS_RUNTIME_SECONDS": "3600",
+                               "JARVIS_CEREBRO": "gemma", "JARVIS_TESTE_INICIO": repr(time.time() - 61 * 60)})
+            main.rodar_cerebro(ui)
+        self.assertTrue(acabou.is_set())
+
+    def test_comeco_do_teste_e_marcado_uma_vez(self):
+        import main
+
+        with patch.dict(os.environ):
+            os.environ.pop("JARVIS_TESTE_INICIO", None)
+            primeiro = main._inicio_do_teste()
+            self.assertEqual(os.environ["JARVIS_TESTE_INICIO"], repr(primeiro))  # os cérebros herdam
+            time.sleep(0.01)
+            self.assertEqual(main._inicio_do_teste(), primeiro)  # religar não recomeça
+            for estragado in ("abc", repr(time.time() + 3600), "-5"):  # no futuro não dá hora extra
+                os.environ["JARVIS_TESTE_INICIO"] = estragado
+                self.assertAlmostEqual(main._inicio_do_teste(), time.time(), delta=5)
+
     def test_fim_do_tempo_de_teste_usa_o_codigo_proprio_no_cerebro_separado(self):
         import main
 

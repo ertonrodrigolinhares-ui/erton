@@ -10,6 +10,8 @@ Diga, por exemplo:
 Na hora certa o Jarvis toca um som, mostra o aviso na tela e FALA o lembrete.
 No modo chamada ele não interrompe: guarda o aviso e fala assim que você disser "Hey Jarvis".
 Os lembretes ficam salvos em Documentos/Jarvis Ultron/lembretes.json (continuam depois de desligar).
+Lembrete marcado no modo privado é sempre falado com a voz do PC e, fora do modo privado, não aparece
+na lista (o texto dele nunca vai para o Gemini).
 """
 
 from __future__ import annotations
@@ -51,6 +53,26 @@ NOME_REPETICAO = {"diario": "todo dia", "dias_uteis": "de segunda a sexta", "sem
 
 _trava = threading.Lock()
 _iniciado = threading.Event()
+
+
+class FrasePrivada(str):
+    """Frase de um lembrete marcado no modo privado: só a voz do PC fala (nunca vai para a nuvem)."""
+
+
+def _modo_privado() -> bool:
+    from core.cerebro_gemma import cerebro_gemma
+
+    return cerebro_gemma()
+
+
+def _escondido(lembrete: dict) -> bool:
+    """Lembrete do modo privado fora do modo privado: o texto não pode ir para a IA na nuvem."""
+    return bool(lembrete.get("privado")) and not _modo_privado()
+
+
+def _texto(lembrete: dict) -> str:
+    return "lembrete do modo privado (o texto só aparece no modo privado)" if _escondido(lembrete) \
+        else lembrete["texto"]
 
 
 def arquivo() -> Path:
@@ -149,8 +171,11 @@ def criar(args: dict, agora: datetime | None = None, caminho: Path | None = None
     with _trava:
         dados = ler(caminho)
         numero = max([l.get("numero", 0) for l in dados["lembretes"]] + [0]) + 1
-        dados["lembretes"].append({"numero": numero, "texto": texto, "quando": quando.isoformat(timespec="minutes"),
-                                   "repetir": repetir, "criado": agora.isoformat(timespec="minutes")})
+        lembrete = {"numero": numero, "texto": texto, "quando": quando.isoformat(timespec="minutes"),
+                    "repetir": repetir, "criado": agora.isoformat(timespec="minutes")}
+        if _modo_privado():  # na hora, fala só com a voz do PC; fora do modo privado, fica escondido
+            lembrete["privado"] = True
+        dados["lembretes"].append(lembrete)
         gravar(dados, caminho)
     extra = f", e repito {NOME_REPETICAO[repetir]}" if repetir in NOME_REPETICAO else ""
     return (f"Lembrete {numero} marcado para {_falar_quando(quando, agora)}{extra}: {texto}. "
@@ -166,7 +191,7 @@ def listar(agora: datetime | None = None, caminho: Path | None = None) -> str:
     for l in itens[:8]:
         quando = datetime.fromisoformat(l["quando"])
         repete = f" ({NOME_REPETICAO[l['repetir']]})" if l.get("repetir") in NOME_REPETICAO else ""
-        partes.append(f"{l['numero']}) {_falar_quando(quando, agora)}{repete}: {l['texto']}")
+        partes.append(f"{l['numero']}) {_falar_quando(quando, agora)}{repete}: {_texto(l)}")
     return "Lembretes: " + "; ".join(partes) + ". Tell the user in Portuguese, briefly."
 
 
@@ -178,18 +203,19 @@ def cancelar(args: dict, caminho: Path | None = None) -> str:
         alvo = None
         for l in dados["lembretes"]:
             if (numero not in (None, "") and int(numero) == l.get("numero")) or (
-                    numero in (None, "") and texto and texto in l["texto"].lower()):
+                    numero in (None, "") and texto and not _escondido(l) and texto in l["texto"].lower()):
                 alvo = l
                 break
         if alvo is None:
             return "Não achei esse lembrete. " + listar(caminho=caminho)
         dados["lembretes"].remove(alvo)
         gravar(dados, caminho)
-    return f"Lembrete {alvo['numero']} cancelado: {alvo['texto']}. Confirm in Portuguese."
+    return f"Lembrete {alvo['numero']} cancelado: {_texto(alvo)}. Confirm in Portuguese."
 
 
 def vencidos(agora: datetime | None = None, caminho: Path | None = None) -> list[str]:
-    """Tira da lista (ou reagenda, se repete) os lembretes que chegaram na hora. Devolve as frases."""
+    """Tira da lista (ou reagenda, se repete) os lembretes que chegaram na hora. Devolve as frases
+    (as dos lembretes do modo privado vêm como FrasePrivada)."""
     agora = agora or datetime.now()
     frases = []
     with _trava:
@@ -202,7 +228,8 @@ def vencidos(agora: datetime | None = None, caminho: Path | None = None) -> list
             mudou = True
             if agora - quando <= ATRASO_MAXIMO:
                 atrasado = agora - quando > timedelta(minutes=5)
-                frases.append(f"{l['texto']}" + (f" (era para as {quando:%H:%M})" if atrasado else ""))
+                frase = f"{l['texto']}" + (f" (era para as {quando:%H:%M})" if atrasado else "")
+                frases.append(FrasePrivada(frase) if l.get("privado") else frase)
             seguinte = proxima_vez(quando, l.get("repetir", "nao"))
             while seguinte is not None and seguinte <= agora:
                 seguinte = proxima_vez(seguinte, l["repetir"])
@@ -218,12 +245,19 @@ def vencidos(agora: datetime | None = None, caminho: Path | None = None) -> list
 
 
 def _avisar(jarvis, frases: list[str]) -> None:
-    texto = ("Lembrete: " if len(frases) == 1 else "Lembretes: ") + "; ".join(frases) + "."
-    anunciar = getattr(jarvis, "anunciar", None)
-    if callable(anunciar):
-        anunciar(texto, titulo="Lembrete")
-    else:  # Jarvis sem a atualização de avisos: pelo menos mostra na tela
-        jarvis.ui.write_log(f"SYS: 🔔 {texto}")
+    # Os do modo privado vão num aviso à parte, sigiloso: só a voz do PC, nunca para o Gemini (nem
+    # mais tarde, no modo normal, nem guardados para depois do "Hey Jarvis").
+    comuns = [f for f in frases if not isinstance(f, FrasePrivada)]
+    privadas = [f for f in frases if isinstance(f, FrasePrivada)]
+    for grupo, extra in ((comuns, {}), (privadas, {"sigiloso": True})):
+        if not grupo:
+            continue
+        texto = ("Lembrete: " if len(grupo) == 1 else "Lembretes: ") + "; ".join(grupo) + "."
+        anunciar = getattr(jarvis, "anunciar", None)
+        if callable(anunciar):
+            anunciar(texto, titulo="Lembrete", **extra)
+        else:  # Jarvis sem a atualização de avisos: pelo menos mostra na tela
+            jarvis.ui.write_log(f"SYS: 🔔 {texto}")
 
 
 def iniciar(jarvis) -> None:

@@ -9,6 +9,9 @@ Como funciona (sempre com o seu "ok", porque cada vídeo é COBRADO pelo Google)
   2. Com o ok, o vídeo é gerado em segundo plano (1 a alguns minutos) — dá para continuar conversando.
   3. Pronto: ele salva em Documentos/Jarvis Ultron/Videos, abre o vídeo e avisa.
 
+Se o Jarvis fechar ou religar (ex.: "modo privado") no meio, o pedido fica anotado e o vídeo é buscado
+quando ele abrir de novo no modo normal (o Google cobra o vídeo mesmo assim).
+
 Precisa da chave do Gemini com faturamento ativado no Google (o Veo não tem uso grátis).
 Qualidade: "economico" (Veo Lite, 720p), "rapido" (Veo Fast, padrão) ou "maximo" (Veo completo).
 O Jarvis nunca troca para um modelo mais caro do que o do preço aprovado. 1080p só nos vídeos de
@@ -18,12 +21,14 @@ O preço mostrado é uma estimativa; o valor certo é o da conta do Google Cloud
 
 from __future__ import annotations
 
+import json
 import math
 import os
 import subprocess
 import sys
 import threading
 import time
+import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -64,9 +69,11 @@ CONHECIDOS = {  # caso a lista de modelos não venha (o Jarvis prefere o que a c
 }
 VALIDADE_PEDIDO = 10 * 60  # segundos que o preço informado vale para o "ok"
 ESPERA_MAXIMA = 15 * 60    # desiste se o Google não terminar em 15 minutos
+ESPERA_AO_ABRIR = 8.0      # ao abrir, deixa a conversa começar antes de avisar do vídeo que ficou pela metade
 
 _pendente: dict = {}
 _trava = threading.Lock()
+_trava_anotados = threading.Lock()
 
 
 def pasta_videos() -> Path:
@@ -141,18 +148,22 @@ def _abrir(arquivo: Path) -> None:
         print(f"[Vídeos] Não consegui abrir o vídeo: {erro}")
 
 
+def _cliente():
+    from google import genai
+
+    from core.gemini_acesso import opcoes_http
+    from core.modelos import _chave
+
+    return genai.Client(api_key=_chave(), http_options=opcoes_http())
+
+
 def gerar(descricao: str, segundos: int, qualidade: str, vertical: bool, cliente=None,
           dormir=time.sleep, agora=time.monotonic) -> Path:
     """Faz o vídeo de verdade (bloqueia; roda em segundo plano). Devolve o arquivo .mp4."""
     from google.genai import types
 
     if cliente is None:
-        from google import genai
-
-        from core.gemini_acesso import opcoes_http
-        from core.modelos import _chave
-
-        cliente = genai.Client(api_key=_chave(), http_options=opcoes_http())
+        cliente = _cliente()
     ultimo = None
     for modelo in escolher_modelo(cliente, qualidade)[:4]:
         config = types.GenerateVideosConfig(
@@ -160,34 +171,157 @@ def gerar(descricao: str, segundos: int, qualidade: str, vertical: bool, cliente
             aspect_ratio="9:16" if vertical else "16:9",
             resolution=_resolucao(modelo, segundos, qualidade, vertical),
         )
+        # Anotado no disco ANTES de pedir: se o Jarvis fechar ou religar no meio (ex.: "modo privado"),
+        # este fio morre sem aviso; a anotação fica e o próximo cérebro busca o vídeo ou avisa (iniciar).
+        anotado = _anotar()
         try:
-            operacao = cliente.models.generate_videos(
-                model=modelo, source=types.GenerateVideosSource(prompt=descricao), config=config)
-        except Exception as erro:
-            ultimo = erro
-            if "404" in str(erro) or "not found" in str(erro).lower():
-                continue  # este modelo não existe na conta: tenta o próximo
-            raise
-        # Daqui em diante o Google já está fazendo (e cobrando) o vídeo: uma falha de rede não pode
-        # fazer perder o vídeo nem levar o Erton a pedir (e pagar) outro sem saber.
-        try:
-            pronta = _esperar(cliente, operacao, dormir, agora)
-        except Exception as erro:
-            raise _ja_pedido(operacao, erro) from erro
-        if getattr(pronta, "error", None):
-            raise RuntimeError(str(pronta.error)[:200])
-        videos = getattr(getattr(pronta, "result", None) or getattr(pronta, "response", None),
-                         "generated_videos", None) or []
-        if not videos:
-            raise RuntimeError("o Google não devolveu o vídeo (pode ter recusado a descrição)")
-        try:
-            return _salvar(cliente, videos[0].video, dormir)
-        except Exception as erro:
-            raise _ja_pedido(operacao, erro) from erro
+            try:
+                operacao = cliente.models.generate_videos(
+                    model=modelo, source=types.GenerateVideosSource(prompt=descricao), config=config)
+            except Exception as erro:
+                ultimo = erro
+                if "404" in str(erro) or "not found" in str(erro).lower():
+                    continue  # este modelo não existe na conta: tenta o próximo
+                raise
+            _anotar(anotado, str(getattr(operacao, "name", "") or ""))
+            return _terminar(cliente, operacao, dormir, agora)
+        finally:  # terminou (pronto, erro ou anotado em pendentes.txt): tira a anotação
+            _desanotar(anotado)
     if qualidade == "economico":  # nunca troca sozinho para um modelo mais caro que o preço aprovado
         raise RuntimeError("a sua conta não tem o modelo econômico (Veo Lite); se quiser, peça de novo na "
                            "qualidade rápida, que custa mais (eu digo o preço antes)")
     raise RuntimeError(f"nenhum modelo de vídeo disponível na sua conta ({ultimo})")
+
+
+def _terminar(cliente, operacao, dormir, agora) -> Path:
+    """Espera o Google terminar o vídeo já pedido e grava o .mp4."""
+    # Daqui em diante o Google já está fazendo (e cobrando) o vídeo: uma falha de rede não pode
+    # fazer perder o vídeo nem levar o Erton a pedir (e pagar) outro sem saber.
+    try:
+        pronta = _esperar(cliente, operacao, dormir, agora)
+    except Exception as erro:
+        raise _ja_pedido(operacao, erro) from erro
+    if getattr(pronta, "error", None):
+        raise RuntimeError(str(pronta.error)[:200])
+    videos = getattr(getattr(pronta, "result", None) or getattr(pronta, "response", None),
+                     "generated_videos", None) or []
+    if not videos:
+        raise RuntimeError("o Google não devolveu o vídeo (pode ter recusado a descrição)")
+    try:
+        return _salvar(cliente, videos[0].video, dormir)
+    except Exception as erro:
+        raise _ja_pedido(operacao, erro) from erro
+
+
+# ----- vídeo que ficou pela metade (o Jarvis fechou ou religou o cérebro durante a espera)
+
+def _arquivo_anotados() -> Path:
+    return pasta_videos() / "em-andamento.json"
+
+
+def _ler_anotados() -> list[dict]:
+    try:
+        dados = json.loads(_arquivo_anotados().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    pedidos = dados.get("pedidos") if isinstance(dados, dict) else None
+    return [p for p in pedidos if isinstance(p, dict) and p.get("id")] if isinstance(pedidos, list) else []
+
+
+def _gravar_anotados(pedidos: list[dict]) -> None:
+    arquivo = _arquivo_anotados()
+    if not pedidos:
+        arquivo.unlink(missing_ok=True)
+        return
+    arquivo.parent.mkdir(parents=True, exist_ok=True)
+    temporario = arquivo.with_suffix(".tmp")
+    temporario.write_text(json.dumps({"pedidos": pedidos}, ensure_ascii=False, indent=2), encoding="utf-8")
+    temporario.replace(arquivo)
+
+
+def _anotar(anotado: str | None = None, nome: str = "") -> str:
+    """Anota (ou completa com o número do pedido do Google) um vídeo em andamento. Devolve o id."""
+    anotado = anotado or uuid.uuid4().hex[:12]
+    try:
+        with _trava_anotados:
+            pedidos = [p for p in _ler_anotados() if p["id"] != anotado]
+            pedidos.append({"id": anotado, "nome": nome, "em": datetime.now().isoformat(timespec="seconds")})
+            _gravar_anotados(pedidos)
+    except OSError as erro:
+        print(f"[Vídeos] Não consegui anotar o vídeo em andamento: {erro}")
+    return anotado
+
+
+def _desanotar(anotado: str) -> None:
+    try:
+        with _trava_anotados:
+            pedidos = _ler_anotados()
+            if any(p["id"] == anotado for p in pedidos):
+                _gravar_anotados([p for p in pedidos if p["id"] != anotado])
+    except OSError as erro:
+        print(f"[Vídeos] Não consegui tirar a anotação do vídeo: {erro}")
+
+
+def iniciar(jarvis) -> None:
+    """Ao abrir: um vídeo pago ficou pela metade (o Jarvis fechou ou religou o cérebro no meio)?
+    No modo normal, busca no Google e abre; no modo privado só avisa (não fala com o Google) e
+    busca quando o Erton voltar ao modo normal."""
+    pedidos = _ler_anotados()
+    if pedidos:
+        threading.Thread(target=_retomar, args=(jarvis, pedidos), daemon=True, name="VideoVeo").start()
+
+
+def _retomar(jarvis, pedidos: list[dict], cliente=None, dormir=time.sleep, agora=time.monotonic) -> None:
+    dormir(ESPERA_AO_ABRIR)
+    privado, para_depois = _modo_privado(), 0
+    for pedido in pedidos:
+        nome = str(pedido.get("nome") or "")
+        if not nome:  # fechou enquanto pedia: não dá para saber se o Google recebeu
+            _para_pendentes("", "o Jarvis fechou enquanto pedia")
+            _desanotar(pedido["id"])
+            _avisar(jarvis, "Quando o Jarvis fechou, um vídeo pago estava sendo pedido ao Google e pode ter sido "
+                            "cobrado. Antes de pedir outro, confira na conta do Google.")
+            continue
+        if privado:  # buscar seria falar com o Google: fica anotado para o modo normal
+            para_depois += 1
+            continue
+        _log(jarvis, "SYS: 🎬 Buscando o vídeo pago que ficou pela metade quando o Jarvis fechou ou religou...")
+        try:
+            from google.genai import types
+
+            arquivo = _terminar(cliente or _cliente(), types.GenerateVideosOperation(name=nome), dormir, agora)
+        except Exception as erro:
+            aviso = ("O vídeo pago que ficou pela metade quando o Jarvis fechou ou religou não chegou: "
+                     f"{_explicar(erro)}.")
+            if not isinstance(erro, VideoJaPedido):  # o VideoJaPedido já anotou e já fala da cobrança
+                _para_pendentes(nome, type(erro).__name__)
+                aviso += " Ele pode ter sido cobrado; anotei o número do pedido em pendentes.txt, na pasta de vídeos."
+        else:
+            _abrir(arquivo)
+            aviso = ("O vídeo pago que ficou pela metade quando o Jarvis fechou ou religou ficou pronto e já abri "
+                     f"para você. Está salvo em {arquivo.parent}.")
+        _desanotar(pedido["id"])
+        _avisar(jarvis, aviso)
+    if para_depois:
+        _avisar(jarvis, "Um vídeo pago ficou pela metade quando o Jarvis religou. No modo privado não falo com o "
+                        "Google; busco o vídeo quando você voltar ao modo normal.")
+
+
+def _log(jarvis, texto: str) -> None:
+    ui = getattr(jarvis, "ui", None)
+    if ui is not None:
+        ui.write_log(texto)
+
+
+def _avisar(jarvis, aviso: str) -> None:
+    anunciar = getattr(jarvis, "anunciar", None)
+    if callable(anunciar):  # respeita o modo chamada: guarda o aviso até o "Hey Jarvis"
+        anunciar(aviso, "Vídeo")
+        return
+    _log(jarvis, f"SYS: 🎬 {aviso}")
+    falar = getattr(jarvis, "_falar_aviso", None)
+    if callable(falar):
+        falar(aviso)
 
 
 class VideoJaPedido(RuntimeError):
@@ -259,12 +393,7 @@ def _ja_pedido(operacao, erro: Exception) -> VideoJaPedido:
     nome = str(getattr(operacao, "name", "") or "")
     print(f"[Vídeos] O vídeo já tinha sido pedido ao Google e não chegou: {nome or 'sem número'} "
           f"({type(erro).__name__}).")
-    try:
-        pasta_videos().mkdir(parents=True, exist_ok=True)
-        with open(pasta_videos() / "pendentes.txt", "a", encoding="utf-8") as saida:
-            saida.write(f"{datetime.now():%Y-%m-%d %H:%M}  {nome or 'sem número'}  ({type(erro).__name__})\n")
-    except OSError:
-        pass
+    _para_pendentes(nome, type(erro).__name__)
     if isinstance(erro, TimeoutError) or not _passageiro(erro):
         causa = _explicar(erro)[:100]
     else:
@@ -273,6 +402,16 @@ def _ja_pedido(operacao, erro: Exception) -> VideoJaPedido:
         f"{causa}. Atenção: o Google já estava fazendo este vídeo e pode cobrar por ele mesmo assim; antes "
         "de pedir outro, confira na conta do Google (anotei o número do pedido em pendentes.txt, na pasta "
         "de vídeos)")
+
+
+def _para_pendentes(nome: str, motivo: str) -> None:
+    """Anota em pendentes.txt um pedido ao Google que não chegou (para conferir/baixar depois)."""
+    try:
+        pasta_videos().mkdir(parents=True, exist_ok=True)
+        with open(pasta_videos() / "pendentes.txt", "a", encoding="utf-8") as saida:
+            saida.write(f"{datetime.now():%Y-%m-%d %H:%M}  {nome or 'sem número'}  ({motivo})\n")
+    except OSError:
+        pass
 
 
 def _explicar(erro: Exception) -> str:
@@ -352,16 +491,9 @@ def executar(args: dict, jarvis) -> str:
             else:
                 _abrir(arquivo)
                 aviso = f"O vídeo ficou pronto e já abri para você. Está salvo em {arquivo.parent}."
-        anunciar = getattr(jarvis, "anunciar", None)
-        if callable(anunciar):  # respeita o modo chamada: guarda o aviso até o "Hey Jarvis"
-            anunciar(aviso, "Vídeo")
-            return
-        if ui is not None:
-            ui.write_log(f"SYS: 🎬 {aviso}")
-        falar = getattr(jarvis, "_falar_aviso", None)
-        if callable(falar):
-            falar(aviso)
+        _avisar(jarvis, aviso)
 
+    # o nome do fio avisa a troca de modo (main.py) de que um vídeo pago está em andamento
     threading.Thread(target=trabalhar, daemon=True, name="VideoVeo").start()
     if ui is not None:
         ui.write_log(f"SYS: 🎬 Fazendo o vídeo ({segundos}s, {qualidade}, ~R$ {reais:.2f})...")

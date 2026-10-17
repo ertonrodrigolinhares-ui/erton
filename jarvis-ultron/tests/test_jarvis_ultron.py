@@ -1561,8 +1561,9 @@ class AutomacoesQueIniciamTests(unittest.TestCase):
         carga = carregar_ferramentas(Path(__file__).resolve().parent.parent / "automacoes")
         self.assertEqual(carga.erros, [])
         self.assertTrue({"spoken_reminders", "saved_routines", "self_repair", "external_memory_drive", "website_security_check", "website_reputation_check", "pc_protection", "wifi_watch"} <= set(carga.ferramentas))
+        # videos.py: ao abrir, busca o vídeo pago que ficou pela metade (o Jarvis fechou ou religou no meio)
         self.assertEqual(sorted(a for a, _ in carga.inicios),
-                         ["lembretes.py", "memoria_hd.py", "painel_stark.py", "painel_ultron.py"])
+                         ["lembretes.py", "memoria_hd.py", "painel_stark.py", "painel_ultron.py", "videos.py"])
 
 
 class AvisosFaladosTests(unittest.TestCase):
@@ -2116,6 +2117,59 @@ class LembretesFaladosTests(unittest.TestCase):
         self.m._avisar(Jarvis(), ["beber água"])
         self.assertEqual(avisos, [("Lembrete", "Lembrete: beber água.")])
 
+    def _criar_no_modo_privado(self, texto):
+        import os
+        with patch.dict(os.environ, {"JARVIS_CEREBRO": "gemma"}):
+            self.m.criar({"text": texto, "time": "15:00"}, self.agora, self.arquivo)
+
+    def test_lembrete_do_modo_privado_nunca_vai_para_o_gemini_no_modo_normal(self):
+        import os
+        import main
+        from datetime import timedelta
+        segredo = "ligar pro cliente João Silva sobre a dívida de 200 mil da holding X"
+        self._criar_no_modo_privado(segredo)
+        self.m.criar({"text": "beber água", "time": "15:00"}, self.agora, self.arquivo)
+        jarvis = object.__new__(main.JarvisLive)
+        jarvis.ui, jarvis.session = UIFalsa(), SessaoFalsa()
+        jarvis._modo_reserva = False
+        jarvis._chamada_fechada = lambda: False
+        jarvis.set_speaking = lambda valor: None
+
+        async def cenario():  # o Erton disse "modo normal": o cérebro agora é o Gemini
+            jarvis._loop = asyncio.get_running_loop()
+            with patch.dict(os.environ, {"JARVIS_CEREBRO": "gemini"}), \
+                    patch("core.palavra_ativacao.tocar_aviso"), \
+                    patch("actions.tts_engine.falar_com_voz_do_windows") as voz:
+                self.m._avisar(jarvis, self.m.vencidos(self.agora + timedelta(hours=1, minutes=1), self.arquivo))
+                for _ in range(40):
+                    await asyncio.sleep(0.05)
+                    if voz.called and jarvis.session.textos:
+                        break
+            return voz
+        voz = asyncio.run(cenario())
+        self.assertTrue(all(segredo not in t for t in jarvis.session.textos), jarvis.session.textos)
+        self.assertIn("beber água", jarvis.session.textos[0])  # o lembrete comum segue normal
+        voz.assert_called_once()
+        self.assertIn(segredo, voz.call_args.args[0])  # o do modo privado: só a voz do PC
+
+    def test_lembrete_do_modo_privado_fica_escondido_fora_do_modo_privado(self):
+        import os
+        segredo = "cliente João Silva, dívida da holding X"
+        self._criar_no_modo_privado(segredo)
+        self.m.criar({"text": "treino", "time": "18:00"}, self.agora, self.arquivo)
+        with patch.dict(os.environ, {"JARVIS_CEREBRO": "gemini"}):
+            lista = self.m.listar(self.agora, self.arquivo)
+            self.assertNotIn("João", lista)
+            self.assertIn("lembrete do modo privado", lista)
+            self.assertIn("treino", lista)
+            self.assertIn("Não achei", self.m.cancelar({"text": "joão silva"}, self.arquivo))
+            cancelado = self.m.cancelar({"number": 1}, self.arquivo)
+        self.assertIn("cancelado", cancelado)
+        self.assertNotIn("João", cancelado)
+        self._criar_no_modo_privado(segredo)
+        with patch.dict(os.environ, {"JARVIS_CEREBRO": "gemma"}):  # no modo privado aparece inteiro
+            self.assertIn("João Silva", self.m.listar(self.agora, self.arquivo))
+
 
 class RotinasSalvasTests(unittest.TestCase):
     def setUp(self):
@@ -2148,6 +2202,25 @@ class RotinasSalvasTests(unittest.TestCase):
         self.assertEqual(r, "[Hermes, rotina pesquisa] 3 provas")
         self.assertIn("1) pesquise provas de triathlon 2) liste as datas", pedidos[0])
         self.assertIn("Nunca publique", pedidos[0])
+
+    def test_rotina_do_modo_privado_nao_vai_para_o_gemini_no_modo_normal(self):
+        import os
+        with patch.dict(os.environ, {"JARVIS_CEREBRO": "gemma"}):
+            self.m.salvar({"name": "cobrança joão", "steps": ["ligue para o cliente João Silva da holding X"]},
+                          self.arquivo)
+            self.assertIn("ligue para o cliente João", self.m.rodar({"name": "cobrança joão"}, None, self.arquivo))
+        with patch.dict(os.environ, {"JARVIS_CEREBRO": "gemini"}):
+            r = self.m.rodar({"name": "cobrança joão"}, None, self.arquivo)
+            self.assertNotIn("João", r)
+            self.assertIn("modo privado", r)
+            lista = self.m.listar(self.arquivo)
+            self.assertNotIn("joão", lista.lower())
+            self.assertIn("1 rotina(s) do modo privado", lista)
+            self.assertIn("bom dia", lista)
+            self.assertIn("modo privado", self.m.apagar({"name": "cobrança joão"}, self.arquivo))
+            self.assertIn("modo privado", self.m.salvar({"name": "cobrança joão", "steps": ["outra"]}, self.arquivo))
+        with patch.dict(os.environ, {"JARVIS_CEREBRO": "gemma"}):  # nada foi apagado nem trocado
+            self.assertIn("João Silva", self.m.rodar({"name": "cobrança joão"}, None, self.arquivo))
 
     def test_rotina_do_hermes_nao_roda_no_modo_privado(self):
         import os
