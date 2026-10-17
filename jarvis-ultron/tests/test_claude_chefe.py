@@ -580,7 +580,13 @@ class MudancaInterrompidaTests(Base):
         self.assertIn("desfiz", saida.getvalue())
         self._voltou()
         bat = (RAIZ / "Iniciar Jarvis Ultron.bat").read_text(encoding="utf-8")
-        self.assertLess(bat.index("-m core.claude_chefe --desfazer-interrompida"), bat.index('python.exe" main.py'))
+        desfaz = bat.index("-m core.claude_chefe --desfazer-interrompida")
+        self.assertLess(desfaz, bat.index('python.exe" main.py'))
+        # antes até de instalar os componentes: a mudança pela metade pode ter mexido no requirements.txt
+        # (o pip instalaria o que ela pôs, e se o pip falhar o Jarvis nunca mais abre nem desfaz)
+        self.assertLess(bat.index("-m venv .venv"), desfaz)
+        self.assertLess(desfaz, bat.index("fc /b requirements.txt"))
+        self.assertLess(desfaz, bat.index("pip install -r requirements.txt"))
 
     def test_cerebro_novo_desfaz_antes_de_importar_o_main(self):
         import inspect
@@ -881,6 +887,29 @@ class InstaladorDoClaudeTests(unittest.TestCase):
         estragado = str(pasta / "claude").replace("\\b", "\b")  # como o .env antigo era lido
         with patch.dict(os.environ, {"JARVIS_CLAUDE_EXE": f'"{estragado}"'}):
             self.assertEqual(chefe.achar_claude(), str(pasta / "claude"))
+
+    def test_claude_ps1_do_npm_vira_o_cmd(self):
+        # o Claude do npm tem claude.ps1 e claude.cmd; o Windows não abre um .ps1 como programa (WinError 193)
+        npm = Path(tempfile.mkdtemp()) / "Roaming\\npm"  # no Linux a barra invertida vale como letra
+        npm.mkdir()
+        (npm / "claude.ps1").write_text("", encoding="utf-8")
+        with patch.dict(os.environ, {"JARVIS_CLAUDE_EXE": str(npm / "claude.ps1")}), \
+                patch.object(chefe.Path, "home", lambda: npm), patch.object(chefe.shutil, "which", return_value=None):
+            self.assertIsNone(chefe.achar_claude())  # sem o .cmd ao lado, o .ps1 não serve
+            (npm / "claude.cmd").write_text("", encoding="utf-8")
+            self.assertEqual(chefe.achar_claude(), str(npm / "claude.cmd"))
+            estragado = str(npm / "claude.ps1").replace("\\n", "\n")  # .env do instalador antigo, lido
+            with patch.dict(os.environ, {"JARVIS_CLAUDE_EXE": f'"{estragado}"'}):
+                self.assertEqual(chefe.achar_claude(), str(npm / "claude.cmd"))
+            with patch.dict(os.environ, {"JARVIS_CLAUDE_EXE": ""}), \
+                    patch.object(chefe.shutil, "which", return_value=str(npm / "claude.ps1")):
+                self.assertEqual(chefe.achar_claude(), str(npm / "claude.cmd"))
+
+    def test_instalador_nao_grava_o_claude_ps1(self):
+        texto = self.SCRIPT.read_text(encoding="ascii")
+        corpo = texto[texto.index("function Achar-Claude"):texto.index("function Logado")]
+        self.assertIn("Get-Command claude -CommandType Application -All", corpo)
+        self.assertIn("-match '\\.(exe|cmd|bat)$'", corpo)
 
     def test_definir_env_de_verdade(self):
         import shutil

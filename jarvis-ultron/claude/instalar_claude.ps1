@@ -71,9 +71,12 @@ function Atualizar-Path {
 function Achar-Claude {
     if (Test-Path $oficial) { return $oficial }
     Atualizar-Path
-    foreach ($c in @(Get-Command claude -All -ErrorAction SilentlyContinue)) {
-        # o Claude Desktop da Microsoft Store tambem se chama Claude.exe: esse nao serve
-        if ($c.Source -and ($c.Source -notlike "*WindowsApps*")) { return $c.Source }
+    foreach ($c in @(Get-Command claude -CommandType Application -All -ErrorAction SilentlyContinue)) {
+        # o Claude Desktop da Microsoft Store tambem se chama Claude.exe: esse nao serve. E o claude.ps1
+        # do npm o Jarvis nao consegue abrir (o Windows so abre .exe/.cmd/.bat): vale o claude.cmd ao lado
+        if ($c.Source -and ($c.Source -notlike "*WindowsApps*") -and ($c.Source -match '\.(exe|cmd|bat)$')) {
+            return $c.Source
+        }
     }
     return $null
 }

@@ -144,20 +144,30 @@ _LETRAS_DO_ENV = str.maketrans({"\a": "\\a", "\b": "\\b", "\f": "\\f", "\n": "\\
                                 "\v": "\\v"})
 
 
+def _sem_ps1(caminho: str) -> str | None:
+    """O Windows não abre um .ps1 como programa (WinError 193). O Claude instalado pelo npm tem um
+    claude.ps1 e, ao lado, um claude.cmd: vale o .cmd. Sem ele, None."""
+    if Path(caminho).suffix.lower() != ".ps1":
+        return caminho
+    irmao = Path(caminho).with_suffix(".cmd")
+    return str(irmao) if irmao.is_file() else None
+
+
 def achar_claude() -> str | None:
     """O claude.exe do instalador oficial; senão o do PATH (menos o Claude Desktop da Microsoft Store,
     que também se chama Claude.exe e abre a janela do app em vez do Claude Code)."""
     # o "Instalar Claude" antigo gravava o caminho sem dobrar a barra, e o .env lido virava "\b" em
     # outra letra (C:\...\.local\bin): aqui ela volta a ser barra
     escolhido = os.environ.get("JARVIS_CLAUDE_EXE", "").translate(_LETRAS_DO_ENV).strip().strip('"')
-    if escolhido and Path(escolhido).is_file():
-        return escolhido
+    # (o "Instalar Claude" antigo também podia gravar o claude.ps1 do npm, que o Windows não abre)
+    if escolhido and Path(escolhido).is_file() and (programa := _sem_ps1(escolhido)):
+        return programa
     oficial = Path.home() / ".local" / "bin" / ("claude.exe" if sys.platform == "win32" else "claude")
     if oficial.is_file():
         return str(oficial)
     achado = shutil.which("claude")
     if achado and "windowsapps" not in achado.lower():
-        return achado
+        return _sem_ps1(achado)
     return None
 
 
@@ -980,7 +990,8 @@ def registrar(pedido: str, plano: str, mudados: list[str], situacao: str, backup
 
 def _principal(argumentos: list[str]) -> int:
     """'python -m core.claude_chefe --desfazer-interrompida': o "Iniciar Jarvis Ultron" roda isto ANTES de
-    abrir o Jarvis, porque uma mudança pela metade pode impedir até a tela de abrir."""
+    abrir o Jarvis, porque uma mudança pela metade pode impedir até a tela de abrir. E antes até de
+    instalar os componentes, porque ela pode ter mexido no requirements.txt (por isso aqui só o Python puro)."""
     if "--desfazer-interrompida" in argumentos:
         aviso = desfazer_interrompida()
         if aviso:
