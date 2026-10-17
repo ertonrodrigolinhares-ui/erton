@@ -882,7 +882,7 @@ class InstaladorDoClaudeTests(unittest.TestCase):
 
     def test_caminho_ja_estragado_no_env_ainda_e_achado(self):
         pasta = Path(tempfile.mkdtemp()) / "local\\bin"  # no Linux a barra invertida vale como letra
-        pasta.mkdir()
+        pasta.mkdir(parents=True)  # no Windows são duas pastas
         (pasta / "claude").write_text("", encoding="utf-8")
         estragado = str(pasta / "claude").replace("\\b", "\b")  # como o .env antigo era lido
         with patch.dict(os.environ, {"JARVIS_CLAUDE_EXE": f'"{estragado}"'}):
@@ -891,7 +891,7 @@ class InstaladorDoClaudeTests(unittest.TestCase):
     def test_claude_ps1_do_npm_vira_o_cmd(self):
         # o Claude do npm tem claude.ps1 e claude.cmd; o Windows não abre um .ps1 como programa (WinError 193)
         npm = Path(tempfile.mkdtemp()) / "Roaming\\npm"  # no Linux a barra invertida vale como letra
-        npm.mkdir()
+        npm.mkdir(parents=True)  # no Windows são duas pastas
         (npm / "claude.ps1").write_text("", encoding="utf-8")
         with patch.dict(os.environ, {"JARVIS_CLAUDE_EXE": str(npm / "claude.ps1")}), \
                 patch.object(chefe.Path, "home", lambda: npm), patch.object(chefe.shutil, "which", return_value=None):
