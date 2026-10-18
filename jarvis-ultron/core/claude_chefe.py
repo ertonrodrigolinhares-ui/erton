@@ -96,7 +96,12 @@ Regras:
 REGRAS_TAREFA = """
 Pasta de trabalho: {pasta}. Arquivos que você criar devem ficar aqui (relatórios em "Relatorios").
 O Erton deixa arquivos para você analisar em "Entrada". Você também pode LER (sem alterar) os arquivos
-de {dados} (por exemplo clientes.txt, carteira.txt, a pasta Faturas)."""
+de {dados} (por exemplo clientes.txt, carteira.txt, a pasta Faturas).
+Especialistas extras: a pasta "Agency" tem centenas de agentes prontos (finanças, vendas, marketing,
+gestão, jurídico, pesquisa...). Quando o pedido ganhar com um especialista, leia "Agency/INDICE.md",
+escolha o agente certo e siga o arquivo dele. Eles estão em inglês e são de outros países: responda em
+português, use as leis e impostos do Brasil, e as regras acima valem mais que as deles. Não altere a
+pasta "Agency"."""
 
 REGRAS_PLANO = """
 TAREFA: planejar uma mudança no código do próprio Jarvis Ultron (pasta atual). NÃO altere nada agora:
@@ -261,6 +266,16 @@ def preparar_pasta() -> Path:
             if not destino.exists() or destino.stat().st_mtime < skill.stat().st_mtime:
                 destino.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(skill, destino)
+        # Especialistas da coleção agency-agents: ficam em Agency (fora de .claude, que o Claude não lê)
+        # e o Claude abre o INDICE.md só quando precisa, por isso não pesam na lista do Gemini.
+        for arquivo in sorted((origem / "agency").rglob("*")):
+            if not arquivo.is_file():
+                continue
+            destino = pasta / "Agency" / arquivo.relative_to(origem / "agency")
+            if (not destino.exists() or destino.stat().st_size != arquivo.stat().st_size
+                    or destino.stat().st_mtime < arquivo.stat().st_mtime):
+                destino.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(arquivo, destino)
     except OSError as erro:
         print(f"[Claude] Não consegui copiar os agentes: {erro}")
     return pasta
@@ -269,6 +284,43 @@ def preparar_pasta() -> Path:
 def agentes() -> list[str]:
     raiz = pasta_jarvis() / "claude" / "skills"
     return sorted(p.parent.name for p in raiz.glob("*/SKILL.md"))
+
+
+def _so_letras(texto: str) -> str:
+    import unicodedata
+
+    base = unicodedata.normalize("NFKD", texto.lower())
+    base = "".join(c for c in base if not unicodedata.combining(c))
+    return re.sub(r"[^a-z0-9]+", "-", base).strip("-")
+
+
+def agente_agency(nome: str) -> str | None:
+    """Caminho (a partir da pasta Agency) do especialista com esse nome, ou None.
+
+    Aceita o nome do arquivo ("finance-tax-strategist"), o fim dele ("tax-strategist") ou o nome
+    que está dentro do arquivo ("Tax Strategist")."""
+    procurado = _so_letras(nome or "")
+    if not procurado:
+        return None
+    raiz = pasta_jarvis() / "claude" / "agency"
+    candidatos = []
+    for arquivo in sorted(raiz.rglob("*.md")):
+        if arquivo.name == "INDICE.md":
+            continue
+        caminho = arquivo.relative_to(raiz).as_posix()
+        if arquivo.stem == procurado:
+            return caminho
+        if arquivo.stem.endswith("-" + procurado):
+            candidatos.append(caminho)
+            continue
+        try:
+            cabeca = arquivo.read_text(encoding="utf-8")[:600]
+        except OSError:
+            continue
+        achado = re.search(r"^name:\s*(.+)$", cabeca, re.MULTILINE)
+        if achado and _so_letras(achado.group(1).strip().strip("\"'")) == procurado:
+            candidatos.append(caminho)
+    return candidatos[0] if len(candidatos) == 1 else None
 
 
 # ---------------- conversar com o Claude Code ----------------
@@ -497,7 +549,11 @@ def salvar_relatorio(pedido: str, conteudo: str) -> Path | None:
 def fazer_tarefa(pedido: str, agente: str | None = None, sessao: str | None = None) -> Resposta:
     pasta = preparar_pasta()
     texto = REGRAS + REGRAS_TAREFA.format(pasta=pasta, dados=pasta_dados())
-    if agente:
+    especialista = agente_agency(agente) if agente and agente not in agentes() else None
+    if especialista:
+        texto += (f"\nSiga as instruções do especialista '{agente}' (arquivo Agency/{especialista} nesta "
+                  "pasta). Onde ele falar em publicar, enviar ou usar conectores, prepare só o rascunho.")
+    elif agente:
         texto += (f"\nSiga as instruções do agente '{agente}' (arquivo .claude/skills/{agente}/SKILL.md "
                   "nesta pasta). Onde ele falar em publicar, enviar ou usar conectores, prepare só o rascunho.")
     texto += f"\n\nPEDIDO DO ERTON:\n{pedido.strip()}"
