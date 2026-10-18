@@ -44,7 +44,7 @@ FERRAMENTA = {
         "properties": {
             "request": {"type": "STRING", "description": "The complete task, in Portuguese, with all details the user gave"},
             "kind": {"type": "STRING", "description": "tarefa (default) | codigo (change the Jarvis's own code)"},
-            "agent": {"type": "STRING", "description": "Optional agent (skill) name to follow"},
+            "agent": {"type": "STRING", "description": "Optional agent to follow: a Jarvis agent name or a specialist name the user said"},
             "continue_last": {"type": "BOOLEAN", "description": "true to continue the previous Claude task (follow-up)"},
             "confirm": {"type": "BOOLEAN", "description": "kind=codigo only: true ONLY after the user approved the plan"},
         },
@@ -102,8 +102,8 @@ def _em_segundo_plano(jarvis, nome: str, trabalho) -> str | None:
 def _tarefa(args: dict, jarvis, chefe) -> str:
     pedido = str(args.get("request", "")).strip()
     agente = str(args.get("agent", "") or "").strip() or None
-    if agente and agente not in chefe.agentes() and not chefe.agente_agency(agente):
-        agente = None
+    # Nome que não é de nenhum agente não se perde: o chefe manda como dica (limpa) para o Claude procurar
+    conhecido = bool(agente) and (agente in chefe.agentes() or bool(chefe.agente_agency(agente)))
     with _trava:
         sessao = _estado["ultima_sessao"] if args.get("continue_last") else None
 
@@ -123,7 +123,7 @@ def _tarefa(args: dict, jarvis, chefe) -> str:
 
     if _em_segundo_plano(jarvis, "ClaudeTarefa", trabalhar) is None:
         return "Claude is still working on the previous task. Tell the user to wait for it to finish."
-    _log(jarvis, "SYS: 🤖 Claude trabalhando" + (f" (agente {agente})" if agente else "") + "...")
+    _log(jarvis, "SYS: 🤖 Claude trabalhando" + (f" (agente {agente})" if conhecido else "") + "...")
     return ("Claude is working on it in the background. Tell the user, in one short Portuguese sentence, that "
             "you will warn when it is ready. Do not wait.")
 

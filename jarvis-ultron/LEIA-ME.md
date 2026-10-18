@@ -186,15 +186,17 @@ o resumo e abre o relatório completo (fica em `Claude\Relatorios`).
 **Especialistas extras (282 agentes da coleção [agency-agents](https://github.com/msitarzewski/agency-agents),
 licença MIT):** ficam em `claude\agency` e o Jarvis copia para `Claude\Agency`. O Gemini continua vendo
 só os 22 agentes acima (assim ele não fica lento nem confuso); quem conhece os 282 é o Claude, que
-consulta o índice (`INDICE.md`) quando o pedido precisa de um especialista. Também dá para pedir um
-pelo nome em inglês, por exemplo:
+consulta os índices (`INDICE.md` com as áreas e um `INDICE.md` por área) quando o pedido precisa de um
+especialista. O Claude só lê essa pasta: não consegue mudar os agentes, e se algo mudar a cópia volta
+ao original na próxima tarefa. Também dá para pedir um pelo nome em inglês, por exemplo:
 - "Jarvis, usa o agente Tax Strategist para a holding do grupo tal."
 - "Jarvis, pede para o Claude, com o especialista Legal Document Review, revisar o contrato da pasta Entrada."
 
 Eles são em inglês e de outros países: o Claude responde em português e usa as leis e impostos do
 Brasil. Agentes de programação, jogos e 3D estão na coleção, mas aqui não rodam comandos nem mexem no
-PC (as travas de sempre valem). Para atualizar a coleção: troque os arquivos de `claude\agency` e rode
-`python scripts\gerar_indice_agency.py`.
+PC (as travas de sempre valem). Se o nome pedido não bater com nenhum, o Claude procura o mais
+parecido nos índices. Para atualizar a coleção: troque os arquivos de `claude\agency`, rode
+`python scripts\gerar_indice_agency.py` e feche e abra o Jarvis.
 
 **Mudar o código do Jarvis**: "Jarvis, pede para o Claude mudar o seu código para ...".
 1. O Claude **só lê e faz um plano** (ele não tem permissão para editar nessa hora).
