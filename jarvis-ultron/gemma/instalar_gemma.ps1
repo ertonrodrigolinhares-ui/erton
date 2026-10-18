@@ -146,10 +146,27 @@ $ErrorActionPreference = "Stop"
 $escolhido = $null
 foreach ($m in $modelos) {
     if ($instalados -match [regex]::Escape($m)) { $escolhido = $m; Write-Host "$m ja estava baixado."; break }
-    Write-Host "Baixando $m..."
-    & ollama pull $m
-    if ($LASTEXITCODE -eq 0) { $escolhido = $m; break }
-    Write-Host "Nao consegui baixar $m. Tentando um menor..." -ForegroundColor Yellow
+    # A internet pode cair no meio ("unexpected EOF"): o que ja baixou fica no disco e o
+    # 'ollama pull' de novo continua de onde parou. Entao tenta varias vezes antes de desistir.
+    for ($tentativa = 1; $tentativa -le 6; $tentativa++) {
+        if ($tentativa -gt 1) {
+            Write-Host "O download parou (internet oscilou). Continuando de onde parou... (tentativa $tentativa de 6)" -ForegroundColor Yellow
+            Start-Sleep -Seconds (5 * $tentativa)
+            if (-not (Ollama-Respondendo)) {
+                Start-Process -FilePath "ollama" -ArgumentList "serve" -WindowStyle Hidden
+                $limite = (Get-Date).AddSeconds(40)
+                while (-not (Ollama-Respondendo) -and (Get-Date) -lt $limite) { Start-Sleep -Seconds 1 }
+            }
+        }
+        Write-Host "Baixando $m..."
+        $ErrorActionPreference = "Continue"
+        & ollama pull $m
+        $codigo = $LASTEXITCODE
+        $ErrorActionPreference = "Stop"
+        if ($codigo -eq 0) { $escolhido = $m; break }
+    }
+    if ($escolhido) { break }
+    Write-Host "Nao consegui baixar $m depois de 6 tentativas. Tentando um menor..." -ForegroundColor Yellow
 }
 if (-not $escolhido) { Sair-Com-Erro "Nao consegui baixar o Gemma 4 (confira a internet e o espaco em disco)." }
 Write-Host "Gemma 4 pronto: $escolhido" -ForegroundColor Green

@@ -589,6 +589,28 @@ class InstaladorGemmaTests(unittest.TestCase):
         self.assertIn("exit 0", texto[senao:ligar])  # sem Whisper, sai antes de ligar o modo privado
         self.assertNotIn("Groq", texto[senao:ligar])
 
+    def test_download_que_cai_continua_antes_de_trocar_de_modelo(self):
+        """'Error: unexpected EOF' (internet oscilou): o 'ollama pull' de novo continua de onde parou."""
+        import shutil
+        import subprocess
+        import tempfile
+
+        pwsh = shutil.which("pwsh") or shutil.which("powershell")
+        if not pwsh:
+            self.skipTest("PowerShell não instalado")
+        texto = (Path(__file__).resolve().parents[1] / "gemma" / "instalar_gemma.ps1").read_text(encoding="ascii")
+        bloco = texto[texto.index("$escolhido = $null"):texto.index("if (-not $escolhido) { Sair-Com-Erro")]
+        falso = ('$ErrorActionPreference = "Stop"\n$global:chamadas = 0\n'
+                 'function Ollama-Respondendo { return $true }\nfunction Start-Sleep { param($Seconds) }\n'
+                 'function ollama { $global:chamadas++; $global:LASTEXITCODE = [int]($global:chamadas -le 2) }\n'
+                 '$modelos = @("gemma4:e4b", "gemma4:e2b")\n$instalados = ""\n')
+        with tempfile.TemporaryDirectory() as pasta:
+            script = Path(pasta) / "pull.ps1"
+            script.write_text(falso + bloco + 'Write-Output "ESCOLHIDO=$escolhido"\n', encoding="ascii")
+            saida = subprocess.run([pwsh, "-NoProfile", "-File", str(script)], capture_output=True, text=True,
+                                   timeout=60).stdout
+        self.assertIn("ESCOLHIDO=gemma4:e4b", saida)  # caiu 2 vezes e mesmo assim ficou com o modelo certo
+
 
 class TelaSemChaveNoModoGemmaTests(unittest.TestCase):
     @classmethod
