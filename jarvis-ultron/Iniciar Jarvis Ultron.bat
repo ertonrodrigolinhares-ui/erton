@@ -23,7 +23,7 @@ rem      ate antes de instalar os componentes: ela pode ter mexido no requiremen
 rem ---- Instala os componentes se ainda nao instalou ou se mudaram ----
 fc /b requirements.txt .venv\instalado.txt >nul 2>nul
 if errorlevel 1 goto instalar_pacotes
-goto chave
+goto whisper
 
 :instalar_pacotes
 echo Instalando os componentes (so na primeira vez, pode demorar)...
@@ -33,6 +33,14 @@ echo ==== %date% %time% ==== >> instalacao-log.txt
 echo Instalando o navegador usado pelas automacoes...
 ".venv\Scripts\python.exe" -m playwright install chromium >> instalacao-log.txt 2>&1 || echo Aviso: o navegador das automacoes nao foi instalado. O resto funciona.
 copy /y requirements.txt .venv\instalado.txt >nul
+
+:whisper
+rem ---- Gemma 4 configurado (modo privado): a transcricao local da voz (Whisper) precisa estar nesta pasta ----
+if not exist ".env" goto chave
+findstr /r /c:"^JARVIS_GEMMA_MODELO=" /c:"^JARVIS_CEREBRO=" .env >nul 2>nul || goto chave
+".venv\Scripts\python.exe" -c "import faster_whisper" >nul 2>nul && goto chave
+echo Instalando a transcricao local da voz (Whisper) para o modo privado...
+".venv\Scripts\python.exe" -m pip install --disable-pip-version-check faster-whisper >> instalacao-log.txt 2>&1 || echo Aviso: o Whisper local nao foi instalado agora. Rode o 'Instalar voz local'.
 
 :chave
 rem ---- Primeira vez: pede a chave do Gemini ----

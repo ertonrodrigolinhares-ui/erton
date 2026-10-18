@@ -2220,7 +2220,7 @@ class JarvisLive:
         if destino == "gemma" and not whisper_instalado():
             # sem ouvir no PC, a voz não pode ir para a nuvem: não liga
             self._recusar_troca(destino, "O modo privado não foi ligado: falta a transcrição local da sua voz. "
-                                         "Rode o Instalar Gemma 4 de novo na pasta do Jarvis.")
+                                         "Dê dois cliques em Instalar voz local, na pasta do Jarvis.")
             return
         if destino == "gemma" and not modelo_instalado():
             self._recusar_troca(destino, "Para o modo privado, primeiro rode o Instalar Gemma 4 na pasta do Jarvis.")

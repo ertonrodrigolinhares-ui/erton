@@ -133,7 +133,7 @@ class CerebroGemmaTests(unittest.TestCase):
             self.assertIsNone(cerebro._preparar_ouvido())
             self.assertEqual(cerebro.transcrever(b"\x00\x10" * 16000), "")
         self.assertEqual(cerebro.erro_ouvido, cerebro_gemma.AVISO_SEM_WHISPER)
-        self.assertIn("Instalar Gemma 4", cerebro.erro_ouvido)
+        self.assertIn("Instalar voz local", cerebro.erro_ouvido)  # o instalador só do Whisper
 
     def test_checar_ouvido_na_abertura(self):
         cerebro = CerebroGemma(cliente=ClienteOllamaFalso())
@@ -637,3 +637,21 @@ class TelaSemChaveNoModoGemmaTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class InstalarVozLocalTests(unittest.TestCase):
+    def test_instalador_da_voz_local_existe_e_baixa_o_modelo(self):
+        raiz = Path(__file__).resolve().parents[1]
+        bat = (raiz / "Instalar voz local.bat").read_bytes().decode("ascii")
+        self.assertIn("pip install --disable-pip-version-check faster-whisper", bat)
+        self.assertIn("WhisperModel('small'", bat)
+        self.assertIn("\r\n", bat)  # fim de linha do Windows
+
+    def test_iniciar_instala_o_whisper_quando_o_gemma_esta_configurado(self):
+        raiz = Path(__file__).resolve().parents[1]
+        bat = (raiz / "Iniciar Jarvis Ultron.bat").read_bytes().decode("ascii")
+        bloco = bat[bat.index(":whisper"):bat.index(":chave")]
+        self.assertIn("JARVIS_GEMMA_MODELO", bloco)
+        self.assertIn("import faster_whisper", bloco)
+        self.assertIn("pip install --disable-pip-version-check faster-whisper", bloco)
+        self.assertIn("goto whisper", bat)  # também quando os componentes já estavam instalados

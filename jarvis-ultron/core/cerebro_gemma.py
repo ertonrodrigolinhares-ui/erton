@@ -81,7 +81,8 @@ def pedido_de_privacidade(fala: str) -> str | None:
 
 
 AVISO_SEM_WHISPER = ("No modo privado não consigo ouvir sua voz: a transcrição local (Whisper) não está "
-                     "instalada, e a voz não vai para a internet. Rode o 'Instalar Gemma 4' de novo. "
+                     "instalada, e a voz não vai para a internet. Dê dois cliques em 'Instalar voz local' "
+                     "na pasta do Jarvis. "
                      "Enquanto isso, digite.")
 AVISO_WHISPER_FALHOU = ("Não consegui carregar a transcrição local da voz (Whisper). Na primeira vez ela precisa "
                         "da internet para baixar o modelo; tento de novo em 1 minuto. Enquanto isso, digite.")
