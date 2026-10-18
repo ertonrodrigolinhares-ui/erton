@@ -1526,6 +1526,8 @@ class JarvisLive:
         self._last_input_transcript_at = time.monotonic()
         if contar and not self._current_input_transcript.startswith("["):  # [UI EVENT], [FILE_UPLOADED] não contam
             self._nova_fala(self._current_input_transcript)
+        if not self._current_input_transcript.startswith("["):  # digitou: a resposta sai em voz
+            self._resposta_digitada_ate = time.monotonic() + self.RESPOSTA_DIGITADA_FALA
         self._checar_pedido_de_modo(self._current_input_transcript)
         outgoing_text = self._current_input_transcript
         if (
@@ -2031,6 +2033,16 @@ class JarvisLive:
         portao = getattr(self, "_portao", None)
         return portao is not None and portao.estado == "aguardando"
 
+    RESPOSTA_DIGITADA_FALA = 90.0  # segundos em que a resposta a um texto digitado sai em voz
+
+    def _pode_falar_agora(self) -> bool:
+        """Jarvis Ultron: fala em voz alta com a conversa aberta, e também a resposta ao que o Erton
+        acabou de DIGITAR (no modo chamada digitar é chamar o Jarvis). O microfone continua fechado:
+        digitar não manda o som do ambiente para a nuvem."""
+        if not self._chamada_fechada():
+            return True
+        return time.monotonic() < float(getattr(self, "_resposta_digitada_ate", 0.0) or 0.0)
+
     async def _announce_startup(self):
         # Jarvis Ultron: cumprimenta uma vez só (não a cada reconexão) e nunca com a chamada fechada.
         if getattr(self, "_ja_cumprimentou", False) or self._chamada_fechada():
@@ -2298,7 +2310,7 @@ class JarvisLive:
     def _falar_com_voz_externa(self, texto: str) -> None:
         """Jarvis Ultron: com ElevenLabs/OpenAI/Edge escolhida, fala a resposta por ela."""
         motor = getattr(self, "_tts_engine", None)
-        if motor is None or self._ext_tts_provider in ("", "gemini") or self._chamada_fechada():
+        if motor is None or self._ext_tts_provider in ("", "gemini") or not self._pode_falar_agora():
             return
         motor.on_speaking_start = lambda: self.set_speaking(True)
         motor.on_speaking_stop = lambda: self.set_speaking(False)
@@ -2311,7 +2323,13 @@ class JarvisLive:
 
         def falar():
             try:
-                motor.speak_sync(texto)
+                if not motor.speak_sync(texto):
+                    # ElevenLabs/OpenAI recusou (créditos, chave, internet): fala pela voz reserva
+                    print("[Voz] A voz escolhida falhou; usando a voz normal.")
+                    self._falar_reserva(texto)
+            except Exception as erro:
+                print(f"[Voz] A voz escolhida falhou ({erro}); usando a voz normal.")
+                self._falar_reserva(texto)
             finally:
                 with self._trava_da_fala():
                     self._voz_externa_pendente = max(0, getattr(self, "_voz_externa_pendente", 1) - 1)
@@ -3111,8 +3129,9 @@ class JarvisLive:
                         if self._complete_self_quit_after_audio():
                             return
                     continue
-                # Jarvis Ultron: no modo chamada, esperando o "Hey Jarvis", ele não fala sozinho.
-                if self._chamada_fechada():
+                # Jarvis Ultron: no modo chamada, esperando o "Hey Jarvis", ele não fala sozinho
+                # (a não ser a resposta a um texto que o Erton digitou).
+                if not self._pode_falar_agora():
                     continue
                 # Skip Gemini audio when external TTS is active
                 if self._tts_engine and self._ext_tts_provider and self._ext_tts_provider != "gemini":

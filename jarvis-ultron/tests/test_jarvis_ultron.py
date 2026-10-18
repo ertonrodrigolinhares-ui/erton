@@ -2773,3 +2773,65 @@ class BotaoAutodiagnosticoTests(unittest.TestCase):
         # o relatório completo continua na tela, uma vez só (linhas SYS)
         self.assertTrue(any("Chave do Gemini" in l and l.startswith("SYS:") for l in jarvis.ui.logs))
         self.assertFalse(any(l.startswith("Jarvis:") and "[OK]" in l for l in jarvis.ui.logs))
+
+
+class RespostaDigitadaFalaTests(unittest.TestCase):
+    """No modo chamada (esperando o "Hey Jarvis"), a resposta ao que o Erton DIGITOU sai em voz, sem
+    abrir o microfone; e se a voz escolhida (ElevenLabs...) falhar, ele fala pela voz normal."""
+
+    def _jarvis(self, chamada_fechada=True):
+        import threading
+        import main
+
+        jarvis = object.__new__(main.JarvisLive)
+        jarvis.ui = UIFalsa()
+        jarvis._speaking_lock, jarvis._is_speaking = threading.Lock(), False
+        jarvis._portao = PortaoDeVoz(None, ativo=False)
+        jarvis._chamada_fechada = lambda: chamada_fechada
+        jarvis._shutdown_requested = threading.Event()
+        return jarvis
+
+    def test_texto_digitado_no_modo_chamada_sai_em_voz(self):
+        jarvis = self._jarvis()
+        enviados = []
+
+        class Sessao:
+            async def send_client_content(self, turns, turn_complete):
+                enviados.append(turns)
+
+        jarvis.session = Sessao()
+        self.assertFalse(jarvis._pode_falar_agora())  # ninguém chamou: não fala sozinho
+        self.assertTrue(asyncio.run(jarvis.send_text("me diga as notícias do dia")))
+        self.assertTrue(jarvis._pode_falar_agora())   # digitou: a resposta sai em voz
+        self.assertEqual(len(enviados), 1)
+        self.assertEqual(jarvis._portao.estado, PortaoDeVoz(None, ativo=False).estado)  # microfone igual
+
+    def test_evento_da_tela_nao_libera_a_voz(self):
+        jarvis = self._jarvis()
+
+        class Sessao:
+            async def send_client_content(self, turns, turn_complete):
+                pass
+
+        jarvis.session = Sessao()
+        asyncio.run(jarvis.send_text("[UI EVENT] painel aberto"))
+        self.assertFalse(jarvis._pode_falar_agora())
+
+    def test_voz_externa_que_falha_fala_pela_voz_normal(self):
+        import threading
+
+        jarvis = self._jarvis(chamada_fechada=False)
+        falado = []
+
+        class Motor:
+            def speak_sync(self, texto):
+                return False  # ex.: acabaram os créditos da ElevenLabs
+
+        jarvis._tts_engine, jarvis._ext_tts_provider = Motor(), "elevenlabs"
+        jarvis._mostrar_volume = lambda *a: None
+        jarvis._falar_reserva = falado.append
+        jarvis._falar_com_voz_externa("Bom dia, Erton.")
+        for t in threading.enumerate():
+            if t.name == "VozExterna":
+                t.join(5)
+        self.assertEqual(falado, ["Bom dia, Erton."])

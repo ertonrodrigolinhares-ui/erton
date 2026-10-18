@@ -26,7 +26,10 @@ _AGENTES = sorted(p.parent.name for p in (Path(__file__).resolve().parents[1] / 
 FERRAMENTA = {
     "name": "claude_task",
     "description": (
-        "Hands a big task to Claude (the task chief running on the user's PC): deep research with sources, "
+        "Hands a BIG task to Claude (the task chief running on the user's PC; slow, takes minutes, and uses the "
+        "user's Claude plan). NEVER use it for quick things you can answer or do with another tool right away: "
+        "today's news/headlines, weather, time, a quick web search, opening sites or apps, reminders. Use it for: "
+        "deep research with sources, "
         "analysis of documents in the Claude 'Entrada' folder, reports, proposals, multi-step thinking, one of "
         "the Jarvis agents (agent=name; available: " + (", ".join(_AGENTES) or "none") + "), "
         "or changing the Jarvis's own code (kind='codigo'). It runs in the background; tell the user, in one short "
