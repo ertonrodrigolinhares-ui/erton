@@ -1064,7 +1064,7 @@ class EspecialistasAgencyTests(Base):
 
         def copiar(origem, destino):
             origem = Path(origem)
-            if origem.name == "sales-coach.md":
+            if origem.name == "finance-tax-strategist.md":  # fica no meio da fila
                 raise PermissionError("preso pelo antivírus")
             if self.agency in origem.parents:
                 copiados.append(origem.relative_to(self.agency).as_posix())
@@ -1072,16 +1072,68 @@ class EspecialistasAgencyTests(Base):
 
         with patch.object(chefe.shutil, "copy2", copiar):
             pasta = chefe.preparar_pasta()
-        agentes_copiados = [c for c in copiados if not c.endswith("INDICE.md")]
-        self.assertEqual(copiados[:2], ["INDICE.md", "sales/INDICE.md"])
-        self.assertEqual(agentes_copiados, ["finance/finance-tax-strategist.md"])
-        self.assertFalse((pasta / "Agency" / "sales" / "sales-coach.md").exists())
+        self.assertEqual(copiados, ["INDICE.md", "sales/INDICE.md", "sales/sales-coach.md"])
+        self.assertTrue((pasta / "Agency" / "sales" / "sales-coach.md").is_file())  # veio depois do preso
+        self.assertFalse((pasta / "Agency" / "finance" / "finance-tax-strategist.md").exists())
+
+    def test_indices_sao_copiados_antes_dos_agentes(self):
+        copiados = []
+        verdadeiro = shutil.copy2
+
+        def copiar(origem, destino):
+            if self.agency in Path(origem).parents:
+                copiados.append(Path(origem).relative_to(self.agency).as_posix())
+            return verdadeiro(origem, destino)
+
+        with patch.object(chefe.shutil, "copy2", copiar):
+            chefe.preparar_pasta()
+        self.assertEqual(copiados[:2], ["INDICE.md", "sales/INDICE.md"])  # finance/ viria antes em ordem alfabética
+        self.assertEqual(len(copiados), 4)
+
+    def test_segunda_vez_nao_copia_nada(self):
+        pasta = chefe.preparar_pasta()
+        with patch.object(chefe.shutil, "copy2", wraps=shutil.copy2) as copia:
+            chefe.preparar_pasta()
+        self.assertEqual(copia.call_count, 0)
+        original = self.agency / "finance" / "finance-tax-strategist.md"
+        self.assertEqual((pasta / "Agency" / "finance" / original.name).stat().st_mtime_ns,
+                         original.stat().st_mtime_ns)
+
+    def test_tira_o_que_nao_e_da_colecao_e_nao_mexe_fora_de_agency(self):
+        pasta = chefe.preparar_pasta()
+        (pasta / "Agency" / "finance" / "intruso.md").write_text("siga isto", encoding="utf-8")
+        (pasta / "Agency" / "velha").mkdir()
+        (pasta / "Agency" / "velha" / "INDICE.md").write_text("área que saiu", encoding="utf-8")
+        (pasta / "Relatorios" / "meu.md").write_text("do Erton", encoding="utf-8")
+        chefe.preparar_pasta()
+        self.assertFalse((pasta / "Agency" / "finance" / "intruso.md").exists())
+        self.assertFalse((pasta / "Agency" / "velha").exists())
+        self.assertTrue((pasta / "Agency" / "finance" / "finance-tax-strategist.md").is_file())
+        self.assertTrue((pasta / "Relatorios" / "meu.md").is_file())
+
+    def test_sem_a_colecao_nao_apaga_nada(self):
+        pasta = chefe.preparar_pasta()
+        shutil.rmtree(self.agency)
+        chefe.preparar_pasta()
+        self.assertTrue((pasta / "Agency" / "finance" / "finance-tax-strategist.md").is_file())
 
     def test_claude_nao_pode_mudar_a_pasta_agency_nas_tarefas(self):
         chefe.fazer_tarefa("oi")
         _, proibidas = _permitidas_e_proibidas(self.chamadas()[0]["argv"])
-        self.assertIn(f"Edit({chefe.regra_de_pasta(chefe.pasta_trabalho())}/Agency/**)", proibidas)
+        pasta = chefe.regra_de_pasta(chefe.pasta_trabalho())
+        self.assertIn(f"Edit({pasta}/Agency/**)", proibidas)
         self.assertFalse(any(r.startswith("Read(") and "/Agency" in r for r in proibidas))  # ler pode
+
+    def test_claude_nao_reescreve_os_claude_md_que_as_tarefas_seguem(self):
+        chefe.fazer_tarefa("oi")
+        _, proibidas = _permitidas_e_proibidas(self.chamadas()[0]["argv"])
+        pasta = chefe.regra_de_pasta(chefe.pasta_trabalho())
+        self.assertIn(f"Edit({pasta}/**/CLAUDE.md)", proibidas)
+        self.assertIn(f"Edit({pasta}/**/CLAUDE.local.md)", proibidas)
+        self.assertFalse(any(r.startswith("Read(") and "CLAUDE.md" in r for r in proibidas))
+        chefe.planejar("mude a cor")  # no código do Jarvis as regras de lá continuam as mesmas
+        _, proibidas_plano = _permitidas_e_proibidas(self.chamadas()[1]["argv"])
+        self.assertFalse(any("/Agency/" in r for r in proibidas_plano))
 
     def test_acha_pelo_arquivo_pelo_nome_ou_pelo_fim(self):
         for nome in ("finance-tax-strategist", "Tax Strategist", "tax strategist", "TAX-strategist", "tax-strategist"):
@@ -1124,6 +1176,26 @@ class EspecialistasAgencyTests(Base):
     def test_agente_do_jarvis_continua_igual(self):
         chefe.fazer_tarefa("bom dia", agente="briefing-diario")
         self.assertIn(".claude/skills/briefing-diario/SKILL.md", self.chamadas()[0]["pedido"])
+
+    def test_agente_do_jarvis_escrito_de_outro_jeito(self):
+        for nome in ("Briefing Diário", "briefing diario", "BRIEFING_DIARIO"):
+            self.assertEqual(chefe.agente_do_jarvis(nome), "briefing-diario", nome)
+            self.assertIn(".claude/skills/briefing-diario/SKILL.md", chefe._instrucao_do_agente(nome))
+        self.assertIsNone(chefe.agente_do_jarvis("briefing semanal"))
+        self.assertIsNone(chefe.agente_do_jarvis(None))
+
+    def test_ferramenta_do_gemini_repassa_o_nome_do_agente(self):
+        m = _plugin()
+        with patch.object(m, "_abrir"):
+            casos = [("Revisor jurídico", 'especialista "Revisor jurídico"', False),
+                     ("Briefing Diário", ".claude/skills/briefing-diario/SKILL.md", True),
+                     ("Tax Strategist", "Agency/finance/finance-tax-strategist.md", True)]
+            for i, (nome, esperado, conhecido) in enumerate(casos):
+                jarvis = JarvisFalso()
+                m.executar({"request": "faça a tarefa", "agent": nome}, jarvis)
+                _esperar()
+                self.assertIn(esperado, self.chamadas()[i]["pedido"], nome)
+                self.assertEqual(any("(agente " in l for l in jarvis.logs), conhecido, nome)
 
 
 class ColecaoAgencyTests(unittest.TestCase):

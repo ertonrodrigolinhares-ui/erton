@@ -248,9 +248,10 @@ def _proibidas_na(pasta: Path) -> list[str]:
     if jarvis == pasta or jarvis.startswith(pasta + "/"):  # só onde o Claude pode mudar a pasta do Jarvis
         regras += _fora_da_foto(jarvis)
     if pasta == regra_de_pasta(pasta_trabalho()):
-        # Os especialistas (Agency) o Claude só lê: uma página da internet com instruções escondidas
-        # não pode reescrever um agente que as próximas tarefas vão seguir.
-        regras.append(f"Edit({pasta}/Agency/**)")
+        # O que as próximas tarefas seguem sozinhas o Claude só lê: os especialistas (Agency) e os
+        # CLAUDE.md (carregados em toda tarefa). Assim uma página da internet com instruções
+        # escondidas não vira regra permanente. O Erton continua podendo editar à mão.
+        regras += [f"Edit({pasta}/Agency/**)", f"Edit({pasta}/**/CLAUDE.md)", f"Edit({pasta}/**/CLAUDE.local.md)"]
     regras += [f"Read({regra_de_pasta(pasta_dados())}/{nome})" for nome in DADOS_PRIVADOS]
     regras += [f"Read(~/{item})" for item in CREDENCIAIS]
     return list(dict.fromkeys(regras + _ler(*_pastas_do_hermes())))
@@ -281,8 +282,8 @@ def _copiar_agency(origem: Path, destino: Path) -> None:
     """Especialistas da coleção agency-agents: ficam em Agency (fora de .claude) e o Claude abre os
     índices só quando precisa, por isso não pesam na lista do Gemini. O Claude não pode mudar essa
     pasta (veja _proibidas_na) e, se algo mudar mesmo assim, a cópia volta ao original: copia de novo
-    quando o tamanho ou a data diferem. Os índices vão primeiro; um arquivo preso (antivírus, OneDrive)
-    não impede os outros."""
+    quando o tamanho ou a data diferem, e o que não for da coleção sai. Os índices vão primeiro; um
+    arquivo preso (antivírus, OneDrive) não impede os outros."""
     if not origem.is_dir():
         return
     arquivos = [a for a in origem.rglob("*") if a.is_file()]
@@ -300,13 +301,51 @@ def _copiar_agency(origem: Path, destino: Path) -> None:
             shutil.copy2(arquivo, alvo)  # leva a data junto: na próxima vez fica igual e não copia
         except OSError:
             falhas += 1
+    if arquivos:
+        falhas += _limpar_sobras(destino, {a.relative_to(origem).as_posix().casefold() for a in arquivos})
     if falhas:
-        print(f"[Claude] Não consegui copiar {falhas} arquivo(s) dos especialistas (pasta Agency).")
+        print(f"[Claude] Não consegui copiar ou limpar {falhas} arquivo(s) dos especialistas (pasta Agency).")
+
+
+def _limpar_sobras(destino: Path, esperados: set[str]) -> int:
+    """Tira de Agency o que não está na coleção (agente que saiu numa atualização, arquivo que não
+    devia estar lá). A pasta é toda do Jarvis. Compara sem maiúsculas, como o Windows, e não entra
+    em atalhos de pasta. Devolve quantos não deu para apagar."""
+    falhas = 0
+    for raiz, pastas, arquivos in os.walk(destino, topdown=False, followlinks=False):
+        for nome in arquivos:
+            arquivo = Path(raiz) / nome
+            if arquivo.relative_to(destino).as_posix().casefold() in esperados:
+                continue
+            try:
+                arquivo.unlink()
+            except OSError:
+                falhas += 1
+        for nome in pastas:
+            try:
+                (Path(raiz) / nome).rmdir()  # só some se ficou vazia
+            except OSError:
+                pass
+    return falhas
 
 
 def agentes() -> list[str]:
     raiz = pasta_jarvis() / "claude" / "skills"
     return sorted(p.parent.name for p in raiz.glob("*/SKILL.md"))
+
+
+def agente_do_jarvis(nome: str | None) -> str | None:
+    """O nome certo de um dos agentes do Jarvis (claude/skills), aceitando o jeito que o Gemini
+    escrever: "Briefing Diário", "briefing diario" e "briefing-diario" dão "briefing-diario"."""
+    nome = (nome or "").strip()
+    if not nome:
+        return None
+    lista = agentes()
+    if nome in lista:
+        return nome
+    simples = _so_letras(nome)
+    achados = [s for s in lista if _so_letras(s) == simples]
+    return achados[0] if len(achados) == 1 else None
 
 
 def _so_letras(texto: str) -> str:
@@ -598,8 +637,9 @@ def _instrucao_do_agente(agente: str | None) -> str:
     agente = (agente or "").strip()
     if not agente:
         return ""
-    if agente in agentes():
-        return f"\nSiga as instruções do agente do arquivo .claude/skills/{agente}/SKILL.md nesta pasta." + _SO_RASCUNHO
+    skill = agente_do_jarvis(agente)
+    if skill:
+        return f"\nSiga as instruções do agente do arquivo .claude/skills/{skill}/SKILL.md nesta pasta." + _SO_RASCUNHO
     especialista = agente_agency(agente)
     if especialista:
         return f"\nSiga as instruções do especialista do arquivo Agency/{especialista} nesta pasta." + _SO_RASCUNHO
