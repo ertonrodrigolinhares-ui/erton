@@ -1014,5 +1014,79 @@ class InstaladorDoClaudeTests(unittest.TestCase):
         self.assertEqual(dotenv_values(pasta / ".env")["JARVIS_CLAUDE_EXE"], r"C:\Users\Erton\.local\bin\claude.exe")
 
 
+class EspecialistasAgencyTests(Base):
+    """Os agentes da coleção agency-agents ficam em Agency, fora da lista que vai para o Gemini."""
+
+    def setUp(self):
+        super().setUp()
+        agency = self.jarvis_dir / "claude" / "agency"
+        (agency / "finance").mkdir(parents=True)
+        (agency / "finance" / "finance-tax-strategist.md").write_text(
+            "---\nname: Tax Strategist\ndescription: Tax planning\n---\nYou are a tax strategist.\n", encoding="utf-8")
+        (agency / "sales").mkdir()
+        (agency / "sales" / "sales-coach.md").write_text(
+            "---\nname: Sales Coach\ndescription: Coaching\n---\nCoach.\n", encoding="utf-8")
+        (agency / "INDICE.md").write_text("# Índice\n", encoding="utf-8")
+        skill = self.jarvis_dir / "claude" / "skills" / "briefing-diario"
+        skill.mkdir(parents=True)
+        (skill / "SKILL.md").write_text("---\nname: briefing-diario\n---\n", encoding="utf-8")
+
+    def test_copia_para_a_pasta_agency_e_fora_da_lista_do_gemini(self):
+        pasta = chefe.preparar_pasta()
+        self.assertTrue((pasta / "Agency" / "INDICE.md").is_file())
+        self.assertTrue((pasta / "Agency" / "finance" / "finance-tax-strategist.md").is_file())
+        self.assertEqual(chefe.agentes(), ["briefing-diario"])
+
+    def test_copia_de_novo_o_que_foi_estragado(self):
+        pasta = chefe.preparar_pasta()
+        copia = pasta / "Agency" / "sales" / "sales-coach.md"
+        copia.write_text("estragado", encoding="utf-8")
+        chefe.preparar_pasta()
+        self.assertIn("Coach.", copia.read_text(encoding="utf-8"))
+
+    def test_acha_pelo_arquivo_pelo_fim_ou_pelo_nome(self):
+        for nome in ("finance-tax-strategist", "tax-strategist", "Tax Strategist", "tax strategist"):
+            self.assertEqual(chefe.agente_agency(nome), "finance/finance-tax-strategist.md", nome)
+        self.assertIsNone(chefe.agente_agency("contador inexistente"))
+        self.assertIsNone(chefe.agente_agency(""))
+
+    def test_nome_que_serve_para_dois_nao_escolhe_nenhum(self):
+        (self.jarvis_dir / "claude" / "agency" / "sales" / "marketing-coach.md").write_text(
+            "---\nname: Marketing Coach\n---\n", encoding="utf-8")
+        self.assertIsNone(chefe.agente_agency("coach"))
+
+    def test_tarefa_com_especialista_aponta_o_arquivo(self):
+        chefe.fazer_tarefa("planeje os impostos da holding", agente="Tax Strategist")
+        pedido = self.chamadas()[0]["pedido"]
+        self.assertIn("Agency/finance/finance-tax-strategist.md", pedido)
+        self.assertNotIn(".claude/skills/Tax Strategist", pedido)
+        self.assertIn("Agency/INDICE.md", pedido)  # e o Claude sabe que a coleção existe
+
+    def test_agente_do_jarvis_continua_igual(self):
+        chefe.fazer_tarefa("bom dia", agente="briefing-diario")
+        self.assertIn(".claude/skills/briefing-diario/SKILL.md", self.chamadas()[0]["pedido"])
+
+
+class ColecaoAgencyTests(unittest.TestCase):
+    """Os arquivos de verdade em claude/agency."""
+
+    PASTA = RAIZ / "claude" / "agency"
+
+    def test_indice_esta_em_dia(self):
+        spec = importlib.util.spec_from_file_location("gerar_indice_agency", RAIZ / "scripts" / "gerar_indice_agency.py")
+        modulo = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(modulo)
+        atual = (self.PASTA / "INDICE.md").read_text(encoding="utf-8")
+        self.assertEqual(atual, modulo.gerar(self.PASTA),
+                         "rode: python scripts/gerar_indice_agency.py")
+
+    def test_todo_agente_tem_nome_e_licenca_veio_junto(self):
+        self.assertTrue((self.PASTA / "LICENSE").is_file())
+        arquivos = [a for a in self.PASTA.rglob("*.md") if a.name != "INDICE.md"]
+        self.assertGreater(len(arquivos), 200)
+        for arquivo in arquivos:
+            self.assertRegex(arquivo.read_text(encoding="utf-8")[:600], r"(?m)^name:\s*\S", arquivo.name)
+
+
 if __name__ == "__main__":
     unittest.main()

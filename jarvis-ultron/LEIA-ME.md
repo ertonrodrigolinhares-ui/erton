@@ -183,6 +183,19 @@ O Gemini continua sendo a **voz** do Jarvis. Quando o pedido é grande, o Jarvis
 O Claude trabalha em segundo plano (dá para continuar conversando). Quando termina, o Jarvis fala
 o resumo e abre o relatório completo (fica em `Claude\Relatorios`).
 
+**Especialistas extras (282 agentes da coleção [agency-agents](https://github.com/msitarzewski/agency-agents),
+licença MIT):** ficam em `claude\agency` e o Jarvis copia para `Claude\Agency`. O Gemini continua vendo
+só os 22 agentes acima (assim ele não fica lento nem confuso); quem conhece os 282 é o Claude, que
+consulta o índice (`INDICE.md`) quando o pedido precisa de um especialista. Também dá para pedir um
+pelo nome em inglês, por exemplo:
+- "Jarvis, usa o agente Tax Strategist para a holding do grupo tal."
+- "Jarvis, pede para o Claude, com o especialista Legal Document Review, revisar o contrato da pasta Entrada."
+
+Eles são em inglês e de outros países: o Claude responde em português e usa as leis e impostos do
+Brasil. Agentes de programação, jogos e 3D estão na coleção, mas aqui não rodam comandos nem mexem no
+PC (as travas de sempre valem). Para atualizar a coleção: troque os arquivos de `claude\agency` e rode
+`python scripts\gerar_indice_agency.py`.
+
 **Mudar o código do Jarvis**: "Jarvis, pede para o Claude mudar o seu código para ...".
 1. O Claude **só lê e faz um plano** (ele não tem permissão para editar nessa hora).
 2. O Jarvis conta o plano e espera o seu **"ok, pode fazer"** (conferido no código, numa fala sua

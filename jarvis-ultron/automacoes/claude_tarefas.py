@@ -31,7 +31,9 @@ FERRAMENTA = {
         "today's news/headlines, weather, time, a quick web search, opening sites or apps, reminders. Use it for: "
         "deep research with sources, "
         "analysis of documents in the Claude 'Entrada' folder, reports, proposals, multi-step thinking, one of "
-        "the Jarvis agents (agent=name; available: " + (", ".join(_AGENTES) or "none") + "), "
+        "the Jarvis agents (agent=name; available: " + (", ".join(_AGENTES) or "none") + "; Claude also has "
+        "hundreds of English-named specialist agents, so if the user names another agent or specialist, "
+        "e.g. 'Tax Strategist', pass that name as agent), "
         "or changing the Jarvis's own code (kind='codigo'). It runs in the background; tell the user, in one short "
         "Portuguese sentence, that Claude is working and you will warn when it is ready. Claude cannot publish, "
         "send or buy anything. For kind='codigo': the first call makes only a PLAN; when the plan is told to the "
@@ -100,7 +102,7 @@ def _em_segundo_plano(jarvis, nome: str, trabalho) -> str | None:
 def _tarefa(args: dict, jarvis, chefe) -> str:
     pedido = str(args.get("request", "")).strip()
     agente = str(args.get("agent", "") or "").strip() or None
-    if agente and agente not in chefe.agentes():
+    if agente and agente not in chefe.agentes() and not chefe.agente_agency(agente):
         agente = None
     with _trava:
         sessao = _estado["ultima_sessao"] if args.get("continue_last") else None
