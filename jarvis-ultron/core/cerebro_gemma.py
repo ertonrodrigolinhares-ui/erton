@@ -151,6 +151,7 @@ class CerebroGemma(ReservaGroq):
     """Mesmo jeito de conversar e chamar ferramentas da reserva, mas com o Gemma 4 local."""
 
     NOME = "Gemma 4"
+    nome = "Gemma 4"
 
     def __init__(self, cliente=None, ouvido=None, modelo: str | None = None):
         if cliente is None:

@@ -1384,8 +1384,6 @@ class JarvisLive:
         self._tour_active = False
         # Jarvis Ultron: palavra de ativação ("Hey Jarvis") e IA reserva (Groq)
         from core.palavra_ativacao import PortaoDeVoz
-        from core.reserva_groq import ReservaGroq
-
         if self.external_audio or self.cloud_safe:
             self._portao = PortaoDeVoz(None, ativo=False)
         else:
@@ -1398,8 +1396,10 @@ class JarvisLive:
             self._reserva = None
         elif cerebro_gemma():  # Jarvis Ultron: Gemma 4 no PC como cérebro principal
             self._reserva = CerebroGemma.da_configuracao()
-        else:
-            self._reserva = ReservaGroq.da_configuracao()
+        else:  # Groq e/ou outra empresa (JARVIS_RESERVA), em fila: quando o limite de uma acaba, vai a outra
+            from core.reserva_outra import reserva_da_configuracao
+
+            self._reserva = reserva_da_configuracao()
         # modo privado mesmo se o Gemma não subiu (assim "modo normal" digitado ainda troca)
         self._cerebro_nome = "gemma" if (not self.cloud_safe and cerebro_gemma()) else "gemini"
         self._trocando_cerebro = False  # indo para o modo privado: nada do microfone/texto vai para a nuvem
@@ -2348,7 +2348,7 @@ class JarvisLive:
             return
         self._modo_reserva = True
         com_ferramentas = not getattr(self, "cloud_safe", False)
-        self.ui.write_log("SYS: Gemini indisponível. Modo reserva (Groq) ligado: "
+        self.ui.write_log(f"SYS: Gemini indisponível. Modo reserva ({getattr(self._reserva, 'nome', 'Groq')}) ligado: "
                           + ("converso e executo as tarefas." if com_ferramentas else "converso, mas sem ferramentas."))
         threading.Thread(target=self._escutar_reserva, daemon=True).start()
         aviso = ("A conexão principal caiu. Estou no modo reserva, mas continuo executando suas tarefas."

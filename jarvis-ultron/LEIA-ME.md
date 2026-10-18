@@ -240,6 +240,26 @@ vídeo, ele avisa antes. Se o Jarvis fechar, cair ou trocar de modo no meio do v
 anotado (sem aviso na hora, quando ele fecha ou cai): quando abrir de novo no modo normal, busca o
 vídeo no Google, abre e avisa (no modo privado ele só lembra que o vídeo está esperando).
 
+## Reserva quando o Gemini cai (Groq ou outra empresa)
+
+Se o Gemini cair, o Jarvis continua pela **reserva**. Quando o limite grátis do Groq acaba, dá para
+usar outra empresa no lugar dele (ou junto: elas ficam em fila e, quando o limite de uma acaba, o
+Jarvis passa sozinho para a outra). No `.env`:
+
+```
+JARVIS_RESERVA="cerebras"
+JARVIS_RESERVA_CHAVE="cole_a_chave_aqui"
+```
+
+Empresas prontas: `cerebras`, `openrouter`, `mistral`, `deepseek`, `openai`, `together`. O Jarvis
+escolhe o modelo sozinho (para escolher você: `JARVIS_RESERVA_MODELO`). Qualquer outra compatível
+com a OpenAI: `JARVIS_RESERVA="outra"` e `JARVIS_RESERVA_URL="https://..."`.
+
+- A voz é transcrita no PC se o Whisper local estiver instalado ("Instalar voz local"); senão, pelo
+  Groq (se houver chave) ou pela OpenAI (se for ela).
+- Planos grátis não devem receber dados de clientes: para isso, use o modo privado (Gemma 4).
+- Nunca cole as chaves no chat; só no `.env`.
+
 ## Chave do Gemini que começa com "AQ." (conversa natural)
 
 Desde 2026 o Google AI Studio só cria chaves que começam com **"AQ."**, e para muitas contas o

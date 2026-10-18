@@ -1,6 +1,9 @@
 Jarvis Ultron - versão 2026-10-17
 
 Novidades desta versão:
+- Reserva com outra empresa (Cerebras, OpenRouter, Mistral, DeepSeek, OpenAI...) quando o limite do
+  Groq acaba: JARVIS_RESERVA e JARVIS_RESERVA_CHAVE no .env; ficam em fila com o Groq.
+- "Instalar voz local": transcrição da voz no PC para o modo privado (o Iniciar também instala sozinho).
 - Tela limpa como no vídeo: só o anel; os cartões do "bom dia" aparecem dentro dele. Botão PAINÉIS
   (canto de baixo) mostra/esconde os painéis dos lados. Campo de digitar embaixo do anel.
 - O Jarvis fala a resposta do que você digita (antes, no modo chamada, só escrevia).

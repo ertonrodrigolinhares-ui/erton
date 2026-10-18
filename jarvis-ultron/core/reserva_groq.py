@@ -74,6 +74,8 @@ def gemini_para_groq(declaracoes: list[dict]) -> list[dict]:
 
 
 class ReservaGroq:
+    nome = "Groq"
+
     def __init__(self, chave: str, cliente=None):
         if cliente is None:
             import groq
