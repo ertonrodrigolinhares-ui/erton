@@ -38,6 +38,7 @@ import sys
 import tempfile
 import threading
 import time
+import unicodedata
 import zipfile
 import zlib
 from dataclasses import dataclass, field
@@ -98,10 +99,10 @@ Pasta de trabalho: {pasta}. Arquivos que você criar devem ficar aqui (relatóri
 O Erton deixa arquivos para você analisar em "Entrada". Você também pode LER (sem alterar) os arquivos
 de {dados} (por exemplo clientes.txt, carteira.txt, a pasta Faturas).
 Especialistas extras: a pasta "Agency" tem centenas de agentes prontos (finanças, vendas, marketing,
-gestão, jurídico, pesquisa...). Quando o pedido ganhar com um especialista, leia "Agency/INDICE.md",
-escolha o agente certo e siga o arquivo dele. Eles estão em inglês e são de outros países: responda em
-português, use as leis e impostos do Brasil, e as regras acima valem mais que as deles. Não altere a
-pasta "Agency"."""
+gestão, jurídico, pesquisa...). Quando o pedido ganhar com um especialista, leia "Agency/INDICE.md"
+(a lista das áreas), depois o INDICE.md da área que serve, escolha o agente certo e siga o arquivo
+dele. Eles estão em inglês e são de outros países: responda em português, use as leis e impostos do
+Brasil, e as regras acima valem mais que as deles. A pasta "Agency" é só para ler."""
 
 REGRAS_PLANO = """
 TAREFA: planejar uma mudança no código do próprio Jarvis Ultron (pasta atual). NÃO altere nada agora:
@@ -246,6 +247,10 @@ def _proibidas_na(pasta: Path) -> list[str]:
         regras += [f"Read({jarvis}/{item})", f"Edit({jarvis}/{item})"]
     if jarvis == pasta or jarvis.startswith(pasta + "/"):  # só onde o Claude pode mudar a pasta do Jarvis
         regras += _fora_da_foto(jarvis)
+    if pasta == regra_de_pasta(pasta_trabalho()):
+        # Os especialistas (Agency) o Claude só lê: uma página da internet com instruções escondidas
+        # não pode reescrever um agente que as próximas tarefas vão seguir.
+        regras.append(f"Edit({pasta}/Agency/**)")
     regras += [f"Read({regra_de_pasta(pasta_dados())}/{nome})" for nome in DADOS_PRIVADOS]
     regras += [f"Read(~/{item})" for item in CREDENCIAIS]
     return list(dict.fromkeys(regras + _ler(*_pastas_do_hermes())))
@@ -266,19 +271,37 @@ def preparar_pasta() -> Path:
             if not destino.exists() or destino.stat().st_mtime < skill.stat().st_mtime:
                 destino.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(skill, destino)
-        # Especialistas da coleção agency-agents: ficam em Agency (fora de .claude, que o Claude não lê)
-        # e o Claude abre o INDICE.md só quando precisa, por isso não pesam na lista do Gemini.
-        for arquivo in sorted((origem / "agency").rglob("*")):
-            if not arquivo.is_file():
-                continue
-            destino = pasta / "Agency" / arquivo.relative_to(origem / "agency")
-            if (not destino.exists() or destino.stat().st_size != arquivo.stat().st_size
-                    or destino.stat().st_mtime < arquivo.stat().st_mtime):
-                destino.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(arquivo, destino)
     except OSError as erro:
         print(f"[Claude] Não consegui copiar os agentes: {erro}")
+    _copiar_agency(origem / "agency", pasta / "Agency")
     return pasta
+
+
+def _copiar_agency(origem: Path, destino: Path) -> None:
+    """Especialistas da coleção agency-agents: ficam em Agency (fora de .claude) e o Claude abre os
+    índices só quando precisa, por isso não pesam na lista do Gemini. O Claude não pode mudar essa
+    pasta (veja _proibidas_na) e, se algo mudar mesmo assim, a cópia volta ao original: copia de novo
+    quando o tamanho ou a data diferem. Os índices vão primeiro; um arquivo preso (antivírus, OneDrive)
+    não impede os outros."""
+    if not origem.is_dir():
+        return
+    arquivos = [a for a in origem.rglob("*") if a.is_file()]
+    arquivos.sort(key=lambda a: (a.name != "INDICE.md", len(a.relative_to(origem).parts), a.as_posix()))
+    falhas = 0
+    for arquivo in arquivos:
+        alvo = destino / arquivo.relative_to(origem)
+        try:
+            fonte = arquivo.stat()
+            if alvo.exists():
+                atual = alvo.stat()
+                if atual.st_size == fonte.st_size and atual.st_mtime_ns == fonte.st_mtime_ns:
+                    continue
+            alvo.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(arquivo, alvo)  # leva a data junto: na próxima vez fica igual e não copia
+        except OSError:
+            falhas += 1
+    if falhas:
+        print(f"[Claude] Não consegui copiar {falhas} arquivo(s) dos especialistas (pasta Agency).")
 
 
 def agentes() -> list[str]:
@@ -287,40 +310,64 @@ def agentes() -> list[str]:
 
 
 def _so_letras(texto: str) -> str:
-    import unicodedata
-
     base = unicodedata.normalize("NFKD", texto.lower())
     base = "".join(c for c in base if not unicodedata.combining(c))
     return re.sub(r"[^a-z0-9]+", "-", base).strip("-")
 
 
+def campo_no_cabecalho(texto: str, campo: str = "name") -> str | None:
+    """Um campo (name, description...) do bloco --- ... --- do começo de um agente. Só do
+    cabeçalho, nunca do corpo; aceita arquivo salvo com BOM."""
+    linhas = texto.lstrip("\ufeff").splitlines()
+    if not linhas or linhas[0].strip() != "---":
+        return None
+    for linha in linhas[1:]:
+        if linha.strip() == "---":
+            return None
+        chave, _, valor = linha.partition(":")
+        if chave.strip() == campo and valor.strip():
+            return valor.strip().strip("\"'")
+    return None
+
+
+@lru_cache(maxsize=4)
+def _mapa_agency(raiz: str) -> tuple[tuple[str, str, str], ...]:
+    """(nome do arquivo, name: em letras simples, caminho) de cada especialista. Lido uma vez por
+    abertura do Jarvis: trocar a coleção pede fechar e abrir o Jarvis de novo."""
+    pasta = Path(raiz)
+    mapa = []
+    for arquivo in sorted(pasta.rglob("*.md")):
+        if arquivo.name == "INDICE.md":
+            continue
+        try:
+            with open(arquivo, encoding="utf-8", errors="replace") as f:
+                nome = campo_no_cabecalho(f.read(1200))
+        except OSError:
+            continue
+        mapa.append((arquivo.stem, _so_letras(nome or ""), arquivo.relative_to(pasta).as_posix()))
+    return tuple(mapa)
+
+
 def agente_agency(nome: str) -> str | None:
     """Caminho (a partir da pasta Agency) do especialista com esse nome, ou None.
 
-    Aceita o nome do arquivo ("finance-tax-strategist"), o fim dele ("tax-strategist") ou o nome
-    que está dentro do arquivo ("Tax Strategist")."""
+    Procura em camadas e só aceita uma resposta única em cada uma: 1) o nome do arquivo
+    ("finance-tax-strategist"); 2) o nome de dentro do arquivo ("Tax Strategist"); 3) o fim do nome
+    do arquivo ("tax-strategist"). Assim "Data Engineer" acha o engineering-data-engineer mesmo
+    existindo também um gis-spatial-data-engineer."""
     procurado = _so_letras(nome or "")
     if not procurado:
         return None
-    raiz = pasta_jarvis() / "claude" / "agency"
-    candidatos = []
-    for arquivo in sorted(raiz.rglob("*.md")):
-        if arquivo.name == "INDICE.md":
-            continue
-        caminho = arquivo.relative_to(raiz).as_posix()
-        if arquivo.stem == procurado:
-            return caminho
-        if arquivo.stem.endswith("-" + procurado):
-            candidatos.append(caminho)
-            continue
-        try:
-            cabeca = arquivo.read_text(encoding="utf-8")[:600]
-        except OSError:
-            continue
-        achado = re.search(r"^name:\s*(.+)$", cabeca, re.MULTILINE)
-        if achado and _so_letras(achado.group(1).strip().strip("\"'")) == procurado:
-            candidatos.append(caminho)
-    return candidatos[0] if len(candidatos) == 1 else None
+    mapa = _mapa_agency(str(pasta_jarvis() / "claude" / "agency"))
+    for bate in (lambda stem, nome_: stem == procurado,
+                 lambda stem, nome_: nome_ == procurado,
+                 lambda stem, nome_: stem.endswith("-" + procurado)):
+        achados = [caminho for stem, nome_, caminho in mapa if bate(stem, nome_)]
+        if len(achados) == 1:
+            return achados[0]
+        if achados:
+            return None  # serve para mais de um: melhor não chutar
+    return None
 
 
 # ---------------- conversar com o Claude Code ----------------
@@ -528,11 +575,7 @@ def separar_fala(texto: str) -> tuple[str, str]:
 
 
 def _nome_de_arquivo(texto: str) -> str:
-    import unicodedata
-
-    base = unicodedata.normalize("NFKD", texto.lower())
-    base = "".join(c for c in base if not unicodedata.combining(c))
-    base = re.sub(r"[^a-z0-9]+", "-", base).strip("-")[:50] or "tarefa"
+    base = _so_letras(texto)[:50] or "tarefa"
     return f"{datetime.now():%Y-%m-%d-%H%M}-{base}.md"
 
 
@@ -546,16 +589,31 @@ def salvar_relatorio(pedido: str, conteudo: str) -> Path | None:
 
 
 # ---------------- tarefas (pesquisa, análise, agentes) ----------------
+_SO_RASCUNHO = " Onde ele falar em publicar, enviar ou usar conectores, prepare só o rascunho."
+
+
+def _instrucao_do_agente(agente: str | None) -> str:
+    """O que vai no pedido sobre o agente. O nome vem do Gemini: no texto entra só o caminho de um
+    arquivo que existe (ou uma versão limpa e curta do nome, como dica)."""
+    agente = (agente or "").strip()
+    if not agente:
+        return ""
+    if agente in agentes():
+        return f"\nSiga as instruções do agente do arquivo .claude/skills/{agente}/SKILL.md nesta pasta." + _SO_RASCUNHO
+    especialista = agente_agency(agente)
+    if especialista:
+        return f"\nSiga as instruções do especialista do arquivo Agency/{especialista} nesta pasta." + _SO_RASCUNHO
+    dica = " ".join(re.sub(r"[^\w &+-]", " ", agente).split())[:60]
+    if not dica:
+        return ""
+    return (f"\nO Erton pediu o especialista \"{dica}\", que não achei pelo nome: procure o mais parecido "
+            "nos índices da pasta Agency e, se nenhum servir, diga isso e faça a tarefa sem ele.")
+
+
 def fazer_tarefa(pedido: str, agente: str | None = None, sessao: str | None = None) -> Resposta:
     pasta = preparar_pasta()
     texto = REGRAS + REGRAS_TAREFA.format(pasta=pasta, dados=pasta_dados())
-    especialista = agente_agency(agente) if agente and agente not in agentes() else None
-    if especialista:
-        texto += (f"\nSiga as instruções do especialista '{agente}' (arquivo Agency/{especialista} nesta "
-                  "pasta). Onde ele falar em publicar, enviar ou usar conectores, prepare só o rascunho.")
-    elif agente:
-        texto += (f"\nSiga as instruções do agente '{agente}' (arquivo .claude/skills/{agente}/SKILL.md "
-                  "nesta pasta). Onde ele falar em publicar, enviar ou usar conectores, prepare só o rascunho.")
+    texto += _instrucao_do_agente(agente)
     texto += f"\n\nPEDIDO DO ERTON:\n{pedido.strip()}"
     permitir = [*LEITURA, *_ler(pasta, pasta_dados()), f"Edit({regra_de_pasta(pasta)}/**)"]
     return rodar(texto, permitir, pasta, sessao=sessao, pastas_extras=[pasta_dados()])
