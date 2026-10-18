@@ -214,7 +214,10 @@ parecido nos índices. Para atualizar a coleção: troque os arquivos de `claude
 Travas (no código, conferidas com o Claude Code de verdade):
 - Nas **tarefas** (pesquisas, relatórios, agentes), o Claude só **escreve** em
   `Documentos\Jarvis Ultron\Claude` e só **lê** a pasta `Documentos\Jarvis Ultron` (clientes.txt,
-  carteira.txt, Faturas...), menos os arquivos de lembretes e rotinas.
+  carteira.txt, Faturas...), menos os arquivos de lembretes e rotinas. Dentro de `Claude`, ele não
+  muda a pasta `Agency` nem os `CLAUDE.md` (as instruções que toda tarefa segue): assim uma página da
+  internet com instruções escondidas não vira regra permanente. Você continua podendo editar o
+  `CLAUDE.md` à mão.
 - Para **mudar o código**, ele **lê** a pasta do programa do Jarvis (no plano) e, só depois do seu
   "ok", **muda** essa pasta. Mesmo aí ele nunca lê o `.env`, as chaves (`config/api_keys.json`, as
   credenciais do Gmail), a memória do Jarvis nem a pasta `.git`, e nunca muda a `.venv`, `tmp`,

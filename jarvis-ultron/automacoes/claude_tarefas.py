@@ -103,7 +103,7 @@ def _tarefa(args: dict, jarvis, chefe) -> str:
     pedido = str(args.get("request", "")).strip()
     agente = str(args.get("agent", "") or "").strip() or None
     # Nome que não é de nenhum agente não se perde: o chefe manda como dica (limpa) para o Claude procurar
-    conhecido = bool(agente) and (agente in chefe.agentes() or bool(chefe.agente_agency(agente)))
+    conhecido = bool(chefe.agente_do_jarvis(agente) or (agente and chefe.agente_agency(agente)))
     with _trava:
         sessao = _estado["ultima_sessao"] if args.get("continue_last") else None
 
