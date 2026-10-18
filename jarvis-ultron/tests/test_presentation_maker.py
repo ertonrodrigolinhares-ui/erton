@@ -4,6 +4,7 @@ import types
 import unittest
 import zipfile
 import xml.etree.ElementTree as ET
+from contextlib import contextmanager
 from io import BytesIO
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -24,6 +25,15 @@ from actions.presentations.sources import ingest_sources
 from agent import planner
 from agent.task_queue import TaskQueue
 from core.qa_audit import declared_tools
+from memory import task_history
+
+
+@contextmanager
+def _historico_temporario():
+    """A fila grava cada tarefa no memory/task_history.json: no teste, numa pasta temporária (nunca no do Erton)."""
+    with tempfile.TemporaryDirectory() as pasta, \
+            patch.object(task_history, "HISTORY_PATH", Path(pasta) / "task_history.json"):
+        yield
 
 
 def _sample_plan():
@@ -801,7 +811,8 @@ class PresentationMakerTests(unittest.TestCase):
         task = queue._tasks[task_id]
         task.status = task.status.RUNNING
         queue._active_count = 1
-        queue._run_task(task)
+        with _historico_temporario():
+            queue._run_task(task)
         status = queue.get_status(task_id)
         self.assertEqual(status["status"], "completed")
         self.assertEqual(status["progress"], 100)
@@ -836,7 +847,8 @@ class PresentationMakerTests(unittest.TestCase):
         task = queue._tasks[task_id]
         task.status = task.status.RUNNING
         queue._active_count = 1
-        queue._run_task(task)
+        with _historico_temporario():
+            queue._run_task(task)
         status = queue.get_status(task_id)
         self.assertEqual(status["status"], "cancelled")
         self.assertEqual(status["phase"], "Cancelled")

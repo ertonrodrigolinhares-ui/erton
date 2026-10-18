@@ -1,13 +1,24 @@
 import asyncio
+import os
+import tempfile
 import threading
 import unittest
 import uuid
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
+
+# Jarvis Ultron: o banco destes testes fica numa pasta temporária, nunca no tmp/jarvis_web.db de verdade.
+# Tem de vir antes de importar o api: ele lê o DATABASE_URL uma vez só, ao ser importado.
+_PASTA_BANCO = tempfile.TemporaryDirectory(prefix="jarvis-web-testes-", ignore_cleanup_errors=True)
+_BANCO = Path(_PASTA_BANCO.name) / "jarvis_web.db"
+_URL_ANTES = os.environ.get("DATABASE_URL")
+os.environ["DATABASE_URL"] = "sqlite:///" + _BANCO.as_posix()
 
 from fastapi.testclient import TestClient
 from sqlalchemy import delete, select
 
+from api import database
 from api.database import SessionLocal, init_db
 from api.models import (
     AnswerCacheEntry,
@@ -25,9 +36,21 @@ from core.tenant import tenant_scope
 from memory.memory_manager import load_memory, update_memory
 
 
+def tearDownModule():
+    database.engine.dispose()  # solta o arquivo do banco (no Windows, senão a pasta não apaga)
+    _PASTA_BANCO.cleanup()
+    if _URL_ANTES is None:
+        os.environ.pop("DATABASE_URL", None)
+    else:
+        os.environ["DATABASE_URL"] = _URL_ANTES
+
+
 class HostedApiTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        # se outro teste importou o api antes, o banco seria o de verdade: para aqui, sem gravar nada
+        if database.DATABASE_URL != "sqlite:///" + _BANCO.as_posix():
+            raise RuntimeError(f"Os testes do servidor não estão no banco temporário: {database.DATABASE_URL}")
         init_db()
         cls.client = TestClient(app)
         cls.context = cls.client.__enter__()

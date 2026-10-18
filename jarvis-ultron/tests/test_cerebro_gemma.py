@@ -619,10 +619,14 @@ class TelaSemChaveNoModoGemmaTests(unittest.TestCase):
         cls.app = QApplication.instance() or QApplication([])
 
     def test_abre_sem_pedir_a_chave_do_gemini(self):
+        import tempfile
         import ui
         from PyQt6.QtCore import QCoreApplication
 
-        with patch.dict(os.environ, {"JARVIS_CEREBRO": "gemma", "GEMINI_API_KEY": ""}):
+        # a tela grava o config/api_keys.json: no teste, numa pasta temporária (nunca no do Erton)
+        with tempfile.TemporaryDirectory() as pasta, \
+                patch.dict(os.environ, {"JARVIS_CEREBRO": "gemma", "GEMINI_API_KEY": ""}), \
+                patch.object(ui, "API_FILE", Path(pasta) / "api_keys.json"):
             win = ui.MainWindow("face.png")
             try:
                 for _ in range(5):
