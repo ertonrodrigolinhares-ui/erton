@@ -2653,7 +2653,7 @@ class PainelUltronTests(unittest.TestCase):
         self.assertTrue(painel.isVisible())
         # acha o botão "Autodiagnóstico" e clica
         from PyQt6.QtWidgets import QPushButton
-        alvo = next(b for b in painel.findChildren(QPushButton) if "Autodiagnóstico" in b.text())
+        alvo = next(b for b in painel.findChildren(QPushButton) if "Autodiagnóstico" in b.toolTip())
         alvo.click()
         self.assertIn(("self_diagnosis", {}), chamadas)
         self.assertFalse(painel.isVisible())  # fecha depois de rodar

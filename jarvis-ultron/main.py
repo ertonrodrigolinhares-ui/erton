@@ -3366,6 +3366,14 @@ _AVISOS_EM_PORTUGUES = {
                                 "quando ficar pronto."),
     "There is no Geekie list yet": ("Ainda não há lista do Geekie. O Hermes lê o Geekie One às 7h e às 18h; "
                                     "entre uma vez no Geekie One pelo navegador do Hermes."),
+    # agentes do painel Ultron (rodam no Claude)
+    "Claude is working on it": "O Claude está trabalhando nisso; eu aviso quando ficar pronto.",
+    "Claude is still working on the previous task": ("O Claude ainda está terminando a tarefa anterior. "
+                                                     "Tente de novo daqui a pouco."),
+    "Private mode is on, so nothing is sent to Claude": ("No modo privado nada vai para o Claude. Diga "
+                                                         "'modo normal' para usar os agentes."),
+    "Claude Code is not installed": ("O Claude ainda não está instalado. Dê dois cliques em 'Instalar Claude' "
+                                     "na pasta do Jarvis."),
 }
 
 

@@ -31,7 +31,7 @@ class ClienteFalso:
 
 
 SEM_RESERVA = {"JARVIS_RESERVA": "", "JARVIS_RESERVA_CHAVE": "", "JARVIS_RESERVA_URL": "",
-               "JARVIS_RESERVA_MODELO": "", "GROQ_API_KEY": ""}
+               "JARVIS_RESERVA_MODELO": "", "GROQ_API_KEY": "", "JARVIS_GEMMA_MODELO": "", "JARVIS_RESERVA_GEMMA": ""}
 
 
 class ConfiguracaoTests(unittest.TestCase):
@@ -65,6 +65,41 @@ class ConfiguracaoTests(unittest.TestCase):
             self.assertIsInstance(reserva_da_configuracao(), ReservaGroq)
         with patch.dict(os.environ, SEM_RESERVA):
             self.assertIsNone(reserva_da_configuracao())
+
+
+class GemmaComoReservaTests(unittest.TestCase):
+    def test_gemma_instalado_vem_primeiro_na_fila(self):
+        from core.cerebro_gemma import CerebroGemma
+
+        with patch.dict(os.environ, dict(SEM_RESERVA, JARVIS_GEMMA_MODELO="jarvis-gemma", GROQ_API_KEY="gsk_x")):
+            r = reserva_da_configuracao()
+        self.assertIsInstance(r, ReservaEmFila)
+        self.assertIsInstance(r.reservas[0], CerebroGemma)
+        self.assertEqual(r.nome, "Gemma 4")
+        self.assertIsInstance(r.reservas[1], ReservaGroq)
+
+    def test_so_o_gemma_tambem_fica_em_fila(self):
+        # o Jarvis trata um CerebroGemma sozinho como modo privado; aqui ele é só reserva
+        with patch.dict(os.environ, dict(SEM_RESERVA, JARVIS_GEMMA_MODELO="jarvis-gemma")):
+            self.assertIsInstance(reserva_da_configuracao(), ReservaEmFila)
+
+    def test_desligar_o_gemma_da_reserva(self):
+        with patch.dict(os.environ, dict(SEM_RESERVA, JARVIS_GEMMA_MODELO="jarvis-gemma",
+                                         JARVIS_RESERVA_GEMMA="0", GROQ_API_KEY="gsk_x")):
+            self.assertIsInstance(reserva_da_configuracao(), ReservaGroq)
+
+    def test_ollama_desligado_passa_para_o_groq(self):
+        from core import cerebro_gemma
+        from core.cerebro_gemma import CerebroGemma
+
+        class APIConnectionError(Exception):
+            pass
+
+        gemma = CerebroGemma(cliente=ClienteFalso(roteiro=[APIConnectionError("refused")]))
+        groq = ReservaGroq("gsk", cliente=ClienteFalso(["openai/gpt-oss-120b"], ["Estou aqui."]))
+        with patch.object(cerebro_gemma, "ollama_respondendo", return_value=False), \
+                patch.object(cerebro_gemma, "garantir_ollama", return_value=False):
+            self.assertEqual(ReservaEmFila([gemma, groq]).responder("oi"), "Estou aqui.")
 
 
 class ModeloTests(unittest.TestCase):

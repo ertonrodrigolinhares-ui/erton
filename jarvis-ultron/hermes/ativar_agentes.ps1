@@ -1,24 +1,39 @@
-# Ativa (ou desativa) os agentes guardados em hermes\agentes-futuros no perfil "jarvis" do Hermes.
+# Liga (ou desliga) os agentes do Jarvis Ultron. Cada agente ligado vira um botao no painel Ultron
+# e roda no Claude. Se o Hermes estiver instalado, o agente tambem e ligado no perfil "jarvis" dele.
+# A lista dos ligados fica em Documentos\Jarvis Ultron\agentes_ligados.txt (um nome por linha).
 
 $ErrorActionPreference = "Stop"
-$kit = Split-Path -Parent $MyInvocation.MyCommand.Path
+$kit = Split-Path -Parent $MyInvocation.MyCommand.Path        # ...\jarvis-ultron\hermes
+$ultron = Split-Path -Parent $kit
+$skills = Join-Path $ultron "claude\skills"
 $guardados = Join-Path $kit "agentes-futuros"
+$dados = Join-Path $env:USERPROFILE "Documents\Jarvis Ultron"
+$lista = Join-Path $dados "agentes_ligados.txt"
+$utf8 = New-Object System.Text.UTF8Encoding $false
 $raizHermes = if ($env:HERMES_HOME) { $env:HERMES_HOME } else { Join-Path $env:LOCALAPPDATA "hermes" }
-$ativos = Join-Path $raizHermes "profiles\jarvis\skills\jarvis"
+$ativosHermes = Join-Path $raizHermes "profiles\jarvis\skills\jarvis"
+$comHermes = Test-Path $ativosHermes
 
-if (-not (Test-Path $ativos)) {
-    Write-Host "O Hermes do Jarvis ainda nao esta instalado. Rode o 'Instalar Hermes' primeiro." -ForegroundColor Yellow
-    Read-Host "Aperte Enter para sair"
-    exit 1
+function Ler-Ligados {
+    if (-not (Test-Path $lista)) { return @() }
+    return @([System.IO.File]::ReadAllLines($lista) | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 }
 
-$agentes = @(Get-ChildItem $guardados -Directory | Sort-Object Name)
+function Gravar-Ligados($nomes) {
+    New-Item -ItemType Directory -Force -Path $dados | Out-Null
+    $texto = ""
+    foreach ($n in $nomes) { $texto += "$n`n" }
+    [System.IO.File]::WriteAllText($lista, $texto, $utf8)
+}
+
+$agentes = @(Get-ChildItem $skills -Directory | Sort-Object Name)
+$ligados = @(Ler-Ligados)
 Write-Host ""
-Write-Host "Agentes guardados:" -ForegroundColor Cyan
+Write-Host "Agentes do Jarvis (os LIGADOS viram botoes no painel Ultron e rodam no Claude):" -ForegroundColor Cyan
 for ($i = 0; $i -lt $agentes.Count; $i++) {
     $nome = $agentes[$i].Name
-    $estado = if (Test-Path (Join-Path $ativos $nome)) { "[LIGADO]   " } else { "[desligado]" }
-    $linha = (Get-Content (Join-Path $agentes[$i].FullName "SKILL.md") | Where-Object { $_ -like "description:*" } | Select-Object -First 1)
+    $estado = if ($ligados -contains $nome) { "[LIGADO]   " } else { "[desligado]" }
+    $linha = (Get-Content (Join-Path $agentes[$i].FullName "SKILL.md") -Encoding UTF8 | Where-Object { $_ -like "description:*" } | Select-Object -First 1)
     $descricao = if ($linha) { $linha.Substring(12).Trim().Trim('"') } else { "" }
     Write-Host ("{0,2}. {1} {2}" -f ($i + 1), $estado, $nome)
     Write-Host ("       {0}" -f $descricao) -ForegroundColor DarkGray
@@ -28,17 +43,21 @@ $resposta = Read-Host "Digite os numeros para LIGAR ou DESLIGAR (ex.: 1 4 10), o
 foreach ($parte in ($resposta -split "[ ,;]+" | Where-Object { $_ })) {
     $n = 0
     if (-not [int]::TryParse($parte, [ref]$n) -or $n -lt 1 -or $n -gt $agentes.Count) { continue }
-    $agente = $agentes[$n - 1]
-    $destino = Join-Path $ativos $agente.Name
-    if (Test-Path $destino) {
-        Remove-Item $destino -Recurse -Force
-        Write-Host "Desligado: $($agente.Name)" -ForegroundColor Yellow
+    $nome = $agentes[$n - 1].Name
+    $noHermes = Join-Path $ativosHermes $nome
+    if ($ligados -contains $nome) {
+        $ligados = @($ligados | Where-Object { $_ -ne $nome })
+        if ($comHermes -and (Test-Path $noHermes)) { Remove-Item $noHermes -Recurse -Force }
+        Write-Host "Desligado: $nome" -ForegroundColor Yellow
     } else {
-        Copy-Item $agente.FullName $destino -Recurse -Force
-        Write-Host "Ligado: $($agente.Name)" -ForegroundColor Green
+        $ligados = @($ligados) + $nome
+        $origemHermes = Join-Path $guardados $nome
+        if ($comHermes -and (Test-Path $origemHermes)) { Copy-Item $origemHermes $noHermes -Recurse -Force }
+        Write-Host "Ligado: $nome" -ForegroundColor Green
     }
 }
+Gravar-Ligados $ligados
 Write-Host ""
-Write-Host "Pronto. Para usar, peca ao Jarvis pelo nome, ex.: 'Hey Jarvis, pede ao Hermes o resumo dos meus treinos'."
-Write-Host "Veja em agentes-futuros\LEIA-ME.md o que cada um precisa (alguns pedem conectar um app)."
+Write-Host "Pronto. Abra o painel Ultron (diga 'Jarvis, modo Ultron'): os agentes ligados aparecem como botoes."
+Write-Host "Eles rodam no Claude: rode o 'Instalar Claude' antes, se ainda nao rodou."
 Read-Host "Aperte Enter para fechar"

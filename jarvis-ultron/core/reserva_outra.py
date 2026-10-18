@@ -131,7 +131,7 @@ def _whisper_da_api(cliente, pcm: bytes, taxa: int, modelos) -> str:
 
 
 ERROS_DE_LIMITE = ("RateLimitError", "AuthenticationError", "PermissionDeniedError", "InternalServerError",
-                   "APIConnectionError", "APITimeoutError", "NotFoundError")
+                   "APIConnectionError", "APITimeoutError", "NotFoundError", "ConnectError", "ConnectionError")
 
 
 class ReservaEmFila:
@@ -171,9 +171,24 @@ class ReservaEmFila:
         return ""
 
 
+def _gemma_reserva():
+    """O Gemma 4 do PC como primeira reserva, quando instalado (o "Instalar Gemma 4" grava
+    JARVIS_GEMMA_MODELO). JARVIS_RESERVA_GEMMA=0 no .env tira ele da fila."""
+    if os.environ.get("JARVIS_RESERVA_GEMMA", "1").strip().lower() in ("0", "nao", "não", "false", "off"):
+        return None
+    if not os.environ.get("JARVIS_GEMMA_MODELO", "").strip():
+        return None
+    from core.cerebro_gemma import CerebroGemma
+
+    return CerebroGemma.da_configuracao()
+
+
 def reserva_da_configuracao():
-    """A reserva do Jarvis: a outra empresa (se configurada) e o Groq, em fila."""
-    fila = [r for r in (ReservaOutra.da_configuracao(), ReservaGroq.da_configuracao()) if r is not None]
+    """A reserva do Jarvis, em fila: Gemma 4 do PC (se instalado), a outra empresa e o Groq."""
+    gemma = _gemma_reserva()
+    fila = [r for r in (gemma, ReservaOutra.da_configuracao(), ReservaGroq.da_configuracao()) if r is not None]
     if not fila:
         return None
+    if gemma is not None:  # sempre em fila: o Gemma aqui é reserva, não o modo privado
+        return ReservaEmFila(fila)
     return fila[0] if len(fila) == 1 else ReservaEmFila(fila)
