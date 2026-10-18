@@ -33,6 +33,10 @@ BOTOES = [
     ("school_tasks", "✎", "Geekie", "Atividades pendentes", {}),
 ]
 
+# Nome curto para a lateral da tela do orbe (coluna estreita: os nomes longos eram cortados)
+CURTOS = {"Autodiagnóstico": "Diagnóstico", "Proteção do PC": "Proteção PC", "Vigia do Wi-Fi": "Vigia Wi-Fi",
+          "Meus lembretes": "Lembretes", "Minhas rotinas": "Rotinas", "Memória no HD": "Backup HD"}
+
 _montado = threading.Event()
 
 
@@ -146,7 +150,8 @@ def _construir(jarvis):
     # Também coloca os botões na lateral da tela do orbe (a tela cheia do vídeo).
     from PyQt6.QtCore import QTimer
 
-    itens_lateral = [(nome, emoji, titulo, args) for (nome, emoji, titulo, _sub, args) in itens]
+    itens_lateral = [(nome, emoji, CURTOS.get(titulo, titulo), args, f"{titulo}: {sub}")
+                     for (nome, emoji, titulo, sub, args) in itens]
     acao = lambda n, a: jarvis.rodar_automacao_ultron(n, a)
     tentativas = {"n": 0}
 

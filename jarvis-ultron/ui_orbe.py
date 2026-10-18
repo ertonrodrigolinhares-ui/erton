@@ -923,7 +923,7 @@ class Cena(QWidget):
 
     # ----- botões do Ultron na lateral
     def montar_botoes_ultron(self, itens, acao):
-        """itens: lista de (nome_ferramenta, emoji, titulo, args). acao(nome, args) roda a automação."""
+        """itens: lista de (nome_ferramenta, emoji, titulo, args[, dica]). acao(nome, args) roda a automação."""
         self._acao_ultron = acao
         # limpa o que já houver
         while self._grade_ultron.count():
@@ -932,8 +932,9 @@ class Cena(QWidget):
             if w is not None:
                 w.setParent(None)
         self._botoes_ultron = []
-        for i, (nome, emoji, titulo, args) in enumerate(itens):
+        for i, (nome, emoji, titulo, args, *dica) in enumerate(itens):
             b = QPushButton(f"{emoji}  {titulo}")
+            b.setToolTip(dica[0] if dica else titulo)
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             b.setMinimumHeight(38)
             b.setFont(fonte(SANS, 8.5, QFont.Weight.Bold))
@@ -1173,6 +1174,23 @@ class Biometria(QWidget):
 
 
 # ---------------------------------------------------------------- dados do briefing
+
+_ACENTOS_CIDADE = {"joao pessoa": "João Pessoa", "sao paulo": "São Paulo", "brasilia": "Brasília",
+                   "belem": "Belém", "goiania": "Goiânia", "maceio": "Maceió", "sao luis": "São Luís",
+                   "vitoria": "Vitória", "florianopolis": "Florianópolis", "cuiaba": "Cuiabá",
+                   "macapa": "Macapá", "patos": "Patos", "sousa": "Sousa", "cabedelo": "Cabedelo"}
+
+
+def nome_da_cidade(cidade: str) -> str:
+    """Como a cidade aparece na tela: "joao pessoa" -> "João Pessoa" (a busca do clima usa o original)."""
+    texto = " ".join(str(cidade or "").split())
+    if texto.lower() in _ACENTOS_CIDADE:
+        return _ACENTOS_CIDADE[texto.lower()]
+    if texto != texto.lower():
+        return texto  # já foi escrita com maiúsculas: respeita
+    pequenas = {"de", "da", "do", "das", "dos", "e"}
+    return " ".join(p if (i and p in pequenas) else p.capitalize() for i, p in enumerate(texto.split(" ")))
+
 
 def _clima() -> dict:
     cidade = os.environ.get("JARVIS_CIDADE", "Campina Grande")
@@ -1435,7 +1453,7 @@ class Resumo(QWidget):
 
         # Clima
         if clima.get("ok"):
-            c1 = cartao("Previsão · clima", clima["cidade"], self)
+            c1 = cartao("Previsão · clima", nome_da_cidade(clima["cidade"]), self)
             linha = QHBoxLayout()
             sol = rotulo("☀", AMBAR, 20, quebra=False)
             temp = rotulo(clima.get("temp") or "--", TEXTO, 22, QFont.Weight.Bold, MONO, False)
@@ -1445,7 +1463,7 @@ class Resumo(QWidget):
             if clima.get("min"):
                 c1.corpo.addWidget(rotulo(f"MÍN {clima['min']}   ·   MÁX {clima['max']}", TEXTO, 8, QFont.Weight.Bold, MONO))
         else:
-            c1 = cartao("Previsão · clima", clima["cidade"], self)
+            c1 = cartao("Previsão · clima", nome_da_cidade(clima["cidade"]), self)
             c1.corpo.addWidget(rotulo("Clima indisponível agora.", TEXTO2, 9))
 
         # Agenda

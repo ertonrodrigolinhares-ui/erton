@@ -2835,3 +2835,25 @@ class RespostaDigitadaFalaTests(unittest.TestCase):
             if t.name == "VozExterna":
                 t.join(5)
         self.assertEqual(falado, ["Bom dia, Erton."])
+
+
+class NomesNaTelaTests(unittest.TestCase):
+    def test_cidade_aparece_com_maiuscula_e_acento(self):
+        import os
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from ui_orbe import nome_da_cidade
+
+        self.assertEqual(nome_da_cidade("joao pessoa"), "João Pessoa")
+        self.assertEqual(nome_da_cidade("rio de janeiro"), "Rio de Janeiro")
+        self.assertEqual(nome_da_cidade("Campina Grande"), "Campina Grande")
+
+    def test_botoes_do_ultron_na_lateral_tem_nome_curto(self):
+        import importlib.util
+        from pathlib import Path
+
+        raiz = Path(__file__).resolve().parents[1]
+        spec = importlib.util.spec_from_file_location("painel_ultron_t", raiz / "automacoes" / "painel_ultron.py")
+        m = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(m)
+        for _nome, _emoji, titulo, _sub, _args in m.BOTOES:
+            self.assertLessEqual(len(m.CURTOS.get(titulo, titulo)), 12, titulo)  # cabe na coluna da lateral
