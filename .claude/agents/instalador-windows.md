@@ -17,7 +17,7 @@ Regras para .bat:
 - Sempre entre aspas em caminhos.
 - Mensagens em português simples, dizendo o que está acontecendo e o que fazer se der erro.
 - Termine com `pause` quando houver erro, para a janela não fechar antes de a pessoa ler.
-- Mantenha as quebras de linha do Windows (CRLF) — veja `.gitattributes`.
+- Salve os .bat com quebras de linha do Windows (CRLF). O `.gitattributes` marca `*.bat -text`, então o Git não converte: o arquivo sobe exatamente como foi salvo.
 - Dependência opcional que falhar não pode impedir o Jarvis de abrir.
 - Nunca peça para desativar antivírus nem rodar como administrador sem necessidade real.
 
