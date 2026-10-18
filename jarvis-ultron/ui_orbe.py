@@ -13,6 +13,8 @@
 Configurações (.env):
 - JARVIS_VISUAL=classico  volta para a esfera antiga (e a tela antiga).
 - JARVIS_CENA=0           mantém o anel, mas dentro da tela antiga.
+- JARVIS_TELA=paineis     abre já com os painéis dos lados (o padrão é a tela limpa do vídeo:
+                          só o anel; o botão PAINÉIS, no canto, mostra e esconde os painéis).
 - JARVIS_BIOMETRIA=0      pula a câmera no "bom dia".
 - JARVIS_NOME=Erton       nome usado na saudação.
 Tecla F2 alterna entre a cena e a tela antiga.
@@ -722,8 +724,21 @@ class Cena(QWidget):
         self.b_maos = self._botao_modo("⛭  MÃOS LIVRES", "Responde a tudo o que você falar", "modo mãos livres")
         self.acender_modo(True)
 
+        # Tela limpa, como no vídeo: só o anel. Os painéis dos lados aparecem pelo botão PAINÉIS.
+        self.limpa = os.environ.get("JARVIS_TELA", "").strip().lower() not in ("paineis", "painéis", "completa")
+        self.b_paineis = QPushButton(self)
+        self.b_paineis.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.b_paineis.setFont(fonte(MONO, 7.5, QFont.Weight.Bold, 2))
+        self.b_paineis.clicked.connect(self.alternar_paineis)
+        self.entrada_rapida = QLineEdit(self)
+        self.entrada_rapida.setPlaceholderText("Converse com o JARVIS...")
+        self.entrada_rapida.setFont(fonte(SANS, 9.5))
+        self.entrada_rapida.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.entrada_rapida.returnPressed.connect(self._enviar_rapido)
+        self._estilo_tela_limpa()
+
         self._painel = [self.b_chamada, self.b_maos, self.p_voz, self.p_sistema, self.p_status, self.p_ultron,
-                        self.p_ativ, self.p_hist, self.p_rede, self.canal]
+                        self.p_ativ, self.p_hist, self.p_rede, self.canal, self.b_paineis, self.entrada_rapida]
 
         self._t = QTimer(self); self._t.timeout.connect(self._atualizar); self._t.start(1000)
         self._t_voz = QTimer(self); self._t_voz.timeout.connect(self._amostra_voz); self._t_voz.start(1000)
@@ -758,7 +773,7 @@ class Cena(QWidget):
         W, H = self.width(), self.height()
         self.hud.setGeometry(0, 0, W, H)
         m, L = 18, self.LARG
-        mostrar_lados = W >= 980
+        mostrar_lados = W >= 980 and not self.limpa
         self.topo_esq.setGeometry(m, 8, 400, 20)
         self.topo_dir.setGeometry(W - 420 - m, 8, 420, 20)
         self.topo_dir.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
@@ -787,7 +802,13 @@ class Cena(QWidget):
             self.canal.setGeometry(W - L - m, y, L, altura_canal)
         else:
             self.canal.setGeometry(m, H - 230, W - 2 * m, 170)
+        self.canal.setVisible(not self.limpa)
         self.botao.move(int(W / 2 - 23), H - 58)
+        self.b_paineis.setText("✕  ESCONDER PAINÉIS" if not self.limpa else "☰  PAINÉIS")
+        self.b_paineis.setGeometry(m, H - 40, 168 if not self.limpa else 104, 26)
+        larg_e = int(min(440, W * 0.42))
+        self.entrada_rapida.setGeometry(int((W - larg_e) / 2), H - 104, larg_e, 34)
+        self.entrada_rapida.setVisible(self.limpa)
         larg_b, alt_b = 172, 30
         x_b = int(W / 2 - larg_b - 6)
         self.b_chamada.setGeometry(x_b, 54, larg_b, alt_b)
@@ -804,6 +825,33 @@ class Cena(QWidget):
         ctl = getattr(self.win, "_orbe", None)
         if ctl is not None:
             ctl.reencaixar()
+
+    def alternar_paineis(self):
+        """Botão PAINÉIS: mostra/esconde os painéis dos lados (a tela limpa é a do vídeo)."""
+        # o que estava sendo digitado passa para o campo que vai aparecer
+        if self.limpa:
+            self.canal.entrada.setText(self.entrada_rapida.text())
+        else:
+            self.entrada_rapida.setText(self.canal.entrada.text())
+        self.limpa = not self.limpa
+        self._organizar()
+        (self.entrada_rapida if self.limpa else self.canal.entrada).setFocus()
+
+    def _enviar_rapido(self):
+        """Campo de digitar da tela limpa: o mesmo caminho do canal."""
+        self.canal.entrada.setText(self.entrada_rapida.text())
+        self.entrada_rapida.clear()
+        self.canal._enviar()
+
+    def _estilo_tela_limpa(self):
+        self.b_paineis.setStyleSheet(
+            f"QPushButton {{ color:{cor(TEXTO2).name()}; background: {_rgba('#041438', 150)};"
+            f" border:1px solid {_rgba('#3a78d8', 110)}; border-radius:13px; padding:2px 10px; }}"
+            f" QPushButton:hover {{ color:{cor(CIANO).name()}; border-color:{cor(CIANO).name()}; }}")
+        self.entrada_rapida.setStyleSheet(
+            f"QLineEdit{{color:{cor(TEXTO).name()}; background: {_rgba('#041438', 120)};"
+            f" border:1px solid {_rgba('#5fb4ff', 60)}; border-radius:17px; padding:6px 14px;}}"
+            f" QLineEdit:focus{{border-color:{cor(CIANO).name()}; background: {_rgba('#041438', 190)};}}")
 
     def _painel_ultron(self):
         """A sobreposição ULTRON (automação painel_ultron), se estiver instalada."""
@@ -919,6 +967,8 @@ class Cena(QWidget):
             chip.definir(chip.text(), chip._tom)
         self.canal.retingir()
         self._estilo_botoes_ultron()
+        if hasattr(self, "b_paineis"):
+            self._estilo_tela_limpa()
         self.acender_modo(getattr(self, "_maos_livres", True))
 
     # ----- botões do Ultron na lateral
@@ -1533,8 +1583,10 @@ class Resumo(QWidget):
 
     def _encaixar(self):
         W, H = self.hud.width(), self.hud.height()
-        lw = int(min(W * 0.46, 640)) if W >= 980 else int(W * 0.9)
-        lh = int(min(H * 0.64, 520))
+        # Como no vídeo: os cartões ficam DENTRO do anel (o brilho dele aparece em volta)
+        R = min(W, H) * 0.34
+        lw = int(min(2 * R * 0.82, 640)) if W >= 980 else int(W * 0.9)
+        lh = int(min(2 * R * 0.80, 520))
         self.setGeometry(int((W - lw) / 2), int((H - lh) / 2) + 6, lw, lh)
         ew = int(min(lw, 560))
         self.etapas.setGeometry(int((lw - ew) / 2), int(lh * 0.3), ew, 170)

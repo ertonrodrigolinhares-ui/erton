@@ -72,6 +72,16 @@ Cópia do projeto **JARVIS-OS V.2** (licença MIT, veja `LICENSE`), com ajustes 
 2. Extraia este pacote numa pasta nova e siga os passos acima (Iniciar Jarvis Ultron → Instalar Hermes).
 3. A pasta antiga do Jarvis pode ser apagada depois que a nova estiver funcionando.
 
+## Tela limpa, como no vídeo
+
+O Jarvis abre só com o anel no centro, como no vídeo que serviu de modelo. Os cartões do "bom dia"
+aparecem dentro do anel. Para digitar, use o campo embaixo do anel; a resposta sai em voz, mesmo no
+modo chamada.
+
+- Botão **PAINÉIS** (canto de baixo, à esquerda): mostra os painéis dos lados (sistema, status,
+  botões do Ultron e o histórico da conversa). **ESCONDER PAINÉIS** volta à tela limpa.
+- Para abrir sempre com os painéis: `JARVIS_TELA="paineis"` no `.env`.
+
 ## Tela e cérebro separados (o Jarvis não trava)
 
 O Jarvis agora roda como **dois programas** que conversam entre si, só dentro do seu PC:

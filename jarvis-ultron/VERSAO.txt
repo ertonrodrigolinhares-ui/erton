@@ -1,6 +1,11 @@
 Jarvis Ultron - versão 2026-10-17
 
 Novidades desta versão:
+- Tela limpa como no vídeo: só o anel; os cartões do "bom dia" aparecem dentro dele. Botão PAINÉIS
+  (canto de baixo) mostra/esconde os painéis dos lados. Campo de digitar embaixo do anel.
+- O Jarvis fala a resposta do que você digita (antes, no modo chamada, só escrevia).
+- Resultado dos botões do Ultron não aparece mais duas vezes; nomes dos botões inteiros.
+- Instalar Gemma 4: se a internet cair no download, continua de onde parou (até 6 tentativas).
 - Revisão final completa: 84 problemas encontrados; 83 corrigidos, cada um conferido por revisores
   independentes, com testes (607 testes passando). O que ficou: às vezes um "ok" dito muito rápido
   não é reconhecido e o Jarvis pede de novo (falha do lado seguro: nada é cobrado nem publicado).

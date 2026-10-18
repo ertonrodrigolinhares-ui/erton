@@ -112,6 +112,7 @@ class UltronNaCenaTests(unittest.TestCase):
             if w is not None:
                 w.hide()
         self.cena = self.win._orbe.cena
+        self.cena.limpa = False  # estes testes conferem os painéis dos lados (botão PAINÉIS aberto)
 
     def tearDown(self):
         ui_orbe.definir_ultron(self.win, False)
@@ -234,3 +235,77 @@ class UltronNaCenaTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TelaLimpaDoVideoTests(unittest.TestCase):
+    """Padrão = tela limpa do vídeo: só o anel; o botão PAINÉIS mostra e esconde os lados."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    def setUp(self):
+        for nome in ("JARVIS_VISUAL", "JARVIS_CENA", "JARVIS_TELA"):
+            os.environ.pop(nome, None)
+        self.win = ui.MainWindow("face.png")
+        for nome in ("_overlay", "_name_overlay"):
+            w = getattr(self.win, nome, None)
+            if w is not None:
+                w.hide()
+        self.win.resize(1300, 860)
+        self.win.show()
+        for _ in range(10):
+            self.app.processEvents()
+        self.cena = self.win._orbe.cena
+
+    def tearDown(self):
+        self.win.close()
+        self.win.deleteLater()
+
+    def test_abre_so_com_o_anel_e_o_campo_de_digitar(self):
+        cena = self.cena
+        self.assertTrue(cena.limpa)
+        for w in (cena.p_voz, cena.p_sistema, cena.p_status, cena.p_ativ, cena.p_rede, cena.canal):
+            self.assertFalse(w.isVisible())
+        self.assertTrue(cena.entrada_rapida.isVisible())
+        self.assertTrue(cena.b_paineis.isVisible())
+
+    def test_botao_paineis_mostra_e_esconde_sem_perder_o_que_foi_digitado(self):
+        cena = self.cena
+        cena.entrada_rapida.setText("me lembra de ligar")
+        cena.alternar_paineis()
+        self.assertFalse(cena.limpa)
+        self.assertTrue(cena.canal.isVisible())
+        self.assertTrue(cena.p_status.isVisible())
+        self.assertFalse(cena.entrada_rapida.isVisible())
+        self.assertEqual(cena.canal.entrada.text(), "me lembra de ligar")
+        cena.alternar_paineis()
+        self.assertTrue(cena.limpa)
+        self.assertFalse(cena.canal.isVisible())
+
+    def test_digitar_na_tela_limpa_manda_para_o_jarvis(self):
+        enviados = []
+        self.win._send = enviados.append
+        self.cena.entrada_rapida.setText("bom dia")
+        self.cena._enviar_rapido()
+        self.assertEqual(enviados, ["bom dia"])
+        self.assertEqual(self.cena.entrada_rapida.text(), "")
+
+    def test_jarvis_tela_paineis_abre_com_os_lados(self):
+        os.environ["JARVIS_TELA"] = "paineis"
+        try:
+            win = ui.MainWindow("face.png")
+            self.assertFalse(win._orbe.cena.limpa)
+            win.close(); win.deleteLater()
+        finally:
+            os.environ.pop("JARVIS_TELA", None)
+
+    def test_bom_dia_fica_dentro_do_anel(self):
+        r = self.win._orbe.resumo
+        r._encaixar()
+        W, H = self.win._orbe.hud.width(), self.win._orbe.hud.height()
+        R = min(W, H) * 0.34
+        g = r.geometry()
+        self.assertLessEqual(g.width(), 2 * R)
+        self.assertLessEqual(g.height(), 2 * R)
+        self.assertAlmostEqual(g.center().x(), W / 2, delta=4)
