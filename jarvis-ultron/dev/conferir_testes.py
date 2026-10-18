@@ -84,6 +84,9 @@ def main(argumentos: list[str]) -> int:
         print("\n".join(f"  {nome}" for nome in novas))
     else:
         print("nenhuma falha nova")
+    oscilaram = sorted(falhas & instaveis)
+    if oscilaram:  # não contam como novas, mas ficam à vista
+        print(f"(instáveis que falharam desta vez, não contam: {', '.join(oscilaram)})")
     sumiram = sorted(fixas - falhas)
     if sumiram:  # bom sinal, mas confira: a lista de conhecidas só muda de propósito, numa etapa
         print(f"({len(sumiram)} falha(s) conhecida(s) passaram a funcionar; se foi de propósito, tire-as do "
