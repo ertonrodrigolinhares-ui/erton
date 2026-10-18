@@ -2857,3 +2857,55 @@ class NomesNaTelaTests(unittest.TestCase):
         spec.loader.exec_module(m)
         for _nome, _emoji, titulo, _sub, _args in m.BOTOES:
             self.assertLessEqual(len(m.CURTOS.get(titulo, titulo)), 12, titulo)  # cabe na coluna da lateral
+
+
+class ResultadoDoUltronSemDuplicarTests(unittest.TestCase):
+    """Botão do Ultron: o resultado aparece UMA vez no canal (antes a leitura do Gemini entrava de novo)."""
+
+    def _rodar(self, saida_do_gemini, depois=None):
+        import threading
+        import main
+
+        jarvis = object.__new__(main.JarvisLive)
+        jarvis.ui = UIFalsa()
+        jarvis.ui.clear_subtitle = jarvis.ui.show_subtitle = lambda *a: None
+        jarvis._portao = PortaoDeVoz(None, ativo=False)
+        jarvis._shutdown_requested = threading.Event()
+        jarvis._turn_done_event = None
+        jarvis._modo_reserva = False
+        jarvis._fala_n, jarvis._fala_texto = 0, ""
+        jarvis._falar_com_voz_externa = lambda t: None
+        enviados = []
+
+        def mensagem(saida=None, fim=False):
+            out = SimpleNamespace(text=saida) if saida else None
+            return SimpleNamespace(tool_call=None, server_content=SimpleNamespace(
+                model_turn=None, output_transcription=out, input_transcription=None, turn_complete=fim))
+
+        class Sessao:
+            async def send_client_content(self, turns, turn_complete):
+                enviados.append(turns)
+
+            async def receive(self):
+                for texto in saida_do_gemini:
+                    yield mensagem(texto)
+                    yield mensagem(fim=True)
+                jarvis._shutdown_requested.set()
+
+        async def cenario():
+            jarvis.session, jarvis._loop = Sessao(), asyncio.get_running_loop()
+            jarvis.ui.write_log("Jarvis: Não há lembretes marcados.")  # o que rodar_automacao_ultron escreve
+            jarvis._falar_resultado_ultron("Não há lembretes marcados.")
+            await asyncio.sleep(0.05)
+            await jarvis._receive_audio()
+        asyncio.run(cenario())
+        return jarvis.ui.logs, enviados
+
+    def test_leitura_do_gemini_nao_aparece_de_novo(self):
+        logs, enviados = self._rodar(["Não há lembretes marcados."])
+        self.assertEqual(len(enviados), 1)  # o Gemini recebeu para ler em voz alta
+        self.assertEqual(sum("Não há lembretes" in l for l in logs), 1)
+
+    def test_a_resposta_seguinte_aparece_normalmente(self):
+        logs, _ = self._rodar(["Não há lembretes marcados.", "Bom dia, Erton."])
+        self.assertIn("Jarvis: Bom dia, Erton.", logs)

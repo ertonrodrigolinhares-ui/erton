@@ -2468,6 +2468,10 @@ class JarvisLive:
                 and not self._chamada_fechada():
             directiva = (f"[Resultado de automação] {texto}\nLeia isso ao usuário em português, "
                          "sem acrescentar nada. Não chame ferramentas.")
+            # o resultado já está escrito no canal: a leitura do Gemini não entra de novo (ficava duplicado)
+            with self._trava_da_fala():
+                self._leituras_sem_registro = getattr(self, "_leituras_sem_registro", 0) + 1
+                self._leituras_sem_registro_ate = time.monotonic() + 30  # se o Gemini não ler, expira
             asyncio.run_coroutine_threadsafe(
                 session.send_client_content(turns={"parts": [{"text": directiva}]}, turn_complete=True), loop)
         else:
@@ -3045,7 +3049,14 @@ class JarvisLive:
 
                             full_out = " ".join(out_buf).strip()
                             if full_out:
-                                self.ui.write_log(f"Jarvis: {full_out}")
+                                with self._trava_da_fala():
+                                    if time.monotonic() > getattr(self, "_leituras_sem_registro_ate", 0.0):
+                                        self._leituras_sem_registro = 0
+                                    ja_escrito = getattr(self, "_leituras_sem_registro", 0) > 0
+                                    if ja_escrito:  # leitura de um resultado do Ultron já mostrado
+                                        self._leituras_sem_registro -= 1
+                                if not ja_escrito:
+                                    self.ui.write_log(f"Jarvis: {full_out}")
                                 self._falar_com_voz_externa(full_out)
                             # fala nova, agora, só com áudio do microfone mandado depois deste turno (e
                             # da voz externa, se ela vai falar a resposta)
