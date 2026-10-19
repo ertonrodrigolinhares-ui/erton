@@ -1,0 +1,1255 @@
+[
+  {
+    "name": "open_app",
+    "description": "Opens any application on the computer. Use this whenever the user asks to open, launch, or start any app, website, or program. Always call this tool — never just say you opened it.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "app_name": {
+          "type": "STRING",
+          "description": "Exact name of the application (e.g. 'WhatsApp', 'Chrome', 'Spotify')"
+        }
+      },
+      "required": [
+        "app_name"
+      ]
+    }
+  },
+  {
+    "name": "web_search",
+    "description": "Searches the web for any information.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "query": {
+          "type": "STRING",
+          "description": "Search query"
+        },
+        "mode": {
+          "type": "STRING",
+          "description": "search (default) or compare"
+        },
+        "items": {
+          "type": "ARRAY",
+          "items": {
+            "type": "STRING"
+          },
+          "description": "Items to compare"
+        },
+        "aspect": {
+          "type": "STRING",
+          "description": "price | specs | reviews"
+        }
+      },
+      "required": [
+        "query"
+      ]
+    }
+  },
+  {
+    "name": "listening_mode",
+    "description": "Switches how JARVIS listens. 'maos_livres' (hands-free): answers everything the user says, no wake word needed. 'chamada' (call mode): answers only after the user says 'Hey Jarvis'. Use when the user says 'modo mãos livres' or 'modo chamada'.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "mode": {
+          "type": "STRING",
+          "enum": [
+            "maos_livres",
+            "chamada"
+          ],
+          "description": "The listening mode"
+        }
+      },
+      "required": [
+        "mode"
+      ]
+    }
+  },
+  {
+    "name": "school_tasks",
+    "description": "Lists the student's pending school activities and deadlines from Geekie One (read-only, via Hermes). Use when the user asks what is pending/due on Geekie or at school. Never answer, submit or mark school activities as done.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "refresh": {
+          "type": "BOOLEAN",
+          "description": "true to read Geekie One again now instead of the saved list"
+        }
+      }
+    }
+  },
+  {
+    "name": "self_diagnosis",
+    "description": "Runs JARVIS's self-diagnosis: checks internet, the Gemini key and models, the Groq backup, Hermes (agents), microphone, speakers, computer memory/disk, the automation browser and the wake word. Use when the user asks what is wrong, to check/diagnose the system, or why something is not working. Afterwards, tell the user in Portuguese only the problems found and how to fix them.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {}
+    }
+  },
+  {
+    "name": "hermes_agent",
+    "description": "Sends a task to Hermes, JARVIS's autonomous orchestrator with sub-agents. Use for: social media posts of the user's athlete profile (daily post proposals, Metricool, best time to post, performance), Meta/Facebook/Instagram ads reports, opening and reading web panels/dashboards by itself. Examples: 'what are today's posts?', 'how are my ads doing?', 'publish the approved posts'. For research, analysis, reports and other long multi-step tasks prefer claude_task (when available). Never use it to publish without approval.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "request": {
+          "type": "STRING",
+          "description": "The full task for Hermes, in Portuguese"
+        }
+      },
+      "required": [
+        "request"
+      ]
+    }
+  },
+  {
+    "name": "approve_publication",
+    "description": "Tells Hermes to publish/schedule posts (kind='redes') or apply an ad change (kind='anuncios'), always with the user's explicit approval, in two calls: first call with confirm=false records the proposal; then tell the user in Portuguese exactly what will be published/changed and ask for an explicit ok. Only after the user clearly approves in their own words, call again with confirm=true (same kind and details). Never assume approval.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "kind": {
+          "type": "STRING",
+          "enum": [
+            "redes",
+            "anuncios"
+          ],
+          "description": "redes = posts; anuncios = Meta ads"
+        },
+        "details": {
+          "type": "STRING",
+          "description": "Exactly what will be done, e.g. 'posts 1 e 3, agendar no horario sugerido'"
+        },
+        "confirm": {
+          "type": "BOOLEAN",
+          "description": "true ONLY after the user approved the proposal told to them"
+        }
+      },
+      "required": [
+        "kind",
+        "details"
+      ]
+    }
+  },
+  {
+    "name": "suspend_listening",
+    "description": "Suspends JARVIS for a number of minutes: the microphone is muted and JARVIS stops listening, then it unmutes automatically and announces it is back. Use when the user asks JARVIS to be suspended, pause, stay quiet, sleep or stop listening for some time (default 10 minutes).",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "minutes": {
+          "type": "NUMBER",
+          "description": "How many minutes to stay suspended (1 to 240)"
+        }
+      },
+      "required": [
+        "minutes"
+      ]
+    }
+  },
+  {
+    "name": "generate_image",
+    "description": "Creates an image from a text description using Gemini's image model (Nano Banana), saves it as PNG and opens it. Use when the user asks to create, draw or generate an image.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "prompt": {
+          "type": "STRING",
+          "description": "Detailed description of the image, in English"
+        }
+      },
+      "required": [
+        "prompt"
+      ]
+    }
+  },
+  {
+    "name": "weather_report",
+    "description": "Gives the weather report to user",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "city": {
+          "type": "STRING",
+          "description": "City name"
+        }
+      },
+      "required": [
+        "city"
+      ]
+    }
+  },
+  {
+    "name": "check_messages",
+    "description": "Reads the current Instagram or Apple Messages conversation and optionally searches Contacts. Use this before drafting a reply or when the user asks about recent messages.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "platform": {
+          "type": "STRING",
+          "description": "all | Instagram | iMessage | Contacts. Default: all."
+        },
+        "include_contacts": {
+          "type": "BOOLEAN",
+          "description": "Also search the user's Contacts."
+        },
+        "contact_query": {
+          "type": "STRING",
+          "description": "Optional spoken contact name to match."
+        },
+        "max_messages": {
+          "type": "INTEGER",
+          "description": "Maximum current-chat lines to inspect. Default: 30."
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "prepare_message_reply",
+    "description": "Creates an approval-gated message draft, approves the current pending draft, or cancels it. Never approve unless the user explicitly confirms the exact pending draft.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "action": {
+          "type": "STRING",
+          "enum": [
+            "prepare",
+            "approve",
+            "cancel"
+          ],
+          "description": "Draft lifecycle action."
+        },
+        "platform": {
+          "type": "STRING",
+          "description": "Instagram, iMessage, WhatsApp, Telegram, or another supported platform."
+        },
+        "receiver": {
+          "type": "STRING",
+          "description": "Recipient name. Optional for the currently open chat."
+        },
+        "message_text": {
+          "type": "STRING",
+          "description": "Exact draft text, required for prepare."
+        }
+      },
+      "required": [
+        "action"
+      ]
+    }
+  },
+  {
+    "name": "send_message",
+    "description": "Sends a user-authored message through iMessage, WhatsApp, Telegram, Instagram, Discord, or the current chat. For Instagram, the first call prepares a visible draft; use action=approve only after explicit user confirmation.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "action": {
+          "type": "STRING",
+          "enum": [
+            "send",
+            "approve",
+            "cancel"
+          ],
+          "description": "Default: send. Approve/cancel operates on the pending draft."
+        },
+        "receiver": {
+          "type": "STRING",
+          "description": "Recipient contact name. Optional for current/focused chats and approval actions."
+        },
+        "message_text": {
+          "type": "STRING",
+          "description": "Exact message content. Required for send."
+        },
+        "platform": {
+          "type": "STRING",
+          "description": "iMessage, WhatsApp, Telegram, Instagram, Discord, or current/focused."
+        }
+      },
+      "required": [
+        "platform"
+      ]
+    }
+  },
+  {
+    "name": "email_control",
+    "description": "Connects Gmail through Google OAuth, checks connection status, reads/searches Gmail, and prepares email. Gmail is the default provider; Apple Mail remains an optional macOS fallback. For Gmail, prepare opens a visible compose window and types To, Cc/Bcc, Subject, and Body in sequence. Every outgoing email is approval-gated: first call action=prepare, then call action=approve only after the user explicitly confirms the exact pending recipient, subject, and body.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "action": {
+          "type": "STRING",
+          "enum": [
+            "connect",
+            "status",
+            "disconnect",
+            "inbox",
+            "unread",
+            "search",
+            "read",
+            "prepare",
+            "approve",
+            "cancel"
+          ],
+          "description": "Email operation."
+        },
+        "provider": {
+          "type": "STRING",
+          "enum": [
+            "gmail",
+            "apple_mail",
+            "default"
+          ],
+          "description": "Email provider. Default: gmail."
+        },
+        "browser": {
+          "type": "STRING",
+          "description": "Browser for the visible Gmail compose window. Default: chrome."
+        },
+        "credentials_path": {
+          "type": "STRING",
+          "description": "Path to a Google Desktop OAuth client JSON file, used only for connect."
+        },
+        "limit": {
+          "type": "INTEGER",
+          "description": "Maximum inbox/search results, 1-30."
+        },
+        "query": {
+          "type": "STRING",
+          "description": "Sender or subject text for search."
+        },
+        "message_id": {
+          "type": "STRING",
+          "description": "Message ID returned by inbox/search, required for read."
+        },
+        "to": {
+          "type": "STRING",
+          "description": "Recipient email address or comma-separated addresses."
+        },
+        "cc": {
+          "type": "STRING",
+          "description": "Optional Cc addresses."
+        },
+        "bcc": {
+          "type": "STRING",
+          "description": "Optional Bcc addresses."
+        },
+        "subject": {
+          "type": "STRING",
+          "description": "Exact email subject for prepare."
+        },
+        "body": {
+          "type": "STRING",
+          "description": "Exact email body for prepare."
+        }
+      },
+      "required": [
+        "action"
+      ]
+    }
+  },
+  {
+    "name": "reminder",
+    "description": "Sets a timed reminder using Task Scheduler.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "date": {
+          "type": "STRING",
+          "description": "Date in YYYY-MM-DD format"
+        },
+        "time": {
+          "type": "STRING",
+          "description": "Time in HH:MM format (24h)"
+        },
+        "message": {
+          "type": "STRING",
+          "description": "Reminder message text"
+        }
+      },
+      "required": [
+        "date",
+        "time",
+        "message"
+      ]
+    }
+  },
+  {
+    "name": "youtube_video",
+    "description": "Controls YouTube. Use for: playing videos, summarizing a video's content, getting video info, or showing trending videos.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "action": {
+          "type": "STRING",
+          "description": "play | summarize | get_info | trending (default: play)"
+        },
+        "query": {
+          "type": "STRING",
+          "description": "Search query for play action"
+        },
+        "save": {
+          "type": "BOOLEAN",
+          "description": "Save summary to Notepad (summarize only)"
+        },
+        "region": {
+          "type": "STRING",
+          "description": "Country code for trending e.g. TR, US"
+        },
+        "url": {
+          "type": "STRING",
+          "description": "Video URL for get_info action"
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "media_control",
+    "description": "Controls music playback, primarily Spotify. Use when the user asks to play, resume, pause, stop, toggle, skip, or go back in Spotify, Apple Music, YouTube Music, or the active media player. Spotify is the default platform. Pass a song, artist, album, playlist, or Spotify link in query.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "action": {
+          "type": "STRING",
+          "enum": [
+            "play",
+            "pause",
+            "stop",
+            "toggle",
+            "next",
+            "previous",
+            "play_query"
+          ],
+          "description": "Playback command. Use play_query to find a specific song or other item."
+        },
+        "platform": {
+          "type": "STRING",
+          "enum": [
+            "spotify",
+            "apple_music",
+            "youtube_music",
+            "system"
+          ],
+          "description": "Music platform. Default: spotify."
+        },
+        "query": {
+          "type": "STRING",
+          "description": "Song, artist, album, playlist, or Spotify link for play/play_query."
+        }
+      },
+      "required": [
+        "action"
+      ]
+    }
+  },
+  {
+    "name": "screen_process",
+    "description": "Captures and analyzes the screen or webcam image. MUST be called when user asks what is on screen, what you see, analyze my screen, look at camera, etc. You have NO visual ability without this tool. After calling this tool, stay SILENT — the vision module speaks directly.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "angle": {
+          "type": "STRING",
+          "description": "'screen' to capture display, 'camera' for webcam. Default: 'screen'"
+        },
+        "text": {
+          "type": "STRING",
+          "description": "The question or instruction about the captured image"
+        }
+      },
+      "required": [
+        "text"
+      ]
+    }
+  },
+  {
+    "name": "computer_settings",
+    "description": "Controls the computer: volume, brightness, window management, keyboard shortcuts, typing text on screen, closing apps, fullscreen, dark mode, WiFi, restart, shutdown, scrolling, tab management, zoom, screenshots, lock screen, refresh/reload page. Use for ANY single computer control command. NEVER route to agent_task.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "action": {
+          "type": "STRING",
+          "description": "The action to perform"
+        },
+        "description": {
+          "type": "STRING",
+          "description": "Natural language description of what to do"
+        },
+        "value": {
+          "type": "STRING",
+          "description": "Optional value: volume level, text to type, etc."
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "browser_control",
+    "description": "Controls any web browser. Use for: opening websites, searching the web, clicking elements, filling forms, scrolling, screenshots, navigation, any web-based task. Always pass the 'browser' parameter when the user specifies a browser (e.g. 'open in Edge', 'use Firefox', 'open Chrome'). Multiple browsers can run simultaneously.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "action": {
+          "type": "STRING",
+          "description": "go_to | search | click | type | scroll | fill_form | smart_click | smart_type | get_text | get_url | press | new_tab | close_tab | screenshot | back | forward | reload | switch | list_browsers | close | close_all"
+        },
+        "browser": {
+          "type": "STRING",
+          "description": "Target browser: chrome | edge | firefox | opera | operagx | brave | vivaldi | safari. Omit to use the currently active browser."
+        },
+        "url": {
+          "type": "STRING",
+          "description": "URL for go_to / new_tab action"
+        },
+        "query": {
+          "type": "STRING",
+          "description": "Search query for search action"
+        },
+        "engine": {
+          "type": "STRING",
+          "description": "Search engine: google | bing | duckduckgo | yandex (default: google)"
+        },
+        "selector": {
+          "type": "STRING",
+          "description": "CSS selector for click/type"
+        },
+        "text": {
+          "type": "STRING",
+          "description": "Text to click or type"
+        },
+        "description": {
+          "type": "STRING",
+          "description": "Element description for smart_click/smart_type"
+        },
+        "direction": {
+          "type": "STRING",
+          "description": "up | down for scroll"
+        },
+        "amount": {
+          "type": "INTEGER",
+          "description": "Scroll amount in pixels (default: 500)"
+        },
+        "key": {
+          "type": "STRING",
+          "description": "Key name for press action (e.g. Enter, Escape, F5)"
+        },
+        "path": {
+          "type": "STRING",
+          "description": "Save path for screenshot"
+        },
+        "incognito": {
+          "type": "BOOLEAN",
+          "description": "Open in private/incognito mode"
+        },
+        "clear_first": {
+          "type": "BOOLEAN",
+          "description": "Clear field before typing (default: true)"
+        }
+      },
+      "required": [
+        "action"
+      ]
+    }
+  },
+  {
+    "name": "file_controller",
+    "description": "Manages and opens local files and folders: open, list, create, delete, move, copy, rename, read, write, find, disk usage. Use action=open for a file path; do not use open_app for files.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "action": {
+          "type": "STRING",
+          "description": "open | list | create_file | create_folder | delete | move | copy | rename | read | write | find | largest | disk_usage | organize_desktop | info"
+        },
+        "path": {
+          "type": "STRING",
+          "description": "File/folder path or shortcut: desktop, downloads, documents, home"
+        },
+        "destination": {
+          "type": "STRING",
+          "description": "Destination path for move/copy"
+        },
+        "new_name": {
+          "type": "STRING",
+          "description": "New name for rename"
+        },
+        "content": {
+          "type": "STRING",
+          "description": "Content for create_file/write"
+        },
+        "name": {
+          "type": "STRING",
+          "description": "File name to search for"
+        },
+        "extension": {
+          "type": "STRING",
+          "description": "File extension to search (e.g. .pdf)"
+        },
+        "count": {
+          "type": "INTEGER",
+          "description": "Number of results for largest"
+        }
+      },
+      "required": [
+        "action"
+      ]
+    }
+  },
+  {
+    "name": "desktop_control",
+    "description": "Controls the desktop: wallpaper, organize, clean, list, stats.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "action": {
+          "type": "STRING",
+          "description": "wallpaper | wallpaper_url | organize | clean | list | stats | task"
+        },
+        "path": {
+          "type": "STRING",
+          "description": "Image path for wallpaper"
+        },
+        "url": {
+          "type": "STRING",
+          "description": "Image URL for wallpaper_url"
+        },
+        "mode": {
+          "type": "STRING",
+          "description": "by_type or by_date for organize"
+        },
+        "task": {
+          "type": "STRING",
+          "description": "Natural language desktop task"
+        }
+      },
+      "required": [
+        "action"
+      ]
+    }
+  },
+  {
+    "name": "code_helper",
+    "description": "Writes, edits, explains, runs, or builds code files.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "action": {
+          "type": "STRING",
+          "description": "write | edit | explain | run | build | auto (default: auto)"
+        },
+        "description": {
+          "type": "STRING",
+          "description": "What the code should do or what change to make"
+        },
+        "language": {
+          "type": "STRING",
+          "description": "Programming language (default: python)"
+        },
+        "output_path": {
+          "type": "STRING",
+          "description": "Where to save the file"
+        },
+        "file_path": {
+          "type": "STRING",
+          "description": "Path to existing file for edit/explain/run/build"
+        },
+        "code": {
+          "type": "STRING",
+          "description": "Raw code string for explain"
+        },
+        "args": {
+          "type": "STRING",
+          "description": "CLI arguments for run/build"
+        },
+        "timeout": {
+          "type": "INTEGER",
+          "description": "Execution timeout in seconds (default: 30)"
+        }
+      },
+      "required": [
+        "action"
+      ]
+    }
+  },
+  {
+    "name": "dev_agent",
+    "description": "Builds complete multi-file projects from scratch: plans, writes files, installs deps, opens VSCode, runs and fixes errors.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "description": {
+          "type": "STRING",
+          "description": "What the project should do"
+        },
+        "language": {
+          "type": "STRING",
+          "description": "Programming language (default: python)"
+        },
+        "project_name": {
+          "type": "STRING",
+          "description": "Optional project folder name"
+        },
+        "timeout": {
+          "type": "INTEGER",
+          "description": "Run timeout in seconds (default: 30)"
+        }
+      },
+      "required": [
+        "description"
+      ]
+    }
+  },
+  {
+    "name": "agent_task",
+    "description": "Executes complex multi-step tasks requiring multiple different tools. Examples: 'research X and save to file', 'find and organize files'. DO NOT use for single commands. NEVER use for Steam/Epic — use game_updater.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "goal": {
+          "type": "STRING",
+          "description": "Complete description of what to accomplish"
+        },
+        "priority": {
+          "type": "STRING",
+          "description": "low | normal | high (default: normal)"
+        }
+      },
+      "required": [
+        "goal"
+      ]
+    }
+  },
+  {
+    "name": "computer_control",
+    "description": "Direct computer control: type, click, hotkeys, scroll, move mouse, screenshots, find elements on screen.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "action": {
+          "type": "STRING",
+          "description": "type | smart_type | click | double_click | right_click | hotkey | press | scroll | move | copy | paste | screenshot | wait | clear_field | focus_window | screen_find | screen_click | random_data | user_data"
+        },
+        "text": {
+          "type": "STRING",
+          "description": "Text to type or paste"
+        },
+        "x": {
+          "type": "INTEGER",
+          "description": "X coordinate"
+        },
+        "y": {
+          "type": "INTEGER",
+          "description": "Y coordinate"
+        },
+        "keys": {
+          "type": "STRING",
+          "description": "Key combination e.g. 'ctrl+c'"
+        },
+        "key": {
+          "type": "STRING",
+          "description": "Single key e.g. 'enter'"
+        },
+        "direction": {
+          "type": "STRING",
+          "description": "up | down | left | right"
+        },
+        "amount": {
+          "type": "INTEGER",
+          "description": "Scroll amount (default: 3)"
+        },
+        "seconds": {
+          "type": "NUMBER",
+          "description": "Seconds to wait"
+        },
+        "title": {
+          "type": "STRING",
+          "description": "Window title for focus_window"
+        },
+        "description": {
+          "type": "STRING",
+          "description": "Element description for screen_find/screen_click"
+        },
+        "type": {
+          "type": "STRING",
+          "description": "Data type for random_data"
+        },
+        "field": {
+          "type": "STRING",
+          "description": "Field for user_data: name|email|city"
+        },
+        "clear_first": {
+          "type": "BOOLEAN",
+          "description": "Clear field before typing (default: true)"
+        },
+        "path": {
+          "type": "STRING",
+          "description": "Save path for screenshot"
+        }
+      },
+      "required": [
+        "action"
+      ]
+    }
+  },
+  {
+    "name": "game_updater",
+    "description": "THE ONLY tool for ANY Steam or Epic Games request. Use for: installing, downloading, updating games, listing installed games, checking download status, scheduling updates. ALWAYS call directly for any Steam/Epic/game request. NEVER use agent_task, browser_control, or web_search for Steam/Epic.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "action": {
+          "type": "STRING",
+          "description": "update | install | list | download_status | schedule | cancel_schedule | schedule_status (default: update)"
+        },
+        "platform": {
+          "type": "STRING",
+          "description": "steam | epic | both (default: both)"
+        },
+        "game_name": {
+          "type": "STRING",
+          "description": "Game name (partial match supported)"
+        },
+        "app_id": {
+          "type": "STRING",
+          "description": "Steam AppID for install (optional)"
+        },
+        "hour": {
+          "type": "INTEGER",
+          "description": "Hour for scheduled update 0-23 (default: 3)"
+        },
+        "minute": {
+          "type": "INTEGER",
+          "description": "Minute for scheduled update 0-59 (default: 0)"
+        },
+        "shutdown_when_done": {
+          "type": "BOOLEAN",
+          "description": "Shut down PC when download finishes"
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "flight_finder",
+    "description": "Searches Google Flights and speaks the best options.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "origin": {
+          "type": "STRING",
+          "description": "Departure city or airport code"
+        },
+        "destination": {
+          "type": "STRING",
+          "description": "Arrival city or airport code"
+        },
+        "date": {
+          "type": "STRING",
+          "description": "Departure date (any format)"
+        },
+        "return_date": {
+          "type": "STRING",
+          "description": "Return date for round trips"
+        },
+        "passengers": {
+          "type": "INTEGER",
+          "description": "Number of passengers (default: 1)"
+        },
+        "cabin": {
+          "type": "STRING",
+          "description": "economy | premium | business | first"
+        },
+        "save": {
+          "type": "BOOLEAN",
+          "description": "Save results to Notepad"
+        }
+      },
+      "required": [
+        "origin",
+        "destination",
+        "date"
+      ]
+    }
+  },
+  {
+    "name": "graphics_quality",
+    "description": "Changes JARVIS rendering quality between low, medium, and high.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "quality": {
+          "type": "STRING",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "description": "Rendering quality preset."
+        }
+      },
+      "required": [
+        "quality"
+      ]
+    }
+  },
+  {
+    "name": "jarvis_ui_control",
+    "description": "Changes JARVIS's own interface. Use when the user asks to open or close the Command Center, change the theme or graphics quality, open settings, enter compact mode, toggle fullscreen, or show shortcuts.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "action": {
+          "type": "STRING",
+          "enum": [
+            "open_command_center",
+            "close_command_center",
+            "change_theme",
+            "change_graphics_quality",
+            "open_settings",
+            "compact_mode",
+            "fullscreen",
+            "show_shortcuts"
+          ],
+          "description": "The interface action to perform."
+        },
+        "theme": {
+          "type": "STRING",
+          "enum": [
+            "arc_reactor",
+            "stealth_red",
+            "vibranium_purple",
+            "nanotech_gold",
+            "platinum"
+          ],
+          "description": "Required for change_theme."
+        },
+        "graphics_quality": {
+          "type": "STRING",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "description": "Required for change_graphics_quality. Low favors performance, medium is balanced, and high enables full visual detail."
+        }
+      },
+      "required": [
+        "action"
+      ]
+    }
+  },
+  {
+    "name": "deep_research",
+    "description": "Runs rigorous, multi-query web research and keeps the report in volatile memory unless the user asks to save it. Use when the user explicitly asks for deep, thorough, comprehensive, or source-backed research. On the first call, ask whether the user wants a background status bar or visible browser research. After completion, use this tool again to save the latest report or read it aloud.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "question": {
+          "type": "STRING",
+          "description": "The research question. Required on the initial ask call; optional when confirming a pending request."
+        },
+        "execution_mode": {
+          "type": "STRING",
+          "enum": [
+            "ask",
+            "background",
+            "visible"
+          ],
+          "description": "Always use ask initially. Background shows a labeled status bar; visible opens a controlled browser and visits sources."
+        },
+        "result_action": {
+          "type": "STRING",
+          "enum": [
+            "none",
+            "save_files",
+            "save_desktop",
+            "read_report"
+          ],
+          "description": "Action for the latest completed in-memory report. Use only after the user chooses one of these options."
+        },
+        "depth": {
+          "type": "STRING",
+          "enum": [
+            "quick",
+            "standard",
+            "deep"
+          ],
+          "description": "Research breadth. Default: standard."
+        },
+        "focus_areas": {
+          "type": "ARRAY",
+          "items": {
+            "type": "STRING"
+          },
+          "description": "Optional angles, constraints, or subtopics to prioritize."
+        },
+        "max_sources": {
+          "type": "INTEGER",
+          "description": "Maximum verified source links to retain, from 5 to 50."
+        },
+        "output_path": {
+          "type": "STRING",
+          "description": "Optional explicit path used only with save_files or save_desktop. Research never saves automatically."
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "create_presentation",
+    "description": "Creates, edits, redesigns, or extends an editable Microsoft PowerPoint (.pptx) presentation. Use this directly whenever the user asks to make a PowerPoint, presentation, slide deck, pitch deck, briefing deck, or slideshow. Do not use code_helper, file_processor, computer_control, or agent_task. First ask whether the user wants a native 3D model, then ask whether they want to see the task or keep it in the background.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "topic": {
+          "type": "STRING",
+          "description": "Subject, goal, and important content instructions. Required on the initial ask; optional when confirming the pending run mode."
+        },
+        "execution_mode": {
+          "type": "STRING",
+          "enum": [
+            "ask",
+            "background",
+            "visible"
+          ],
+          "description": "Always use ask initially. Visible shows real build phases; background keeps a compact status indicator."
+        },
+        "mode": {
+          "type": "STRING",
+          "description": "auto | create | edit | redesign | extend. Default: auto."
+        },
+        "title": {
+          "type": "STRING",
+          "description": "Optional presentation title."
+        },
+        "audience": {
+          "type": "STRING",
+          "description": "Who will view the presentation, such as executives, investors, clients, or students."
+        },
+        "slide_count": {
+          "type": "INTEGER",
+          "description": "Final slide count from 3 to 50. Default: inferred or 8."
+        },
+        "tone": {
+          "type": "STRING",
+          "description": "Desired writing and visual tone, such as executive, persuasive, technical, or educational."
+        },
+        "theme": {
+          "type": "STRING",
+          "description": "Visual theme: jarvis_minimal | editorial | arc_reactor | executive | platinum. Default: jarvis_minimal."
+        },
+        "appearance": {
+          "type": "STRING",
+          "enum": [
+            "auto",
+            "light",
+            "dark"
+          ],
+          "description": "Overall slide appearance. Honor light or dark when requested; auto uses the restrained dark JARVIS style."
+        },
+        "transition": {
+          "type": "STRING",
+          "enum": [
+            "morph",
+            "fade",
+            "none"
+          ],
+          "description": "Native PowerPoint slide transition. Default: morph, with a fade fallback for older PowerPoint versions."
+        },
+        "source_file": {
+          "type": "STRING",
+          "description": "Backward-compatible single source path. Leave empty to use the uploaded file."
+        },
+        "source_files": {
+          "type": "ARRAY",
+          "items": {
+            "type": "STRING"
+          },
+          "description": "Source paths: PDF, Office files, data, text, images, audio, video, or PowerPoint."
+        },
+        "source_urls": {
+          "type": "ARRAY",
+          "items": {
+            "type": "STRING"
+          },
+          "description": "Specific source URLs supplied by the user."
+        },
+        "template_file": {
+          "type": "STRING",
+          "description": "Existing PPTX template or deck to preserve for edit/extend operations."
+        },
+        "model_source_file": {
+          "type": "STRING",
+          "description": "A PPTX used only as a native 3D model library. Its slides and text are not copied into the new presentation."
+        },
+        "use_native_3d": {
+          "type": "BOOLEAN",
+          "description": "The user's answer to the 3D-model question. Omit on the initial call unless the user already explicitly answered."
+        },
+        "three_d_mode": {
+          "type": "STRING",
+          "enum": [
+            "ask",
+            "yes",
+            "no"
+          ],
+          "description": "Use ask on the initial call unless the user already explicitly requested or rejected 3D."
+        },
+        "quality": {
+          "type": "STRING",
+          "description": "fast | quality | premium. Default: quality."
+        },
+        "language": {
+          "type": "STRING",
+          "description": "Optional output language; otherwise infer from the request."
+        },
+        "allow_web_research": {
+          "type": "BOOLEAN",
+          "description": "Use broader web research. Set true only after the user explicitly permits web search."
+        },
+        "export_pdf": {
+          "type": "BOOLEAN",
+          "description": "Also export a PDF when Microsoft PowerPoint is available. Default: true."
+        },
+        "include_speaker_notes": {
+          "type": "BOOLEAN",
+          "description": "Generate editable speaker notes. Default: false."
+        },
+        "output_path": {
+          "type": "STRING",
+          "description": "Optional .pptx output path or destination folder."
+        },
+        "open_after_create": {
+          "type": "BOOLEAN",
+          "description": "Open the finished PowerPoint after creation. Default: false."
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "task_status",
+    "description": "Checks or cancels background jobs, including presentation and deep-research jobs.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "action": {
+          "type": "STRING",
+          "description": "get | all | cancel. Default: get."
+        },
+        "task_id": {
+          "type": "STRING",
+          "description": "Background task ID for get or cancel."
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "file_processor",
+    "description": "Processes any file that the user has uploaded or dropped onto the interface. Use this when the user refers to an uploaded file and wants an action on it. Supports: images (describe/ocr/resize/compress/convert), PDFs (summarize/extract_text/to_word), Word docs & text files (summarize/fix/reformat/translate), CSV/Excel (analyze/stats/filter/sort/convert), JSON/XML (validate/format/analyze), code files (explain/review/fix/optimize/run/document/test), audio (transcribe/trim/convert/info), video (trim/extract_audio/extract_frame/compress/transcribe/info), archives (list/extract), presentations (summarize/extract_text). ALWAYS call this tool when a file has been uploaded and the user gives a command about it. If the user's command is ambiguous, pick the most logical action for that file type.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "file_path": {
+          "type": "STRING",
+          "description": "Full path to the uploaded file. Leave empty to use the currently uploaded file."
+        },
+        "action": {
+          "type": "STRING",
+          "description": "What to do with the file. Examples by type:\nimage: describe | ocr | resize | compress | convert | info\npdf: summarize | extract_text | to_word | info\ndocx/txt: summarize | fix | reformat | translate_hint | word_count | to_bullet\ncsv/excel: analyze | stats | filter | sort | convert | info\njson: validate | format | analyze | to_csv\ncode: explain | review | fix | optimize | run | document | test\naudio: transcribe | trim | convert | info\nvideo: trim | extract_audio | extract_frame | compress | transcribe | info | convert\narchive: list | extract\npptx: summarize | extract_text | analyze"
+        },
+        "instruction": {
+          "type": "STRING",
+          "description": "Free-form instruction if action doesn't cover it. E.g. 'translate this to Turkish', 'find all email addresses'"
+        },
+        "format": {
+          "type": "STRING",
+          "description": "Target format for conversion. E.g. 'mp3', 'pdf', 'csv', 'png'"
+        },
+        "width": {
+          "type": "INTEGER",
+          "description": "Target width for image resize"
+        },
+        "height": {
+          "type": "INTEGER",
+          "description": "Target height for image resize"
+        },
+        "scale": {
+          "type": "NUMBER",
+          "description": "Scale factor for image resize (e.g. 0.5)"
+        },
+        "quality": {
+          "type": "INTEGER",
+          "description": "Quality 1-100 for image/video compress"
+        },
+        "start": {
+          "type": "STRING",
+          "description": "Start time for trim: seconds or HH:MM:SS"
+        },
+        "end": {
+          "type": "STRING",
+          "description": "End time for trim: seconds or HH:MM:SS"
+        },
+        "timestamp": {
+          "type": "STRING",
+          "description": "Timestamp for video frame extraction HH:MM:SS"
+        },
+        "column": {
+          "type": "STRING",
+          "description": "Column name for CSV filter/sort"
+        },
+        "value": {
+          "type": "STRING",
+          "description": "Filter value for CSV filter"
+        },
+        "condition": {
+          "type": "STRING",
+          "description": "Filter condition: equals|contains|gt|lt"
+        },
+        "ascending": {
+          "type": "BOOLEAN",
+          "description": "Sort order for CSV sort (default: true)"
+        },
+        "save": {
+          "type": "BOOLEAN",
+          "description": "Save result to file (default: true)"
+        },
+        "destination": {
+          "type": "STRING",
+          "description": "Output folder for archive extract"
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "save_memory",
+    "description": "Save an important personal fact about the user to long-term memory. Call this silently whenever the user reveals something worth remembering: name, age, city, job, preferences, hobbies, relationships, projects, or future plans. Do NOT call for: weather, reminders, searches, or one-time commands. Do NOT announce that you are saving — just call it silently. Values must be in English regardless of the conversation language.",
+    "parameters": {
+      "type": "OBJECT",
+      "properties": {
+        "category": {
+          "type": "STRING",
+          "description": "identity — name, age, birthday, city, job, language, nationality | preferences — favorite food/color/music/film/game/sport, hobbies | projects — active projects, goals, things being built | relationships — friends, family, partner, colleagues | wishes — future plans, things to buy, travel dreams | notes — habits, schedule, anything else worth remembering"
+        },
+        "key": {
+          "type": "STRING",
+          "description": "Short snake_case key (e.g. name, favorite_food, sister_name)"
+        },
+        "value": {
+          "type": "STRING",
+          "description": "Concise value in English (e.g. Fatih, pizza, older sister)"
+        }
+      },
+      "required": [
+        "category",
+        "key",
+        "value"
+      ]
+    }
+  }
+]

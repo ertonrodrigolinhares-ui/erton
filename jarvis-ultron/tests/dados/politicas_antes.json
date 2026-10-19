@@ -1,0 +1,69 @@
+{
+  "_sobre": "Foto das listas de política do main.py (Etapa 1 da reorganização). Só muda de propósito, numa etapa do docs/PLANO-REORGANIZACAO.md, no mesmo commit da mudança: python tests/test_contratos.py --gravar-fotos. 'mutating' = ferramentas que o _execute_tool_batch roda em fila (conferido pelo comportamento). 'AUTOMACOES_NUVEM_IA' = automações da pasta com USA_IA_NUVEM = True (o test_invariantes confere que nenhuma perde a marca).",
+  "FERRAMENTAS_NUVEM_IA": [
+    "agent_task",
+    "approve_publication",
+    "code_helper",
+    "computer_control",
+    "computer_settings",
+    "create_presentation",
+    "deep_research",
+    "desktop_control",
+    "dev_agent",
+    "file_processor",
+    "flight_finder",
+    "generate_image",
+    "hermes_agent",
+    "screen_process",
+    "web_search"
+  ],
+  "CLOUD_SAFE_ACTIONS": [
+    "code_helper",
+    "create_presentation",
+    "deep_research",
+    "email_control",
+    "flight_finder",
+    "web_search",
+    "youtube_video"
+  ],
+  "RESERVA_FERRAMENTAS_ESSENCIAIS": [
+    "agent_task",
+    "browser_control",
+    "check_messages",
+    "email_control",
+    "generate_image",
+    "hermes_agent",
+    "listening_mode",
+    "media_control",
+    "open_app",
+    "reminder",
+    "save_memory",
+    "school_tasks",
+    "self_diagnosis",
+    "weather_report",
+    "web_search",
+    "youtube_video"
+  ],
+  "mutating": [
+    "code_helper",
+    "computer_control",
+    "computer_settings",
+    "create_presentation",
+    "desktop_control",
+    "dev_agent",
+    "email_control",
+    "file_controller",
+    "file_processor",
+    "game_updater",
+    "graphics_quality",
+    "jarvis_ui_control",
+    "prepare_message_reply",
+    "reminder",
+    "save_memory",
+    "send_message"
+  ],
+  "AUTOMACOES_NUVEM_IA": [
+    "claude_task",
+    "generate_video"
+  ]
+}
