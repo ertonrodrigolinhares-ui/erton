@@ -1858,7 +1858,7 @@ class SessaoQueCaiuTests(unittest.TestCase):
         jarvis.ui.set_state = lambda estado: None
         jarvis._loop, jarvis._reserva, jarvis._modo_reserva = None, None, False
         jarvis.cloud_safe, jarvis.external_audio, jarvis._api_key = True, True, "chave-de-teste"
-        jarvis.runtime_limit_seconds, jarvis.required_unlock_path = None, None
+        jarvis.runtime_limit_seconds = None
         jarvis._falhas_seguidas = 0
         no_religar = {}
 
@@ -1907,7 +1907,7 @@ class SessaoQueCaiuTests(unittest.TestCase):
         jarvis.ui.muted = True
         jarvis.session, jarvis._loop, jarvis._reserva, jarvis._modo_reserva = None, None, None, False
         jarvis.cloud_safe, jarvis.external_audio, jarvis._api_key = True, True, "chave-de-teste"
-        jarvis.runtime_limit_seconds, jarvis.required_unlock_path = None, None
+        jarvis.runtime_limit_seconds = None
         jarvis._falhas_seguidas = 0
         sessao_ao_conectar, no_religar = [], {}
 

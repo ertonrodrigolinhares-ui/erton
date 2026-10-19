@@ -1028,9 +1028,6 @@ class JarvisLive:
         self.voice_name     = voice_name
         # optional runtime limit in seconds (set by main)
         self.runtime_limit_seconds: int | None = None
-        # optional path that must exist (e.g. a mounted encrypted volume)
-        self.required_unlock_path: str | None = None
-        self.required_unlock_secret: str | None = None
         self._textos_trava = threading.Lock()  # texto digitado antes de o Gemini conectar
         self._textos_esperando = []
         self.ui.on_text_command = self._on_text_command
@@ -2848,26 +2845,6 @@ class JarvisLive:
                 if elapsed >= float(self.runtime_limit_seconds):
                     self._encerrar_fim_do_teste()
 
-            # enforce presence of required unlock path (e.g. mounted encrypted volume)
-            if getattr(self, "required_unlock_path", None):
-                try:
-                    path = Path(self.required_unlock_path)
-                    if not path.exists():
-                        print(f"[JARVIS] 🔒 Required unlock path not present: {self.required_unlock_path}")
-                        print("Please mount the locked container (see scripts/create_locked_dmg.sh).")
-                        time.sleep(5)
-                        continue
-                    if self.required_unlock_secret is not None:
-                        content = path.read_text(encoding="utf-8").strip()
-                        if content != self.required_unlock_secret:
-                            print("[JARVIS] 🔒 unlock.key content does not match expected secret.")
-                            print("Please mount the locked container with the correct unlock.key file.")
-                            time.sleep(5)
-                            continue
-                except Exception as e:
-                    print(f"[JARVIS] 🔒 Locked path check error: {e}")
-                    time.sleep(1)
-                    continue
             # Jarvis Ultron: o modelo de voz que vai ser usado agora (3.x antes do 2.5; se um falhar,
             # a central passa para o próximo).
             modelo_voz = central_de_modelos.resolver(live_model_id)
@@ -3117,17 +3094,6 @@ def rodar_cerebro(ui):
         jarvis.ui.write_log(f"SYS: Trial keyword detected. Running for {jarvis.runtime_limit_seconds} seconds.")
         _vigiar_fim_do_teste(jarvis)
 
-    locked_secret = os.environ.get("JARVIS_LOCKED_KEY_SECRET")
-    if locked_secret:
-        jarvis.required_unlock_secret = locked_secret.strip()
-
-    # Locked container check: if `JARVIS_LOCKED_VOLUME` is set, require
-    # presence of `/Volumes/<name>/unlock.key` before full operation.
-    locked_vol = os.environ.get("JARVIS_LOCKED_VOLUME")
-    if locked_vol:
-        mount_path = f"/Volumes/{locked_vol}/unlock.key"
-        jarvis.required_unlock_path = mount_path
-        jarvis.ui.write_log(f"SYS: Locked volume required: {mount_path}")
     ui.on_voice_change = jarvis.update_voice
     def _on_tts_change(provider, api_key, voice_id):
         if provider == "gemini":

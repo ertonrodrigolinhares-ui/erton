@@ -326,7 +326,7 @@ Vários commits pequenos, nesta ordem:
 - o README da raiz vira poucas linhas em português apontando para o LEIA-ME;
 - sai do LEIA-ME a frase da “apresentação em inglês”, que não existe mais;
 - o LICENSE fica na raiz.
-(6) Limpar do .env.example as variáveis do servidor e do Mac: DATABASE_URL, REDIS_URL, JWT_SECRET, JARVIS_ENCRYPTION_KEY e JARVIS_LOCKED_VOLUME. O modo de teste com prazo (JARVIS_TRIAL_KEYWORD) só sai se o Erton confirmar, e em commit separado, porque mexe na ponte (SAIDA_FIM_DO_TESTE).
+(6) Limpar do .env.example as variáveis do servidor: DATABASE_URL, REDIS_URL, JWT_SECRET e JARVIS_ENCRYPTION_KEY (as do Mac, JARVIS_LOCKED_VOLUME e JARVIS_LOCKED_KEY_SECRET, saíram na Etapa 5). O modo de teste com prazo (JARVIS_TRIAL_KEYWORD) só sai se o Erton confirmar, e em commit separado, porque mexe na ponte (SAIDA_FIM_DO_TESTE).
 O core/tenant.py e o core/jarvis_client.py FICAM. O requirements.txt NÃO muda aqui: fica para a Etapa 18, para o .bat reinstalar os componentes uma vez só.
 
 - **Arquivos:** api/status.py → core/status.py; main.py (linha 15); api/, web/, alembic/, alembic.ini, Dockerfile, docker-compose.yml, .dockerignore, fly.toml, render.yaml, deploy.yml, scripts/start_web_api.sh → arquivo/servidor-web/; .github/workflows/ci.yml; scripts antigos, JARVIS*.spec, create_locked_dmg.sh → arquivo/mac-linux/; pyproject.toml; README.md, PRODUCT.md, DESIGN.md, CONTRIBUTING.md, docs/USAGE.md, docs/TUTORIAL.md → docs/original/; LEIA-ME.md; .env.example; tests/test_hosted_api.py e tests/test_phase1_decoupling.py → arquivo/
@@ -588,7 +588,7 @@ Cada item só com o sim dele, um commit por item:
 - Servidor web, se ele confirmar que não usa, para arquivo/servidor-web/ (Etapa 11): api/ (depois de mover o status.py para core/), web/, alembic/, alembic.ini, Dockerfile, docker-compose.yml, .dockerignore, fly.toml, render.yaml, deploy.yml, scripts/start_web_api.sh, test_hosted_api.py e test_phase1_decoupling.py (com as conferências de segurança já copiadas na Etapa 1). Os ramos cloud_safe/external_audio saem na Etapa 14.
 - Mac/Linux, para arquivo/mac-linux/ (Etapa 11): os scripts start_jarvis.*, setup_jarvis.*, install_jarvis_cli.sh, scripts/jarvis e create_locked_dmg.sh, e os arquivos JARVIS.spec e JARVIS-Debug.spec. O pyproject.toml é reescrito curto ou apagado.
 - Manuais herdados em inglês, para docs/original/ (Etapa 11): o README original, PRODUCT.md, DESIGN.md, CONTRIBUTING.md, docs/USAGE.md e docs/TUTORIAL.md. O LICENSE fica na raiz.
-- Do .env.example (Etapa 11): DATABASE_URL, REDIS_URL, JWT_SECRET, JARVIS_ENCRYPTION_KEY e JARVIS_LOCKED_VOLUME. O JARVIS_TRIAL_KEYWORD só sai se o Erton confirmar.
+- Do .env.example (Etapa 11): DATABASE_URL, REDIS_URL, JWT_SECRET e JARVIS_ENCRYPTION_KEY (JARVIS_LOCKED_VOLUME e JARVIS_LOCKED_KEY_SECRET saíram na Etapa 5). O JARVIS_TRIAL_KEYWORD só sai se o Erton confirmar.
 - Do requirements.txt, num commit único (Etapa 18): fastapi, uvicorn, SQLAlchemy, alembic, psycopg, redis, email-validator, pywinauto e pygetwindow. O google-generativeai só sai depois de migrar as 3 actions que ficam, e o duckduckgo-search vira ddgs.
 - Da ferramenta jarvis_ui_control (Etapa 7): as ações de mudar o tema e de abrir/fechar o Command Center, enquanto não fizerem efeito na tela azul.
 - Os avisos “JARVIS is thinking...” e “Processing request...” (Etapa 8).
