@@ -1,6 +1,8 @@
-"""O LEIA-ME e o VERSAO.txt são o manual do Erton (não é programador): o que eles prometem precisa bater
-com o código. Cada teste aqui guarda uma promessa que estava errada na conferência final."""
+"""O LEIA-ME e o VERSAO.txt são o manual do Erton (não é programador), e o dev/ROTEIRO_DE_5_MINUTOS.md é
+como ele confere cada versão: o que eles prometem precisa bater com o código. Cada teste aqui guarda uma
+promessa que estava errada numa conferência."""
 
+import importlib.util
 import os
 import re
 import sys
@@ -120,6 +122,31 @@ class FecharNoXTests(unittest.TestCase):
         self.assertIn("continua ouvindo", texto)
         self.assertIn("Quit JARVIS", texto)
         self.assertNotIn("Running in background", titulo + texto)
+
+
+class RoteiroBateComOCodigoTests(unittest.TestCase):
+    def test_painel_ultron_pelos_botoes_que_existem_na_tela_azul(self):
+        # na tela azul (a padrão) a cena cobre a tela antiga inteira: o botão ⚙ ULTRON fica escondido, e
+        # procurando por ele o Erton acharia que a versão quebrou
+        roteiro = _uma_linha((RAIZ / "dev" / "ROTEIRO_DE_5_MINUTOS.md").read_text(encoding="utf-8"))
+        passo = roteiro[roteiro.index("**Painel Ultron:**"):roteiro.index("**Vídeo com")]
+        self.assertNotIn("clique no botão **⚙ ULTRON**", passo)
+        self.assertIn("**⚙ ULTRON** (ele só aparece na tela antiga, a do F2)", passo)
+        self.assertIn('BotaoModo("⚙  ULTRON"', (RAIZ / "ui_stark.py").read_text(encoding="utf-8"))
+        orbe = (RAIZ / "ui_orbe.py").read_text(encoding="utf-8")
+        self.assertNotIn("⚙", orbe)
+        # os nomes que o passo manda procurar são os da tela
+        spec = importlib.util.spec_from_file_location("pu_roteiro", RAIZ / "automacoes" / "painel_ultron.py")
+        painel = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(painel)
+        self.assertIn(("⏰", "Meus lembretes"), [(emoji, titulo) for _n, emoji, titulo, *_ in painel.BOTOES])
+        self.assertIn("**⏰ Meus lembretes**", passo)
+        self.assertEqual(painel.CURTOS["Meus lembretes"], "Lembretes")
+        self.assertIn("**⏰ Lembretes**", passo)
+        self.assertIn('Vidro("Ultron · automações"', orbe)
+        self.assertIn("**Ultron · automações**", passo)
+        self.assertIn('"☰  PAINÉIS"', orbe)
+        self.assertIn("**☰ PAINÉIS**", passo)
 
 
 if __name__ == "__main__":

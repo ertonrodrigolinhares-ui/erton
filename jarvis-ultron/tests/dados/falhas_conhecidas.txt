@@ -1,7 +1,8 @@
 # Falhas conhecidas da suíte de testes (Etapa 0 da reorganização, 18/10/2026).
 # O dev/conferir_testes.py compara cada rodada com esta lista e só acusa as falhas que NÃO estão aqui.
 # Esta lista só muda de propósito, numa etapa do docs/PLANO-REORGANIZACAO.md (a Etapa 2 deve zerá-la).
-# Linhas com # são comentário. "instavel: <teste>" = às vezes falha, às vezes passa (investigar à parte).
+# Linhas com # são comentário. "instavel: <teste>" = às vezes falha, às vezes passa (investigar à parte):
+# quando ele falha, o conferir_testes o roda de novo sozinho; falhando em todas as vezes, é falha nova.
 #
 # 70 testes do tests/test_ui_regressions.py cobram telas do JARVIS-OS que não existem mais
 # (apresentação inicial, tour guiado, INTRO_*, save_auto_graphics_result, voz padrão "charon").

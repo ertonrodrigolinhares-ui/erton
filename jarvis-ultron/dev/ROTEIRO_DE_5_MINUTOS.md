@@ -25,9 +25,12 @@ Para cada passo, o que fazer e o que tem de acontecer.
      que no modo privado isso não é usado (iria para uma IA na nuvem).
 4. **Modo normal:** diga **"Jarvis, modo normal"**.
    - O selo 🔒 some, e ele volta para o Gemini.
-5. **Painel Ultron:** diga **"Jarvis, modo Ultron"** (ou clique no botão **⚙ ULTRON**) e, no painel,
-   clique em **⏰ Meus lembretes**.
+5. **Painel Ultron:** diga **"Jarvis, modo Ultron"** e, no painel que abre por cima do anel, clique
+   em **⏰ Meus lembretes**.
    - O painel fecha, e o resultado aparece na tela uma vez só e é falado.
+   - Na tela azul não existe o botão **⚙ ULTRON** (ele só aparece na tela antiga, a do F2). Os mesmos
+     botões, com nome curto (**⏰ Lembretes**), também ficam no quadro **Ultron · automações**, que
+     aparece com o botão **☰ PAINÉIS**; ali eles rodam direto, sem abrir o painel.
 6. **Vídeo com "não":** diga **"Jarvis, faz um vídeo de 8 segundos de um triatleta cruzando a linha
    de chegada"**. Ele diz o preço e pergunta se pode fazer: responda **"não"**.
    - Nada é gerado: nenhum vídeo novo em `Documentos\Jarvis Ultron\Videos` e nenhum aviso de vídeo
