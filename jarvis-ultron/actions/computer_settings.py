@@ -320,8 +320,13 @@ def find_on_page():
     if _OS == "Darwin": pyautogui.hotkey("command", "f")
     else:               pyautogui.hotkey("ctrl", "f")
 
-def reload_page_n(n: int):
-    for _ in range(max(1, n)):
+def reload_page_n(n: int, janela=None):
+    """Jarvis Ultron: com a janela (a que apareceu na pergunta), confere antes de cada F5 se ela ainda é a da
+    frente; se mudou, para e lança o erro (o _depois_do_ok avisa o Erton): o ok vale só para aquela janela."""
+    for vez in range(max(1, n)):
+        if janela is not None and _a_mesma(_janela_da_frente()) != _a_mesma(janela):
+            raise RuntimeError(f"a janela da frente mudou depois de {vez} de {n}, e parei para não apertar F5 "
+                               "em outra janela")
         refresh_page()
         time.sleep(0.8)
 
@@ -521,9 +526,15 @@ def _energia(comando: list) -> None:
     if resultado.returncode:
         saida = resultado.stderr or resultado.stdout or b""
         if isinstance(saida, bytes):
-            try:
-                saida = saida.decode("oem")  # a saída dos comandos do Windows (no Brasil, o cp850)
-            except (LookupError, UnicodeDecodeError):
+            # a saída dos comandos do Windows vem na página OEM (no Brasil, o cp850): o codec "oem" e, onde
+            # ele não existe (fora do Windows de verdade, como nos testes), o cp850; no Linux e no Mac, utf-8
+            for codigo in ("oem", "cp850") if _OS == "Windows" else ("utf-8",):
+                try:
+                    saida = saida.decode(codigo)
+                    break
+                except (LookupError, UnicodeDecodeError):
+                    continue
+            else:
                 saida = saida.decode("utf-8", "replace")
         raise RuntimeError(" ".join(str(saida).split()) or f"o sistema recusou (código {resultado.returncode})")
 
@@ -730,6 +741,7 @@ def _has_explicit_computer_power_target(params: dict, description: str, value) -
 # jarvis (fora da conversa) não faz nada.
 
 VALIDADE_PEDIDO = 2 * 60  # segundos que a pergunta espera a resposta dele
+RECARREGAR_NO_MAXIMO = 20  # vezes do reload_n por ok (o número vem do modelo; cada F5 leva 0,8 s)
 TITULO_DO_JARVIS = "J.A.R.V.I.S — MARK XXXIX"  # o da janela da tela (ui.py, setWindowTitle)
 
 _pendente: dict = {}
@@ -1033,10 +1045,14 @@ def computer_settings(
             vezes = max(1, int(value or 1))
         except (TypeError, ValueError) as e:
             return f"Reload failed: {e}"
+        if vezes > RECARREGAR_NO_MAXIMO:
+            return (f"Not done: Jarvis reloads at most {RECARREGAR_NO_MAXIMO} times per ok, and {vezes} were "
+                    "asked. Tell the user, in one short Portuguese sentence, and ask for a smaller number.")
         janela = _janela_da_frente()
         o_que = f"apertar F5 (recarregar a página) {vezes} {'vez' if vezes == 1 else 'vezes'}"
+        # a cada F5 confere de novo a janela: se o Erton trocar de janela no meio, para
         return _pedir_ok(jarvis, ("reload_n", vezes, _a_mesma(janela)), o_que, janela,
-                         lambda: reload_page_n(vezes))
+                         lambda: reload_page_n(vezes, janela))
 
     if action == "scroll_up":
         scroll_up(int(value or 500))

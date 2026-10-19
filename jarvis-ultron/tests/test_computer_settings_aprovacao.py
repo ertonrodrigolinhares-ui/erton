@@ -123,7 +123,9 @@ class DesligarEReiniciarTests(BaseTests):
         self.chamar(REINICIAR, jarvis)
         jarvis.falar("ok, pode fazer")
         self.assertIn("Approved", self.chamar(dict(REINICIAR, confirmed="yes"), jarvis))
-        self.assertEqual(self.desligou(), [["shutdown", "/r", "/t", "10"]])  # espera 10 s e sem /f
+        # espera 10 s (com /t maior que 0 o Windows fecha os programas à força, mesmo sem o /f: por isso a
+        # pergunta pede para salvar antes)
+        self.assertEqual(self.desligou(), [["shutdown", "/r", "/t", "10"]])
         # o ok valeu uma vez: chamar de novo pergunta de novo, e não reinicia outra vez
         self.assertIn("Not done yet", self.chamar(dict(REINICIAR, confirmed="yes"), jarvis))
         self.assertEqual(len(self.desligou()), 1)
@@ -247,9 +249,11 @@ class DesligarEReiniciarTests(BaseTests):
 
     def test_windows_que_recusa_o_comando_avisa(self):
         # "desliga o computador", ok, e logo "não, reinicia", ok: o Windows recusa o segundo (erro 1190, já há um
-        # desligamento agendado) e o PC desliga. O "Feito" seria mentira: o Erton ouve o aviso do Windows
+        # desligamento agendado) e o PC desliga. O "Feito" seria mentira: o Erton ouve o aviso do Windows.
+        # Os bytes são os que o Windows em português manda (a página OEM, cp850), e não utf-8: no Windows o
+        # _energia lê pelo codec "oem"; fora dele (aqui, no Linux, sem esse codec), pelo cp850
         self.sistema.run.return_value = NS(returncode=1190, stdout=b"",
-                                           stderr="Já foi agendado um desligamento do sistema.(1190)\r\n".encode("utf-8"))
+                                           stderr="Já foi agendado um desligamento do sistema.(1190)\r\n".encode("cp850"))
         jarvis = JarvisFalso("reinicia o computador")
         self.chamar(REINICIAR, jarvis)
         jarvis.falar("ok, pode fazer")
@@ -564,6 +568,50 @@ class TecladoTests(BaseTests):
         self.assertIn("Not done yet", dez)
         self.assertIn("10 vezes", dez)
         self.assertEqual(self.teclado.method_calls, [])
+
+    def test_recarregar_varias_vezes_para_se_a_janela_mudar_no_meio(self):
+        # o ok vale para a janela da pergunta: se o Erton trocar de janela no meio (no VS Code, o F5 roda o
+        # programa), os F5 que faltam não vão para a outra janela. Ele para e avisa
+        jarvis, frente, apertos = JarvisFalso("recarrega 5 vezes"), [(42, "Site - Google Chrome")], []
+        vscode = (77, "app.py - Visual Studio Code")
+
+        def apertar(tecla):
+            apertos.append((tecla, frente[0]))
+            if len(apertos) == 2:
+                frente[0] = vscode  # depois do 2º F5, o VS Code vem para a frente
+
+        self.teclado.press.side_effect = apertar
+        with patch.object(cs, "_janela_da_frente", side_effect=lambda: frente[0]):
+            self.assertIn("5 vezes", self.chamar({"action": "reload_n", "value": "5"}, jarvis))
+            jarvis.falar("ok, pode fazer")
+            self.assertIn("Approved", self.chamar({"action": "reload_n", "value": "5"}, jarvis))
+        self.assertEqual(apertos, [("f5", (42, "Site - Google Chrome"))] * 2)
+        self.assertEqual(len(jarvis.avisos), 1, jarvis.avisos)
+        self.assertIn("Não consegui apertar F5 (recarregar a página) 5 vezes", jarvis.avisos[0])
+        self.assertIn("a janela da frente mudou depois de 2", jarvis.avisos[0])
+        self.assertFalse(any("Feito com o seu ok" in log for log in jarvis.logs), jarvis.logs)
+        # com a mesma janela na frente, aperta todas
+        apertos.clear()
+        jarvis, frente[0] = JarvisFalso("recarrega 3 vezes"), vscode
+        with patch.object(cs, "_janela_da_frente", side_effect=lambda: frente[0]):
+            self.chamar({"action": "reload_n", "value": "3"}, jarvis)
+            jarvis.falar("ok, pode fazer")
+            self.assertIn("Approved", self.chamar({"action": "reload_n", "value": "3"}, jarvis))
+        self.assertEqual(apertos, [("f5", vscode)] * 3)
+        self.assertEqual(jarvis.avisos, [])
+
+    def test_recarregar_tem_um_limite_de_vezes(self):
+        # o número vem do modelo: sem limite, "recarrega mil vezes" apertaria F5 por uns 13 minutos
+        jarvis = JarvisFalso("recarrega mil vezes")
+        for valor in ("21", "1000", 10 ** 9):
+            with self.subTest(valor=valor):
+                resposta = self.chamar({"action": "reload_n", "value": valor}, jarvis)
+                self.assertTrue(resposta.startswith("Not done: Jarvis reloads at most 20 times"), resposta)
+                self.assertNotIn("Ask the user now", resposta)
+                self.assertEqual(cs._pendente, {})
+        self.assertIn("apertar F5 (recarregar a página) 20 vezes", self.chamar({"action": "reload_n", "value": "20"}, jarvis))
+        self.assertEqual(self.teclado.method_calls, [])
+        self.assertEqual(jarvis.avisos, [])
 
     def test_janela_que_nao_da_para_saber_e_titulo_comprido(self):
         jarvis = JarvisFalso("aperta enter")

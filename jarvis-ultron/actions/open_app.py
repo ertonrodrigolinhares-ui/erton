@@ -93,6 +93,8 @@ def _normalize(raw: str) -> str:
 # é conferido e aberto pelo apelido, que é fixo: as palavras ditas não vão para a busca do menu Iniciar.
 # Um nome que começa com um comando ("Docker Desktop", "Git GUI") só abre pelo atalho do menu Iniciar com
 # esse nome exato (é ele que a busca abriria): as palavras ditas só escolhem o atalho, nenhuma vira argumento.
+# O "&" entre espaços faz parte do nome de aplicativos do Windows ("Movies & TV", "Snip & Sketch") e vale:
+# nada passa pelo shell, e "cmd & ..." continua recusado pela regra do comando na primeira palavra.
 _DESLIGAM = {"shutdown", "logoff", "logout", "tsdiscon", "slidetoshutdown", "psshutdown", "psshutdown64",
              "rundll32", "poweroff", "reboot", "halt", "gnome-session-quit"}
 _SINAIS_DO_CMD = re.compile(r'[&|<>^%"`\\\x00-\x1f\x7f]')
@@ -138,7 +140,7 @@ def _recusa(app_name: str, sistema: str) -> str | None:
         return None
     endereco = _ENDERECO.fullmatch(app_name)
     palavras = app_name.split()
-    if _SINAIS_DO_CMD.search(app_name) or (endereco and endereco.group(1).lower() == "file") or (
+    if _SINAIS_DO_CMD.search(app_name.replace(" & ", " ")) or (endereco and endereco.group(1).lower() == "file") or (
             not endereco and ("/" in app_name or re.search(r"\s-", app_name))):
         return (f"Not opened: open_app opens an application by its name only, and '{app_name}' has command "
                 "arguments, a path or special characters. Use file_controller for files and folders, and "

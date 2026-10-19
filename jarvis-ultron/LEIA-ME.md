@@ -438,7 +438,7 @@ Espaço) **só acontecem com o seu "ok"**, conferido no código. Não é a IA qu
 1. Você pede, por exemplo: "Jarvis, digita olá mundo" ou "Jarvis, reinicia o computador".
 2. O Jarvis pergunta antes e diz exatamente o que vai digitar ou que teclas vai apertar, e em que janela.
    Por exemplo: *Posso digitar "olá mundo" na janela "Sem título - Bloco de Notas"?* A pergunta também
-   aparece escrita num aviso do Windows, perto do relógio (e, por alguns segundos, no alto da janela do
+   aparece escrita num aviso do Windows, perto do relógio (e, por uns 15 segundos, no alto da janela do
    Jarvis).
 3. Ele só faz se a sua **resposta seguinte** for um "ok" claro: **"ok"** ou **"ok, pode fazer"**. "Não",
    ou qualquer outra resposta, cancela. Um "ok" dito junto com o pedido, antes da pergunta, não vale.
@@ -449,7 +449,8 @@ Espaço) **só acontecem com o seu "ok"**, conferido no código. Não é a IA qu
    reiniciar, o "ok" digitado também vale.)
 4. O "ok" vale para aquilo, uma vez só. Outro texto, outra tecla ou outra janela na frente (também outra
    aba do navegador): ele pergunta de novo. Se a janela da frente mudar depois do seu "ok", ele não digita
-   nada e avisa.
+   nada e avisa. Recarregar a página várias vezes vai até 20 de cada vez, e ele para no meio se a
+   janela da frente mudar.
 5. Uma coisa de cada vez: se você pedir duas ("digita olá mundo e aperta Enter"), ele pergunta uma, faz,
    e depois pergunta a outra. São dois "ok", uma de cada vez.
 6. O texto vai numa linha só: com quebra de linha, tab ou caractere invisível no meio, ele não digita.

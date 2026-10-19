@@ -38,9 +38,11 @@ PROGRAMAS = {"powershell": r"C:\Windows\System32\WindowsPowerShell\v1.0\powershe
              "shutdown.exe": r"C:\Windows\System32\shutdown.exe", "logoff": r"C:\Windows\System32\logoff.exe",
              "code": r"C:\Program Files\Microsoft VS Code\bin\code.cmd",
              "control": r"C:\Windows\System32\control.exe",
-             # um caminho com a barra normal: o which do Windows acha o arquivo (e o Popen o rodaria)
+             # um caminho com a barra normal ou a invertida: o which do Windows acha o arquivo (e o Popen o rodaria)
              "c:/users/erton/downloads/instalar.bat": r"C:\Users\erton\Downloads\instalar.bat",
-             "./x.bat": r"C:\Users\erton\x.bat"}
+             "./x.bat": r"C:\Users\erton\x.bat",
+             r"c:\users\erton\downloads\instalar.bat": r"C:\Users\erton\Downloads\instalar.bat",
+             r".\x.bat": r"C:\Users\erton\x.bat"}
 
 
 def _which(nome):
@@ -106,6 +108,13 @@ class OpenAppTests(BaseTests):
                  "file:///C:/Users/erton/Desktop/x.bat", 'notepad" & "shutdown',
                  # caminho com a barra normal (o which acha o arquivo; só a regra da "/" o recusa)
                  "C:/Users/erton/Downloads/instalar.bat", "./x.bat",
+                 # e com a barra invertida (só a regra dos sinais, que tem a "\", o recusa)
+                 r"C:\Users\erton\Downloads\instalar.bat", r".\x.bat",
+                 # caractere de controle, sem "/", sem " -" e sem um comando na primeira palavra (só a regra dos
+                 # caracteres de controle o recusa): na busca do menu Iniciar, o "\n" viraria um Enter no meio
+                 "PowerShel\nStop-Computer", "Bloco\tshutdown", "x\x1by",
+                 # o "&" só vale entre espaços e depois de uma palavra que não é um comando
+                 "cmd & shutdown", "x &shutdown", "x& shutdown",
                  # a busca do menu Iniciar roda "programa argumento" como comando
                  "powershell Stop-Computer", "cmd c shutdown")
         for cerebro in ("gemini", "gemma"):
@@ -133,10 +142,14 @@ class OpenAppTests(BaseTests):
         self.sistema.Popen.assert_not_called()
 
     def test_programa_que_o_windows_acha_pelo_nome_abre_pelo_menu_iniciar(self):
-        # nome com espaço, sem argumento: vai para a busca do menu Iniciar, como antes
-        self.assertEqual(self.ferramenta("open_app", {"app_name": "Microsoft Store"}), "Opened Microsoft Store.")
-        self.assertEqual(self.teclado.method_calls,
-                         [call.press("win"), call.write("Microsoft Store", interval=0.05), call.press("enter")])
+        # nome com espaço, sem argumento: vai para a busca do menu Iniciar, como antes. Os aplicativos do
+        # Windows com "&" no nome ("Movies & TV", o Filmes e TV) também: nada passa pelo shell
+        for nome in ("Microsoft Store", "Movies & TV", "Snip & Sketch", "Solitaire & Casual Games"):
+            with self.subTest(nome=nome):
+                self.teclado.reset_mock()
+                self.assertEqual(self.ferramenta("open_app", {"app_name": nome}), f"Opened {nome}.")
+                self.assertEqual(self.teclado.method_calls,
+                                 [call.press("win"), call.write(nome, interval=0.05), call.press("enter")])
         self.sistema.Popen.assert_not_called()
 
     def test_nome_conhecido_abre_mesmo_comecando_com_um_comando(self):
@@ -279,6 +292,28 @@ class FileControllerTests(BaseTests):
                 self.assertTrue(resposta.startswith("Not opened"), resposta)
         self.abrir.assert_not_called()
 
+    def test_caminho_inteiro_sem_o_nome_tambem_nao_vale(self):
+        # a declaração manda pôr o caminho inteiro em path, sem name ("Use action=open for a file path"): a trava
+        # confere o nome do arquivo de verdade, e não o parâmetro name, que aqui fica vazio
+        for nome in ("x.bat", "y.cmd", "atalho.lnk"):
+            (self.pasta / nome).write_text("shutdown /s /t 0", encoding="utf-8")
+            with self.subTest(acao="open", nome=nome):
+                resposta = self.ferramenta("file_controller", {"action": "open", "path": str(self.pasta / nome)})
+                self.assertTrue(resposta.startswith("Not opened"), resposta)
+        for acao in ("write", "create_file"):
+            for nome in ("z.bat", "z.cmd", "z.lnk"):
+                with self.subTest(acao=acao, nome=nome):
+                    resposta = self.ferramenta("file_controller", {"action": acao, "path": str(self.pasta / nome),
+                                                                   "content": "shutdown /r"})
+                    self.assertTrue(resposta.startswith("Not done"), resposta)
+                    self.assertFalse((self.pasta / nome).exists())
+        self.abrir.assert_not_called()
+        # um arquivo comum pelo caminho inteiro continua
+        self.assertEqual(self.ferramenta("file_controller", {"action": "write", "path": str(self.pasta / "nota.txt"),
+                                                             "content": "oi"}), "Written to: nota.txt")
+        self.assertEqual(self.ferramenta("file_controller", {"action": "open", "path": str(self.pasta / "nota.txt")}),
+                         "Opened file: nota.txt")
+
     def test_criar_renomear_copiar_ou_mover_para_programa_nao_vale(self):
         (self.pasta / "nota.txt").write_text("shutdown /s /t 0", encoding="utf-8")
         destino = self.pasta / "Inicializar"
@@ -332,6 +367,35 @@ class FileControllerTests(BaseTests):
         self.assertEqual(self.arquivo("open"), f"Opened folder: {self.pasta.name}")
         self.assertIn("nota2.txt", self.arquivo("rename", name="nota.txt", new_name="nota2.txt"))
         self.assertEqual(len(self.abrir.call_args_list), 3)
+
+
+class ListasEscritasAMaoTests(unittest.TestCase):
+    """As listas das travas, escritas à mão aqui: os outros testes conferem só alguns nomes de cada uma, e tirar
+    um nome abre uma porta (sem "slidetoshutdown", o open_app rodaria a tela de deslizar para desligar; sem
+    ".jar", o file_controller abriria um programa Java). As listas podem crescer; tirar um nome só acontece de
+    propósito, mudando este teste junto."""
+
+    def test_programas_de_desligar_do_open_app(self):
+        self.assertLessEqual({"shutdown", "logoff", "logout", "tsdiscon", "slidetoshutdown", "psshutdown",
+                              "psshutdown64", "rundll32", "poweroff", "reboot", "halt", "gnome-session-quit"},
+                             oa._DESLIGAM)
+
+    def test_programas_scripts_e_atalhos_do_file_controller(self):
+        self.assertLessEqual({
+            ".exe", ".com", ".bat", ".cmd", ".ps1", ".psm1", ".psd1", ".vbs", ".vbe", ".js", ".jse", ".wsf", ".wsh",
+            ".msc", ".msi", ".msp", ".scr", ".pif", ".hta", ".cpl", ".lnk", ".url", ".reg", ".inf", ".scf", ".jar",
+            ".py", ".pyw", ".pyz", ".pyc", ".appref-ms", ".application", ".settingcontent-ms", ".library-ms",
+            ".sh", ".command", ".app", ".desktop", ".appimage", ".run",
+        }, fc._PROGRAMAS)
+        for extensao in fc._PROGRAMAS:
+            with self.subTest(extensao=extensao), patch.dict(os.environ, {"PATHEXT": ""}):
+                self.assertTrue(fc._e_programa(f"x{extensao}"))
+                self.assertTrue(fc._e_programa(f"X{extensao.upper()}"))
+
+    def test_sinais_do_cmd_do_open_app(self):
+        for sinal in '&|<>^%"`\\' + "".join(map(chr, range(32))) + "\x7f":
+            with self.subTest(sinal=sinal):
+                self.assertTrue(oa._recusa(f"a{sinal}b", "Windows"), sinal)
 
 
 class DesktopControlTests(BaseTests):

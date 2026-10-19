@@ -1136,6 +1136,7 @@ class ToastNotification(QWidget):
         msg = QLabel(message)
         msg.setFont(QFont("Courier New", 8))
         msg.setStyleSheet(f"color: {C.WHITE}; background: transparent;")
+        msg.setWordWrap(True)  # Jarvis Ultron: o texto inteiro, em quantas linhas precisar (ToastManager)
         lay.addWidget(msg, stretch=1)
 
         close = QPushButton("✕")
@@ -1189,6 +1190,8 @@ class ToastManager:
         try:
             toast = ToastNotification(parent, message, toast_type, duration)
             toast.setFixedWidth(min(400, parent.width() - 40))
+            # Jarvis Ultron: cresce com o texto (a pergunta antes de agir tem até ~190 letras), no mínimo 40px
+            toast.setFixedHeight(max(40, toast.heightForWidth(toast.width())))
 
             # Clean up dead references first
             cls._toasts = [t for t in cls._toasts if cls._is_alive(t)]
@@ -7527,9 +7530,9 @@ class MainWindow(QMainWindow):
                 return
 
     # ── Toast helper ─────────────────────────────────────────────────────
-    def _show_toast(self, message: str, toast_type: str = "info"):
+    def _show_toast(self, message: str, toast_type: str = "info", duration: int = 4000):
         try:
-            ToastManager.show_toast(self.centralWidget(), message, toast_type)
+            ToastManager.show_toast(self.centralWidget(), message, toast_type, duration=duration)
         except Exception:
             pass
 
@@ -9242,6 +9245,11 @@ class _RootShim:
         pass
 
 
+# Jarvis Ultron: quanto tempo a pergunta antes de agir (notificar com o título "Pergunta", que o
+# actions/computer_settings.py manda) fica no alto da janela; os outros avisos ficam 4 s
+AVISO_DA_PERGUNTA_MS = 15000
+
+
 class JarvisUI:
 
     def __init__(self, face_path: str, size=None):
@@ -9345,7 +9353,10 @@ class JarvisUI:
                 bandeja.showMessage(f"Jarvis · {titulo}", texto, QSystemTrayIcon.MessageIcon.Information, 10000)
             mostrar_aviso = getattr(janela, "_show_toast", None)
             if callable(mostrar_aviso):
-                mostrar_aviso(f"{titulo}: {texto}", "warning")
+                if titulo == "Pergunta":  # a pergunta antes de agir (computer_settings): ele lê, confere e responde
+                    mostrar_aviso(f"{titulo}: {texto}", "warning", duration=AVISO_DA_PERGUNTA_MS)
+                else:
+                    mostrar_aviso(f"{titulo}: {texto}", "warning")
 
         from core.na_tela import executar
         executar(mostrar)

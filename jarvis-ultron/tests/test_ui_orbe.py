@@ -8,6 +8,7 @@ from unittest.mock import ANY, Mock, patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from PyQt6.QtCore import QRect, Qt
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QApplication, QLabel, QWidget
 
@@ -149,7 +150,8 @@ class CenaTests(unittest.TestCase):
             jarvis_ui._win = win
             pergunta = ('Posso digitar "olá mundo" na janela "Sem título - Bloco de Notas"? Para confirmar, '
                         'diga "ok, pode fazer".')
-            with patch("core.na_tela.executar", side_effect=lambda funcao: funcao()):
+            with patch("core.na_tela.executar", side_effect=lambda funcao: funcao()), \
+                    patch.object(ui.ToastManager, "show_toast", wraps=ui.ToastManager.show_toast) as mostrar:
                 jarvis_ui.notificar("Pergunta", pergunta)
             for _ in range(5):
                 self.app.processEvents()
@@ -162,6 +164,27 @@ class CenaTests(unittest.TestCase):
             # o que aparece no meio do aviso é ele, e não a cena que cobre a janela
             no_meio = central.childAt(aviso.geometry().center())
             self.assertTrue(no_meio is aviso or aviso.isAncestorOf(no_meio), no_meio)
+            # a pergunta fica no alto da janela por mais tempo que um aviso comum (4 s): o Erton lê e responde
+            self.assertGreaterEqual(mostrar.call_args.kwargs.get("duration", 0), 15000)
+            # e cabe inteira, com o nome da janela e o "ok, pode fazer" (antes, só os primeiros ~50 caracteres
+            # apareciam): também uma com o título mais comprido que a pergunta mostra (80 caracteres)
+            comprida = (f'Posso apertar Espaço (pausar ou continuar o vídeo) na janela "{("Lofi Girl - " * 7)[:79]}…"? '
+                        'Para confirmar, diga "ok, pode fazer".')
+            with patch("core.na_tela.executar", side_effect=lambda funcao: funcao()):
+                jarvis_ui.notificar("Pergunta", comprida)
+            for _ in range(5):
+                self.app.processEvents()
+            for texto in (pergunta, comprida):
+                with self.subTest(texto=texto):
+                    aviso = next(t for t in central.findChildren(ui.ToastNotification) if t.isVisible()
+                                 and any(texto in r.text() for r in t.findChildren(QLabel)))
+                    rotulo = next(r for r in aviso.findChildren(QLabel) if texto in r.text())
+                    self.assertTrue(rotulo.wordWrap())
+                    precisa = rotulo.fontMetrics().boundingRect(
+                        QRect(0, 0, rotulo.contentsRect().width(), 10000),
+                        Qt.TextFlag.TextWordWrap.value, rotulo.text()).height()
+                    self.assertLessEqual(precisa, rotulo.contentsRect().height())
+                    self.assertTrue(central.rect().contains(aviso.geometry()))
         finally:
             win.close()
             win.deleteLater()
