@@ -577,8 +577,10 @@ class DesligadasTests(unittest.TestCase):
                          {"action": "press_key", "value": "enter", "confirmed": "yes"}):
                 chamada = NS(id="1", name="computer_settings", args=args)
                 respostas.append(asyncio.run(jarvis._execute_tool(chamada)).response["result"])
-        self.assertTrue(all(r.startswith("Not done yet") for r in respostas), respostas)
+        self.assertTrue(respostas[0].startswith("Not done yet"), respostas)
         self.assertIn('Posso digitar "oi Ana" e apertar Enter', respostas[0])
+        # na mesma fala, a segunda não troca a pergunta que espera a resposta (uma por vez)
+        self.assertTrue(respostas[1].startswith("Not done: another action is already waiting"), respostas)
         self.assertEqual(teclado.method_calls, [])
         mapa = (RAIZ / "core" / "SEGURANCA.md").read_text(encoding="utf-8")
         secao = mapa[mapa.index("## 1."):mapa.index("## 2.")]

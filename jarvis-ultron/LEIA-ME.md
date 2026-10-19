@@ -417,9 +417,10 @@ voltar na hora, abra o "Iniciar Jarvis Ultron" da pasta da versão anterior.
 ## Antes de desligar, reiniciar, digitar ou apertar teclas, o Jarvis pergunta
 
 Desligar ou reiniciar o PC, escrever um texto na janela da frente e apertar teclas nela (Enter, Esc,
-colar, copiar, recortar, desfazer, salvar, selecionar tudo, fechar o programa, a janela ou a aba, trocar de
-aba, voltar e avançar, recarregar, zoom, procurar, tela cheia, pausar o vídeo com o Espaço) **só acontecem
-com o seu "ok"**, conferido no código. Não é a IA que decide se você aprovou.
+colar, copiar, recortar, desfazer, refazer, salvar, selecionar tudo, fechar o programa, a janela ou a aba,
+abrir aba nova, trocar de aba, voltar e avançar, ir para a barra de endereço, recarregar, zoom, procurar,
+tela cheia, subir ou descer uma tela (Page Up/Page Down), ir para o começo ou o fim, pausar o vídeo com o
+Espaço) **só acontecem com o seu "ok"**, conferido no código. Não é a IA que decide se você aprovou.
 
 1. Você pede, por exemplo: "Jarvis, digita olá mundo" ou "Jarvis, reinicia o computador".
 2. O Jarvis pergunta antes e diz exatamente o que vai digitar ou que teclas vai apertar, e em que janela.
@@ -427,8 +428,16 @@ com o seu "ok"**, conferido no código. Não é a IA que decide se você aprovou
    aparece escrita na tela.
 3. Ele só faz se a sua **resposta seguinte** for um "ok" claro: **"ok"** ou **"ok, pode fazer"**. "Não",
    ou qualquer outra resposta, cancela. Um "ok" dito junto com o pedido, antes da pergunta, não vale.
-4. O "ok" vale para aquilo, uma vez só. Outro texto, outra tecla ou outra janela na frente: ele pergunta
-   de novo. Se a janela da frente mudar depois do seu "ok", ele não digita nada e avisa.
+   Para digitar ou apertar teclas, responda **falando**, com o programa certo na frente: se você clicar
+   no campo do Jarvis para digitar o "ok", a janela da frente passa a ser a do Jarvis, e ele pergunta de
+   novo, agora com a janela dele. Aí é só responder "não" e pedir de novo. (Para desligar e reiniciar, o
+   "ok" digitado também vale.)
+4. O "ok" vale para aquilo, uma vez só. Outro texto, outra tecla ou outra janela na frente (também outra
+   aba do navegador): ele pergunta de novo. Se a janela da frente mudar depois do seu "ok", ele não digita
+   nada e avisa.
+5. Uma coisa de cada vez: se você pedir duas ("digita olá mundo e aperta Enter"), ele pergunta uma, faz,
+   e depois pergunta a outra. São dois "ok", uma de cada vez.
+6. O texto vai numa linha só: com quebra de linha, tab ou caractere invisível no meio, ele não digita.
 
 Reiniciar e desligar acontecem uns 10 segundos depois do "ok" (dá tempo de salvar algo). Para cancelar
 nesse tempo: aperte Windows+R, digite `shutdown /a` e aperte Enter.

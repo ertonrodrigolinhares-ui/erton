@@ -26,7 +26,7 @@ O "ok" só vale numa fala do Erton **depois** de ele ouvir o que vai ser feito. 
 | `hermes/hooks/aprovacao_jarvis.py` (`decidir`, `aprovado`) | Gancho do Hermes: escrita no Metricool ou no Meta só passa com o "ok" registrado nos últimos minutos; se não conseguir ler o arquivo do "ok", bloqueia. |
 | `automacoes/videos.py` (`executar`) | Vídeo pago: primeiro o preço, depois o "ok" numa fala nova; confere de novo no fio `VideoVeo` antes de gastar. |
 | `automacoes/claude_tarefas.py` e `core/claude_chefe.py` | Mudança de código pelo Claude chefe: plano, "ok", backup e desfaz sozinho se os testes quebrarem. O Claude só escreve na pasta dele e nunca lê `.env`, chaves nem memória (`PROTEGIDOS`). |
-| `actions/computer_settings.py` (`_pedir_ok`, `_depois_do_ok`, `TECLAS_PEDEM_OK`) | Desligar e reiniciar o PC, digitar e apertar teclas no programa da janela da frente (Etapa 4): a primeira chamada só pergunta, com o texto ou as teclas e o nome da janela (a pergunta aparece na tela); só age se a **primeira** fala nova do Erton depois da pergunta for um "ok" claro. O `confirmed=yes` que o modelo preenche não conta; "não" (ou qualquer outra resposta) cancela; o ok vale uma vez e só para aquele pedido (outro texto, outra tecla ou outra janela pedem de novo); antes de agir, confere de novo com a fala inteira (`ainda_aprovado`) e se a janela da frente é a mesma. Sem o `jarvis` (chamada fora da conversa), não age. A trava fica dentro da ação, que o `_execute_tool` chama com o `jarvis`: vale para o Gemini, a reserva e o painel Ultron. |
+| `actions/computer_settings.py` (`_pedir_ok`, `_depois_do_ok`, `TECLAS_PEDEM_OK`) | Desligar e reiniciar o PC, digitar e apertar teclas no programa da janela da frente (Etapa 4): a primeira chamada só pergunta, com o texto ou as teclas e o nome da janela (a pergunta aparece na tela); só age se a **primeira** fala nova do Erton depois da pergunta for um "ok" claro. O `confirmed=yes` que o modelo preenche não conta; "não" (ou qualquer outra resposta) cancela; o ok vale uma vez e só para aquele pedido (outro texto, outra tecla, outro número de vezes ou outra janela, pelo número e pelo título, pedem de novo; `_a_mesma` só ignora a marca de "não salvo" do editor); uma pergunta por vez: enquanto uma espera a resposta, outro pedido na mesma fala não é guardado; texto com quebra de linha, tab ou caractere invisível é recusado (viraria Enter ou Tab, ou a pergunta mostraria outra coisa); antes de agir, confere de novo com a fala inteira (`ainda_aprovado`) e se a janela da frente é a mesma. Sem o `jarvis` (chamada fora da conversa), não age. A trava fica dentro da ação, que o `_execute_tool` chama com o `jarvis`: vale para o Gemini, a reserva e o painel Ultron. |
 | `main.py`, `JarvisLive._nova_fala`, `_microfone_mandou_audio` e `_receive_audio` | No Gemini ao vivo, um pedaço de transcrição só abre fala nova se o microfone mandou áudio depois do último turno do Jarvis. |
 
 Testes: `test_invariantes.py` (`OkAntigoTests`), `test_videos.py` (`OkAntesDoVideoTests`,
@@ -70,9 +70,11 @@ na janela da frente e, com `press_enter`, apertava Enter; o `press_key` e as aç
 sem o "ok". Agora passam pelo `_pedir_ok` com o `core/aprovacao.py` (a mesma trava de desligar e reiniciar,
 na tabela acima): o `type_text` e os sinônimos, o `press_key`, o `reload_n` e todas as ações do `ACTION_MAP`
 que mandam teclas para o programa da frente (`TECLAS_PEDEM_OK`: Enter, Esc, colar, copiar, recortar, desfazer,
-salvar, selecionar tudo, fechar programa, janela ou aba, abas, voltar e avançar, recarregar, zoom, procurar,
-tela cheia, Page Up/Down, começo e fim, e o Espaço do `pause_video`). A pergunta mostra o texto ou as teclas e
-o nome da janela da frente; o ok vale para aquele texto, naquela janela, uma vez. Não pedem (`NAO_PEDEM_OK`,
+refazer, salvar, selecionar tudo, fechar programa, janela ou aba, abrir aba nova, trocar de aba, voltar e
+avançar, ir para a barra de endereço, recarregar, zoom, procurar, tela cheia, Page Up/Down, começo e fim, e o
+Espaço do `pause_video`). A pergunta mostra o texto ou as teclas e o nome da janela da frente; o ok vale para
+aquele texto, naquela janela (o número e o título: trocar de aba no navegador muda o título), uma vez, e só um
+pedido espera a resposta de cada vez. O texto vai numa linha só, sem caracteres invisíveis. Não pedem (`NAO_PEDEM_OK`,
 cada uma com o motivo): volume, brilho, Wi-Fi, tema escuro, apagar a tela, rolar com o mouse e os atalhos que o
 próprio Windows atende (tecla Windows, Alt+Tab, Ctrl+Shift+Esc). Toda ação nova do `ACTION_MAP` tem de entrar
 numa das duas listas (teste). As linhas "Messaging" e "Typing safety" do `core/prompt.txt` continuam (nunca

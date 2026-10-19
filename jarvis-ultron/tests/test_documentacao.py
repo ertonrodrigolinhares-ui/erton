@@ -100,6 +100,48 @@ class LeiaMeBateComOCodigoTests(unittest.TestCase):
         linha = _uma_linha(VERSAO[VERSAO.index("- Ferramentas antigas"):VERSAO.index("- Reserva com outra empresa")])
         self.assertNotIn("mouse e do teclado", linha)
 
+    def test_leia_me_conta_cada_tecla_que_pede_o_ok(self):
+        # a lista do LEIA-ME parecia completa e deixava de fora 7 das ações de TECLAS_PEDEM_OK (Page Down,
+        # aba nova...): o Erton levaria uma pergunta que o manual não avisou. Ação nova na lista do código
+        # tem de ganhar o seu trecho aqui e no LEIA-ME
+        import actions.computer_settings as cs
+
+        no_leia_me = {
+            "pause_video": "pausar o vídeo com o Espaço", "play_pause": "pausar o vídeo com o Espaço",
+            "close_app": "fechar o programa", "quit_app": "fechar o programa", "close_window": "a janela ou a aba",
+            "close_tab": "a janela ou a aba", "full_screen": "tela cheia", "fullscreen": "tela cheia",
+            "focus_search": "ir para a barra de endereço", "refresh_page": "recarregar", "reload": "recarregar",
+            "new_tab": "abrir aba nova", "next_tab": "trocar de aba", "prev_tab": "trocar de aba",
+            "go_back": "voltar e avançar", "go_forward": "voltar e avançar", "zoom_in": "zoom", "zoom_out": "zoom",
+            "zoom_reset": "zoom", "find_on_page": "procurar", "scroll_top": "ir para o começo ou o fim",
+            "scroll_bottom": "ir para o começo ou o fim", "page_up": "(Page Up/Page Down)",
+            "page_down": "(Page Up/Page Down)", "copy": "copiar", "paste": "colar", "cut": "recortar",
+            "undo": "desfazer", "redo": "refazer", "save": "salvar", "select_all": "selecionar tudo",
+            "enter": "(Enter, Esc", "escape": "(Enter, Esc",
+        }
+        self.assertEqual(set(no_leia_me), set(cs.TECLAS_PEDEM_OK))
+        ok = _secao("## Antes de desligar, reiniciar, digitar ou apertar teclas, o Jarvis pergunta")
+        lista = ok[:ok.index("1. Você pede")]
+        for acao, trecho in no_leia_me.items():
+            self.assertIn(trecho, lista, acao)
+        self.assertIn("ir para a barra de endereço", (RAIZ / "core" / "SEGURANCA.md").read_text(encoding="utf-8"))
+
+    def test_leia_me_conta_o_ok_falado_uma_pergunta_por_vez_e_a_aba(self):
+        # o ok DIGITADO no campo do Jarvis põe a janela do Jarvis na frente: para digitar ou apertar teclas,
+        # ele pergunta de novo, agora com a janela do Jarvis (test_computer_settings_aprovacao); duas ações
+        # pedidas juntas vão uma de cada vez; outra aba do navegador é outra janela; e texto de várias linhas
+        # não é digitado
+        ok = _secao("## Antes de desligar, reiniciar, digitar ou apertar teclas, o Jarvis pergunta")
+        for trecho in ('responda **falando**', "campo do Jarvis", 'responder "não"', "uma de cada vez",
+                       "outra aba do navegador", "numa linha só"):
+            self.assertIn(trecho, ok)
+        novidades = _uma_linha(VERSAO[:VERSAO.index("Versão anterior")])
+        for trecho in ("responda falando", "uma de cada vez", "numa linha só"):
+            self.assertIn(trecho, novidades)
+        roteiro = _uma_linha((RAIZ / "dev" / "ROTEIRO_DE_5_MINUTOS.md").read_text(encoding="utf-8"))
+        digitar = roteiro[roteiro.index('**Digitar com "ok":**'):roteiro.index("**F2:**")]
+        self.assertIn("responda falando", digitar)
+
     def test_o_x_da_janela_so_esconde_o_jarvis(self):
         secao = _secao("## Tela e cérebro separados")
         self.assertNotIn("Fechando a janela, o cérebro fecha junto", secao)

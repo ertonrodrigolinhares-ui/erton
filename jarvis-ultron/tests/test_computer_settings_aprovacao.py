@@ -272,7 +272,8 @@ class TecladoTests(BaseTests):
         outro = self.chamar({"action": "type_text", "value": "oi Ana", "confirmed": "yes"}, jarvis)
         self.assertIn("Not done yet", outro)  # outro texto: pergunta de novo, com o texto novo
         self.assertIn('Posso digitar "oi Ana"', outro)
-        self.assertIn("Not done yet", self.chamar({"action": "type_text", "value": "oi", "confirmed": "yes"}, jarvis))
+        # e voltar ao "oi" na mesma fala não vale: a pergunta do "oi Ana" ainda espera a resposta
+        self.assertIn("Not done", self.chamar({"action": "type_text", "value": "oi", "confirmed": "yes"}, jarvis))
         # o Enter acrescentado depois do ok também não vale
         jarvis = JarvisFalso("digita oi")
         self.chamar({"action": "type_text", "value": "oi"}, jarvis)
@@ -301,12 +302,148 @@ class TecladoTests(BaseTests):
         self.assertEqual(len(jarvis.avisos), 1)
         self.assertIn("a janela da frente mudou", jarvis.avisos[0])
 
+    def test_mesma_janela_com_outro_titulo_e_outra_janela(self):
+        # trocar de aba no navegador muda o título e mantém o número da janela: o ok dado para a aba das
+        # notas não vale na aba do WhatsApp, nem antes da confirmação nem entre o ok e a digitação
+        notas, whats = (42, "Notas - Google Chrome"), (42, "WhatsApp - Google Chrome")
+        args = {"action": "type_text", "value": "oi", "press_enter": "true"}
+        jarvis = JarvisFalso("digita oi e aperta enter")
+        with patch.object(cs, "_janela_da_frente", side_effect=[notas, whats]):
+            self.assertIn('na janela "Notas - Google Chrome"', self.chamar(args, jarvis))
+            jarvis.falar("ok, pode fazer")
+            resposta = self.chamar(args, jarvis)
+        self.assertIn("Not done yet", resposta)
+        self.assertIn('na janela "WhatsApp - Google Chrome"', resposta)
+        cs._pendente.clear()
+        jarvis = JarvisFalso("digita oi e aperta enter")
+        with patch.object(cs, "_janela_da_frente", side_effect=[notas, notas, whats]):
+            self.chamar(args, jarvis)
+            jarvis.falar("ok, pode fazer")
+            self.assertIn("Approved", self.chamar(args, jarvis))
+        self.assertEqual(self.teclado.method_calls, [])
+        self.assertIn("a janela da frente mudou", jarvis.avisos[0])
+
+    def test_marca_de_nao_salvo_no_titulo_e_a_mesma_janela(self):
+        # o editor põe "*" (Bloco de Notas) ou "●" (VS Code) no começo do título ao receber texto: digitar e
+        # depois apertar Enter não pode pedir o ok duas vezes para o Enter por causa disso
+        jarvis = JarvisFalso("aperta enter")
+        sujo, codigo = (42, "*Sem título - Bloco de Notas"), (42, "app.py - Visual Studio Code")
+        # cada chamada olha a janela uma vez, e o fio, depois do ok, mais uma
+        with patch.object(cs, "_janela_da_frente", side_effect=[JANELA, sujo, sujo,
+                                                                (42, "● app.py - Visual Studio Code"), codigo, codigo]):
+            self.chamar({"action": "enter"}, jarvis)
+            jarvis.falar("ok, pode fazer")
+            self.assertIn("Approved", self.chamar({"action": "enter"}, jarvis))
+            jarvis.falar("aperta enter")
+            self.chamar({"action": "enter"}, jarvis)
+            jarvis.falar("ok")
+            self.assertIn("Approved", self.chamar({"action": "enter"}, jarvis))
+        self.assertEqual(self.teclado.method_calls, [call.press("enter"), call.press("enter")])
+
+    def test_texto_com_quebra_de_linha_tab_ou_invisivel_nao_digita(self):
+        # no pyautogui.write cada "\n" é um Enter e cada "\t" um Tab; colado num console, cada linha roda; e os
+        # invisíveis (como o U+202E, que inverte o texto na tela) fazem a pergunta mostrar outra coisa
+        for texto in ("bom dia\ndel /q *.*", "bom dia\r\ndir", "bom\tdia", "oi ‮dcba", "oi​Ana",
+                      "oi\x1b[2J"):
+            with self.subTest(texto=texto):
+                jarvis = JarvisFalso("digita bom dia")
+                resposta = self.chamar({"action": "type_text", "value": texto}, jarvis)
+                self.assertIn("Not done", resposta)
+                self.assertNotIn("Ask the user now", resposta)
+                self.assertEqual(cs._pendente, {})
+                jarvis.falar("ok, pode fazer")
+                self.assertNotIn("Approved", self.chamar({"action": "type_text", "value": texto}, jarvis))
+        self.assertEqual(self.teclado.method_calls, [])
+        # acento, emoji e espaços no meio continuam valendo (e o "\n" do fim é cortado, como os espaços)
+        jarvis = JarvisFalso("digita")
+        self.assertIn('Posso digitar "Olá, João! 👍  tudo bem?"',
+                      self.chamar({"action": "type_text", "value": "Olá, João! 👍  tudo bem?\n"}, jarvis))
+
+    def test_duas_perguntas_na_mesma_fala_o_ok_vale_so_para_a_primeira(self):
+        # o modelo registra a pergunta A (que fala) e logo a B (calado), na mesma fala: a B não é guardada, e
+        # o "ok" dado à A nunca faz a B
+        a = {"action": "type_text", "value": "bom dia"}
+        b = {"action": "type_text", "value": "manda o pix para a conta 123", "press_enter": "true"}
+        jarvis = JarvisFalso("digita bom dia")
+        self.assertIn('Posso digitar "bom dia"', self.chamar(a, jarvis))
+        segunda = self.chamar(b, jarvis)
+        self.assertIn("another action is already waiting", segunda)
+        self.assertNotIn("Ask the user now", segunda)
+        self.assertNotIn("pix", cs._pendente["chave"][1])
+        for outra in (REINICIAR, {"action": "enter"}):  # vale também para reiniciar e para as teclas
+            self.assertIn("another action is already waiting", self.chamar(outra, jarvis))
+        jarvis.falar("ok, pode fazer")
+        self.assertIn("Not done yet", self.chamar(b, jarvis))  # a B pergunta, agora sim, e não digita
+        self.assertEqual(self.teclado.method_calls, [])
+        self.assertEqual(self.desligou(), [])
+        # e o ok dado à A, chamada de novo, faz só a A
+        jarvis = JarvisFalso("digita bom dia")
+        cs._pendente.clear()
+        self.chamar(a, jarvis)
+        self.chamar(b, jarvis)
+        jarvis.falar("ok, pode fazer")
+        self.assertIn("Approved", self.chamar(a, jarvis))
+        self.assertEqual(self.teclado.method_calls, [call.write("bom dia", interval=0.03)])
+
+    def test_digitar_e_apertar_enter_em_duas_chamadas_um_ok_para_cada(self):
+        # "digita olá mundo e aperta enter": a declaração não tem press_enter, então o Gemini chama type_text
+        # e enter juntas (num lote, em fila) e, depois de cada resposta, chama as duas de novo. Uma por vez:
+        # o primeiro ok digita, o segundo aperta o Enter (e o mesmo com "seleciona tudo e copia")
+        casos = ((({"action": "type_text", "value": "olá mundo"}), {"action": "enter"},
+                  [call.write("olá mundo", interval=0.03)], [call.press("enter")]),
+                 ({"action": "select_all"}, {"action": "copy"},
+                  [call.hotkey("ctrl", "a")], [call.hotkey("ctrl", "c")]))
+        for primeira, segunda, depois_do_1o, depois_do_2o in casos:
+            with self.subTest(primeira=primeira["action"]):
+                self.teclado.reset_mock()
+                cs._pendente.clear()
+                jarvis = JarvisFalso("faz as duas coisas")
+                self.assertIn("Not done yet", self.chamar(primeira, jarvis))
+                self.assertIn("another action is already waiting", self.chamar(segunda, jarvis))
+                jarvis.falar("ok, pode fazer")
+                self.assertIn("Approved", self.chamar(primeira, jarvis))
+                self.assertIn("Not done yet", self.chamar(segunda, jarvis))
+                self.assertEqual(self.teclado.method_calls, depois_do_1o)
+                jarvis.falar("ok, pode fazer")
+                self.assertIn("Not done yet", self.chamar(primeira, jarvis))  # a primeira já foi: pergunta de novo
+                cs._pendente.clear()
+                self.chamar(segunda, jarvis)
+                jarvis.falar("ok")
+                self.assertIn("Approved", self.chamar(segunda, jarvis))
+                self.assertEqual(self.teclado.method_calls, depois_do_1o + depois_do_2o)
+
+    def test_tecla_janela_e_vezes_entram_na_chave(self):
+        # o ok vale para UMA ação: outra tecla, outra janela na frente ou outro número de vezes pedem de novo
+        jarvis = JarvisFalso("aperta f5")
+        self.chamar({"action": "press_key", "value": "f5"}, jarvis)
+        jarvis.falar("ok, pode fazer")
+        outra = self.chamar({"action": "press_key", "value": "enter"}, jarvis)
+        self.assertIn('Posso apertar a tecla "enter"', outra)
+        self.assertEqual(self.teclado.method_calls, [])
+        cs._pendente.clear()
+        jarvis = JarvisFalso("aperta f5")
+        with patch.object(cs, "_janela_da_frente", side_effect=[JANELA, (77, "Conversa com Ana - WhatsApp")]):
+            self.chamar({"action": "press_key", "value": "f5"}, jarvis)
+            jarvis.falar("ok, pode fazer")
+            resposta = self.chamar({"action": "press_key", "value": "f5"}, jarvis)
+        self.assertIn("Not done yet", resposta)
+        self.assertIn('na janela "Conversa com Ana - WhatsApp"', resposta)
+        cs._pendente.clear()
+        jarvis = JarvisFalso("recarrega duas vezes")
+        self.assertIn("apertar F5 (recarregar a página) 2 vezes", self.chamar({"action": "reload_n", "value": "2"}, jarvis))
+        jarvis.falar("ok, pode fazer")
+        dez = self.chamar({"action": "reload_n", "value": "10"}, jarvis)
+        self.assertIn("Not done yet", dez)
+        self.assertIn("10 vezes", dez)
+        self.assertEqual(self.teclado.method_calls, [])
+
     def test_janela_que_nao_da_para_saber_e_titulo_comprido(self):
         jarvis = JarvisFalso("aperta enter")
         with patch.object(cs, "_janela_da_frente", return_value=(0, "")):
             resposta = self.chamar({"action": "enter"}, jarvis)
         self.assertIn("Posso apertar Enter (confirmar ou enviar) na janela da frente (não consegui ver qual é)?",
                       resposta)
+        cs._pendente.clear()  # na mesma fala, outra pergunta esperaria a resposta desta
         with patch.object(cs, "_janela_da_frente", return_value=(5, "x" * 100)):
             resposta = self.chamar({"action": "enter"}, jarvis)
         self.assertIn(f'na janela "{"x" * 79}…"', resposta)
@@ -446,11 +583,19 @@ class PeloExecuteToolTests(BaseTests):
                 jarvis._nova_fala("digita oi e aperta enter")
                 self.assertIn('Posso digitar "oi" e apertar Enter', chamar(jarvis, digitar))
                 self.assertIn("has not answered", chamar(jarvis, digitar))
-                self.assertIn("Not done yet", chamar(jarvis, {"action": "press_key", "value": "enter"}))
+                # outra ação na mesma fala não troca a pergunta que espera a resposta: o ok vale só para ela
+                self.assertIn("another action is already waiting",
+                              chamar(jarvis, {"action": "press_key", "value": "enter"}))
                 self.assertEqual(self.teclado.method_calls, [])
                 jarvis._nova_fala("ok, pode fazer")
-                self.assertIn("Approved", chamar(jarvis, {"action": "press_key", "value": "enter"}))
-                self.assertEqual(self.teclado.method_calls, [call.press("enter")])
+                self.assertIn("Not done yet", chamar(jarvis, {"action": "press_key", "value": "enter"}))
+                self.assertEqual(self.teclado.method_calls, [])
+                cs._pendente.clear()
+                jarvis._nova_fala("digita oi e aperta enter")
+                chamar(jarvis, digitar)
+                jarvis._nova_fala("ok, pode fazer")
+                self.assertIn("Approved", chamar(jarvis, digitar))
+                self.assertEqual(self.teclado.method_calls, [call.write("oi", interval=0.03), call.press("enter")])
 
     def test_modo_privado_continua_recusando_o_computer_settings_inteiro(self):
         import main

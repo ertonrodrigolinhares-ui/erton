@@ -6,6 +6,7 @@ import sys
 import time
 import threading
 import subprocess
+import unicodedata
 import platform
 from pathlib import Path
 
@@ -701,9 +702,11 @@ def _has_explicit_computer_power_target(params: dict, description: str, value) -
 # acontece com o "ok" dele conferido pelo core/aprovacao.py, como no approve_publication e nos vídeos. A
 # primeira chamada não faz nada: guarda o pedido, com a marca da fala atual dele, e devolve a pergunta com
 # o texto ou as teclas e a janela da frente (que também aparece na tela). Numa chamada seguinte com o MESMO
-# pedido (mesmo texto, mesma tecla, mesma janela), só faz se a PRIMEIRA fala nova dele depois da pergunta
-# for um "ok" claro; um "não", ou qualquer outra resposta, cancela. O confirmed=yes que o modelo preenche
-# não conta. O ok vale uma vez só e só para aquele pedido. Como nos vídeos, a ação roda num fio depois de
+# pedido (mesmo texto, mesma tecla, mesma janela, pelo número e pelo título), só faz se a PRIMEIRA fala nova
+# dele depois da pergunta for um "ok" claro; um "não", ou qualquer outra resposta, cancela. O confirmed=yes
+# que o modelo preenche não conta. O ok vale uma vez só e só para aquele pedido. Uma pergunta por vez:
+# enquanto uma espera a resposta, outro pedido na mesma fala não é guardado (senão o ok dado à pergunta
+# falada faria a outra, guardada calada). Como nos vídeos, a ação roda num fio depois de
 # ainda_aprovado (no Gemini ao vivo o resto da fala só chega depois que a ferramenta responde): se o resto
 # da resposta desfizer o "ok", ou se a janela da frente mudar, nada é feito e ele é avisado. Chamada sem o
 # jarvis (fora da conversa) não faz nada.
@@ -731,6 +734,13 @@ def _janela_da_frente() -> tuple[int, str]:
         return 0, ""
 
 
+def _a_mesma(janela) -> tuple:
+    """O que identifica a janela na chave e na conferência antes de agir: o número e o título (trocar de aba
+    no navegador muda só o título), sem a marca de "não salvo" que os editores põem no começo do título ao
+    receber texto ("*Sem título - Bloco de Notas", "● app.py - Visual Studio Code")."""
+    return janela[0], janela[1].lstrip("*●• ")
+
+
 def _log(jarvis, texto: str) -> None:
     ui = getattr(jarvis, "ui", None)
     if ui is not None:
@@ -752,7 +762,8 @@ def _pedir_ok(jarvis, chave: tuple, o_que: str, janela, fazer) -> str:
     """Pergunta antes de agir ou, se a pergunta já foi feita, confere a resposta do Erton e, com o "ok",
     faz (num fio). Devolve o texto para o modelo. o_que: o que vai ser feito, em português ("reiniciar o
     computador"). janela: (número, título) da janela da frente quando a ação vai para ela, que entra na
-    chave e é conferida de novo antes de agir; None quando a janela não importa (desligar e reiniciar)."""
+    chave (pelo _a_mesma) e é conferida de novo antes de agir; None quando a janela não importa (desligar e
+    reiniciar)."""
     if jarvis is None:  # sem a conversa não há como conferir o "ok" dele
         return ("Not done: this needs the user's ok, which Jarvis checks in the conversation, and this call "
                 "did not come from the conversation.")
@@ -760,12 +771,17 @@ def _pedir_ok(jarvis, chave: tuple, o_que: str, janela, fazer) -> str:
 
     agora = time.monotonic()
     with _trava:
-        pedido = _pendente.get("chave") == chave and agora - _pendente.get("em", 0) < VALIDADE_PEDIDO
+        valido = bool(_pendente) and agora - _pendente.get("em", 0) < VALIDADE_PEDIDO
+        pedido = valido and _pendente.get("chave") == chave
         marca = _pendente.get("marca", 0)
         fala = aprovacao.marca(jarvis)
         if pedido and fala == marca:
             return ("Not done: the user has not answered the question yet. Wait for the answer; only a clear "
                     "ok in the user's own words, said after the question, counts.")
+        if valido and fala == marca:  # outra pergunta, da mesma fala, ainda espera a resposta: uma por vez
+            return ("Not done: another action is already waiting for the user's ok. Ask only that question, "
+                    "wait for the answer, and call this one again only after that one is done or cancelled; "
+                    "then it asks its own question.")
         if pedido and fala == marca + 1:
             _pendente.clear()  # a primeira resposta decide, uma vez só: o "ok" faz, qualquer outra cancela
             fala_do_ok = aprovacao.fala_que_aprovou(jarvis, marca)
@@ -809,7 +825,7 @@ def _depois_do_ok(jarvis, fala_do_ok: int, o_que: str, janela, fazer) -> None:
     if not aprovacao.ainda_aprovado(jarvis, fala_do_ok):
         _avisar(jarvis, f'Não vou {o_que}: a sua resposta não foi um "ok" claro. Se quiser, peça de novo.')
         return
-    if janela is not None and _janela_da_frente()[0] != janela[0]:
+    if janela is not None and _a_mesma(_janela_da_frente()) != _a_mesma(janela):
         _avisar(jarvis, f"Não vou {o_que}: a janela da frente mudou depois da pergunta. Se quiser, peça de novo.")
         return
     try:
@@ -915,11 +931,18 @@ def computer_settings(
         text = str(value or params.get("text", "")).strip()
         if not text:
             return "No text provided to type."
+        if any(unicodedata.category(letra) in ("Cc", "Cf") for letra in text):
+            # quebra de linha e tab viram Enter e Tab de verdade (e, colados num console, cada linha roda), e os
+            # invisíveis (como o U+202E, que inverte o texto na tela) fazem a pergunta mostrar outra coisa
+            return ("Not done: the text has line breaks, tabs or invisible characters, which would press keys "
+                    "or make the question show something different from what is typed. Jarvis types only one "
+                    "line of visible text per ok (Enter only with press_enter, which the question shows). Tell "
+                    "the user, in one short Portuguese sentence.")
         enter_after = str(params.get("press_enter", "false")).lower() in ("true", "1", "yes")
         # escreve na janela da frente, seja ela qual for: só com o "ok" do Erton (Etapa 4)
         janela = _janela_da_frente()
         o_que = f'digitar "{text}"' + (" e apertar Enter" if enter_after else "")
-        return _pedir_ok(jarvis, ("type_text", text, enter_after, janela[0]), o_que, janela,
+        return _pedir_ok(jarvis, ("type_text", text, enter_after, _a_mesma(janela)), o_que, janela,
                          lambda: type_text(text, press_enter_after=enter_after))
 
     if action == "press_key":
@@ -927,7 +950,7 @@ def computer_settings(
         if not key:
             return "No key specified."
         janela = _janela_da_frente()
-        return _pedir_ok(jarvis, ("press_key", key, janela[0]), f'apertar a tecla "{key}"', janela,
+        return _pedir_ok(jarvis, ("press_key", key, _a_mesma(janela)), f'apertar a tecla "{key}"', janela,
                          lambda: press_key(key))
 
     if action in ("reload_n", "refresh_n", "reload_page_n"):
@@ -937,7 +960,8 @@ def computer_settings(
             return f"Reload failed: {e}"
         janela = _janela_da_frente()
         o_que = f"apertar F5 (recarregar a página) {vezes} {'vez' if vezes == 1 else 'vezes'}"
-        return _pedir_ok(jarvis, ("reload_n", vezes, janela[0]), o_que, janela, lambda: reload_page_n(vezes))
+        return _pedir_ok(jarvis, ("reload_n", vezes, _a_mesma(janela)), o_que, janela,
+                         lambda: reload_page_n(vezes))
 
     if action == "scroll_up":
         scroll_up(int(value or 500))
@@ -974,7 +998,7 @@ def computer_settings(
         do_mac = app_name if _OS == "Darwin" else ""
         o_que = f'fechar o programa "{do_mac}"' if do_mac else f"apertar {teclas} ({para_que})"
         janela = _janela_da_frente()
-        return _pedir_ok(jarvis, (action, do_mac, janela[0]), o_que, janela, fazer)
+        return _pedir_ok(jarvis, (action, do_mac, _a_mesma(janela)), o_que, janela, fazer)
 
     try:
         return fazer()
