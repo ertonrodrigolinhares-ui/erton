@@ -15,7 +15,8 @@ regrava os dois .json (confira no "git diff" que só mudou o que devia); os mét
 respostas padrão ficam nas listas deste arquivo, editadas à mão.
 
 As regras que nunca podem quebrar, nem de propósito (modo privado, "ok", chaves), ficam no
-tests/test_invariantes.py. O mapa das travas está no core/SEGURANCA.md."""
+tests/test_invariantes.py, com a base delas escrita à mão lá: o --gravar-fotos não a muda. O mapa das
+travas está no core/SEGURANCA.md."""
 
 import asyncio
 import json

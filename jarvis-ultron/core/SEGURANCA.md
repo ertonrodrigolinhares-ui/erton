@@ -7,7 +7,9 @@ mesmo commit.
 Dois arquivos de teste guardam o conjunto:
 
 - `tests/test_invariantes.py`: as regras que **nunca** mudam, nem de propósito. Se uma etapa fizer um deles
-  falhar, a etapa está errada.
+  falhar, a etapa está errada. A base dessas regras (as ferramentas de nuvem, as automações com
+  `USA_IA_NUVEM` e o `mutating` de hoje) fica escrita à mão nele (`NUVEM_MINIMA`, `AUTOMACOES_NUVEM_MINIMA`,
+  `MUTATING_MINIMO`), e não só na foto, porque o `--gravar-fotos` regrava a foto com o código do momento.
 - `tests/test_contratos.py`: as "fotos" de hoje (texto das ferramentas que o Gemini lê, listas de política,
   nomes que outros arquivos usam, respostas padrão). Só mudam de propósito, no mesmo commit da mudança
   (`python tests/test_contratos.py --gravar-fotos` regrava os .json de `tests/dados/`).
@@ -31,8 +33,9 @@ Testes: `test_invariantes.py` (`OkAntigoTests`), `test_videos.py` (`OkAntesDoVid
 `PonteHermesTests`), `test_claude_chefe.py` (`FerramentaClaudeTests`, `MudarCodigoTests`,
 `DesfazerSoOQueEDoClaudeTests`, `MudancaInterrompidaTests`).
 
-**Portas ainda abertas (fechadas na Etapa 3, decisão do Erton: desligar todas):** `send_message`,
-`prepare_message_reply` e `check_messages` (digitam e enviam no WhatsApp, Telegram e Discord), `agent_task`
+**Portas ainda abertas (fechadas na Etapa 3, decisão do Erton: desligar todas):** `send_message` e
+`prepare_message_reply` (digitam e podem enviar no WhatsApp, Telegram e Discord sem o "ok" conferido no
+código), `check_messages` (lê as mensagens; sai junto porque o Erton não usa mensagens), `agent_task`
 (escreve e roda código gerado pela IA), `code_helper` e `dev_agent` (rodam código e `pip install`),
 `computer_control` (clica e digita em qualquer lugar) e `game_updater` (pode desligar o PC). Nenhuma delas
 passa pelo `core/aprovacao.py`.
@@ -53,7 +56,7 @@ Ligado por `JARVIS_CEREBRO=gemma` (`core/cerebro_gemma.py`, `cerebro_gemma()`).
 | Tela: selo "🔒 MODO PRIVADO" no alto da tela azul (`ui_orbe.py`, que lê `JARVIS_CEREBRO` no programa da tela) | O Erton vê que está no modo privado. |
 | `main.py`, `JarvisLive._falar_no_pc` | Aviso sigiloso (ex.: resultado do Claude com dados de clientes) sai só pela voz do Windows, nunca pelo Gemini. |
 
-Testes: `test_invariantes.py` (`ModoPrivadoTests`, `ListaDeNuvemTests`,
+Testes: `test_invariantes.py` (`ModoPrivadoTests`, `ListaDeNuvemTests`, `BaseEscritaAMaoTests`,
 `OrdemDasTravasTests.test_save_memory_nao_grava_no_modo_privado`), `test_contratos.py` (foto da
 `FERRAMENTAS_NUVEM_IA`), `test_cerebro_gemma.py` (`GemmaNoJarvisTests`, `ModoPrivadoPorVozTests`),
 `test_videos.py` (`TrocaDeModoComVideoTests` e os testes de modo privado), `test_jarvis_ultron.py`
@@ -110,7 +113,7 @@ A ordem pode mudar de arquivo, nunca de ordem. Teste: `test_invariantes.py` (`Or
 
 Num lote, as ferramentas que mudam algo (o `mutating` do `JarvisLive._execute_tool_batch`) rodam em fila e
 na ordem; as só de leitura rodam juntas. A lista só pode crescer. Testes: `test_invariantes.py`
-(`LoteDoGeminiTests`) e `test_contratos.py` (foto do `mutating`).
+(`LoteDoGeminiTests`, `BaseEscritaAMaoTests`) e `test_contratos.py` (foto do `mutating`).
 
 ## 7. Modo servidor (herdado do JARVIS-OS)
 

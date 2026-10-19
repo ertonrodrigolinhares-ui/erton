@@ -6,7 +6,9 @@ está no core/SEGURANCA.md.
 
   - modo privado: cada ferramenta que usa IA na nuvem é recusada ANTES de chegar à ação (também as
     regras por argumento e as automações com USA_IA_NUVEM); a reserva não oferece nenhuma delas;
-  - a lista de nuvem (FERRAMENTAS_NUVEM_IA) só cresce enquanto a ferramenta existir;
+  - a lista de nuvem (FERRAMENTAS_NUVEM_IA) só cresce enquanto a ferramenta existir. A base dessas
+    regras fica escrita à mão AQUI (NUVEM_MINIMA...), e não só na foto: o --gravar-fotos regrava a foto
+    com o código do momento e apagaria a base junto;
   - a ORDEM das travas no começo do _execute_tool: servidor (cloud_safe) → modo privado → Jarvis pronto
     → modo QA → desligar o Jarvis → save_memory (que não grava no modo privado);
   - um "ok" antigo não aprova publicação nem vídeo;
@@ -45,6 +47,22 @@ from test_contratos import FOTO_POLITICAS, UIFalsa, acoes_do_main, em_fila, ler_
 AGEM_NO_PC = frozenset({"computer_control", "open_app", "file_controller", "media_control",
                         "desktop_control", "computer_settings"})
 
+# A base das regras, escrita à mão com os nomes de hoje (Etapa 1). NÃO é lida da foto: o
+# "python tests/test_contratos.py --gravar-fotos" regrava o tests/dados/politicas_antes.json com o código
+# do momento, e quem tirasse uma ferramenta da lista e regravasse a foto no mesmo commit apagaria a base
+# junto. Não se edita: a ferramenta que deixou de existir é pulada sozinha (_existentes).
+NUVEM_MINIMA = frozenset({
+    "agent_task", "approve_publication", "code_helper", "computer_control", "computer_settings",
+    "create_presentation", "deep_research", "desktop_control", "dev_agent", "file_processor",
+    "flight_finder", "generate_image", "hermes_agent", "screen_process", "web_search",
+})
+AUTOMACOES_NUVEM_MINIMA = frozenset({"claude_task", "generate_video"})
+MUTATING_MINIMO = frozenset({
+    "code_helper", "computer_control", "computer_settings", "create_presentation", "desktop_control",
+    "dev_agent", "email_control", "file_controller", "file_processor", "game_updater", "graphics_quality",
+    "jarvis_ui_control", "prepare_message_reply", "reminder", "save_memory", "send_message",
+})
+
 
 def _jarvis(ui=None):
     """Uma JarvisLive sem abrir nada (sem microfone, sem Gemini, sem fios)."""
@@ -72,6 +90,38 @@ def _existentes() -> set[str]:
     return ({d["name"] for d in main.TOOL_DECLARATIONS} | set(main.carregar_automacoes().ferramentas)
             | set(main.FERRAMENTAS_NUVEM_IA) | set(main.CLOUD_SAFE_ACTIONS)
             | set(main.JarvisLive.RESERVA_FERRAMENTAS_ESSENCIAIS))
+
+
+def _base(lista: str, minima: frozenset) -> set[str]:
+    """A base de uma regra: a lista escrita à mão acima mais a foto (que pode ter crescido)."""
+    return set(minima) | set(ler_foto(FOTO_POLITICAS)[lista])
+
+
+def _de_nuvem() -> set[str]:
+    """O que o modo privado tem de recusar: a lista de hoje e a base, enquanto a ferramenta existir."""
+    import main
+
+    return set(main.FERRAMENTAS_NUVEM_IA) | (_base("FERRAMENTAS_NUVEM_IA", NUVEM_MINIMA) & _existentes())
+
+
+def _sairam_da_lista_de_nuvem() -> set[str]:
+    import main
+
+    return (_base("FERRAMENTAS_NUVEM_IA", NUVEM_MINIMA) - set(main.FERRAMENTAS_NUVEM_IA)) & _existentes()
+
+
+def _perderam_a_marca() -> set[str]:
+    """Automações da base que ainda existem e perderam o USA_IA_NUVEM = True."""
+    import main
+
+    automacoes = main.carregar_automacoes().ferramentas
+    return {nome for nome in _base("AUTOMACOES_NUVEM_IA", AUTOMACOES_NUVEM_MINIMA)
+            if nome in automacoes and not automacoes[nome].usa_ia_nuvem}
+
+
+def _sairam_do_mutating() -> set[str]:
+    existentes = _existentes()
+    return (_base("mutating", MUTATING_MINIMO) & existentes) - set(em_fila(existentes))
 
 
 def _esperar_fio(nome: str) -> None:
@@ -131,10 +181,7 @@ class ModoPrivadoTests(unittest.TestCase):
         self.assertTrue(any("🔒" in texto for tipo, texto in jarvis.ui.eventos if tipo == "log"), nome)
 
     def test_cada_ferramenta_de_nuvem_e_recusada_antes_da_acao(self):
-        import main
-
-        foto = set(ler_foto(FOTO_POLITICAS)["FERRAMENTAS_NUVEM_IA"]) & _existentes()
-        for nome in sorted(set(main.FERRAMENTAS_NUVEM_IA) | foto):
+        for nome in sorted(_de_nuvem()):
             with self.subTest(ferramenta=nome):
                 self._recusa(nome)
 
@@ -145,9 +192,11 @@ class ModoPrivadoTests(unittest.TestCase):
     def test_automacoes_de_nuvem_sao_recusadas(self):
         import main
 
-        de_nuvem = [nome for nome, a in main.carregar_automacoes().ferramentas.items() if a.usa_ia_nuvem]
+        automacoes = main.carregar_automacoes().ferramentas
+        de_nuvem = ({nome for nome, a in automacoes.items() if a.usa_ia_nuvem}
+                    | (_base("AUTOMACOES_NUVEM_IA", AUTOMACOES_NUVEM_MINIMA) & set(automacoes)))
         self.assertTrue(de_nuvem)
-        for nome in de_nuvem:
+        for nome in sorted(de_nuvem):
             with self.subTest(automacao=nome):
                 self._recusa(nome, {"description": "cliente Fulano", "confirm": True})
 
@@ -165,8 +214,9 @@ class ModoPrivadoTests(unittest.TestCase):
             return {f["function"]["name"] for f in ferramentas}
 
         automacoes = main.carregar_automacoes().ferramentas
-        proibidas = (set(main.FERRAMENTAS_NUVEM_IA) | set(ler_foto(FOTO_POLITICAS)["FERRAMENTAS_NUVEM_IA"])
-                     | {"save_memory"} | {n for n, a in automacoes.items() if a.usa_ia_nuvem})
+        proibidas = (set(main.FERRAMENTAS_NUVEM_IA) | _base("FERRAMENTAS_NUVEM_IA", NUVEM_MINIMA)
+                     | {"save_memory"} | {n for n, a in automacoes.items() if a.usa_ia_nuvem}
+                     | _base("AUTOMACOES_NUVEM_IA", AUTOMACOES_NUVEM_MINIMA))
         privado = nomes("gemma")
         self.assertTrue(privado)
         self.assertEqual(privado & proibidas, set())
@@ -175,20 +225,48 @@ class ModoPrivadoTests(unittest.TestCase):
 
 class ListaDeNuvemTests(unittest.TestCase):
     def test_lista_de_nuvem_so_cresce_enquanto_a_ferramenta_existir(self):
-        import main
-
-        foto = set(ler_foto(FOTO_POLITICAS)["FERRAMENTAS_NUVEM_IA"])
-        saiu = foto - set(main.FERRAMENTAS_NUVEM_IA)
-        self.assertEqual(saiu & _existentes(), set(),
+        self.assertEqual(_sairam_da_lista_de_nuvem(), set(),
                          "só sai da FERRAMENTAS_NUVEM_IA a ferramenta que deixou de existir")
 
     def test_automacao_de_nuvem_nao_perde_a_marca(self):
+        self.assertEqual(_perderam_a_marca(), set(), "perderam o USA_IA_NUVEM = True")
+
+
+class BaseEscritaAMaoTests(unittest.TestCase):
+    """Tirar de propósito uma ferramenta de uma regra e regravar a foto no mesmo commit não passa: o
+    --gravar-fotos regrava a foto com o código do momento, mas a base fica escrita neste arquivo."""
+
+    def _foto_regravada_sem(self, lista, nome):
+        foto = ler_foto(FOTO_POLITICAS)
+        foto[lista] = [n for n in foto[lista] if n != nome]
+        return patch.object(sys.modules[__name__], "ler_foto", return_value=foto)
+
+    def test_tirar_da_lista_de_nuvem_e_regravar_a_foto_nao_passa(self):
+        # no modo privado, a tela do Erton iria para o Gemini
         import main
 
-        automacoes = main.carregar_automacoes().ferramentas
-        for nome in ler_foto(FOTO_POLITICAS)["AUTOMACOES_NUVEM_IA"]:
-            if nome in automacoes:
-                self.assertTrue(automacoes[nome].usa_ia_nuvem, f"{nome} perdeu o USA_IA_NUVEM = True")
+        with patch.object(main, "FERRAMENTAS_NUVEM_IA", main.FERRAMENTAS_NUVEM_IA - {"screen_process"}), \
+                self._foto_regravada_sem("FERRAMENTAS_NUVEM_IA", "screen_process"):
+            self.assertEqual(_sairam_da_lista_de_nuvem(), {"screen_process"})
+            self.assertIn("screen_process", _de_nuvem())  # e o modo privado continua cobrando a recusa
+
+    def test_tirar_a_marca_da_automacao_e_regravar_a_foto_nao_passa(self):
+        import main
+
+        automacoes = dict(main.carregar_automacoes().ferramentas, claude_task=NS(usa_ia_nuvem=False))
+        with patch.object(main, "carregar_automacoes", return_value=NS(ferramentas=automacoes)), \
+                self._foto_regravada_sem("AUTOMACOES_NUVEM_IA", "claude_task"):
+            self.assertEqual(_perderam_a_marca(), {"claude_task"})
+
+    def test_tirar_do_mutating_e_regravar_a_foto_nao_passa(self):
+        de_verdade = em_fila
+
+        def sem_email(nomes):
+            return [nome for nome in de_verdade(nomes) if nome != "email_control"]
+
+        with patch.object(sys.modules[__name__], "em_fila", side_effect=sem_email), \
+                self._foto_regravada_sem("mutating", "email_control"):
+            self.assertEqual(_sairam_do_mutating(), {"email_control"})
 
 
 # ======================================================================= ordem das travas
@@ -434,13 +512,9 @@ def _rodar_lote(nomes):
 class LoteDoGeminiTests(unittest.TestCase):
     # (cópia do tests/test_qa_system.py: o lote que muda algo continua em fila)
     def test_o_que_muda_algo_roda_em_fila_e_na_ordem(self):
-        existentes = _existentes()
-        fila_de_hoje = set(em_fila(existentes))
-        for nome in ler_foto(FOTO_POLITICAS)["mutating"]:
-            if nome not in existentes:
-                continue  # a ferramenta deixou de existir
+        self.assertEqual(_sairam_do_mutating(), set(), "o 'mutating' só pode crescer")
+        for nome in sorted(_base("mutating", MUTATING_MINIMO) & _existentes()):  # a que deixou de existir sai
             with self.subTest(ferramenta=nome):
-                self.assertIn(nome, fila_de_hoje, "o 'mutating' só pode crescer")
                 resultados, maximo = _rodar_lote(["web_search", nome, "weather_report"])
                 self.assertEqual(resultados, ["web_search", nome, "weather_report"])
                 self.assertEqual(maximo, 1)
