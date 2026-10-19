@@ -43,7 +43,7 @@ lista escrita à mão).
 
 - `send_message` e `prepare_message_reply` (digitavam e podiam enviar no WhatsApp, Telegram e Discord) e
   `check_messages` (lia as mensagens; sai junto porque o Erton não usa mensagens): **desligadas**.
-- `agent_task` (escreve e roda código gerado pela IA): ainda aberta.
+- `agent_task` (escrevia e rodava código gerado pela IA, em `agent/executor.py`): **desligada**.
 - `code_helper` e `dev_agent` (rodam código e `pip install`): ainda abertas.
 - `computer_control` (clica e digita em qualquer lugar): ainda aberta.
 - `game_updater` (pode desligar o PC): ainda aberta.

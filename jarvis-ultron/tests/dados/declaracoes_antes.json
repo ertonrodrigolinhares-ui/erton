@@ -374,7 +374,7 @@
   },
   {
     "name": "computer_settings",
-    "description": "Controls the computer: volume, brightness, window management, keyboard shortcuts, typing text on screen, closing apps, fullscreen, dark mode, WiFi, restart, shutdown, scrolling, tab management, zoom, screenshots, lock screen, refresh/reload page. Use for ANY single computer control command. NEVER route to agent_task.",
+    "description": "Controls the computer: volume, brightness, window management, keyboard shortcuts, typing text on screen, closing apps, fullscreen, dark mode, WiFi, restart, shutdown, scrolling, tab management, zoom, screenshots, lock screen, refresh/reload page. Use for ANY single computer control command.",
     "parameters": {
       "type": "OBJECT",
       "properties": {
@@ -611,26 +611,6 @@
     }
   },
   {
-    "name": "agent_task",
-    "description": "Executes complex multi-step tasks requiring multiple different tools. Examples: 'research X and save to file', 'find and organize files'. DO NOT use for single commands. NEVER use for Steam/Epic — use game_updater.",
-    "parameters": {
-      "type": "OBJECT",
-      "properties": {
-        "goal": {
-          "type": "STRING",
-          "description": "Complete description of what to accomplish"
-        },
-        "priority": {
-          "type": "STRING",
-          "description": "low | normal | high (default: normal)"
-        }
-      },
-      "required": [
-        "goal"
-      ]
-    }
-  },
-  {
     "name": "computer_control",
     "description": "Direct computer control: type, click, hotkeys, scroll, move mouse, screenshots, find elements on screen.",
     "parameters": {
@@ -704,7 +684,7 @@
   },
   {
     "name": "game_updater",
-    "description": "THE ONLY tool for ANY Steam or Epic Games request. Use for: installing, downloading, updating games, listing installed games, checking download status, scheduling updates. ALWAYS call directly for any Steam/Epic/game request. NEVER use agent_task, browser_control, or web_search for Steam/Epic.",
+    "description": "THE ONLY tool for ANY Steam or Epic Games request. Use for: installing, downloading, updating games, listing installed games, checking download status, scheduling updates. ALWAYS call directly for any Steam/Epic/game request. NEVER use browser_control or web_search for Steam/Epic.",
     "parameters": {
       "type": "OBJECT",
       "properties": {
@@ -908,7 +888,7 @@
   },
   {
     "name": "create_presentation",
-    "description": "Creates, edits, redesigns, or extends an editable Microsoft PowerPoint (.pptx) presentation. Use this directly whenever the user asks to make a PowerPoint, presentation, slide deck, pitch deck, briefing deck, or slideshow. Do not use code_helper, file_processor, computer_control, or agent_task. First ask whether the user wants a native 3D model, then ask whether they want to see the task or keep it in the background.",
+    "description": "Creates, edits, redesigns, or extends an editable Microsoft PowerPoint (.pptx) presentation. Use this directly whenever the user asks to make a PowerPoint, presentation, slide deck, pitch deck, briefing deck, or slideshow. Do not use code_helper, file_processor, or computer_control. First ask whether the user wants a native 3D model, then ask whether they want to see the task or keep it in the background.",
     "parameters": {
       "type": "OBJECT",
       "properties": {

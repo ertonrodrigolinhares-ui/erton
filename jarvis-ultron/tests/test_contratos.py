@@ -210,7 +210,6 @@ RESPOSTAS_PADRAO = (
     ("desktop_control", {}, "Done."),
     ("code_helper", {}, "Done."),
     ("dev_agent", {}, "Done."),
-    ("agent_task", {"goal": "x"}, "Task started (ID: t1)."),
     ("computer_control", {}, "Done."),
     ("game_updater", {}, "Done."),
     ("flight_finder", {}, "Done."),
@@ -247,7 +246,7 @@ ACAO = {
     "suspend_listening": ("jarvis", "_suspender"),
     "approve_publication": ("modulo", "core.hermes_ponte.aprovar_e_executar"),
     "generate_image": ("modulo", "core.modelos.gerar_imagem"),
-    "agent_task": ("fila", "submit"), "task_status": ("fila", None),
+    "task_status": ("fila", None),
     "graphics_quality": ("tela", "set_graphics_quality"), "jarvis_ui_control": ("tela", None),
 }
 ASSINCRONAS = {"_geekie_pendencias", "_hermes_sem_travar"}
@@ -260,6 +259,7 @@ DESLIGADAS = {
     "send_message": ("actions.send_message",),
     "prepare_message_reply": ("actions.send_message",),
     "check_messages": ("actions.message_monitor", "actions.send_message"),
+    "agent_task": ("agent.executor", "agent.planner"),
 }
 
 
@@ -507,7 +507,7 @@ class DesligadasTests(unittest.TestCase):
 
         usados = []
         proibidos = {modulo: ModuloProibido(modulo, usados) for modulos in DESLIGADAS.values() for modulo in modulos}
-        args = {"receiver": "Ana", "message_text": "oi", "platform": "WhatsApp", "action": "send"}
+        args = {"receiver": "Ana", "message_text": "oi", "platform": "WhatsApp", "action": "send", "goal": "x"}
         for nome in sorted(DESLIGADAS):
             with self.subTest(ferramenta=nome):
                 with patch.dict(sys.modules, proibidos):

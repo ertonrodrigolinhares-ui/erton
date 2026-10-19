@@ -400,6 +400,9 @@ no código. Elas foram **desligadas**: se você pedir, o Jarvis diz que não faz
 - **Mensagens** (WhatsApp, Telegram, Discord, Instagram, iMessage): o Jarvis não envia, não responde e
   não lê mais mensagens. Antes ele podia digitar e apertar Enter sozinho. Você disse que não usa.
   O Hermes pelo Telegram continua: ali é você que manda mensagem para o robô.
+- **"Faça tal tarefa no PC"** (o agente antigo, de vários passos): ele escrevia e rodava programas
+  feitos pela IA, sem mostrar nada antes. Para tarefas grandes, peça ao Claude ("Jarvis, pede para o
+  Claude ...") ou ao Hermes.
 
 Os arquivos dessas ferramentas continuam na pasta por enquanto. Se alguma fizer falta, avise; para
 voltar na hora, abra o "Iniciar Jarvis Ultron" da pasta da versão anterior.

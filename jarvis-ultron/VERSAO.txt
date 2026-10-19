@@ -5,6 +5,8 @@ Novidades desta versão:
   faz isso, e nada acontece (veja "O que o Jarvis não faz mais" no LEIA-ME):
   - mensagens: o Jarvis não envia, não responde e não lê mais mensagens (WhatsApp, Telegram,
     Discord, Instagram), porque você não usa.
+  - "faça tal tarefa no PC" (o agente antigo): escrevia e rodava programas feitos pela IA sem
+    mostrar antes. Para tarefas grandes, use o Claude ou o Hermes.
 - Reserva com outra empresa (Cerebras, OpenRouter, Mistral, DeepSeek, OpenAI...) quando o limite do
   Groq acaba: JARVIS_RESERVA e JARVIS_RESERVA_CHAVE no .env; ficam em fila com o Groq.
 - "Instalar voz local": transcrição da voz no PC para o modo privado (o Iniciar também instala sozinho).

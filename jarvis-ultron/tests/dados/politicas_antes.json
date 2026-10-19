@@ -27,7 +27,6 @@
     "youtube_video"
   ],
   "RESERVA_FERRAMENTAS_ESSENCIAIS": [
-    "agent_task",
     "browser_control",
     "email_control",
     "generate_image",

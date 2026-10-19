@@ -38,7 +38,7 @@ class LeiaMeBateComOCodigoTests(unittest.TestCase):
         # main.RESERVA_FERRAMENTAS_ESSENCIAIS manda e-mail, Hermes, agentes... ao Groq
         import main
 
-        self.assertTrue({"email_control", "hermes_agent", "agent_task"} <= main.JarvisLive.RESERVA_FERRAMENTAS_ESSENCIAIS)
+        self.assertTrue({"email_control", "hermes_agent"} <= main.JarvisLive.RESERVA_FERRAMENTAS_ESSENCIAIS)
         texto = _uma_linha(LEIA_ME)
         self.assertNotIn("mas não usa as ferramentas", texto)
         self.assertIn("executa as tarefas principais", texto)
@@ -50,7 +50,8 @@ class LeiaMeBateComOCodigoTests(unittest.TestCase):
 
         secao = _secao("## O que o Jarvis não faz mais")
         contadas = {"send_message": "**Mensagens**", "prepare_message_reply": "**Mensagens**",
-                    "check_messages": "**Mensagens**"}
+                    "check_messages": "**Mensagens**",
+                    "agent_task": '**"Faça tal tarefa no PC"**'}
         for nome in main.FERRAMENTAS_DESLIGADAS:
             self.assertIn(nome, contadas, f"{nome} foi desligada e o LEIA-ME não conta")
             self.assertIn(contadas[nome], secao, nome)

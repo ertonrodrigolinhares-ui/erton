@@ -683,7 +683,7 @@ TOOL_DECLARATIONS = [
             "Controls the computer: volume, brightness, window management, keyboard shortcuts, "
             "typing text on screen, closing apps, fullscreen, dark mode, WiFi, restart, shutdown, "
             "scrolling, tab management, zoom, screenshots, lock screen, refresh/reload page. "
-            "Use for ANY single computer control command. NEVER route to agent_task."
+            "Use for ANY single computer control command."
         ),
         "parameters": {
             "type": "OBJECT",
@@ -790,22 +790,6 @@ TOOL_DECLARATIONS = [
         }
     },
     {
-        "name": "agent_task",
-        "description": (
-            "Executes complex multi-step tasks requiring multiple different tools. "
-            "Examples: 'research X and save to file', 'find and organize files'. "
-            "DO NOT use for single commands. NEVER use for Steam/Epic — use game_updater."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "goal":     {"type": "STRING", "description": "Complete description of what to accomplish"},
-                "priority": {"type": "STRING", "description": "low | normal | high (default: normal)"}
-            },
-            "required": ["goal"]
-        }
-    },
-    {
         "name": "computer_control",
         "description": "Direct computer control: type, click, hotkeys, scroll, move mouse, screenshots, find elements on screen.",
         "parameters": {
@@ -837,7 +821,7 @@ TOOL_DECLARATIONS = [
             "Use for: installing, downloading, updating games, listing installed games, "
             "checking download status, scheduling updates. "
             "ALWAYS call directly for any Steam/Epic/game request. "
-            "NEVER use agent_task, browser_control, or web_search for Steam/Epic."
+            "NEVER use browser_control or web_search for Steam/Epic."
         ),
         "parameters": {
             "type": "OBJECT",
@@ -966,7 +950,7 @@ TOOL_DECLARATIONS = [
             "Creates, edits, redesigns, or extends an editable Microsoft PowerPoint (.pptx) presentation. "
             "Use this directly whenever the user asks to make a PowerPoint, presentation, "
             "slide deck, pitch deck, briefing deck, or slideshow. Do not use code_helper, "
-            "file_processor, computer_control, or agent_task. First ask whether the user wants "
+            "file_processor, or computer_control. First ask whether the user wants "
             "a native 3D model, then ask whether they want to see the task or keep it in the background."
         ),
         "parameters": {
@@ -1258,6 +1242,7 @@ FERRAMENTAS_DESLIGADAS = {
     "send_message": "sending messages on WhatsApp, Telegram, Discord, Instagram or iMessage",
     "prepare_message_reply": "drafting and sending message replies",
     "check_messages": "reading messages and contacts",
+    "agent_task": "multi-step tasks that write and run AI-generated code",
 }
 
 
@@ -2367,7 +2352,7 @@ class JarvisLive:
     # só as mais usadas por voz vão para a reserva (as automações da pasta entram sempre).
     RESERVA_FERRAMENTAS_ESSENCIAIS = {
         "open_app", "browser_control", "weather_report", "reminder", "media_control", "youtube_video",
-        "web_search", "email_control", "hermes_agent", "agent_task", "school_tasks",
+        "web_search", "email_control", "hermes_agent", "school_tasks",
         "self_diagnosis", "save_memory", "generate_image", "listening_mode",
     }
 
@@ -2717,18 +2702,6 @@ class JarvisLive:
             elif name == "dev_agent":
                 r = await asyncio.to_thread(lambda: dev_agent(parameters=args, player=self.ui, speak=self.speak))
                 result = r or "Done."
-
-            elif name == "agent_task":
-                from agent.task_queue import get_queue, TaskPriority
-                priority_map = {"low": TaskPriority.LOW, "normal": TaskPriority.NORMAL, "high": TaskPriority.HIGH}
-                priority = priority_map.get(args.get("priority", "normal").lower(), TaskPriority.NORMAL)
-                task_id  = get_queue().submit(
-                    goal=args.get("goal", ""),
-                    priority=priority,
-                    speak=self.speak,
-                    immediate=True,
-                )
-                result   = f"Task started (ID: {task_id})."
 
             elif name == "web_search":
                 r = await asyncio.to_thread(lambda: web_search_action(parameters=args, player=self.ui))
