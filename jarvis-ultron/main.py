@@ -1034,12 +1034,9 @@ class JarvisLive:
         self._textos_trava = threading.Lock()  # texto digitado antes de o Gemini conectar
         self._textos_esperando = []
         self.ui.on_text_command = self._on_text_command
-        self._voice_changed  = threading.Event()
         self._turn_done_event: asyncio.Event | None = None
         self._tts_engine = None
         self._ext_tts_provider = ""
-        self._ext_tts_voice_id = ""
-        self._ext_tts_api_key = ""
         self._current_input_transcript = ""
         self._last_input_transcript = ""
         self._last_input_transcript_at = 0.0
@@ -2602,7 +2599,6 @@ class JarvisLive:
                             txt = _clean_transcript(sc.output_transcription.text)
                             if txt:
                                 out_buf.append(txt)
-                                self._interrupted_text = " ".join(out_buf)
                                 if not self.ui.muted:
                                     if _new_turn:
                                         self.ui.clear_subtitle()
@@ -3137,13 +3133,9 @@ def rodar_cerebro(ui):
         if provider == "gemini":
             jarvis._tts_engine = None
             jarvis._ext_tts_provider = ""
-            jarvis._ext_tts_voice_id = ""
-            jarvis._ext_tts_api_key = ""
             jarvis.update_voice(voice_id)
         else:
             jarvis._ext_tts_provider = provider
-            jarvis._ext_tts_voice_id = voice_id
-            jarvis._ext_tts_api_key = api_key
             try:
                 from actions.tts_engine import TTSEngine
                 jarvis._tts_engine = TTSEngine(
