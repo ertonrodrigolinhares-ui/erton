@@ -127,7 +127,7 @@ def gravar_fotos() -> None:
 
 # ======================================================================= o que outros arquivos usam
 
-# Métodos da JarvisLive (main.py). Só muda de propósito (ex.: a Etapa 5 apaga o set_tour_active).
+# Métodos da JarvisLive (main.py). Só muda de propósito (ex.: a Etapa 5 apagou o set_tour_active).
 METODOS_DA_JARVISLIVE = frozenset({
     "__init__", "_announce_startup", "_ativar_modo_reserva", "_autodiagnostico", "_avisar_o_que_para",
     "_avisar_se_nao_enviou", "_avisar_sem_ouvido", "_aviso_de_escuta", "_build_config", "_chamada_fechada",
@@ -146,7 +146,7 @@ METODOS_DA_JARVISLIVE = frozenset({
     "_suspender", "_trava_avisos", "_trava_da_fala", "_trava_textos", "_troca_pela_voz_indisponivel",
     "_trocar_cerebro", "_verificar_lembretes_geekie", "_voltar_da_suspensao", "_wait_before_reconnect",
     "anunciar", "request_shutdown", "rodar_automacao_ultron", "run", "send_audio_chunk", "send_text",
-    "set_speaking", "set_tour_active", "speak", "speak_error", "update_voice",
+    "set_speaking", "speak", "speak_error", "update_voice",
 })
 
 # Nomes da JarvisLive que outros arquivos chamam (e quem chama). Não podem sumir nem mudar de nome.

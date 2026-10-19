@@ -1051,7 +1051,6 @@ class JarvisLive:
         self._pending_self_quit_farewell_received = False
         self._self_quit_timer = None
         self._shutdown_requested = threading.Event()
-        self._tour_active = False
         # Jarvis Ultron: palavra de ativação ("Hey Jarvis") e IA reserva (Groq)
         from core.palavra_ativacao import PortaoDeVoz
         if self.external_audio or self.cloud_safe:
@@ -1376,10 +1375,6 @@ class JarvisLive:
                 out_queue.put_nowait(None)
         except Exception as exc:
             print(f"[JARVIS] ⚠️ Shutdown session close failed: {exc}")
-
-    def set_tour_active(self, active: bool) -> None:
-        """Track whether the desktop introduction temporarily owns the UI."""
-        self._tour_active = bool(active)
 
     async def _wait_before_reconnect(self, delay: float) -> None:
         deadline = time.monotonic() + max(0.0, float(delay))

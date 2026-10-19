@@ -198,19 +198,6 @@ class QAModeSafetyTests(unittest.TestCase):
         asyncio.run(jarvis._wait_before_reconnect(30.0))
         self.assertLess(time.perf_counter() - started, 0.1)
 
-    def test_tour_lock_tracks_state_without_closing_on_release(self):
-        import main
-
-        jarvis = main.JarvisLive.__new__(main.JarvisLive)
-        jarvis.session = None
-        jarvis._loop = None
-        jarvis._tour_active = False
-
-        jarvis.set_tour_active(True)
-        self.assertTrue(jarvis._tour_active)
-        jarvis.set_tour_active(False)
-        self.assertFalse(jarvis._tour_active)
-
     def test_independent_tool_batch_executes_concurrently_and_preserves_order(self):
         import main
 
