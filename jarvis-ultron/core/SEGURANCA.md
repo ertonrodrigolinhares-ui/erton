@@ -49,6 +49,25 @@ lista escrita à mão).
 - `computer_control` (clicava e digitava em qualquer lugar): **desligada**.
 - `game_updater` (podia desligar o PC): **desligada**.
 
+Os nomes das desligadas continuam reservados: uma automação em `automacoes/` com um deles não carrega
+(`main.carregar_automacoes`; teste `test_automacao_com_nome_de_desligada_nao_carrega`). A reserva (Groq e
+outra empresa, `core/reserva_groq.py`, `INSTRUCOES`) também diz que o Jarvis não envia nem lê mensagens,
+nem pelo navegador (teste `test_reserva_nao_manda_mensagem`).
+
+**Pendência (Etapa 14, ou antes com o sim do Erton):** o `INSTRUCOES_GEMMA` do `core/cerebro_gemma.py`
+(lista "Não mexer" do plano) ainda diz "Nunca publique, envie mensagens ... sem o 'ok' do Erton". Nenhuma
+ferramenta de mensagem é oferecida ao Gemma, mas ele tem o `browser_control`, que digita e aperta Enter.
+Falta a mesma frase da reserva.
+
+**Como desfazer uma só (para quem programa):** os commits da Etapa 3 mexem nas mesmas linhas (a
+`FERRAMENTAS_DESLIGADAS`, as declarações, o LEIA-ME, o VERSAO.txt, este arquivo, os testes e as fotos), então
+o `git revert` de um só dá conflito. Ou se resolve o conflito à mão (devolver a declaração, o ramo do
+`_execute_tool` e o nome nas listas, e tirar o nome da `FERRAMENTAS_DESLIGADAS` e do `DESLIGADAS` do
+`test_contratos.py`), ou se revertem todos os commits da Etapa 3, reparos inclusive, do mais novo para o mais
+antigo. No meio do caminho, os commits do `code_helper`, do `computer_control` e do `game_updater` só passam
+no `test_phase1_decoupling` depois do reparo que tira o `code_helper` da `CLOUD_SAFE_ACTIONS`. Para o Erton
+continua valendo reabrir a pasta da versão anterior.
+
 ## 2. Modo privado (nada vai para IA na nuvem)
 
 Ligado por `JARVIS_CEREBRO=gemma` (`core/cerebro_gemma.py`, `cerebro_gemma()`).

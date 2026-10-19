@@ -392,7 +392,7 @@ Abra com o Bloco de Notas para mudar:
 
 Deixe essas linhas de fora para o Jarvis escolher sozinho. Esse é o recomendado.
 
-## O que o Jarvis não faz mais (nada age sem o seu "ok")
+## O que o Jarvis não faz mais (ferramentas antigas que agiam sem o seu "ok")
 
 Algumas ferramentas antigas, que vieram do projeto original, agiam sozinhas, sem o seu "ok" conferido
 no código. Elas foram **desligadas**: se você pedir, o Jarvis diz que não faz isso, e nada acontece.
@@ -410,6 +410,9 @@ no código. Elas foram **desligadas**: se você pedir, o Jarvis diz que não faz
   um botão na tela e clicar nele). Volume, brilho, janelas, atalhos e o resto das configurações do PC
   continuam funcionando.
 - **Atualizar jogos** (Steam e Epic): ele podia desligar o PC sozinho no fim do download.
+
+Desligar e reiniciar o PC continuam funcionando, mas hoje quem confirma é a própria IA, sem o seu "ok"
+conferido no código. Isso muda numa próxima versão.
 
 Os arquivos dessas ferramentas continuam na pasta por enquanto. Se alguma fizer falta, avise; para
 voltar na hora, abra o "Iniciar Jarvis Ultron" da pasta da versão anterior.

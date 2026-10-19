@@ -1181,7 +1181,9 @@ def carregar_automacoes(recarregar: bool = False):
     if _AUTOMACOES is None or recarregar:
         from core.automacoes import carregar_ferramentas
 
-        _AUTOMACOES = carregar_ferramentas(reservados={d.get("name") for d in TOOL_DECLARATIONS})
+        # as desligadas também ficam reservadas: uma automação com o nome delas não carrega
+        _AUTOMACOES = carregar_ferramentas(reservados={d.get("name") for d in TOOL_DECLARATIONS}
+                                           | set(FERRAMENTAS_DESLIGADAS))
     return _AUTOMACOES
 
 

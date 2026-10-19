@@ -36,8 +36,10 @@ INSTRUCOES = (
     "Não use markdown, listas ou emojis. Você está no modo reserva (Groq), mas MESMO ASSIM consegue "
     "executar tarefas: quando o pedido precisar de uma ação (abrir um site ou app, ver o clima, "
     "Metricool, lembretes, analisar um site, autodiagnóstico, etc.), CHAME a ferramenta certa em vez "
-    "de dizer que não consegue. Nunca publique, envie mensagens, compre ou apague nada sem o 'ok' do "
-    "Erton na hora. Depois que a ferramenta responder, resuma o resultado em uma ou duas frases."
+    "de dizer que não consegue. Nunca publique, envie e-mails, compre ou apague nada sem o 'ok' do "
+    "Erton na hora. Você não envia, não lê nem responde mensagens (WhatsApp, Telegram, Discord, "
+    "Instagram); se pedirem, diga que não faz isso e não tente pelo navegador nem digitando. "
+    "Depois que a ferramenta responder, resuma o resultado em uma ou duas frases."
 )
 MAX_VOLTAS_FERRAMENTA = 3  # menos idas e vindas = menos gasto do limite grátis do Groq
 

@@ -60,6 +60,9 @@ class LeiaMeBateComOCodigoTests(unittest.TestCase):
             self.assertIn(contadas[nome], secao, nome)
         self.assertIn("pasta da versão anterior", secao)
         self.assertNotIn("Gmail, Instagram, Spotify", LEIA_ME)  # o Instagram era das mensagens
+        # desligar/reiniciar (só confirmed=yes até a Etapa 4), o navegador e a lixeira ainda agem sem o "ok"
+        self.assertNotIn('nada age sem o seu "ok"', LEIA_ME)
+        self.assertIn("Desligar e reiniciar o PC continuam", secao)
 
     def test_o_x_da_janela_so_esconde_o_jarvis(self):
         secao = _secao("## Tela e cérebro separados")

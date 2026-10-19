@@ -519,6 +519,40 @@ class DesligadasTests(unittest.TestCase):
                 self.assertEqual(_chamadas(falsas), [])
                 self.assertIn(("log", f"SYS: ⛔ {nome} está desligada no Jarvis."), ui.eventos)
 
+    def test_automacao_com_nome_de_desligada_nao_carrega(self):
+        # o nome de uma desligada continua reservado: um automacoes/send_message.py não volta a ser oferecido
+        import tempfile
+
+        import core.automacoes
+        import main
+
+        guardadas = main._AUTOMACOES
+        with tempfile.TemporaryDirectory() as pasta:
+            for nome in DESLIGADAS:
+                (Path(pasta) / f"{nome}.py").write_text(
+                    f'FERRAMENTA = {{"name": "{nome}", "description": "x"}}\n'
+                    'def executar(args, jarvis):\n    return "enviada"\n', encoding="utf-8")
+            try:
+                with patch.object(core.automacoes, "pasta_padrao", return_value=Path(pasta)):
+                    carga = main.carregar_automacoes(recarregar=True)
+                    oferecidas = {d["name"] for d in main.get_tool_declarations()}
+            finally:
+                main._AUTOMACOES = guardadas
+        self.assertEqual(carga.ferramentas, {})
+        self.assertEqual(sorted(a for a, _ in carga.erros), sorted(f"{nome}.py" for nome in DESLIGADAS))
+        self.assertTrue(all("já existe no Jarvis" in erro for _, erro in carga.erros))
+        self.assertEqual(oferecidas & set(DESLIGADAS), set())
+
+    def test_reserva_nao_manda_mensagem(self):
+        # o Groq e a outra empresa (core/reserva_outra.py usa as mesmas INSTRUCOES) têm o browser_control,
+        # que digita e aperta Enter: o texto delas não pode dar a entender que, com um "ok", podem enviar
+        from core.reserva_groq import INSTRUCOES
+
+        self.assertNotIn("envie mensagens", INSTRUCOES)
+        self.assertIn("Você não envia, não lê nem responde mensagens", INSTRUCOES)
+        self.assertIn("não tente pelo navegador nem digitando", INSTRUCOES)
+        self.assertIn("modo reserva (Groq)", INSTRUCOES)  # o core/reserva_outra.py troca o nome por aqui
+
 
 if __name__ == "__main__":
     if "--gravar-fotos" in sys.argv:
