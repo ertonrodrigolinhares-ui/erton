@@ -26,12 +26,14 @@ O "ok" só vale numa fala do Erton **depois** de ele ouvir o que vai ser feito. 
 | `hermes/hooks/aprovacao_jarvis.py` (`decidir`, `aprovado`) | Gancho do Hermes: escrita no Metricool ou no Meta só passa com o "ok" registrado nos últimos minutos; se não conseguir ler o arquivo do "ok", bloqueia. |
 | `automacoes/videos.py` (`executar`) | Vídeo pago: primeiro o preço, depois o "ok" numa fala nova; confere de novo no fio `VideoVeo` antes de gastar. |
 | `automacoes/claude_tarefas.py` e `core/claude_chefe.py` | Mudança de código pelo Claude chefe: plano, "ok", backup e desfaz sozinho se os testes quebrarem. O Claude só escreve na pasta dele e nunca lê `.env`, chaves nem memória (`PROTEGIDOS`). |
+| `actions/computer_settings.py` (`_pedir_ok`, `_depois_do_ok`) | Desligar e reiniciar o PC (Etapa 4): a primeira chamada só pergunta (a pergunta aparece na tela); só age se a **primeira** fala nova do Erton depois da pergunta for um "ok" claro. O `confirmed=yes` que o modelo preenche não conta; "não" (ou qualquer outra resposta) cancela; o ok vale uma vez e só para aquele pedido; antes de agir, confere de novo com a fala inteira (`ainda_aprovado`). Sem o `jarvis` (chamada fora da conversa), não age. A trava fica dentro da ação, que o `_execute_tool` chama com o `jarvis`: vale para o Gemini, a reserva e o painel Ultron. |
 | `main.py`, `JarvisLive._nova_fala`, `_microfone_mandou_audio` e `_receive_audio` | No Gemini ao vivo, um pedaço de transcrição só abre fala nova se o microfone mandou áudio depois do último turno do Jarvis. |
 
 Testes: `test_invariantes.py` (`OkAntigoTests`), `test_videos.py` (`OkAntesDoVideoTests`,
 `OkNoGeminiAoVivoTests`), `test_jarvis_ultron.py` (`TravaDeAprovacaoTests`, `OkClaroTests`,
 `PonteHermesTests`), `test_claude_chefe.py` (`FerramentaClaudeTests`, `MudarCodigoTests`,
-`DesfazerSoOQueEDoClaudeTests`, `MudancaInterrompidaTests`).
+`DesfazerSoOQueEDoClaudeTests`, `MudancaInterrompidaTests`), `test_computer_settings_aprovacao.py`
+(`DesligarEReiniciarTests`, `PeloExecuteToolTests`).
 
 **Portas que agiam sem o "ok" (Etapa 3, decisão do Erton: desligar todas).** Nenhuma delas passava pelo
 `core/aprovacao.py`. Desligadas, saem da lista do Gemini (`TOOL_DECLARATIONS`), da reserva
@@ -128,7 +130,7 @@ tela), `test_gemini_acesso.py`, `test_api_key_validation.py`, `test_claude_chefe
 |---|---|
 | `main.py`, `JarvisLive._intercept_ui_tool_call` e `_is_explicit_self_quit_transcript` | "Desliga o Jarvis" só com pedido claro na fala atual do Erton; senão responde "Ignored an unverified shutdown request". |
 | `main.py`, `_queue_self_quit_after_farewell` e `_complete_self_quit_after_audio` | O Jarvis só fecha depois de terminar a despedida (`SELF_QUIT_GOODBYE`). O `quit_jarvis` não é oferecido ao Gemini. |
-| `actions/computer_settings.py`, `computer_settings` | Desligar ou reiniciar o PC: exige alvo explícito ("meu computador"), recusa "desligar o Jarvis", espera 10 s e não usa `/f`. **Ponto fraco de hoje:** basta `confirmed=yes`, que o próprio modelo preenche. A Etapa 4 passa a exigir o "ok" do `core/aprovacao.py`. |
+| `actions/computer_settings.py`, `computer_settings` | Desligar ou reiniciar o PC: exige alvo explícito ("meu computador"), recusa "desligar o Jarvis", espera 10 s, não usa `/f` e só acontece com o "ok" do Erton conferido no código (`_pedir_ok` com o `core/aprovacao.py`, Etapa 4; veja a seção 1). O `confirmed=yes` que o próprio modelo preenche não basta mais. |
 | `actions/game_updater.py` | Podia desligar o PC ao fim de um download. Desligado na Etapa 3: fora da lista do Gemini e, chamado mesmo assim, responde que está desligado. |
 | `core/qa_mode.py` | No modo de teste (QA), desligar, reiniciar e travar a tela ficam sempre bloqueados. |
 
@@ -136,8 +138,8 @@ Testes: `test_qa_system.py` (`test_live_quit_tool_requires_explicit_current_user
 `test_self_quit_waits_for_farewell_audio_to_finish`, `test_shutdown_is_not_exposed_as_a_gemini_tool_action`,
 `test_power_actions_remain_blocked_even_with_desktop_opt_in`), `test_jarvis_ultron.py` (`IdiomaTests`,
 frases de "desliga o Jarvis"), `test_core_resilience.py` (alvo explícito), `test_invariantes.py`
-(`OrdemDasTravasTests.test_desligar_o_jarvis_so_com_pedido_claro_antes_de_qualquer_ferramenta`). A
-Etapa 4 cria o `tests/test_computer_settings_aprovacao.py`.
+(`OrdemDasTravasTests.test_desligar_o_jarvis_so_com_pedido_claro_antes_de_qualquer_ferramenta`),
+`test_computer_settings_aprovacao.py` (`DesligarEReiniciarTests`, `PeloExecuteToolTests`).
 
 ## 5. A ordem das travas no começo do `_execute_tool`
 

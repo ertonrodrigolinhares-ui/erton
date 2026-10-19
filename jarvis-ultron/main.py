@@ -2609,7 +2609,9 @@ class JarvisLive:
                 result = "Vision module activated. Stay completely silent — vision module will speak directly."
 
             elif name == "computer_settings":
-                r = await asyncio.to_thread(lambda: computer_settings(parameters=args, response=None, player=self.ui))
+                # desligar e reiniciar só com o "ok" do Erton, conferido na ação (core/aprovacao.py)
+                r = await asyncio.to_thread(lambda: computer_settings(parameters=args, response=None, player=self.ui,
+                                                                      jarvis=self))
                 result = r or "Done."
 
             elif name == "desktop_control":

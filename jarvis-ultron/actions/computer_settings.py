@@ -4,6 +4,7 @@ import json
 import re
 import sys
 import time
+import threading
 import subprocess
 import platform
 from pathlib import Path
@@ -622,6 +623,130 @@ def _has_explicit_computer_power_target(params: dict, description: str, value) -
     return any(word in text for word in ("computer", "system", "mac", "macbook", "pc", "machine"))
 
 
+# ----- Jarvis Ultron: o "ok" do Erton conferido no código (Etapa 4 do docs/PLANO-REORGANIZACAO.md)
+#
+# Desligar ou reiniciar o PC só acontece com o "ok" dele conferido pelo core/aprovacao.py, como no
+# approve_publication e nos vídeos. A primeira chamada não faz nada: guarda o pedido, com a marca da fala
+# atual dele, e devolve a pergunta (que também aparece na tela). Numa chamada seguinte com o MESMO pedido,
+# só faz se a PRIMEIRA fala nova dele depois da pergunta for um "ok" claro; um "não", ou qualquer outra
+# resposta, cancela. O confirmed=yes que o modelo preenche não conta. O ok vale uma vez só e só para aquele
+# pedido. Como nos vídeos, a ação roda num fio depois de ainda_aprovado (no Gemini ao vivo o resto da fala
+# só chega depois que a ferramenta responde): se o resto da resposta desfizer o "ok", nada é feito e ele é
+# avisado. Chamada sem o jarvis (fora da conversa) não faz nada.
+
+VALIDADE_PEDIDO = 2 * 60  # segundos que a pergunta espera a resposta dele
+
+_pendente: dict = {}
+_trava = threading.Lock()
+
+
+def _janela_da_frente() -> tuple[int, str]:
+    """(número, título) da janela da frente, no Windows; (0, "") quando não dá para saber."""
+    if _OS != "Windows":
+        return 0, ""
+    try:
+        import ctypes
+
+        user32 = ctypes.windll.user32
+        janela = user32.GetForegroundWindow() or 0
+        tamanho = int(user32.GetWindowTextLengthW(janela) or 0)
+        titulo = ctypes.create_unicode_buffer(tamanho + 1)
+        user32.GetWindowTextW(janela, titulo, tamanho + 1)
+        return int(janela), " ".join(titulo.value.split())
+    except Exception:
+        return 0, ""
+
+
+def _log(jarvis, texto: str) -> None:
+    ui = getattr(jarvis, "ui", None)
+    if ui is not None:
+        ui.write_log(texto)
+
+
+def _avisar(jarvis, aviso: str) -> None:
+    anunciar = getattr(jarvis, "anunciar", None)
+    if callable(anunciar):  # respeita o modo chamada: guarda o aviso até o "Hey Jarvis"
+        anunciar(aviso, "Computador")
+        return
+    _log(jarvis, f"SYS: ✋ {aviso}")
+    falar = getattr(jarvis, "_falar_aviso", None)
+    if callable(falar):
+        falar(aviso)
+
+
+def _pedir_ok(jarvis, chave: tuple, o_que: str, janela, fazer) -> str:
+    """Pergunta antes de agir ou, se a pergunta já foi feita, confere a resposta do Erton e, com o "ok",
+    faz (num fio). Devolve o texto para o modelo. o_que: o que vai ser feito, em português ("reiniciar o
+    computador"). janela: (número, título) da janela da frente quando a ação vai para ela, que entra na
+    chave e é conferida de novo antes de agir; None quando a janela não importa (desligar e reiniciar)."""
+    if jarvis is None:  # sem a conversa não há como conferir o "ok" dele
+        return ("Not done: this needs the user's ok, which Jarvis checks in the conversation, and this call "
+                "did not come from the conversation.")
+    from core import aprovacao
+
+    agora = time.monotonic()
+    with _trava:
+        pedido = _pendente.get("chave") == chave and agora - _pendente.get("em", 0) < VALIDADE_PEDIDO
+        marca = _pendente.get("marca", 0)
+        fala = aprovacao.marca(jarvis)
+        if pedido and fala == marca:
+            return ("Not done: the user has not answered the question yet. Wait for the answer; only a clear "
+                    "ok in the user's own words, said after the question, counts.")
+        if pedido and fala == marca + 1:
+            _pendente.clear()  # a primeira resposta decide, uma vez só: o "ok" faz, qualquer outra cancela
+            fala_do_ok = aprovacao.fala_que_aprovou(jarvis, marca)
+        else:  # pedido novo (ou outro pedido, ou a pergunta venceu, ou já houve outras falas): pergunta
+            pedido = False
+            _pendente.clear()
+            _pendente.update(chave=chave, em=agora, marca=fala)
+
+    if not pedido:
+        if janela is None:
+            pergunta = f"Posso {o_que} agora? Salve antes o que estiver aberto."
+        else:
+            titulo = janela[1] if len(janela[1]) <= 80 else janela[1][:79] + "…"
+            onde = f'na janela "{titulo}"' if titulo else "na janela da frente (não consegui ver qual é)"
+            pergunta = f"Posso {o_que} {onde}?"
+        pergunta += ' Para confirmar, diga "ok, pode fazer".'
+        _log(jarvis, f"SYS: ✋ Antes de agir, pergunto: {pergunta}")
+        return ("Not done yet: Jarvis needs the user's ok first. Ask the user now, in Portuguese, exactly this "
+                f"question: {pergunta} Then stop and wait for the answer. Only if the user's next answer is a "
+                "clear ok in their own words (for example 'ok, pode fazer'), call computer_settings again with "
+                "exactly the same parameters. If the user says no or anything else, do not call it again; just "
+                "say you did not do it. Never call it again without the user's answer.")
+    if fala_do_ok != marca + 1:
+        _log(jarvis, f'SYS: ✋ Cancelado ({o_que}): a resposta não foi um "ok" claro.')
+        return ("Cancelled: the user's answer to the question was not a clear ok, so nothing was done. Tell the "
+                "user, in one short Portuguese sentence, that you did not do it. Call computer_settings again "
+                "only if the user asks for it again.")
+    threading.Thread(target=_depois_do_ok, args=(jarvis, fala_do_ok, o_que, janela, fazer),
+                     daemon=True, name="ComputadorOk").start()
+    return ("Approved by the user. Jarvis checks the user's whole answer once more and then does it. Tell the "
+            "user, in one short Portuguese sentence, that you are doing it. Do not call computer_settings "
+            "again for this.")
+
+
+def _depois_do_ok(jarvis, fala_do_ok: int, o_que: str, janela, fazer) -> None:
+    """Fio: confere o "ok" de novo, com a fala inteira, e a janela da frente; só então faz."""
+    from core import aprovacao
+
+    # A ferramenta pode ter chegado com só o começo da resposta transcrito ("Ok," ... "não, espera"):
+    # antes do que não tem volta, confere de novo com a fala inteira.
+    if not aprovacao.ainda_aprovado(jarvis, fala_do_ok):
+        _avisar(jarvis, f'Não vou {o_que}: a sua resposta não foi um "ok" claro. Se quiser, peça de novo.')
+        return
+    if janela is not None and _janela_da_frente()[0] != janela[0]:
+        _avisar(jarvis, f"Não vou {o_que}: a janela da frente mudou depois da pergunta. Se quiser, peça de novo.")
+        return
+    try:
+        fazer()
+    except Exception as erro:
+        print(f"[Settings] Action failed after the ok ({o_que}): {erro}")
+        _avisar(jarvis, f"Não consegui {o_que}: {str(erro)[:150]}")
+        return
+    _log(jarvis, f"SYS: ✅ Feito com o seu ok: {o_que}.")
+
+
 
 def _detect_action(description: str) -> dict:
 
@@ -665,7 +790,10 @@ def computer_settings(
     response=None,
     player=None,
     session_memory=None,
+    jarvis=None,
 ) -> str:
+    """jarvis: a conversa (o main.py passa no _execute_tool), onde o "ok" do Erton é conferido. Sem ela,
+    desligar e reiniciar não acontecem."""
     if not _PYAUTOGUI:
         return "pyautogui is not installed. Run: pip install pyautogui"
 
@@ -698,12 +826,9 @@ def computer_settings(
                 f"Refusing to {action} the computer because the target was not explicit. "
                 f"Say '{action} my computer' if you intend to power-control the machine."
             )
-        confirmed = str(params.get("confirmed", "")).lower()
-        if confirmed not in ("yes", "true", "1", "confirm"):
-            return (
-                f"This will {action} the computer. "
-                f"Please confirm by calling again with confirmed=yes."
-            )
+        # o confirmed=yes do modelo não basta: só com o "ok" do Erton conferido no código
+        o_que = "reiniciar o computador" if action == "restart" else "desligar o computador"
+        return _pedir_ok(jarvis, (action,), o_que, None, ACTION_MAP[action])
 
     if action == "volume_set":
         try:
