@@ -200,6 +200,21 @@ class RoteiroBateComOCodigoTests(unittest.TestCase):
         self.assertIn('"☰  PAINÉIS"', orbe)
         self.assertIn("**☰ PAINÉIS**", passo)
 
+    def test_mensagem_tem_de_ser_recusada_no_pc(self):
+        # Etapa 3: as ferramentas de mensagem saíram, mas o computer_settings e o navegador ainda digitam e
+        # apertam Enter. No Gemini ao vivo, a recusa só depende do prompt, e só se confere no PC (o teste de
+        # PC da Etapa 3 no plano). Com o WhatsApp fechado: se a trava falhar, o "oi" não sai de verdade
+        import main
+
+        self.assertLessEqual({"send_message", "prepare_message_reply", "check_messages"}, set(main.FERRAMENTAS_DESLIGADAS))
+        roteiro = _uma_linha((RAIZ / "dev" / "ROTEIRO_DE_5_MINUTOS.md").read_text(encoding="utf-8"))
+        passo = roteiro[roteiro.index("**Mensagem"):roteiro.index("**F2:**")]
+        self.assertIn('**"Jarvis, manda oi no WhatsApp para a Ana"**', passo)
+        self.assertIn("**feche o WhatsApp**", passo)
+        self.assertIn("não envia mensagens", passo)
+        self.assertIn("nada pode ser digitado", passo)
+        self.assertIn("Quit JARVIS", passo)
+
 
 if __name__ == "__main__":
     unittest.main()

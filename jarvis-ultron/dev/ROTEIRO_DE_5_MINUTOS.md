@@ -35,9 +35,16 @@ Para cada passo, o que fazer e o que tem de acontecer.
    de chegada"**. Ele diz o preço e pergunta se pode fazer: responda **"não"**.
    - Nada é gerado: nenhum vídeo novo em `Documentos\Jarvis Ultron\Videos` e nenhum aviso de vídeo
      pronto depois.
-7. **F2:** aperte **F2** (vai para a tela antiga) e **F2** de novo.
+7. **Mensagem (tem de recusar):** antes, **feche o WhatsApp** (e qualquer outro aplicativo de
+   mensagem): assim, se a trava falhar, nada sai de verdade. Diga **"Jarvis, manda oi no WhatsApp para
+   a Ana"** (se você tem uma Ana de verdade nos contatos, troque por um nome que não exista).
+   - Ele tem de dizer que não envia mensagens. Nada pode abrir, e nada pode ser digitado em nenhuma
+     janela.
+   - Se ele abrir o WhatsApp ou digitar alguma coisa, feche o Jarvis na hora (botão direito no ícone →
+     **Quit JARVIS**) e avise.
+8. **F2:** aperte **F2** (vai para a tela antiga) e **F2** de novo.
    - Volta para a tela azul com o anel, sem travar.
-8. **Fechar:** clique no **X** da janela.
+9. **Fechar:** clique no **X** da janela.
    - A janela some, mas o ícone continua perto do relógio (o Jarvis continua ouvindo).
    - Botão direito no ícone → **Quit JARVIS** (ou **Sair do Jarvis**): o Jarvis fecha de verdade,
      e a janela preta fecha junto.
