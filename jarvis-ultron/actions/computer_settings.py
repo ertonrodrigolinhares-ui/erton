@@ -597,6 +597,78 @@ ACTION_MAP: dict[str, callable] = {
 
 _DANGEROUS_ACTIONS = {"restart", "shutdown"}
 
+# Jarvis Ultron (Etapa 4): além de desligar e reiniciar, pede o "ok" do Erton (_pedir_ok) tudo o que
+# escreve ou aperta teclas no PROGRAMA da janela da frente: o efeito depende de qual programa está na
+# frente, e nada confere qual é (o Enter envia no WhatsApp, o Ctrl+V cola no chat, o F5 roda o programa no
+# VS Code, o Alt+F4 fecha o que estiver na frente, o Espaço escreve num campo de texto). Fora do ACTION_MAP
+# pedem também type_text (e write_on_screen, type, write), press_key e reload_n. Ação -> (teclas no
+# Windows, para quê), para a pergunta.
+TECLAS_PEDEM_OK = {
+    "pause_video":   ("Espaço", "pausar ou continuar o vídeo"),
+    "play_pause":    ("Espaço", "pausar ou continuar o vídeo"),
+    "close_app":     ("Alt+F4", "fechar o programa da frente"),
+    "close_window":  ("Ctrl+W", "fechar a janela ou a aba da frente"),
+    "quit_app":      ("Alt+F4", "fechar o programa da frente"),
+    "full_screen":   ("F11", "tela cheia"),
+    "fullscreen":    ("F11", "tela cheia"),
+    "focus_search":  ("Ctrl+L", "ir para a barra de endereço"),
+    "refresh_page":  ("F5", "recarregar a página"),
+    "reload":        ("F5", "recarregar a página"),
+    "close_tab":     ("Ctrl+W", "fechar a aba"),
+    "new_tab":       ("Ctrl+T", "abrir uma aba nova"),
+    "next_tab":      ("Ctrl+Tab", "ir para a próxima aba"),
+    "prev_tab":      ("Ctrl+Shift+Tab", "voltar para a aba anterior"),
+    "go_back":       ("Alt+Seta para a esquerda", "voltar uma página"),
+    "go_forward":    ("Alt+Seta para a direita", "avançar uma página"),
+    "zoom_in":       ("Ctrl+=", "aumentar o zoom"),
+    "zoom_out":      ("Ctrl+-", "diminuir o zoom"),
+    "zoom_reset":    ("Ctrl+0", "voltar o zoom ao normal"),
+    "find_on_page":  ("Ctrl+F", "procurar na página"),
+    "scroll_top":    ("Ctrl+Home", "ir para o começo"),
+    "scroll_bottom": ("Ctrl+End", "ir para o fim"),
+    "page_up":       ("Page Up", "subir uma tela"),
+    "page_down":     ("Page Down", "descer uma tela"),
+    "copy":          ("Ctrl+C", "copiar"),
+    "paste":         ("Ctrl+V", "colar o que está copiado"),
+    "cut":           ("Ctrl+X", "recortar"),
+    "undo":          ("Ctrl+Z", "desfazer"),
+    "redo":          ("Ctrl+Y", "refazer"),
+    "select_all":    ("Ctrl+A", "selecionar tudo"),
+    "save":          ("Ctrl+S", "salvar"),
+    "enter":         ("Enter", "confirmar ou enviar"),
+    "escape":        ("Esc", "cancelar ou fechar"),
+}
+# Não pedem: o que não chega ao programa da frente. As teclas de volume, os atalhos com a tecla Windows, o
+# Alt+Tab e o Ctrl+Shift+Esc são atendidos pelo próprio Windows; brilho, Wi-Fi, tema escuro e apagar a tela
+# não usam teclas; rolar usa a rodinha do mouse. Ação -> por quê.
+NAO_PEDEM_OK = {
+    "volume_up":       "tecla de volume, atendida pelo Windows",
+    "volume_down":     "tecla de volume, atendida pelo Windows",
+    "mute":            "tecla de volume, atendida pelo Windows",
+    "unmute":          "tecla de volume, atendida pelo Windows",
+    "toggle_mute":     "tecla de volume, atendida pelo Windows",
+    "brightness_up":   "brilho pelo Windows, sem teclas",
+    "brightness_down": "brilho pelo Windows, sem teclas",
+    "sleep_display":   "só apaga a tela, sem teclas (o PC continua ligado)",
+    "screen_off":      "só apaga a tela, sem teclas (o PC continua ligado)",
+    "minimize":        "Windows+Seta para baixo: o Windows mexe na janela, não no que está nela",
+    "maximize":        "Windows+Seta para cima: o Windows mexe na janela, não no que está nela",
+    "snap_left":       "Windows+Seta para a esquerda: o Windows mexe na janela, não no que está nela",
+    "snap_right":      "Windows+Seta para a direita: o Windows mexe na janela, não no que está nela",
+    "show_desktop":    "Windows+D: o Windows mostra a área de trabalho",
+    "switch_window":   "Alt+Tab: o Windows troca de janela",
+    "task_manager":    "Ctrl+Shift+Esc: o Windows abre o Gerenciador de Tarefas",
+    "screenshot":      "Windows+Shift+S: o Windows abre a captura de tela",
+    "lock_screen":     "Windows+L: o Windows bloqueia a tela (não desliga nem sai da conta)",
+    "open_settings":   "Windows+I: o Windows abre as Configurações",
+    "file_explorer":   "Windows+E: o Windows abre o Explorador de Arquivos",
+    "open_run":        "Windows+R: o Windows abre o Executar (digitar nele pede o ok)",
+    "dark_mode":       "tema escuro pelo registro do Windows, sem teclas",
+    "toggle_wifi":     "Wi-Fi pelo Windows, sem teclas",
+    "scroll_up":       "rodinha do mouse, sem teclas",
+    "scroll_down":     "rodinha do mouse, sem teclas",
+}
+
 
 def _power_target_text(params: dict, description: str, value) -> str:
     return " ".join(
@@ -625,14 +697,16 @@ def _has_explicit_computer_power_target(params: dict, description: str, value) -
 
 # ----- Jarvis Ultron: o "ok" do Erton conferido no código (Etapa 4 do docs/PLANO-REORGANIZACAO.md)
 #
-# Desligar ou reiniciar o PC só acontece com o "ok" dele conferido pelo core/aprovacao.py, como no
-# approve_publication e nos vídeos. A primeira chamada não faz nada: guarda o pedido, com a marca da fala
-# atual dele, e devolve a pergunta (que também aparece na tela). Numa chamada seguinte com o MESMO pedido,
-# só faz se a PRIMEIRA fala nova dele depois da pergunta for um "ok" claro; um "não", ou qualquer outra
-# resposta, cancela. O confirmed=yes que o modelo preenche não conta. O ok vale uma vez só e só para aquele
-# pedido. Como nos vídeos, a ação roda num fio depois de ainda_aprovado (no Gemini ao vivo o resto da fala
-# só chega depois que a ferramenta responde): se o resto da resposta desfizer o "ok", nada é feito e ele é
-# avisado. Chamada sem o jarvis (fora da conversa) não faz nada.
+# Desligar ou reiniciar o PC, e escrever ou apertar teclas no programa da frente (TECLAS_PEDEM_OK), só
+# acontece com o "ok" dele conferido pelo core/aprovacao.py, como no approve_publication e nos vídeos. A
+# primeira chamada não faz nada: guarda o pedido, com a marca da fala atual dele, e devolve a pergunta com
+# o texto ou as teclas e a janela da frente (que também aparece na tela). Numa chamada seguinte com o MESMO
+# pedido (mesmo texto, mesma tecla, mesma janela), só faz se a PRIMEIRA fala nova dele depois da pergunta
+# for um "ok" claro; um "não", ou qualquer outra resposta, cancela. O confirmed=yes que o modelo preenche
+# não conta. O ok vale uma vez só e só para aquele pedido. Como nos vídeos, a ação roda num fio depois de
+# ainda_aprovado (no Gemini ao vivo o resto da fala só chega depois que a ferramenta responde): se o resto
+# da resposta desfizer o "ok", ou se a janela da frente mudar, nada é feito e ele é avisado. Chamada sem o
+# jarvis (fora da conversa) não faz nada.
 
 VALIDADE_PEDIDO = 2 * 60  # segundos que a pergunta espera a resposta dele
 
@@ -793,7 +867,7 @@ def computer_settings(
     jarvis=None,
 ) -> str:
     """jarvis: a conversa (o main.py passa no _execute_tool), onde o "ok" do Erton é conferido. Sem ela,
-    desligar e reiniciar não acontecem."""
+    desligar, reiniciar, digitar e apertar teclas no programa da frente não acontecem."""
     if not _PYAUTOGUI:
         return "pyautogui is not installed. Run: pip install pyautogui"
 
@@ -842,22 +916,28 @@ def computer_settings(
         if not text:
             return "No text provided to type."
         enter_after = str(params.get("press_enter", "false")).lower() in ("true", "1", "yes")
-        type_text(text, press_enter_after=enter_after)
-        return f"Typed: {text[:80]}"
+        # escreve na janela da frente, seja ela qual for: só com o "ok" do Erton (Etapa 4)
+        janela = _janela_da_frente()
+        o_que = f'digitar "{text}"' + (" e apertar Enter" if enter_after else "")
+        return _pedir_ok(jarvis, ("type_text", text, enter_after, janela[0]), o_que, janela,
+                         lambda: type_text(text, press_enter_after=enter_after))
 
     if action == "press_key":
         key = str(value or params.get("key", "")).strip()
         if not key:
             return "No key specified."
-        press_key(key)
-        return f"Pressed: {key}"
+        janela = _janela_da_frente()
+        return _pedir_ok(jarvis, ("press_key", key, janela[0]), f'apertar a tecla "{key}"', janela,
+                         lambda: press_key(key))
 
     if action in ("reload_n", "refresh_n", "reload_page_n"):
         try:
-            reload_page_n(int(value or 1))
-            return f"Reloaded {value or 1} time(s)."
-        except Exception as e:
+            vezes = max(1, int(value or 1))
+        except (TypeError, ValueError) as e:
             return f"Reload failed: {e}"
+        janela = _janela_da_frente()
+        o_que = f"apertar F5 (recarregar a página) {vezes} {'vez' if vezes == 1 else 'vezes'}"
+        return _pedir_ok(jarvis, ("reload_n", vezes, janela[0]), o_que, janela, lambda: reload_page_n(vezes))
 
     if action == "scroll_up":
         scroll_up(int(value or 500))
@@ -871,22 +951,33 @@ def computer_settings(
     if not func:
         return f"Unknown action: '{raw_action}'."
 
-    try:
-        if action in ("quit_app", "close_app", "close_window"):
-            app_name = str(
-                params.get("app_name")
-                or value
-                or description
-                or ""
-            ).strip()
+    app_name = ""
+    if action in ("quit_app", "close_app", "close_window"):
+        app_name = str(
+            params.get("app_name")
+            or value
+            or description
+            or ""
+        ).strip()
 
-            # If user named an app on macOS, target that app directly.
-            if _OS == "Darwin" and app_name:
-                quit_app(app_name)
-                return f"Closed app: {app_name}."
-
+    def fazer() -> str:
+        # If user named an app on macOS, target that app directly.
+        if _OS == "Darwin" and app_name:
+            quit_app(app_name)
+            return f"Closed app: {app_name}."
         func()
         return f"Done: {action}."
+
+    if action in TECLAS_PEDEM_OK:
+        # tecla para o programa da frente: só com o "ok" do Erton (Etapa 4)
+        teclas, para_que = TECLAS_PEDEM_OK[action]
+        do_mac = app_name if _OS == "Darwin" else ""
+        o_que = f'fechar o programa "{do_mac}"' if do_mac else f"apertar {teclas} ({para_que})"
+        janela = _janela_da_frente()
+        return _pedir_ok(jarvis, (action, do_mac, janela[0]), o_que, janela, fazer)
+
+    try:
+        return fazer()
     except Exception as e:
         print(f"[Settings] Action failed ({action}): {e}")
         return f"Action failed ({action}): {e}"

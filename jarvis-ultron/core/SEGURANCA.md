@@ -26,14 +26,14 @@ O "ok" só vale numa fala do Erton **depois** de ele ouvir o que vai ser feito. 
 | `hermes/hooks/aprovacao_jarvis.py` (`decidir`, `aprovado`) | Gancho do Hermes: escrita no Metricool ou no Meta só passa com o "ok" registrado nos últimos minutos; se não conseguir ler o arquivo do "ok", bloqueia. |
 | `automacoes/videos.py` (`executar`) | Vídeo pago: primeiro o preço, depois o "ok" numa fala nova; confere de novo no fio `VideoVeo` antes de gastar. |
 | `automacoes/claude_tarefas.py` e `core/claude_chefe.py` | Mudança de código pelo Claude chefe: plano, "ok", backup e desfaz sozinho se os testes quebrarem. O Claude só escreve na pasta dele e nunca lê `.env`, chaves nem memória (`PROTEGIDOS`). |
-| `actions/computer_settings.py` (`_pedir_ok`, `_depois_do_ok`) | Desligar e reiniciar o PC (Etapa 4): a primeira chamada só pergunta (a pergunta aparece na tela); só age se a **primeira** fala nova do Erton depois da pergunta for um "ok" claro. O `confirmed=yes` que o modelo preenche não conta; "não" (ou qualquer outra resposta) cancela; o ok vale uma vez e só para aquele pedido; antes de agir, confere de novo com a fala inteira (`ainda_aprovado`). Sem o `jarvis` (chamada fora da conversa), não age. A trava fica dentro da ação, que o `_execute_tool` chama com o `jarvis`: vale para o Gemini, a reserva e o painel Ultron. |
+| `actions/computer_settings.py` (`_pedir_ok`, `_depois_do_ok`, `TECLAS_PEDEM_OK`) | Desligar e reiniciar o PC, digitar e apertar teclas no programa da janela da frente (Etapa 4): a primeira chamada só pergunta, com o texto ou as teclas e o nome da janela (a pergunta aparece na tela); só age se a **primeira** fala nova do Erton depois da pergunta for um "ok" claro. O `confirmed=yes` que o modelo preenche não conta; "não" (ou qualquer outra resposta) cancela; o ok vale uma vez e só para aquele pedido (outro texto, outra tecla ou outra janela pedem de novo); antes de agir, confere de novo com a fala inteira (`ainda_aprovado`) e se a janela da frente é a mesma. Sem o `jarvis` (chamada fora da conversa), não age. A trava fica dentro da ação, que o `_execute_tool` chama com o `jarvis`: vale para o Gemini, a reserva e o painel Ultron. |
 | `main.py`, `JarvisLive._nova_fala`, `_microfone_mandou_audio` e `_receive_audio` | No Gemini ao vivo, um pedaço de transcrição só abre fala nova se o microfone mandou áudio depois do último turno do Jarvis. |
 
 Testes: `test_invariantes.py` (`OkAntigoTests`), `test_videos.py` (`OkAntesDoVideoTests`,
 `OkNoGeminiAoVivoTests`), `test_jarvis_ultron.py` (`TravaDeAprovacaoTests`, `OkClaroTests`,
 `PonteHermesTests`), `test_claude_chefe.py` (`FerramentaClaudeTests`, `MudarCodigoTests`,
 `DesfazerSoOQueEDoClaudeTests`, `MudancaInterrompidaTests`), `test_computer_settings_aprovacao.py`
-(`DesligarEReiniciarTests`, `PeloExecuteToolTests`).
+(`DesligarEReiniciarTests`, `TecladoTests`, `PeloExecuteToolTests`).
 
 **Portas que agiam sem o "ok" (Etapa 3, decisão do Erton: desligar todas).** Nenhuma delas passava pelo
 `core/aprovacao.py`. Desligadas, saem da lista do Gemini (`TOOL_DECLARATIONS`), da reserva
@@ -49,7 +49,7 @@ lista escrita à mão).
 - `code_helper` e `dev_agent` (rodavam código e `pip install`): **desligadas**. O `code_helper` saiu
   também da `CLOUD_SAFE_ACTIONS` (modo servidor): lá só é oferecido o que está declarado.
 - `computer_control` (clicava e digitava em qualquer lugar): **desligada**. Digitar e apertar teclas
-  continua pelo `computer_settings` (veja a pendência abaixo).
+  continua pelo `computer_settings`, só com o "ok" do Erton desde a Etapa 4 (veja a porta fechada abaixo).
 - `game_updater` (podia desligar o PC): **desligada**.
 
 Os nomes das desligadas continuam reservados: uma automação em `automacoes/` com um deles não carrega
@@ -62,19 +62,25 @@ nem pelo navegador (teste `test_reserva_nao_manda_mensagem`).
 ferramenta de mensagem é oferecida ao Gemma, mas ele tem o `browser_control`, que digita e aperta Enter.
 Falta a mesma frase da reserva.
 
-**Pendência (porta aberta no Gemini, sem o "ok"): digitar e apertar teclas pelo `computer_settings`.** O
-`computer_control` saiu, mas o `computer_settings` continua oferecido ao Gemini (a declaração diz "typing text
-on screen") e não passa pelo `core/aprovacao.py`: o `type_text` (e `write_on_screen`, `type`, `write`)
-escreve qualquer texto na janela que estiver na frente e, com `press_enter`, aperta Enter depois; o
-`press_key` (e a ação `enter`) aperta qualquer tecla. Nada confere se a janela é um campo de texto (o
-`actions/safe_text_entry.py` só era usado pelo `computer_control` e pelas mensagens). Com uma conversa do
-WhatsApp na frente, dá para digitar e enviar: hoje só as linhas "Messaging" e "Typing safety" do
-`core/prompt.txt` impedem, não o código. Já era assim antes da Etapa 3. O modo privado recusa o
+**Porta fechada (Etapa 4): digitar e apertar teclas pelo `computer_settings` só com o "ok" do Erton.** O
+`computer_settings` continua oferecido ao Gemini (a declaração diz "typing text on screen"), e nada confere se
+a janela da frente é um campo de texto (o `actions/safe_text_entry.py` só era usado pelo `computer_control` e
+pelas mensagens). Até a Etapa 4, o `type_text` (e `write_on_screen`, `type`, `write`) escrevia qualquer texto
+na janela da frente e, com `press_enter`, apertava Enter; o `press_key` e as ações de atalho apertavam teclas,
+sem o "ok". Agora passam pelo `_pedir_ok` com o `core/aprovacao.py` (a mesma trava de desligar e reiniciar,
+na tabela acima): o `type_text` e os sinônimos, o `press_key`, o `reload_n` e todas as ações do `ACTION_MAP`
+que mandam teclas para o programa da frente (`TECLAS_PEDEM_OK`: Enter, Esc, colar, copiar, recortar, desfazer,
+salvar, selecionar tudo, fechar programa, janela ou aba, abas, voltar e avançar, recarregar, zoom, procurar,
+tela cheia, Page Up/Down, começo e fim, e o Espaço do `pause_video`). A pergunta mostra o texto ou as teclas e
+o nome da janela da frente; o ok vale para aquele texto, naquela janela, uma vez. Não pedem (`NAO_PEDEM_OK`,
+cada uma com o motivo): volume, brilho, Wi-Fi, tema escuro, apagar a tela, rolar com o mouse e os atalhos que o
+próprio Windows atende (tecla Windows, Alt+Tab, Ctrl+Shift+Esc). Toda ação nova do `ACTION_MAP` tem de entrar
+numa das duas listas (teste). As linhas "Messaging" e "Typing safety" do `core/prompt.txt` continuam (nunca
+digitar num aplicativo de mensagem) e agora mandam perguntar e esperar o ok. O modo privado recusa o
 `computer_settings` inteiro, e o modo QA (`core/qa_mode.py`) recusa digitar e apertar teclas sem
-`JARVIS_QA_ALLOW_DESKTOP=1`. Para fechar:
-estender a trava da Etapa 4 (`marca`, `aprovou_depois`, `ainda_aprovado`) a essas ações, a decidir antes
-dela (o plano hoje só põe o "ok" em desligar e reiniciar). Teste: `test_contratos.py`
-(`DesligadasTests.test_digitar_pelo_computer_settings_continua_sem_ok_e_esta_no_mapa` e
+`JARVIS_QA_ALLOW_DESKTOP=1`. Continua sem o "ok": o `browser_control`, que digita e aperta Enter no navegador
+que o Jarvis controla. Testes: `test_computer_settings_aprovacao.py` (`TecladoTests`, `PeloExecuteToolTests`),
+`test_contratos.py` (`DesligadasTests.test_digitar_pelo_computer_settings_so_com_o_ok_e_esta_no_mapa` e
 `test_prompt_nao_promete_conferir_o_campo_de_texto`).
 
 **Como desfazer uma só (para quem programa):** os commits da Etapa 3 mexem nas mesmas linhas (a
