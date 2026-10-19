@@ -1,0 +1,25 @@
+# Arquivo: peças que saíram do Jarvis
+
+Esta pasta guarda, por algumas semanas, o que saiu do Jarvis Ultron na reorganização (veja
+`docs/PLANO-REORGANIZACAO.md`). **Nada aqui é usado:** o Jarvis não importa nada desta pasta (o
+`tests/test_arquivo.py` confere) e os testes guardados aqui não rodam (o `conftest.py` desta pasta
+impede).
+
+Depois de alguns meses, a pasta é apagada (Etapa 21). O git guarda tudo para sempre.
+
+## Como trazer uma peça de volta
+
+O jeito mais simples é `git revert` do commit que a guardou (o nome do commit está abaixo): o arquivo
+volta para o lugar, junto com os testes e as linhas que saíram de outros arquivos. À mão:
+
+1. `git mv` do arquivo de volta para o lugar de onde veio (abaixo).
+2. Tire o nome dele da lista `GUARDADOS` do `tests/test_arquivo.py`.
+3. Traga de volta os testes e as linhas de scripts que saíram junto (`git show` do commit).
+
+## O que está aqui
+
+<!-- awareness (Etapa 5) -->
+
+<!-- memory/answer_cache.py (Etapa 5) -->
+
+<!-- core/graphics_capability.py (Etapa 5) -->
