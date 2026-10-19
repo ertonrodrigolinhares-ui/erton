@@ -265,11 +265,10 @@ def _agent() -> CapabilityResult:
 
 def _memory() -> CapabilityResult:
     return _tested(
-        "MEMORY / AWARENESS",
+        "MEMORY",
         (
             "tests.test_core_resilience.CoreResilienceTests.test_answer_cache_round_trip_uses_temporary_file",
             "tests.test_core_resilience.CoreResilienceTests.test_corrupt_memory_recovers_and_round_trips",
-            "tests.test_core_resilience.CoreResilienceTests.test_awareness_state_is_copied_and_bounded",
             "tests.test_hosted_api.HostedApiTests.test_memory_is_scoped_by_tenant",
         ),
         "memory contract tests pass",

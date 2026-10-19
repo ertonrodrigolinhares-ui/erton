@@ -11,7 +11,6 @@ from actions import computer_settings, file_controller, flight_finder, instagram
 from agent import error_handler
 from agent.task_queue import TaskPriority, TaskQueue
 from api import status as api_status
-from awareness.engine import AwarenessEngine
 from core import api_key_validator, live_model
 from memory import answer_cache, config_manager, memory_manager
 
@@ -91,15 +90,6 @@ class CoreResilienceTests(unittest.TestCase):
         self.assertEqual(queue.get_status(task_id)["status"], "pending")
         self.assertTrue(queue.cancel(task_id))
         self.assertEqual(queue.get_status(task_id)["status"], "cancelled")
-
-    def test_awareness_state_is_copied_and_bounded(self):
-        engine = AwarenessEngine(lambda *_: None)
-        engine.set_goal("Audit JARVIS")
-        for index in range(25):
-            engine.record_event(f"event-{index}")
-        state = engine.get_state()
-        self.assertEqual(state.current_goal, "Audit JARVIS")
-        self.assertEqual(len(state.recent_events), 20)
 
 
 class PureActionContractTests(unittest.TestCase):

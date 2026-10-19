@@ -19,6 +19,10 @@ volta para o lugar, junto com os testes e as linhas que saíram de outros arquiv
 ## O que está aqui
 
 <!-- awareness (Etapa 5) -->
+- **`pecas-sem-uso/awareness/`** (commit "Reorganização etapa 5: guarda o awareness"): o motor de
+  "consciência" herdado do JARVIS-OS. Vinha de `awareness/engine.py`; as anotações vinham de
+  `memory/awareness-engine-enhanced.md` e `docs/MEMORY.md`. Nada criava o motor. O teste que saiu
+  está em `teste-que-saiu.md`.
 
 <!-- memory/answer_cache.py (Etapa 5) -->
 

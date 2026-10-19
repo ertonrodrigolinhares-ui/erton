@@ -15,6 +15,7 @@ NAO_OLHAR = {".git", "__pycache__", ".venv", "venv", "env", "tmp", "outputs", "n
 # abaixo dela no commit que a guarda: assim um "git revert" de uma peça não esbarra no de outra.
 GUARDADOS = (
     # awareness/ (Etapa 5)
+    "awareness",
     # memory/answer_cache.py (Etapa 5)
     # core/graphics_capability.py (Etapa 5)
 )
