@@ -30,3 +30,7 @@ volta para o lugar, junto com os testes e as linhas que saíram de outros arquiv
   arquivo de respostas nunca era criado. Os testes que saíram estão em `teste-que-saiu.md`.
 
 <!-- core/graphics_capability.py (Etapa 5) -->
+- **`pecas-sem-uso/graphics_capability/`** (commit "Reorganização etapa 5: guarda o
+  graphics_capability"): a detecção da placa de vídeo para o modo gráfico "Auto", herdada do
+  JARVIS-OS. Vinha de `core/graphics_capability.py`, e o teste de `tests/test_graphics_capability.py`
+  (aqui ele não roda). Nada a chamava: o gancho do ui.py ficou vazio.
