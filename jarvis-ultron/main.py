@@ -41,10 +41,7 @@ file_processor = _lazy_action("actions.file_processor", "file_processor")
 flight_finder = _lazy_action("actions.flight_finder", "flight_finder")
 open_app = _lazy_action("actions.open_app", "open_app")
 weather_action = _lazy_action("actions.weather_report", "weather_action")
-send_message = _lazy_action("actions.send_message", "send_message")
-prepare_message_reply = _lazy_action("actions.send_message", "prepare_message_reply")
 email_control = _lazy_action("actions.email_control", "email_control")
-check_messages = _lazy_action("actions.message_monitor", "check_messages")
 reminder = _lazy_action("actions.reminder", "reminder")
 computer_settings = _lazy_action("actions.computer_settings", "computer_settings")
 screen_process = _lazy_action("actions.screen_processor", "screen_process")
@@ -559,57 +556,6 @@ TOOL_DECLARATIONS = [
                 "city": {"type": "STRING", "description": "City name"}
             },
             "required": ["city"]
-        }
-    },
-    {
-        "name": "check_messages",
-        "description": (
-            "Reads the current Instagram or Apple Messages conversation and optionally searches Contacts. "
-            "Use this before drafting a reply or when the user asks about recent messages."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "platform": {"type": "STRING", "description": "all | Instagram | iMessage | Contacts. Default: all."},
-                "include_contacts": {"type": "BOOLEAN", "description": "Also search the user's Contacts."},
-                "contact_query": {"type": "STRING", "description": "Optional spoken contact name to match."},
-                "max_messages": {"type": "INTEGER", "description": "Maximum current-chat lines to inspect. Default: 30."}
-            },
-            "required": []
-        }
-    },
-    {
-        "name": "prepare_message_reply",
-        "description": (
-            "Creates an approval-gated message draft, approves the current pending draft, or cancels it. "
-            "Never approve unless the user explicitly confirms the exact pending draft."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "action": {"type": "STRING", "enum": ["prepare", "approve", "cancel"], "description": "Draft lifecycle action."},
-                "platform": {"type": "STRING", "description": "Instagram, iMessage, WhatsApp, Telegram, or another supported platform."},
-                "receiver": {"type": "STRING", "description": "Recipient name. Optional for the currently open chat."},
-                "message_text": {"type": "STRING", "description": "Exact draft text, required for prepare."}
-            },
-            "required": ["action"]
-        }
-    },
-    {
-        "name": "send_message",
-        "description": (
-            "Sends a user-authored message through iMessage, WhatsApp, Telegram, Instagram, Discord, or the current chat. "
-            "For Instagram, the first call prepares a visible draft; use action=approve only after explicit user confirmation."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "action":       {"type": "STRING", "enum": ["send", "approve", "cancel"], "description": "Default: send. Approve/cancel operates on the pending draft."},
-                "receiver":     {"type": "STRING", "description": "Recipient contact name. Optional for current/focused chats and approval actions."},
-                "message_text": {"type": "STRING", "description": "Exact message content. Required for send."},
-                "platform":     {"type": "STRING", "description": "iMessage, WhatsApp, Telegram, Instagram, Discord, or current/focused."}
-            },
-            "required": ["platform"]
         }
     },
     {
@@ -1301,6 +1247,25 @@ def bloqueio_do_modo_privado(nome: str, args: dict | None = None) -> str | None:
     if automacao is not None and getattr(automacao, "usa_ia_nuvem", False):
         return AVISO_MODO_PRIVADO
     return None
+
+
+# Jarvis Ultron: ferramentas herdadas DESLIGADAS de propósito (Etapa 3 do docs/PLANO-REORGANIZACAO.md,
+# decisão do Erton): agiam sem o "ok" dele conferido no código, ou ele não usa. Saíram da lista que o
+# Gemini vê, da reserva e do prompt; os arquivos ficam no lugar até a Etapa 18. Se alguém chamar mesmo
+# assim (um nome antigo, o modelo inventando), o _execute_tool responde isto e não chama nada.
+# Nome -> o que ela fazia (vai na resposta ao modelo, em inglês como as outras).
+FERRAMENTAS_DESLIGADAS = {
+    "send_message": "sending messages on WhatsApp, Telegram, Discord, Instagram or iMessage",
+    "prepare_message_reply": "drafting and sending message replies",
+    "check_messages": "reading messages and contacts",
+}
+
+
+def resposta_de_desligada(nome: str) -> str:
+    """O que volta para o modelo quando ele chama uma ferramenta desligada (nada é chamado)."""
+    return (f"Tool '{nome}' ({FERRAMENTAS_DESLIGADAS[nome]}) is turned off in Jarvis Ultron. "
+            "Do not try to do this with another tool. Tell the user, in one short sentence in Portuguese, "
+            "that you do not do this.")
 
 
 _AUTOMACOES = None
@@ -2402,7 +2367,7 @@ class JarvisLive:
     # só as mais usadas por voz vão para a reserva (as automações da pasta entram sempre).
     RESERVA_FERRAMENTAS_ESSENCIAIS = {
         "open_app", "browser_control", "weather_report", "reminder", "media_control", "youtube_video",
-        "web_search", "email_control", "check_messages", "hermes_agent", "agent_task", "school_tasks",
+        "web_search", "email_control", "hermes_agent", "agent_task", "school_tasks",
         "self_diagnosis", "save_memory", "generate_image", "listening_mode",
     }
 
@@ -2702,21 +2667,10 @@ class JarvisLive:
                 r = await asyncio.to_thread(lambda: file_controller(parameters=args, player=self.ui))
                 result = r or "Done."
 
-            elif name == "check_messages":
-                r = await asyncio.to_thread(
-                    lambda: check_messages(parameters=args, response=None, player=self.ui, session_memory=None),
-                )
-                result = r or "No readable messages were found."
-
-            elif name == "prepare_message_reply":
-                r = await asyncio.to_thread(
-                    lambda: prepare_message_reply(parameters=args, response=None, player=self.ui, session_memory=None),
-                )
-                result = r or "The message draft could not be prepared."
-
-            elif name == "send_message":
-                r = await asyncio.to_thread(lambda: send_message(parameters=args, response=None, player=self.ui, session_memory=None))
-                result = r or f"Message sent to {args.get('receiver')}."
+            elif name in FERRAMENTAS_DESLIGADAS:
+                # desligada de propósito (Etapa 3): responde e não chama nada
+                self.ui.write_log(f"SYS: ⛔ {name} está desligada no Jarvis.")
+                result = resposta_de_desligada(name)
 
             elif name == "email_control":
                 if args.get("action", "").lower() == "connect" and not args.get("credentials_path"):

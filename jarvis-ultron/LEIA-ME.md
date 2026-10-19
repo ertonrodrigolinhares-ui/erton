@@ -392,10 +392,22 @@ Abra com o Bloco de Notas para mudar:
 
 Deixe essas linhas de fora para o Jarvis escolher sozinho. Esse é o recomendado.
 
+## O que o Jarvis não faz mais (nada age sem o seu "ok")
+
+Algumas ferramentas antigas, que vieram do projeto original, agiam sozinhas, sem o seu "ok" conferido
+no código. Elas foram **desligadas**: se você pedir, o Jarvis diz que não faz isso, e nada acontece.
+
+- **Mensagens** (WhatsApp, Telegram, Discord, Instagram, iMessage): o Jarvis não envia, não responde e
+  não lê mais mensagens. Antes ele podia digitar e apertar Enter sozinho. Você disse que não usa.
+  O Hermes pelo Telegram continua: ali é você que manda mensagem para o robô.
+
+Os arquivos dessas ferramentas continuam na pasta por enquanto. Se alguma fizer falta, avise; para
+voltar na hora, abra o "Iniciar Jarvis Ultron" da pasta da versão anterior.
+
 ## Observações
 
 - A interface original é em **inglês**. O Jarvis fala e entende português.
-- Algumas funções exigem configuração extra (Gmail, Instagram, Spotify). Veja `docs/USAGE.md`.
+- Algumas funções exigem configuração extra (Gmail, Spotify). Veja `docs/USAGE.md`.
 - Os testes herdados do projeto original que cobravam telas do JARVIS-OS que não existem mais saíram
   (ficam guardados na etiqueta git `antes-da-reorganizacao`). Os defeitos que já se sabe que existem
   (hoje, só visuais) ficam anotados, com o motivo, em `tests/dados/falhas_conhecidas.txt`. O

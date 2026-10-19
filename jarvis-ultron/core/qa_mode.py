@@ -70,6 +70,8 @@ def guard_tool_call(name: str, args: dict[str, Any] | None = None) -> QAGuardDec
     action = _action(payload)
     workspace = qa_workspace()
 
+    # send_message e prepare_message_reply estão desligadas no Jarvis Ultron (Etapa 3 da reorganização):
+    # as duas regras abaixo ficam como trava a mais até os arquivos delas saírem (Etapa 18).
     if tool == "send_message":
         return QAGuardDecision(False, "QA mode never sends real messages.")
 

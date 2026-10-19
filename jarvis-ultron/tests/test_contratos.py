@@ -7,7 +7,9 @@ Uma foto guarda o que nenhuma mudança pode alterar sem querer:
     "mutating" do _execute_tool_batch (o que roda em fila num lote). Foto em tests/dados/politicas_antes.json;
   - os métodos da JarvisLive, os nomes que outros arquivos usam e os nomes da ponte entre a tela e o
     cérebro (core/ponte.py);
-  - a resposta padrão de cada ferramenta nativa quando a ação não devolve nada ("Done."...).
+  - a resposta padrão de cada ferramenta nativa quando a ação não devolve nada ("Done."...);
+  - as ferramentas herdadas desligadas de propósito na Etapa 3 (DESLIGADAS): não são oferecidas, o
+    prompt não as cita e, chamadas mesmo assim, respondem "desligada" sem tocar na ação.
 
 Mudou de propósito numa etapa do plano? Atualize a foto no MESMO commit e só no que mudou:
     python tests/test_contratos.py --gravar-fotos
@@ -21,8 +23,10 @@ travas está no core/SEGURANCA.md."""
 import asyncio
 import json
 import os
+import re
 import sys
 import time
+import types
 import unittest
 from contextlib import ExitStack
 from pathlib import Path
@@ -183,6 +187,7 @@ CHAMADAS_DO_CEREBRO = ("on_text_command", "on_voice_change", "on_name_change",
 # Resposta de cada ferramenta nativa quando a ação (falsa) não devolve nada: (ferramenta, argumentos,
 # resposta). Quem não tem texto padrão devolve o que a ação devolveu (aqui, None). Estes textos voltam
 # para o Gemini e ficam em inglês. Toda ferramenta declarada tem de estar aqui (o save_memory tem teste próprio).
+# As desligadas na Etapa 3 (DESLIGADAS, mais abaixo) saíram daqui de propósito: respondem "desligada".
 RESPOSTAS_PADRAO = (
     ("open_app", {"app_name": "Spotify"}, "Opened Spotify."),
     ("web_search", {"query": "x"}, "Done."),
@@ -194,9 +199,6 @@ RESPOSTAS_PADRAO = (
     ("suspend_listening", {"minutes": 5}, None),
     ("generate_image", {"prompt": "x"}, None),
     ("weather_report", {"city": "João Pessoa"}, "Weather delivered."),
-    ("check_messages", {}, "No readable messages were found."),
-    ("prepare_message_reply", {}, "The message draft could not be prepared."),
-    ("send_message", {"receiver": "Ana"}, "Message sent to Ana."),
     ("email_control", {"action": "inbox"}, "Email action completed."),
     ("reminder", {}, "Reminder set."),
     ("youtube_video", {"action": "play"}, "Done."),
@@ -230,8 +232,7 @@ RESPOSTAS_PADRAO = (
 # ("modulo", "módulo.função"). O teste confere que ela foi mesmo chamada (nenhum passa por engano).
 ACAO = {
     "open_app": ("main", "open_app"), "web_search": ("main", "web_search_action"),
-    "weather_report": ("main", "weather_action"), "check_messages": ("main", "check_messages"),
-    "prepare_message_reply": ("main", "prepare_message_reply"), "send_message": ("main", "send_message"),
+    "weather_report": ("main", "weather_action"),
     "email_control": ("main", "email_control"), "reminder": ("main", "reminder"),
     "youtube_video": ("main", "youtube_video"), "media_control": ("main", "media_control"),
     "screen_process": ("main", "screen_process"), "computer_settings": ("main", "computer_settings"),
@@ -250,6 +251,16 @@ ACAO = {
     "graphics_quality": ("tela", "set_graphics_quality"), "jarvis_ui_control": ("tela", None),
 }
 ASSINCRONAS = {"_geekie_pendencias", "_hermes_sem_travar"}
+
+# Ferramentas herdadas DESLIGADAS de propósito na Etapa 3 (decisão do Erton: agiam sem o "ok" dele
+# conferido no código, ou ele não usa), com os módulos das ações delas, que nem podem ser usados quando
+# alguém chama a ferramenta. Escrita à mão, e não lida do main.FERRAMENTAS_DESLIGADAS: tirar um nome
+# daqui é religar a ferramenta, e isso só acontece de propósito.
+DESLIGADAS = {
+    "send_message": ("actions.send_message",),
+    "prepare_message_reply": ("actions.send_message",),
+    "check_messages": ("actions.message_monitor", "actions.send_message"),
+}
 
 
 class UIFalsa:
@@ -323,6 +334,29 @@ def rodar_ferramenta(nome: str, args: dict, *, privado: bool = False):
         falsas["update_memory"] = pilha.enter_context(patch.object(main, "update_memory"))
         resposta = asyncio.run(jarvis._execute_tool(NS(id="1", name=nome, args=dict(args))))
     return resposta, falsas, ui
+
+
+class ModuloProibido(types.ModuleType):
+    """Fica no lugar do módulo da ação de uma ferramenta desligada: anota e falha se alguém o usar."""
+
+    def __init__(self, nome: str, usados: list):
+        super().__init__(nome)
+        self._usados = usados
+
+    def __getattr__(self, nome):
+        if nome.startswith("__"):
+            raise AttributeError(nome)
+        self._usados.append(f"{self.__name__}.{nome}")
+        raise AssertionError(f"{self.__name__}.{nome} foi usado por uma ferramenta desligada")
+
+
+def _chamadas(falsas: dict) -> list[str]:
+    """As ações falsas (de rodar_ferramenta) que foram chamadas."""
+    chamadas = [nome for nome, falsa in falsas.items() if nome != "fila" and falsa.called]
+    fila = falsas["fila"]
+    chamadas += [f"fila.{nome}" for nome in ("submit", "get_all_statuses", "cancel", "get_status")
+                 if getattr(fila, nome).called]
+    return chamadas
 
 
 def _esperar_chamada(falsa, segundos: float = 3.0) -> None:
@@ -439,6 +473,51 @@ class RespostasPadraoTests(unittest.TestCase):
             resposta = asyncio.run(jarvis._execute_tool(NS(id="1", name="web_search", args={"query": "x"})))
         self.assertEqual(resposta.response, {"result": "Tool 'web_search' failed: caiu a rede"})
         jarvis.speak_error.assert_called_once()
+
+
+class DesligadasTests(unittest.TestCase):
+    """Etapa 3: as ferramentas herdadas que agiam sem o "ok" do Erton saíram da lista do Gemini. Chamadas
+    mesmo assim (um nome antigo, o modelo inventando), respondem "desligada" e não chamam nada."""
+
+    def test_nenhuma_desligada_e_oferecida_ao_gemini_nem_a_reserva(self):
+        import main
+
+        oferecidas = main.get_tool_declarations()
+        self.assertEqual({d["name"] for d in oferecidas} & set(DESLIGADAS), set())
+        self.assertEqual(set(main.JarvisLive.RESERVA_FERRAMENTAS_ESSENCIAIS) & set(DESLIGADAS), set())
+        # nem o texto de outra ferramenta manda o Gemini para uma delas
+        texto = json.dumps(oferecidas, ensure_ascii=False)
+        self.assertEqual({nome for nome in DESLIGADAS if re.search(rf"\b{nome}\b", texto)}, set())
+        self.assertLessEqual(set(DESLIGADAS), set(main.FERRAMENTAS_DESLIGADAS))
+
+    def test_prompt_nao_cita_ferramenta_que_nao_existe(self):
+        import main
+
+        prompt = (RAIZ / "core" / "prompt.txt").read_text(encoding="utf-8")
+        existem = {d["name"] for d in main.get_tool_declarations()}
+        # o que já foi ferramenta: as desligadas e os nomes das listas de política (que as guardam)
+        ja_foram = set(DESLIGADAS) | set(main.FERRAMENTAS_NUVEM_IA) | set(main.CLOUD_SAFE_ACTIONS) | _nomes_da_foto()
+        citadas = set(re.findall(r"\b[a-z]+(?:_[a-z]+)+\b", prompt))
+        self.assertEqual((citadas & ja_foram) - existem, set())
+        # cada linha "ferramenta: quando usar" fala de uma ferramenta que existe
+        self.assertEqual(set(re.findall(r"^([a-z]+(?:_[a-z]+)+):", prompt, re.M)) - existem, set())
+
+    def test_chamar_uma_desligada_responde_e_nao_chama_nada(self):
+        import main
+
+        usados = []
+        proibidos = {modulo: ModuloProibido(modulo, usados) for modulos in DESLIGADAS.values() for modulo in modulos}
+        args = {"receiver": "Ana", "message_text": "oi", "platform": "WhatsApp", "action": "send"}
+        for nome in sorted(DESLIGADAS):
+            with self.subTest(ferramenta=nome):
+                with patch.dict(sys.modules, proibidos):
+                    resposta, falsas, ui = rodar_ferramenta(nome, args)
+                self.assertEqual(resposta.response, {"result": main.resposta_de_desligada(nome)})
+                self.assertIn(f"Tool '{nome}'", resposta.response["result"])
+                self.assertIn("is turned off", resposta.response["result"])
+                self.assertEqual(usados, [])
+                self.assertEqual(_chamadas(falsas), [])
+                self.assertIn(("log", f"SYS: ⛔ {nome} está desligada no Jarvis."), ui.eventos)
 
 
 if __name__ == "__main__":

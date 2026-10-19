@@ -1,6 +1,10 @@
 Jarvis Ultron - versão 2026-10-17
 
 Novidades desta versão:
+- Ferramentas antigas que agiam sem o seu "ok" foram desligadas. Se você pedir, o Jarvis diz que não
+  faz isso, e nada acontece (veja "O que o Jarvis não faz mais" no LEIA-ME):
+  - mensagens: o Jarvis não envia, não responde e não lê mais mensagens (WhatsApp, Telegram,
+    Discord, Instagram), porque você não usa.
 - Reserva com outra empresa (Cerebras, OpenRouter, Mistral, DeepSeek, OpenAI...) quando o limite do
   Groq acaba: JARVIS_RESERVA e JARVIS_RESERVA_CHAVE no .env; ficam em fila com o Groq.
 - "Instalar voz local": transcrição da voz no PC para o modo privado (o Iniciar também instala sozinho).

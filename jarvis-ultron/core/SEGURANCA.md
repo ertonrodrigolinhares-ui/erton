@@ -33,12 +33,20 @@ Testes: `test_invariantes.py` (`OkAntigoTests`), `test_videos.py` (`OkAntesDoVid
 `PonteHermesTests`), `test_claude_chefe.py` (`FerramentaClaudeTests`, `MudarCodigoTests`,
 `DesfazerSoOQueEDoClaudeTests`, `MudancaInterrompidaTests`).
 
-**Portas ainda abertas (fechadas na Etapa 3, decisão do Erton: desligar todas):** `send_message` e
-`prepare_message_reply` (digitam e podem enviar no WhatsApp, Telegram e Discord sem o "ok" conferido no
-código), `check_messages` (lê as mensagens; sai junto porque o Erton não usa mensagens), `agent_task`
-(escreve e roda código gerado pela IA), `code_helper` e `dev_agent` (rodam código e `pip install`),
-`computer_control` (clica e digita em qualquer lugar) e `game_updater` (pode desligar o PC). Nenhuma delas
-passa pelo `core/aprovacao.py`.
+**Portas que agiam sem o "ok" (Etapa 3, decisão do Erton: desligar todas).** Nenhuma delas passava pelo
+`core/aprovacao.py`. Desligadas, saem da lista do Gemini (`TOOL_DECLARATIONS`), da reserva
+(`RESERVA_FERRAMENTAS_ESSENCIAIS`) e do `core/prompt.txt`; chamadas mesmo assim (um nome antigo, o modelo
+inventando), o `_execute_tool` responde que estão desligadas (`main.FERRAMENTAS_DESLIGADAS`,
+`resposta_de_desligada`) e não chama nada. Os arquivos ficam no lugar até a Etapa 18, e as regras delas no
+`core/qa_mode.py` ficam como trava a mais até lá. Teste: `test_contratos.py` (`DesligadasTests`, com a
+lista escrita à mão).
+
+- `send_message` e `prepare_message_reply` (digitavam e podiam enviar no WhatsApp, Telegram e Discord) e
+  `check_messages` (lia as mensagens; sai junto porque o Erton não usa mensagens): **desligadas**.
+- `agent_task` (escreve e roda código gerado pela IA): ainda aberta.
+- `code_helper` e `dev_agent` (rodam código e `pip install`): ainda abertas.
+- `computer_control` (clica e digita em qualquer lugar): ainda aberta.
+- `game_updater` (pode desligar o PC): ainda aberta.
 
 ## 2. Modo privado (nada vai para IA na nuvem)
 
@@ -105,7 +113,7 @@ Toda chamada de ferramenta (Gemini, reserva, painel Ultron) passa por elas, **ne
 4. modo QA (`core/qa_mode.guard_tool_call`);
 5. desligar o Jarvis (`_intercept_ui_tool_call`);
 6. `save_memory` (não grava no modo privado);
-7. só então a ferramenta.
+7. só então a ferramenta (uma ferramenta desligada na Etapa 3 responde que está desligada e não chama nada).
 
 A ordem pode mudar de arquivo, nunca de ordem. Teste: `test_invariantes.py` (`OrdemDasTravasTests`).
 

@@ -8716,7 +8716,6 @@ class MainWindow(QMainWindow):
             "weather_report": "Weather Report",
             "browser_control": "Browser Control",
             "file_controller": "File Controller",
-            "send_message": "Send Message",
             "reminder": "Set Reminder",
             "youtube_video": "YouTube",
             "screen_process": "Vision Analysis",

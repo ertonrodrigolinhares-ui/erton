@@ -44,6 +44,19 @@ class LeiaMeBateComOCodigoTests(unittest.TestCase):
         self.assertIn("executa as tarefas principais", texto)
         self.assertIn("JARVIS_RESERVA_FERRAMENTAS=0", texto)
 
+    def test_ferramentas_desligadas_estao_no_leia_me(self):
+        # main.FERRAMENTAS_DESLIGADAS (Etapa 3): o que o Jarvis não faz mais tem de estar contado ao Erton
+        import main
+
+        secao = _secao("## O que o Jarvis não faz mais")
+        contadas = {"send_message": "**Mensagens**", "prepare_message_reply": "**Mensagens**",
+                    "check_messages": "**Mensagens**"}
+        for nome in main.FERRAMENTAS_DESLIGADAS:
+            self.assertIn(nome, contadas, f"{nome} foi desligada e o LEIA-ME não conta")
+            self.assertIn(contadas[nome], secao, nome)
+        self.assertIn("pasta da versão anterior", secao)
+        self.assertNotIn("Gmail, Instagram, Spotify", LEIA_ME)  # o Instagram era das mensagens
+
     def test_o_x_da_janela_so_esconde_o_jarvis(self):
         secao = _secao("## Tela e cérebro separados")
         self.assertNotIn("Fechando a janela, o cérebro fecha junto", secao)

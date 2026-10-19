@@ -29,7 +29,6 @@
   "RESERVA_FERRAMENTAS_ESSENCIAIS": [
     "agent_task",
     "browser_control",
-    "check_messages",
     "email_control",
     "generate_image",
     "hermes_agent",
