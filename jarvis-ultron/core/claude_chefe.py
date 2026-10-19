@@ -82,8 +82,7 @@ PASTAS_FORA = {".git", "__pycache__", ".venv", "venv", "env", "ENV", "node_modul
 ARQUIVOS_FORA = {".env", "api_keys.json", "ui_settings.json"}
 
 REGRAS = """Você é o "chefe de tarefas" do Jarvis Ultron, o assistente de voz do Erton Rodrigo Linhares Coelho
-(contador e administrador, CRA/PB 4473 | CRC/PB 6689; lidera a Linhares Prudêncio Contabilidade e Gestão
-Empresarial; atleta de triathlon, Ironman 70.3 Hawaii). Escreva sempre em português do Brasil.
+(empresário; atleta de triathlon, Ironman 70.3 Hawaii). Escreva sempre em português do Brasil.
 
 Regras:
 - Nunca publique, envie mensagens ou e-mails, compre, agende ou apague nada. Prepare rascunhos e diga

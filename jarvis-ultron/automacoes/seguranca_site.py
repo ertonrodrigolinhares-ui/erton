@@ -1,7 +1,7 @@
 """Análise de segurança de sites (automação: salve na pasta 'automacoes' e reabra o Jarvis).
 
 Diga, por exemplo:
-  - "Jarvis, verifique a segurança do site linharesprudencio.com.br"
+  - "Jarvis, verifique a segurança do site minhaempresa.com.br"
   - "Jarvis, esse site é seguro? www.exemplo.com"
 
 O que ele faz (SEMPRE de forma passiva, como um visitante normal):

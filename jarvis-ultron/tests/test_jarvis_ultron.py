@@ -2427,7 +2427,7 @@ class ReputacaoSiteTests(unittest.TestCase):
         criado = datetime(2015, 1, 1, tzinfo=timezone.utc)
         with patch.object(self.m, "_rdap_criacao", return_value=criado), \
                 patch.object(self.m, "_cadeado_ok", return_value=True):
-            r = self.m.reputacao("linharesprudencio.com.br", agora)
+            r = self.m.reputacao("minhaempresa.com.br", agora)
         self.assertEqual(r["confianca"], "boa")
         self.assertIn("passiva", self.m._frase(r)) if False else None
         self.assertIn("não é invasão", self.m._frase(r))

@@ -5,12 +5,8 @@ Esta pasta é onde o Claude Code trabalha quando o Jarvis Ultron entrega uma tar
 (`.claude/skills`) para cá; pode editar à vontade, ele não sobrescreve este arquivo.
 
 ## Quem é o Erton
-Erton Rodrigo Linhares Coelho (CRA/PB 4473 | CRC/PB 6689), de Campina Grande. Lidera a Linhares
-Prudêncio Contabilidade e Gestão Empresarial (mais de 40 especialistas, 23 estados), focada em
-Grupos Empresariais Familiares: governança corporativa familiar, compliance, planejamento
-sucessório e holdings. Especialista em M&A e reorganização societária. Atleta de endurance
-(Ironman 70.3 Hawaii, faixa marrom de jiu-jitsu). Casado com Emanuele Mabrinni; pai de Yvnna e
-Luiz Enrique.
+Erton Rodrigo Linhares Coelho, de Campina Grande. Empresário e atleta de endurance (Ironman 70.3
+Hawaii, faixa marrom de jiu-jitsu). Casado com Emanuele Mabrinni; pai de Yvnna e Luiz Enrique.
 
 ## Regras
 - Escreva sempre em português do Brasil, de forma clara e direta.
@@ -25,4 +21,5 @@ Luiz Enrique.
 - `Entrada`: arquivos que o Erton deixa para você analisar.
 - `Relatorios`: relatórios e rascunhos prontos.
 - `Mudancas`: registro das mudanças feitas no código do Jarvis (com o plano aprovado e o backup).
+- `Agency`: os especialistas extras (comece pelo `Agency/INDICE.md`) — só leitura.
 - `..\` (Documentos\Jarvis Ultron): clientes.txt, carteira.txt, Faturas, Vídeos — só leitura.
