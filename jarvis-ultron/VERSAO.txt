@@ -1,4 +1,20 @@
-Jarvis Ultron - versão 2026-10-19
+Jarvis Ultron - versão 2026-10-19.2
+
+Novidades desta versão:
+- 282 especialistas extras para o Claude (coleção agency-agents, licença MIT): finanças, vendas,
+  marketing, gestão, jurídico, pesquisa e muito mais. O Claude consulta os índices e escolhe o
+  especialista quando o pedido precisa, ou você pede pelo nome em inglês ("Jarvis, usa o agente Tax
+  Strategist para ..."). Eles ficam em Documentos\Jarvis Ultron\Claude\Agency, só para leitura (veja
+  "Especialistas extras" no LEIA-ME).
+- As instruções do Claude e do Hermes não citam mais nenhuma empresa, e o agente de proposta comercial
+  agora serve para qualquer produto ou serviço. Se você já usava o Claude, o Jarvis troca sozinho o
+  CLAUDE.md antigo da pasta do Claude pelo novo (se você tinha mudado esse arquivo à mão, ele troca só
+  o parágrafo "Quem é o Erton" e deixa o resto). Se você usa o Hermes, rode o "Instalar Hermes" de novo
+  para atualizar o perfil dele.
+- Nas tarefas e nas mudanças de código, a "memória" do Claude Code fica desligada e o Claude não
+  consegue escrever nela: uma página da internet com instruções escondidas não vira regra permanente.
+
+Versão anterior (2026-10-19):
 
 Novidades desta versão:
 - Desligar, reiniciar, digitar e apertar teclas só com o seu "ok": o Jarvis pergunta antes e diz
@@ -26,13 +42,6 @@ Novidades desta versão:
   janela, o Claude Code de terminal), e "abre o Painel de Controle" abre o Painel de Controle. Se o Windows
   recusar desligar ou reiniciar (por exemplo, porque já há um desligamento marcado), o Jarvis avisa que não
   conseguiu, em vez de dizer que fez.
-- 282 especialistas extras para o Claude (coleção agency-agents, licença MIT): finanças, vendas,
-  marketing, gestão, jurídico, pesquisa e muito mais. O Claude consulta os índices e escolhe o
-  especialista quando o pedido precisa, ou você pede pelo nome em inglês ("Jarvis, usa o agente Tax
-  Strategist para ..."). Eles ficam em Documentos\Jarvis Ultron\Claude\Agency, só para leitura (veja
-  "Especialistas extras" no LEIA-ME).
-- A empresa Linhares Prudêncio saiu das instruções do Jarvis (Claude, Hermes e o agente de proposta
-  comercial, que agora serve para qualquer produto ou serviço).
 
 Versão anterior (2026-10-17):
 

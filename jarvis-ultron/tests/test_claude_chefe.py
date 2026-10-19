@@ -1152,6 +1152,45 @@ class EspecialistasAgencyTests(Base):
         self.escrever("marketing/marketing-coach.md", "Marketing Coach")
         self.assertIsNone(chefe.agente_agency("coach"))
 
+    def test_nome_generico_nao_cai_num_agente_de_nicho(self):
+        self.escrever("marketing/marketing-bilibili-content-strategist.md", "Bilibili Content Strategist")
+        self.escrever("gis/gis-spatial-data-scientist.md", "Spatial Data Scientist")
+        for nome in ("Content Strategist", "Data Scientist", "Strategist"):
+            self.assertIsNone(chefe.agente_agency(nome), nome)
+        chefe.fazer_tarefa("plano de conteúdo", agente="Content Strategist")
+        pedido = self.chamadas()[0]["pedido"]
+        self.assertIn('especialista "Content Strategist"', pedido)  # o Claude escolhe pelos índices
+        self.assertNotIn("bilibili", pedido)
+
+    def test_atalho_de_pasta_em_agency_nao_leva_a_apagar_nem_copiar_fora(self):
+        fora = self.tmp / "fora"
+        fora.mkdir()
+        (fora / "meu.txt").write_text("do Erton", encoding="utf-8")
+        agency = chefe.pasta_trabalho() / "Agency"
+        agency.mkdir(parents=True)
+        os.symlink(fora, agency / "finance", target_is_directory=True)
+        os.symlink(fora, agency / "velha", target_is_directory=True)
+        andar = os.walk  # no Windows o os.walk entra nas junções mesmo com followlinks=False
+
+        def walk_que_entra(topo, topdown=True, followlinks=False):
+            return andar(topo, topdown=topdown, followlinks=True)
+
+        with patch.object(chefe.os, "walk", walk_que_entra):
+            chefe.preparar_pasta()
+            chefe.preparar_pasta()
+        self.assertEqual((fora / "meu.txt").read_text(encoding="utf-8"), "do Erton")
+        self.assertFalse((fora / "finance-tax-strategist.md").exists())  # não copiou pelo atalho
+        self.assertTrue((agency / "sales" / "sales-coach.md").is_file())  # o resto continua vindo
+
+    def test_memoria_do_claude_code_desligada_e_sem_escrita(self):
+        chefe.fazer_tarefa("oi")
+        chefe.planejar("mude a cor")
+        for chamada in self.chamadas():
+            self.assertIn("CLAUDE_CODE_DISABLE_AUTO_MEMORY", chamada["env"])
+            _, proibidas = _permitidas_e_proibidas(chamada["argv"])
+            self.assertIn("Edit(~/.claude/**)", proibidas)
+        self.assertEqual(chefe.ambiente()["CLAUDE_CODE_DISABLE_AUTO_MEMORY"], "1")
+
     def test_le_o_nome_so_do_cabecalho_e_aceita_bom(self):
         self.assertEqual(chefe.campo_no_cabecalho("\ufeff---\nname: Com BOM\n---\n"), "Com BOM")
         self.assertIsNone(chefe.campo_no_cabecalho("---\ndescription: x\n---\nname: Do corpo\n"))
@@ -1196,6 +1235,80 @@ class EspecialistasAgencyTests(Base):
                 _esperar()
                 self.assertIn(esperado, self.chamadas()[i]["pedido"], nome)
                 self.assertEqual(any("(agente " in l for l in jarvis.logs), conhecido, nome)
+
+
+class ClaudeMdInstaladoTests(Base):
+    """O CLAUDE.md da pasta do Claude é copiado uma vez e depois é do Erton; só o modelo antigo que o
+    Jarvis instalava (reconhecido pela impressão) é atualizado."""
+
+    ANTIGO = "# Pasta\n\n## Quem é o Erton\nTexto antigo\nem duas linhas.\n\n## Regras\n- Regra.\n"
+    NOVO = "# Pasta\n\n## Quem é o Erton\nTexto novo.\n\n## Regras\n- Regra.\n- `Agency`: só leitura.\n"
+
+    def setUp(self):
+        super().setUp()
+        modelo = self.jarvis_dir / "claude" / "CLAUDE.md"
+        modelo.parent.mkdir(parents=True)
+        modelo.write_text(self.NOVO, encoding="utf-8")
+        self.instalado = chefe.pasta_trabalho() / "CLAUDE.md"
+        self.instalado.parent.mkdir(parents=True)
+        quem_e = "Texto antigo\nem duas linhas."
+        self.patches += [patch.object(chefe, "CLAUDE_MD_ANTIGO", chefe._impressao(self.ANTIGO)),
+                         patch.object(chefe, "QUEM_E_ANTIGO", chefe._impressao(quem_e))]
+        for p in self.patches[-2:]:
+            p.start()
+
+    def test_sem_arquivo_copia_o_modelo(self):
+        chefe.preparar_pasta()
+        self.assertEqual(self.instalado.read_text(encoding="utf-8"), self.NOVO)
+
+    def test_modelo_antigo_intacto_vira_o_novo_mesmo_com_crlf_e_bom(self):
+        self.instalado.write_bytes(("\ufeff" + self.ANTIGO.replace("\n", "\r\n")).encode("utf-8"))
+        chefe.preparar_pasta()
+        self.assertEqual(self.instalado.read_text(encoding="utf-8"), self.NOVO)
+
+    def test_arquivo_mexido_troca_so_o_paragrafo_antigo(self):
+        self.instalado.write_text(self.ANTIGO + "\n## Minhas notas\n- Prefiro tabelas.\n", encoding="utf-8")
+        chefe.preparar_pasta()
+        texto = self.instalado.read_text(encoding="utf-8")
+        self.assertIn("## Quem é o Erton\nTexto novo.\n", texto)
+        self.assertNotIn("Texto antigo", texto)
+        self.assertIn("- Prefiro tabelas.", texto)  # o que o Erton escreveu fica
+
+    def test_claude_md_preso_nao_impede_os_agentes(self):
+        skill = self.jarvis_dir / "claude" / "skills" / "briefing-diario"
+        skill.mkdir(parents=True)
+        (skill / "SKILL.md").write_text("---\nname: briefing-diario\n---\n", encoding="utf-8")
+        with patch.object(chefe, "_atualizar_claude_md", side_effect=PermissionError("preso")):
+            pasta = chefe.preparar_pasta()
+        self.assertTrue((pasta / ".claude" / "skills" / "briefing-diario" / "SKILL.md").is_file())
+
+    def test_arquivo_do_erton_fica_como_esta(self):
+        meu = "## Quem é o Erton\nEscrevi do meu jeito.\n"
+        self.instalado.write_text(meu, encoding="utf-8")
+        chefe.preparar_pasta()
+        self.assertEqual(self.instalado.read_text(encoding="utf-8"), meu)
+
+
+class ClaudeMdDeVerdadeTests(unittest.TestCase):
+    def test_modelo_novo_nao_e_o_antigo_e_tem_o_paragrafo(self):
+        texto = (RAIZ / "claude" / "CLAUDE.md").read_text(encoding="utf-8")
+        achado = chefe._QUEM_E.search(texto)
+        self.assertIsNotNone(achado)
+        self.assertNotEqual(chefe._impressao(texto), chefe.CLAUDE_MD_ANTIGO)
+        self.assertNotEqual(chefe._impressao(achado.group(1)), chefe.QUEM_E_ANTIGO)
+
+    def test_impressoes_sao_as_do_claude_md_que_o_jarvis_instalava(self):
+        import subprocess
+        try:
+            saida = subprocess.run(["git", "show", "34b3986:jarvis-ultron/claude/CLAUDE.md"], cwd=RAIZ,
+                                   capture_output=True, timeout=30)
+        except (OSError, subprocess.TimeoutExpired):
+            self.skipTest("sem git")
+        if saida.returncode != 0:
+            self.skipTest("sem o histórico do git")
+        antigo = saida.stdout.decode("utf-8").replace("\r\n", "\n")
+        self.assertEqual(chefe._impressao(antigo), chefe.CLAUDE_MD_ANTIGO)
+        self.assertEqual(chefe._impressao(chefe._QUEM_E.search(antigo).group(1)), chefe.QUEM_E_ANTIGO)
 
 
 class ColecaoAgencyTests(unittest.TestCase):

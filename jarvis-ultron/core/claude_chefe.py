@@ -195,6 +195,9 @@ def ambiente() -> dict:
            if k.upper() not in SEGREDOS and not k.upper().startswith(SEGREDOS_PREFIXOS)}
     env["PYTHONIOENCODING"] = "utf-8"
     env["ENABLE_CLAUDEAI_MCP_SERVERS"] = "false"  # reforço do --strict-mcp-config: sem conectores
+    # Sem a "memória" do Claude Code (MEMORY.md em ~/.claude/projects): o que uma página da internet
+    # escondesse ali seria seguido em toda tarefa. A escrita também é proibida (_proibidas_na).
+    env["CLAUDE_CODE_DISABLE_AUTO_MEMORY"] = "1"
     return env
 
 
@@ -253,6 +256,7 @@ def _proibidas_na(pasta: Path) -> list[str]:
         regras += [f"Edit({pasta}/Agency/**)", f"Edit({pasta}/**/CLAUDE.md)", f"Edit({pasta}/**/CLAUDE.local.md)"]
     regras += [f"Read({regra_de_pasta(pasta_dados())}/{nome})" for nome in DADOS_PRIVADOS]
     regras += [f"Read(~/{item})" for item in CREDENCIAIS]
+    regras.append("Edit(~/.claude/**)")  # a memória e as configurações do Claude Code, em todo modo
     return list(dict.fromkeys(regras + _ler(*_pastas_do_hermes())))
 
 
@@ -263,9 +267,10 @@ def preparar_pasta() -> Path:
         (pasta / sub).mkdir(parents=True, exist_ok=True)
     origem = pasta_jarvis() / "claude"
     try:
-        modelo = origem / "CLAUDE.md"
-        if modelo.is_file() and not (pasta / "CLAUDE.md").exists():
-            shutil.copy2(modelo, pasta / "CLAUDE.md")
+        _atualizar_claude_md(origem / "CLAUDE.md", pasta / "CLAUDE.md")
+    except OSError as erro:  # um CLAUDE.md preso (OneDrive, antivírus) não impede os agentes
+        print(f"[Claude] Não consegui atualizar o CLAUDE.md: {erro}")
+    try:
         for skill in sorted((origem / "skills").glob("*/SKILL.md")):
             destino = pasta / ".claude" / "skills" / skill.parent.name / "SKILL.md"
             if not destino.exists() or destino.stat().st_mtime < skill.stat().st_mtime:
@@ -275,6 +280,35 @@ def preparar_pasta() -> Path:
         print(f"[Claude] Não consegui copiar os agentes: {erro}")
     _copiar_agency(origem / "agency", pasta / "Agency")
     return pasta
+
+
+# O CLAUDE.md que o Jarvis instalava até 19/10/2026 (é guardada só a impressão, não o texto). O
+# arquivo da pasta do Claude é copiado uma vez e depois é do Erton; mas, se ainda for aquele, ele
+# vira o novo, e se só o parágrafo "Quem é o Erton" ainda for aquele, só o parágrafo é trocado.
+CLAUDE_MD_ANTIGO = "82df4793001f34208cbd154ffd1051cfd2c91fde24b7c92e7b523557c68408d1"
+QUEM_E_ANTIGO = "989cf1fb8d1c1a723cfda9756a25ccac272c7c3ca3d98f031c534603898888df"
+_QUEM_E = re.compile(r"^## Quem é o Erton\n(.*?)(?=\n\n|\Z)", re.S | re.M)
+
+
+def _impressao(texto: str) -> str:
+    """sha256 do texto sem BOM e com os espaços e quebras de linha (\\r\\n ou \\n) iguais."""
+    return hashlib.sha256(" ".join(texto.lstrip("\ufeff").split()).encode("utf-8")).hexdigest()
+
+
+def _atualizar_claude_md(modelo: Path, instalado: Path) -> None:
+    if not modelo.is_file():
+        return
+    if not instalado.exists():
+        shutil.copy2(modelo, instalado)
+        return
+    texto = instalado.read_text(encoding="utf-8-sig", errors="replace").replace("\r\n", "\n")
+    if _impressao(texto) == CLAUDE_MD_ANTIGO:
+        shutil.copy2(modelo, instalado)
+        return
+    antigo = _QUEM_E.search(texto)
+    novo = _QUEM_E.search(modelo.read_text(encoding="utf-8-sig").replace("\r\n", "\n"))
+    if antigo and novo and _impressao(antigo.group(1)) == QUEM_E_ANTIGO:
+        instalado.write_text(texto[:antigo.start(1)] + novo.group(1) + texto[antigo.end(1):], encoding="utf-8")
 
 
 def _copiar_agency(origem: Path, destino: Path) -> None:
@@ -288,9 +322,14 @@ def _copiar_agency(origem: Path, destino: Path) -> None:
     arquivos = [a for a in origem.rglob("*") if a.is_file()]
     arquivos.sort(key=lambda a: (a.name != "INDICE.md", len(a.relative_to(origem).parts), a.as_posix()))
     falhas = 0
+    conferidas: dict[Path, bool] = {}
     for arquivo in arquivos:
         alvo = destino / arquivo.relative_to(origem)
         try:
+            if alvo.parent not in conferidas:
+                conferidas[alvo.parent] = _dentro(alvo.parent, destino)
+            if not conferidas[alvo.parent]:
+                raise OSError("atalho de pasta dentro de Agency")
             fonte = arquivo.stat()
             if alvo.exists():
                 atual = alvo.stat()
@@ -309,9 +348,15 @@ def _copiar_agency(origem: Path, destino: Path) -> None:
 def _limpar_sobras(destino: Path, esperados: set[str]) -> int:
     """Tira de Agency o que não está na coleção (agente que saiu numa atualização, arquivo que não
     devia estar lá). A pasta é toda do Jarvis. Compara sem maiúsculas, como o Windows, e não entra
-    em atalhos de pasta. Devolve quantos não deu para apagar."""
+    em atalhos de pasta: no Windows o os.walk entra nas "junções" (mklink /J) mesmo com
+    followlinks=False, por isso cada pasta é conferida pelo caminho de verdade. Devolve quantos não
+    deu para apagar."""
     falhas = 0
+    if not _dentro(destino, destino.parent):
+        return 0  # a própria Agency é um atalho: não apaga nada
     for raiz, pastas, arquivos in os.walk(destino, topdown=False, followlinks=False):
+        if not _dentro(raiz, destino):
+            continue  # entrou por um atalho: o que está lá não é do Jarvis
         for nome in arquivos:
             arquivo = Path(raiz) / nome
             if arquivo.relative_to(destino).as_posix().casefold() in esperados:
@@ -321,11 +366,19 @@ def _limpar_sobras(destino: Path, esperados: set[str]) -> int:
             except OSError:
                 falhas += 1
         for nome in pastas:
+            if not _dentro(Path(raiz) / nome, destino):
+                continue
             try:
                 (Path(raiz) / nome).rmdir()  # só some se ficou vazia
             except OSError:
                 pass
     return falhas
+
+
+def _dentro(caminho, pasta) -> bool:
+    """O caminho de verdade (sem atalhos, junções nem ..) fica dentro da pasta (ou é ela)?"""
+    real, base = Path(os.path.realpath(caminho)), Path(os.path.realpath(pasta))
+    return real == base or base in real.parents
 
 
 def agentes() -> list[str]:
@@ -390,17 +443,24 @@ def agente_agency(nome: str) -> str | None:
     """Caminho (a partir da pasta Agency) do especialista com esse nome, ou None.
 
     Procura em camadas e só aceita uma resposta única em cada uma: 1) o nome do arquivo
-    ("finance-tax-strategist"); 2) o nome de dentro do arquivo ("Tax Strategist"); 3) o fim do nome
-    do arquivo ("tax-strategist"). Assim "Data Engineer" acha o engineering-data-engineer mesmo
-    existindo também um gis-spatial-data-engineer."""
+    ("finance-tax-strategist"); 2) o nome de dentro do arquivo ("Tax Strategist"); 3) o nome do
+    arquivo sem a área na frente ("tax-strategist"). Assim "Data Engineer" acha o
+    engineering-data-engineer, e não o gis-spatial-data-engineer; e um nome genérico como "Content
+    Strategist" não cai num agente de nicho (marketing-bilibili-content-strategist): vira dica e o
+    Claude escolhe pelos índices."""
     procurado = _so_letras(nome or "")
     if not procurado:
         return None
     mapa = _mapa_agency(str(pasta_jarvis() / "claude" / "agency"))
-    for bate in (lambda stem, nome_: stem == procurado,
-                 lambda stem, nome_: nome_ == procurado,
-                 lambda stem, nome_: stem.endswith("-" + procurado)):
-        achados = [caminho for stem, nome_, caminho in mapa if bate(stem, nome_)]
+
+    def sem_area(stem: str, caminho: str) -> str:
+        area = caminho.split("/", 1)[0] + "-"
+        return stem[len(area):] if stem.startswith(area) else stem
+
+    for bate in (lambda stem, nome_, caminho: stem == procurado,
+                 lambda stem, nome_, caminho: nome_ == procurado,
+                 lambda stem, nome_, caminho: sem_area(stem, caminho) == procurado):
+        achados = [caminho for stem, nome_, caminho in mapa if bate(stem, nome_, caminho)]
         if len(achados) == 1:
             return achados[0]
         if achados:

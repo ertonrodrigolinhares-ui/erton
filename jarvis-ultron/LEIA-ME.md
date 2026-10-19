@@ -217,7 +217,8 @@ Travas (no código, conferidas com o Claude Code de verdade):
   carteira.txt, Faturas...), menos os arquivos de lembretes e rotinas. Dentro de `Claude`, ele não
   muda a pasta `Agency` nem os `CLAUDE.md` (as instruções que toda tarefa segue): assim uma página da
   internet com instruções escondidas não vira regra permanente. Você continua podendo editar o
-  `CLAUDE.md` à mão.
+  `CLAUDE.md` à mão. Pelo mesmo motivo, em todo pedido ao Claude (tarefas e mudanças de código) a
+  "memória" do Claude Code fica desligada e ele não escreve na pasta `.claude` do seu usuário.
 - Para **mudar o código**, ele **lê** a pasta do programa do Jarvis (no plano) e, só depois do seu
   "ok", **muda** essa pasta. Mesmo aí ele nunca lê o `.env`, as chaves (`config/api_keys.json`, as
   credenciais do Gmail), a memória do Jarvis nem a pasta `.git`, e nunca muda a `.venv`, `tmp`,

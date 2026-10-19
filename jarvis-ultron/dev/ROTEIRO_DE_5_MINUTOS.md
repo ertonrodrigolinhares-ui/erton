@@ -59,7 +59,12 @@ Para cada passo, o que fazer e o que tem de acontecer.
      e avise.
 10. **F2:** aperte **F2** (vai para a tela antiga) e **F2** de novo.
     - Volta para a tela azul com o anel, sem travar.
-11. **Fechar:** clique no **X** da janela.
+11. **Especialista do Claude** (só se o Claude estiver instalado pelo "Instalar Claude"; se não, pule):
+    diga **"Jarvis, usa o agente Tax Strategist para listar três cuidados ao abrir uma holding"**.
+    - Ele diz que o Claude está trabalhando. Quando termina, fala um resumo em português e abre o
+      relatório (em `Documentos\Jarvis Ultron\Claude\Relatorios`).
+    - A pasta `Documentos\Jarvis Ultron\Claude\Agency` existe, com o `INDICE.md` e uma pasta por área.
+12. **Fechar:** clique no **X** da janela.
     - A janela some, mas o ícone continua perto do relógio (o Jarvis continua ouvindo).
     - Botão direito no ícone → **Quit JARVIS** (ou **Sair do Jarvis**): o Jarvis fecha de verdade,
       e a janela preta fecha junto.

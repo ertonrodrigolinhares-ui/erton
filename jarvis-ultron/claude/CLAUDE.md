@@ -2,7 +2,8 @@
 
 Esta pasta é onde o Claude Code trabalha quando o Jarvis Ultron entrega uma tarefa para ele
 (pesquisas, análises, relatórios, agentes). O Jarvis copia este arquivo e os agentes
-(`.claude/skills`) para cá; pode editar à vontade, ele não sobrescreve este arquivo.
+(`.claude/skills`) para cá; pode editar à vontade: depois de copiado, ele não sobrescreve este
+arquivo (só troca o modelo antigo que ele instalava até 19/10/2026, se ainda estiver aqui).
 
 ## Quem é o Erton
 Erton Rodrigo Linhares Coelho, de Campina Grande. Empresário e atleta de endurance (Ironman 70.3

@@ -92,7 +92,7 @@ class LeiaMeBateComOCodigoTests(unittest.TestCase):
                        "Continuam sem perguntar", "volume, brilho", "abrir as Configurações",
                        "**navegador que o Jarvis controla**", 'sem esse "ok"', "não deixe uma conversa do WhatsApp"):
             self.assertIn(trecho, ok)
-        novidades = _uma_linha(VERSAO[:VERSAO.index("Versão anterior")])
+        novidades = _uma_linha(VERSAO[:VERSAO.index("Versão anterior (2026-10-17)")])  # as duas últimas versões
         for trecho in ('Desligar, reiniciar, digitar e apertar teclas só com o seu "ok"', "pergunta antes",
                        "em que janela", "resposta seguinte", '"não", ou qualquer outra resposta, cancela',
                        "antes da pergunta não vale", "continuam sem perguntar",
@@ -141,7 +141,7 @@ class LeiaMeBateComOCodigoTests(unittest.TestCase):
             self.assertIn(trecho, ok)
         self.assertNotIn('responder "não"', ok)  # antes ele perguntava de novo com a janela dele
         self.assertEqual(cs.TECLAS_DE_ENERGIA, {"sleep": "suspender o computador"})
-        novidades = _uma_linha(VERSAO[:VERSAO.index("Versão anterior")])
+        novidades = _uma_linha(VERSAO[:VERSAO.index("Versão anterior (2026-10-17)")])  # as duas últimas versões
         for trecho in ("responda falando", "uma de cada vez", "numa linha só",
                        "na janela do próprio Jarvis ele nunca digita nem aperta teclas",
                        "A tecla Sleep, que suspende o computador, também pergunta"):
@@ -172,7 +172,7 @@ class LeiaMeBateComOCodigoTests(unittest.TestCase):
         secao = _secao("## O que o Jarvis não faz mais")
         self.assertIn("**Tarefas livres na área de trabalho**", secao)
         self.assertIn("**Abrir ou criar programas pelo nome ou por arquivo**", secao)
-        novidades = _uma_linha(VERSAO[:VERSAO.index("Versão anterior")])
+        novidades = _uma_linha(VERSAO[:VERSAO.index("Versão anterior (2026-10-17)")])  # as duas últimas versões
         for trecho in ("tarefas livres na área de trabalho", "não roda comandos", "não abre nem cria programas"):
             self.assertIn(trecho, novidades)
         # o open_app recusa um nome que começa com um comando do PC ("PowerShell 7": a busca do menu Iniciar
