@@ -408,21 +408,40 @@ no código. Elas foram **desligadas**: se você pedir, o Jarvis diz que não faz
   peça ao Claude: ele escreve na pasta dele e não roda nada sozinho.
 - **Controle livre do mouse** (clicar em qualquer ponto da tela, mover o mouse, procurar um botão na
   tela e clicar nele). Volume, brilho, janelas, atalhos e o resto das configurações do PC continuam
-  funcionando, e digitar também (veja logo abaixo).
+  funcionando, e digitar também, agora com o seu "ok" (veja a seção seguinte).
 - **Atualizar jogos** (Steam e Epic): ele podia desligar o PC sozinho no fim do download.
-
-**Digitar e apertar teclas continuam funcionando, sem o seu "ok" conferido no código.** O Jarvis ainda
-escreve um texto na janela que estiver na frente e aperta qualquer tecla, inclusive o Enter (pelo mesmo
-comando do volume e das janelas); no navegador que ele controla, também digita e aperta Enter. Ele não
-confere em que janela está escrevendo. O que hoje o impede de mandar uma mensagem por esse caminho é só a
-instrução dada à IA, não uma trava no código. Por isso, ao falar com o Jarvis, não deixe uma conversa do
-WhatsApp (ou de outro aplicativo de mensagem) aberta na frente. Isso está anotado para uma próxima versão.
-
-Desligar e reiniciar o PC continuam funcionando, mas hoje quem confirma é a própria IA, sem o seu "ok"
-conferido no código. Isso muda numa próxima versão.
 
 Os arquivos dessas ferramentas continuam na pasta por enquanto. Se alguma fizer falta, avise; para
 voltar na hora, abra o "Iniciar Jarvis Ultron" da pasta da versão anterior.
+
+## Antes de desligar, reiniciar, digitar ou apertar teclas, o Jarvis pergunta
+
+Desligar ou reiniciar o PC, escrever um texto na janela da frente e apertar teclas nela (Enter, Esc,
+colar, copiar, recortar, desfazer, salvar, selecionar tudo, fechar o programa, a janela ou a aba, trocar de
+aba, voltar e avançar, recarregar, zoom, procurar, tela cheia, pausar o vídeo com o Espaço) **só acontecem
+com o seu "ok"**, conferido no código. Não é a IA que decide se você aprovou.
+
+1. Você pede, por exemplo: "Jarvis, digita olá mundo" ou "Jarvis, reinicia o computador".
+2. O Jarvis pergunta antes e diz exatamente o que vai digitar ou que teclas vai apertar, e em que janela.
+   Por exemplo: *Posso digitar "olá mundo" na janela "Sem título - Bloco de Notas"?* A pergunta também
+   aparece escrita na tela.
+3. Ele só faz se a sua **resposta seguinte** for um "ok" claro: **"ok"** ou **"ok, pode fazer"**. "Não",
+   ou qualquer outra resposta, cancela. Um "ok" dito junto com o pedido, antes da pergunta, não vale.
+4. O "ok" vale para aquilo, uma vez só. Outro texto, outra tecla ou outra janela na frente: ele pergunta
+   de novo. Se a janela da frente mudar depois do seu "ok", ele não digita nada e avisa.
+
+Reiniciar e desligar acontecem uns 10 segundos depois do "ok" (dá tempo de salvar algo). Para cancelar
+nesse tempo: aperte Windows+R, digite `shutdown /a` e aperte Enter.
+
+Continuam sem perguntar, porque não escrevem nem apertam teclas no programa da frente: volume, brilho,
+Wi-Fi, tema escuro, apagar a tela, rolar a página com o mouse, minimizar, maximizar e encaixar janelas,
+mostrar a área de trabalho, trocar de janela (Alt+Tab), bloquear a tela, tirar print e abrir as
+Configurações, o Explorador de Arquivos, o Executar e o Gerenciador de Tarefas.
+
+No **navegador que o Jarvis controla** (abrir sites, pesquisar, preencher), ele ainda digita e aperta Enter
+sem esse "ok": só a instrução dada à IA o impede de mandar mensagem por ali. Por isso, não deixe uma
+conversa do WhatsApp (ou de outro aplicativo de mensagem) aberta nesse navegador. No modo privado (Gemma),
+o Jarvis não mexe nessas configurações do PC.
 
 ## Observações
 

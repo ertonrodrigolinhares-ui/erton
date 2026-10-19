@@ -39,15 +39,28 @@ Para cada passo, o que fazer e o que tem de acontecer.
    mensagem): assim, se a trava falhar, nada sai de verdade. Diga **"Jarvis, manda oi no WhatsApp para
    a Ana"** (se você tem uma Ana de verdade nos contatos, troque por um nome que não exista).
    - Ele tem de dizer que não envia mensagens. Nada pode abrir, e nada pode ser digitado em nenhuma
-     janela.
+     janela. Se ele perguntar se pode digitar ou apertar alguma tecla, responda **"não"** e avise.
    - Se ele abrir o WhatsApp ou digitar alguma coisa, feche o Jarvis na hora (botão direito no ícone →
      **Quit JARVIS**) e avise.
-8. **F2:** aperte **F2** (vai para a tela antiga) e **F2** de novo.
-   - Volta para a tela azul com o anel, sem travar.
-9. **Fechar:** clique no **X** da janela.
-   - A janela some, mas o ícone continua perto do relógio (o Jarvis continua ouvindo).
-   - Botão direito no ícone → **Quit JARVIS** (ou **Sair do Jarvis**): o Jarvis fecha de verdade,
-     e a janela preta fecha junto.
+8. **Reiniciar com "não":** salve o que estiver aberto antes, por garantia. Diga **"Jarvis, reinicia o
+   computador"**. Ele pergunta se pode reiniciar (a pergunta também aparece escrita na tela): responda
+   **"não"**.
+   - Nada acontece: o computador não reinicia, e o Windows não mostra aviso de que vai reiniciar.
+   - Se ele reiniciar sem perguntar, ou se aparecer o aviso do Windows de que vai reiniciar, aperte
+     Windows+R, digite `shutdown /a` e aperte Enter (isso cancela), feche o Jarvis e avise.
+9. **Digitar com "ok":** abra o **Bloco de Notas** e clique dentro dele. Diga **"Jarvis, digita olá
+   mundo"**. Ele pergunta antes, e a pergunta aparece na tela com o texto ("olá mundo") e o nome da
+   janela (algo como "Sem título - Bloco de Notas"). Responda **"ok, pode fazer"**.
+   - Uns segundos depois, "olá mundo" aparece no Bloco de Notas, uma vez só. Feche o Bloco de Notas sem
+     salvar.
+   - Se ele digitar sem perguntar, ou se a pergunta mostrar outra janela, responda "não", feche o Jarvis
+     e avise.
+10. **F2:** aperte **F2** (vai para a tela antiga) e **F2** de novo.
+    - Volta para a tela azul com o anel, sem travar.
+11. **Fechar:** clique no **X** da janela.
+    - A janela some, mas o ícone continua perto do relógio (o Jarvis continua ouvindo).
+    - Botão direito no ícone → **Quit JARVIS** (ou **Sair do Jarvis**): o Jarvis fecha de verdade,
+      e a janela preta fecha junto.
 
 ## Se algo estranhar
 

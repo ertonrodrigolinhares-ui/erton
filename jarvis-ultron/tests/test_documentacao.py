@@ -60,31 +60,45 @@ class LeiaMeBateComOCodigoTests(unittest.TestCase):
             self.assertIn(contadas[nome], secao, nome)
         self.assertIn("pasta da versão anterior", secao)
         self.assertNotIn("Gmail, Instagram, Spotify", LEIA_ME)  # o Instagram era das mensagens
-        # desligar/reiniciar (só confirmed=yes até a Etapa 4), o navegador e a lixeira ainda agem sem o "ok"
+        # o navegador e a lixeira ainda agem sem o "ok"; desligar e reiniciar pedem o ok desde a Etapa 4
         self.assertNotIn('nada age sem o seu "ok"', LEIA_ME)
-        self.assertIn("Desligar e reiniciar o PC continuam", secao)
+        self.assertNotIn("hoje quem confirma é a própria IA", LEIA_ME)
 
-    def test_digitar_e_apertar_teclas_continua_e_o_leia_me_conta(self):
-        # o computer_control saiu, mas o computer_settings (oferecido ao Gemini: "typing text on screen")
-        # ainda escreve na janela da frente e aperta qualquer tecla, Enter inclusive, sem o "ok" conferido no
-        # código: o LEIA-ME e o VERSAO não podem dizer que o teclado saiu nem que ele não digita e aperta
-        # Enter sozinho (test_contratos confere o comportamento)
+    def test_digitar_e_apertar_teclas_so_com_o_ok_e_o_leia_me_conta(self):
+        # o computer_control saiu, e o computer_settings (oferecido ao Gemini: "typing text on screen")
+        # continua digitando e apertando teclas, Enter inclusive, mas desde a Etapa 4 só com o "ok" do
+        # Erton numa fala nova depois da pergunta (test_computer_settings_aprovacao confere). O LEIA-ME e o
+        # VERSAO não podem dizer que o teclado saiu, nem que ele digita sem perguntar, e têm de contar como
+        # é o "ok", o que continua sem pergunta e que o navegador ainda digita sem o "ok"
         import actions.computer_settings as cs
         import main
 
         declaracao = next(d for d in main.get_tool_declarations() if d["name"] == "computer_settings")
         self.assertIn("typing text on screen", declaracao["description"])
         self.assertTrue(callable(cs.type_text) and callable(cs.press_key))
+        self.assertLessEqual({"enter", "paste", "close_tab", "pause_video"}, set(cs.TECLAS_PEDEM_OK))
+        self.assertLessEqual({"volume_up", "brightness_up", "toggle_wifi", "minimize", "open_settings"},
+                             set(cs.NAO_PEDEM_OK))
         secao = _secao("## O que o Jarvis não faz mais")
         self.assertNotIn("mouse e do teclado", secao)
         self.assertNotIn("Antes ele podia digitar e apertar Enter sozinho", secao)
-        self.assertIn('**Digitar e apertar teclas continuam funcionando, sem o seu "ok" conferido no código.**', secao)
-        self.assertIn("inclusive o Enter", secao)
-        self.assertIn("não deixe uma conversa do WhatsApp", secao)
+        self.assertNotIn('continuam funcionando, sem o seu "ok"', LEIA_ME)
+        self.assertIn('digitar também, agora com o seu "ok"', secao)
+        ok = _secao("## Antes de desligar, reiniciar, digitar ou apertar teclas, o Jarvis pergunta")
+        for trecho in ('**só acontecem com o seu "ok"**', "Enter", "em que janela", "aparece escrita na tela",
+                       '**resposta seguinte**', '**"ok, pode fazer"**', '"Não", ou qualquer outra resposta, cancela',
+                       "antes da pergunta, não vale", "uma vez só", "Se a janela da frente mudar", "`shutdown /a`",
+                       "Continuam sem perguntar", "volume, brilho", "abrir as Configurações",
+                       "**navegador que o Jarvis controla**", 'sem esse "ok"', "não deixe uma conversa do WhatsApp"):
+            self.assertIn(trecho, ok)
+        novidades = _uma_linha(VERSAO[:VERSAO.index("Versão anterior")])
+        for trecho in ('Desligar, reiniciar, digitar e apertar teclas só com o seu "ok"', "pergunta antes",
+                       "em que janela", "resposta seguinte", '"não", ou qualquer outra resposta, cancela',
+                       "antes da pergunta não vale", "continuam sem perguntar",
+                       "No navegador que o Jarvis controla, ele ainda digita sem perguntar"):
+            self.assertIn(trecho, novidades)
         linha = _uma_linha(VERSAO[VERSAO.index("- Ferramentas antigas"):VERSAO.index("- Reserva com outra empresa")])
         self.assertNotIn("mouse e do teclado", linha)
-        self.assertIn("digitar e apertar teclas também", linha)
-        self.assertIn("aperta Enter sem o seu \"ok\"", linha)
 
     def test_o_x_da_janela_so_esconde_o_jarvis(self):
         secao = _secao("## Tela e cérebro separados")
@@ -177,6 +191,32 @@ class FecharNoXTests(unittest.TestCase):
 
 
 class RoteiroBateComOCodigoTests(unittest.TestCase):
+    def test_reiniciar_com_nao_e_digitar_com_ok_no_roteiro(self):
+        # o teste de PC da Etapa 4: "reinicia o computador" -> pergunta -> "não" -> nada; e digitar no Bloco
+        # de Notas -> pergunta com o texto e a janela -> "ok" -> digita (o código: _pedir_ok, shutdown /t 10)
+        import inspect
+
+        import actions.computer_settings as cs
+
+        roteiro = _uma_linha((RAIZ / "dev" / "ROTEIRO_DE_5_MINUTOS.md").read_text(encoding="utf-8"))
+        reiniciar = roteiro[roteiro.index('**Reiniciar com "não":**'):roteiro.index('**Digitar com "ok":**')]
+        self.assertIn('**"Jarvis, reinicia o computador"**', reiniciar)
+        self.assertIn('responda **"não"**', reiniciar)
+        self.assertIn("Nada acontece", reiniciar)
+        self.assertIn("`shutdown /a`", reiniciar)
+        self.assertIn('"shutdown", "/r", "/t", "10"', inspect.getsource(cs.restart_computer))
+        digitar = roteiro[roteiro.index('**Digitar com "ok":**'):roteiro.index("**F2:**")]
+        self.assertIn("**Bloco de Notas**", digitar)
+        self.assertIn('**"Jarvis, digita olá mundo"**', digitar)
+        self.assertIn("o nome da janela", digitar)
+        self.assertIn('Responda **"ok, pode fazer"**', digitar)
+        self.assertIn("uma vez só", digitar)
+        self.assertIn("Se ele digitar sem perguntar", digitar)
+        from core.hermes_ponte import usuario_aprovou
+
+        self.assertTrue(usuario_aprovou("ok, pode fazer"))  # a resposta do roteiro vale como "ok"
+        self.assertFalse(usuario_aprovou("não"))
+
     def test_painel_ultron_pelos_botoes_que_existem_na_tela_azul(self):
         # na tela azul (a padrão) a cena cobre a tela antiga inteira: o botão ⚙ ULTRON fica escondido, e
         # procurando por ele o Erton acharia que a versão quebrou

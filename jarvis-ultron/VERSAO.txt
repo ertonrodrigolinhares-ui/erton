@@ -1,4 +1,16 @@
-Jarvis Ultron - versão 2026-10-17
+Jarvis Ultron - versão 2026-10-19
+
+Novidades desta versão:
+- Desligar, reiniciar, digitar e apertar teclas só com o seu "ok": o Jarvis pergunta antes e diz
+  exatamente o que vai digitar ou que teclas vai apertar, e em que janela (a pergunta também aparece na
+  tela). Ele só faz se a sua resposta seguinte for "ok" (ou "ok, pode fazer"); "não", ou qualquer outra
+  resposta, cancela. Um "ok" dito antes da pergunta não vale, e o "ok" vale uma vez, só para aquilo.
+  Antes, para desligar e reiniciar bastava a própria IA confirmar, e digitar e apertar teclas (inclusive o
+  Enter) não pediam nada. Volume, brilho, Wi-Fi, minimizar e maximizar janelas e abrir as Configurações
+  continuam sem perguntar. No navegador que o Jarvis controla, ele ainda digita sem perguntar (veja
+  "Antes de desligar, reiniciar, digitar ou apertar teclas" no LEIA-ME).
+
+Versão anterior (2026-10-17):
 
 Novidades desta versão:
 - Ferramentas antigas que agiam sem o seu "ok" foram desligadas. Se você pedir, o Jarvis diz que não
