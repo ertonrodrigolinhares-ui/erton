@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -30,10 +31,12 @@ class UIRegressionTests(unittest.TestCase):
 
         cls.original_update_metrics = staticmethod(ui.MainWindow._update_metrics)
         cls.patchers = [
+            patch.dict(os.environ),  # Jarvis Ultron: devolve as variáveis como estavam no fim
             patch.object(ui, "UI_SETTINGS_FILE", temp_path / "ui_settings.json"),
             patch.object(ui, "LAYOUT_SETTINGS_FILE", temp_path / "layout_settings.json"),
             patch.object(ui, "API_FILE", temp_path / "api_keys.json"),
             patch.object(ui, "get_secret_store", return_value=_NoSecrets()),
+            patch.object(ui, "BASE_DIR", temp_path),  # Jarvis Ultron: o .env que a tela regrava
             patch.object(ui.MainWindow, "_setup_system_tray", lambda self: None),
             patch.object(ui.MainWindow, "_update_metrics", lambda self: None),
             patch.object(ui.MainWindow, "_restore_detached_panels", lambda self: None),
@@ -42,6 +45,9 @@ class UIRegressionTests(unittest.TestCase):
         ]
         for patcher in cls.patchers:
             patcher.start()
+        # Jarvis Ultron: no PC do Erton, o main.py (importado por outros testes) já pôs no ambiente a
+        # chave do .env; com ela, a janela de teste a mandaria ao Google e regravaria o .env.
+        os.environ.pop("GEMINI_API_KEY", None)
 
         ui.UI_SETTINGS_FILE.write_text(
             json.dumps({"intro_completed": True, "intro_every_launch": False}),
@@ -156,6 +162,14 @@ class UIRegressionTests(unittest.TestCase):
         self.assertNotIn('f"""', sheet)
         self.assertNotIn("{C.", sheet)
         self.assertIn("QSplitter::handle", sheet)
+
+    def test_qss_alpha_colors_are_explicit_rgba(self):
+        # O Qt lê "#RRGGBBAA" como "#AARRGGBB": "{C.ENERGY}22" não deixa a cor transparente, ela some ou
+        # vira outra cor. A transparência tem de ser escrita como rgba(...).
+        # Jarvis Ultron: a outra metade deste teste cobrava o qss_rgba do JARVIS-OS, que não existe mais.
+        linhas = Path(ui.__file__).read_text(encoding="utf-8").splitlines()
+        casos = [n for n, linha in enumerate(linhas, 1) if re.search(r"\{C\.[A-Z_]+\}[0-9A-Fa-f]{2}", linha)]
+        self.assertEqual(casos, [], "linhas do ui.py com a transparência no fim da cor (#RRGGBBAA)")
 
     def test_unavailable_hardware_metrics_are_not_fabricated(self):
         self.window._gpu_info_cached = True

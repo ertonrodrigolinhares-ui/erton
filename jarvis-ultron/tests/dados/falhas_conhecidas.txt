@@ -5,10 +5,11 @@
 # quando ele falha, o conferir_testes o roda de novo sozinho; falhando em todas as vezes, é falha nova.
 #
 # Na Etapa 0 eram 71, as mesmas em 3 rodadas da suíte inteira (com casa temporária). A Etapa 2 tirou do
-# tests/test_ui_regressions.py os 67 testes que cobravam telas do JARVIS-OS que não existem mais
+# tests/test_ui_regressions.py os 66 testes que cobravam telas do JARVIS-OS que não existem mais
 # (apresentação inicial, tour guiado, INTRO_*, save_auto_graphics_result, voz padrão "charon"...): ficam
 # guardados na etiqueta git "antes-da-reorganizacao". Outros 2 do mesmo arquivo cobram o que existe hoje
-# e só tinham um detalhe velho no próprio teste: foram consertados e passam.
+# e só tinham um detalhe velho no próprio teste: foram consertados e passam. Mais 1 perdeu só a metade
+# que cobrava o JARVIS-OS (o qss_rgba) e ficou com a outra, que acha um defeito de hoje (abaixo).
 #
 # Numa rodada antes desta lista, o tests/test_jarvis_ultron.py::PainelUltronTests::
 # test_botao_roda_automacao_direto_e_fecha falhou uma vez; depois passou em todas as rodadas (inteiras,
@@ -23,6 +24,14 @@
 # ela fica no alto, à esquerda, enquanto confere a chave. Conferido também numa tela X de verdade (xvfb):
 # (90, 30) em vez de (410, 200). Consertar junto com a Etapa 7 (janelas por cima da Cena) e tirar daqui.
 tests/test_ui_regressions.py::UIRegressionTests::test_setup_overlay_is_centered_after_first_show
+
+# Outro defeito de verdade, só visual (anotado no reparo da Etapa 2): 23 linhas do ui.py pedem cor com
+# transparência escrevendo "{C.ENERGY}22" (#RRGGBBAA), mas o Qt lê #AARRGGBB: a cor some ou vira outra
+# (conferido: "background: #00d4ff22" não pinta nada; rgba(0, 212, 255, 34) pinta). Não é só a tela
+# antiga (F2): estão na conversa da tela antiga (ChatBubbleWidget), no "executando..." (ToolProgressWidget),
+# nos avisos (BasePopup), nos Ajustes (SettingsOverlay) e na escolha de voz (VoiceSelectorOverlay), que
+# também aparecem por cima da Cena. Consertar (trocar por rgba) junto com a Etapa 7 e tirar daqui.
+tests/test_ui_regressions.py::UIRegressionTests::test_qss_alpha_colors_are_explicit_rgba
 
 # Instáveis: testes do anel pela placa de vídeo numa tela virtual (xvfb-run). Eles medem o brilho do anel
 # 2,5 s depois de abrir, e às vezes o valor fica logo abaixo do limite (ex.: 118 para 120). Também falham

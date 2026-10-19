@@ -5,8 +5,10 @@ privado ou a ponte com o cérebro. Os testes do JARVIS-OS que cobravam telas que
 (apresentação inicial, tour guiado...) saíram do tests/test_ui_regressions.py; ficam guardados na
 etiqueta git "antes-da-reorganizacao".
 
-A janela de teste nunca lê nem grava as configurações, a chave ou o cofre de verdade: tudo vai para uma
-pasta temporária, e o cofre é trocado por um vazio (sem chave, a tela não tenta falar com o Gemini).
+A janela de teste nunca lê nem grava as configurações, a chave, o cofre ou o .env de verdade: tudo vai
+para uma pasta temporária e o cofre é trocado por um vazio. A chave que o main.py (importado por outros
+testes) já pôs no ambiente, lida do .env do Erton, sai enquanto a janela existe: sem chave, a tela não
+tenta falar com o Google. E, se algo ainda tentar, o validador é falso e responde "não conferida".
 """
 
 import os
@@ -23,6 +25,7 @@ from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import QApplication, QLineEdit
 
 import ui
+from core.api_key_validator import ApiKeyValidationResult
 from core.ponte import METODOS_TELA
 
 
@@ -43,17 +46,27 @@ class TelaContratosTests(unittest.TestCase):
             patch.object(ui, "LAYOUT_SETTINGS_FILE", pasta / "layout_settings.json"),
             patch.object(ui, "API_FILE", pasta / "api_keys.json"),
             patch.object(ui, "get_secret_store", return_value=_CofreVazio()),
+            patch.object(ui, "BASE_DIR", pasta),  # o .env que a tela regrava ao aceitar uma chave
+            # a tela importa o validador na hora de conferir: ele nunca chega ao Google no teste
+            patch("core.api_key_validator.validate_gemini_api_key", side_effect=cls._validador_falso),
         ]
+        cls._chaves_conferidas = []
         for troca in cls._trocas:
             troca.start()
         for nome in ("JARVIS_VISUAL", "JARVIS_CENA", "JARVIS_TELA", "JARVIS_CEREBRO"):
             os.environ.pop(nome, None)  # a tela padrão: o anel azul (Cena), tela limpa, cérebro Gemini
+        os.environ.pop("GEMINI_API_KEY", None)  # a do .env do Erton, se o main.py já foi importado
         cls.janela = ui.MainWindow("face.png")
         cls.janela.show()
         cls.app.processEvents()
         # a fachada que o cérebro usa, em cima da mesma janela (sem abrir uma segunda)
         cls.fachada = ui.JarvisUI.__new__(ui.JarvisUI)
         cls.fachada._win = cls.janela
+
+    @classmethod
+    def _validador_falso(cls, chave, *_args, **_kwargs):
+        cls._chaves_conferidas.append(chave)
+        return ApiKeyValidationResult(False, "Não conferida no teste.")
 
     @classmethod
     def tearDownClass(cls):
@@ -78,6 +91,15 @@ class TelaContratosTests(unittest.TestCase):
         finally:
             nova.deleteLater()
             tutorial.deleteLater()
+
+    def test_a_chave_de_verdade_nunca_vai_ao_google(self):
+        # no PC do Erton, a chave do .env já está no ambiente quando a janela de teste abre: ela não pode
+        # ser mandada ao Google nem regravada no .env de verdade (o _on_setup_done grava em BASE_DIR)
+        self.assertIsNotNone(self.janela._overlay)  # a tela da chave continua aberta, esperando
+        self.assertFalse(self.janela._overlay._validation_pending)  # nem começou a conferir uma chave
+        self.assertEqual(self._chaves_conferidas, [])
+        self.assertFalse(self.janela._ready)
+        self.assertEqual(ui.BASE_DIR, Path(self._pasta.name))
 
     def test_jarvis_ui_tem_todos_os_nomes_da_ponte(self):
         # o cérebro (outro programa) chama a tela por estes nomes, via core/ponte.py

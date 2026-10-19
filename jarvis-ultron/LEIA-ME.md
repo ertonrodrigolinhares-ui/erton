@@ -396,8 +396,10 @@ Deixe essas linhas de fora para o Jarvis escolher sozinho. Esse é o recomendado
 
 - A interface original é em **inglês**. O Jarvis fala e entende português.
 - Algumas funções exigem configuração extra (Gmail, Instagram, Spotify). Veja `docs/USAGE.md`.
-- Os testes do projeto original já vinham com 71 falhas (testes desatualizados em relação ao código).
-  Os ajustes do Jarvis Ultron não mudaram nenhum resultado.
+- Os testes herdados do projeto original que cobravam telas do JARVIS-OS que não existem mais saíram
+  (ficam guardados na etiqueta git `antes-da-reorganizacao`). Os defeitos que já se sabe que existem
+  (hoje, só visuais) ficam anotados, com o motivo, em `tests/dados/falhas_conhecidas.txt`. O
+  `python dev/conferir_testes.py` roda todos os testes e avisa só das falhas novas.
 
 ## Hermes: agentes, rotina das 8h e redes sociais
 

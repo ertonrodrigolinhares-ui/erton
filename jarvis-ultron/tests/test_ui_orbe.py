@@ -1,7 +1,9 @@
 import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -11,6 +13,38 @@ from PyQt6.QtWidgets import QApplication, QWidget
 
 import ui
 import ui_orbe
+
+
+class _CofreVazio:
+    def get(self, _chave):
+        return None
+
+
+_TROCAS = []
+_GUARDADO = {}
+
+
+def setUpModule():
+    # As janelas destes testes nunca usam a chave de verdade. No PC do Erton, o main.py (importado por
+    # outros testes) já pôs no ambiente a chave do .env, e o cofre pode ter outra: com elas, cada janela
+    # mandaria a chave ao Google, gravaria o config/api_keys.json e regravaria o .env de verdade.
+    pasta = tempfile.TemporaryDirectory()
+    _TROCAS[:] = [
+        patch.object(ui, "API_FILE", Path(pasta.name) / "api_keys.json"),
+        patch.object(ui, "BASE_DIR", Path(pasta.name)),
+        patch.object(ui, "get_secret_store", return_value=_CofreVazio()),
+    ]
+    for troca in _TROCAS:
+        troca.start()
+    _GUARDADO.update(pasta=pasta, chave=os.environ.pop("GEMINI_API_KEY", None))
+
+
+def tearDownModule():
+    for troca in reversed(_TROCAS):
+        troca.stop()
+    if _GUARDADO.get("chave") is not None:
+        os.environ["GEMINI_API_KEY"] = _GUARDADO["chave"]  # só a chave volta; o resto fica como sempre
+    _GUARDADO.pop("pasta").cleanup()
 
 
 class _Janela(QWidget):

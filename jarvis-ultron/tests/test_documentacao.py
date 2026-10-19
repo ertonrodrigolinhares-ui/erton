@@ -106,6 +106,16 @@ class LeiaMeBateComOCodigoTests(unittest.TestCase):
         self.assertNotIn("voz do Windows: nada sai do PC", linha)
         self.assertIn("Groq", linha)
 
+    def test_observacoes_nao_contam_as_71_falhas_que_sairam(self):
+        # a Etapa 2 tirou os testes que cobravam telas do JARVIS-OS: o que sobra fica anotado na lista
+        secao = _secao("## Observações")
+        self.assertNotIn("71 falhas", secao)
+        self.assertNotIn("não mudaram nenhum resultado", secao)
+        self.assertIn("antes-da-reorganizacao", secao)
+        for arquivo in ("tests/dados/falhas_conhecidas.txt", "dev/conferir_testes.py"):
+            self.assertIn(arquivo, secao)
+            self.assertTrue((RAIZ / arquivo).exists(), arquivo)
+
 
 class FecharNoXTests(unittest.TestCase):
     def test_aviso_da_bandeja_em_portugues_diz_que_continua_ouvindo(self):
