@@ -14,7 +14,7 @@ EXPECTED_TOOLS = {
     "email_control", "reminder", "youtube_video", "media_control",
     "screen_process", "computer_settings", "browser_control", "file_controller",
     "desktop_control",
-    "computer_control", "game_updater", "flight_finder", "jarvis_ui_control",
+    "game_updater", "flight_finder", "jarvis_ui_control",
     "file_processor", "create_presentation", "deep_research", "graphics_quality", "task_status", "save_memory",
 }
 

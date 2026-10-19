@@ -92,6 +92,8 @@ def guard_tool_call(name: str, args: dict[str, Any] | None = None) -> QAGuardDec
     if tool == "media_control" and not _opt_in("JARVIS_QA_ALLOW_DESKTOP"):
         return QAGuardDecision(False, "QA media playback requires JARVIS_QA_ALLOW_DESKTOP=1.")
 
+    # computer_control está desligada no Jarvis Ultron (Etapa 3 da reorganização): fica aqui como trava a
+    # mais até o arquivo dela sair (Etapa 18).
     if tool in {"computer_control", "computer_settings"}:
         safe_read_actions = {"screenshot", "get_clipboard", "screen_size"}
         if action not in safe_read_actions and not _opt_in("JARVIS_QA_ALLOW_DESKTOP"):

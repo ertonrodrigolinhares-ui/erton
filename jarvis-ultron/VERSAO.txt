@@ -9,6 +9,8 @@ Novidades desta versão:
     mostrar antes. Para tarefas grandes, use o Claude ou o Hermes.
   - o programador antigo (escrever, rodar e montar programas): rodava código e instalava
     componentes sem o seu "ok". Para escrever um programa, peça ao Claude.
+  - controle livre do mouse e do teclado (clicar em qualquer ponto da tela). Volume, janelas, atalhos
+    e o resto das configurações do PC continuam.
 - Reserva com outra empresa (Cerebras, OpenRouter, Mistral, DeepSeek, OpenAI...) quando o limite do
   Groq acaba: JARVIS_RESERVA e JARVIS_RESERVA_CHAVE no .env; ficam em fila com o Groq.
 - "Instalar voz local": transcrição da voz no PC para o modo privado (o Iniciar também instala sozinho).

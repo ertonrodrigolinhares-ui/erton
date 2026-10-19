@@ -47,7 +47,7 @@ lista escrita à mão).
 - `code_helper` e `dev_agent` (rodavam código e `pip install`): **desligadas**. O `code_helper` continua
   na `CLOUD_SAFE_ACTIONS` (modo servidor, que sai nas Etapas 11 e 14): lá ele também não é mais
   oferecido (não está declarado) e, chamado, responde que está desligado.
-- `computer_control` (clica e digita em qualquer lugar): ainda aberta.
+- `computer_control` (clicava e digitava em qualquer lugar): **desligada**.
 - `game_updater` (pode desligar o PC): ainda aberta.
 
 ## 2. Modo privado (nada vai para IA na nuvem)

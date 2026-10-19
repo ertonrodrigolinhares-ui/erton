@@ -52,7 +52,8 @@ class LeiaMeBateComOCodigoTests(unittest.TestCase):
         contadas = {"send_message": "**Mensagens**", "prepare_message_reply": "**Mensagens**",
                     "check_messages": "**Mensagens**",
                     "agent_task": '**"Faça tal tarefa no PC"**',
-                    "code_helper": "**O programador antigo**", "dev_agent": "**O programador antigo**"}
+                    "code_helper": "**O programador antigo**", "dev_agent": "**O programador antigo**",
+                    "computer_control": "**Controle livre do mouse e do teclado**"}
         for nome in main.FERRAMENTAS_DESLIGADAS:
             self.assertIn(nome, contadas, f"{nome} foi desligada e o LEIA-ME não conta")
             self.assertIn(contadas[nome], secao, nome)

@@ -51,7 +51,6 @@ desktop_control = _lazy_action("actions.desktop", "desktop_control")
 browser_control = _lazy_action("actions.browser_control", "browser_control")
 file_controller = _lazy_action("actions.file_controller", "file_controller")
 web_search_action = _lazy_action("actions.web_search", "web_search")
-computer_control = _lazy_action("actions.computer_control", "computer_control")
 game_updater = _lazy_action("actions.game_updater", "game_updater")
 request_presentation = _lazy_action("actions.presentation_maker", "request_presentation")
 request_deep_research = _lazy_action("actions.deep_research", "request_deep_research")
@@ -756,31 +755,6 @@ TOOL_DECLARATIONS = [
         }
     },
     {
-        "name": "computer_control",
-        "description": "Direct computer control: type, click, hotkeys, scroll, move mouse, screenshots, find elements on screen.",
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "action":      {"type": "STRING", "description": "type | smart_type | click | double_click | right_click | hotkey | press | scroll | move | copy | paste | screenshot | wait | clear_field | focus_window | screen_find | screen_click | random_data | user_data"},
-                "text":        {"type": "STRING", "description": "Text to type or paste"},
-                "x":           {"type": "INTEGER", "description": "X coordinate"},
-                "y":           {"type": "INTEGER", "description": "Y coordinate"},
-                "keys":        {"type": "STRING", "description": "Key combination e.g. 'ctrl+c'"},
-                "key":         {"type": "STRING", "description": "Single key e.g. 'enter'"},
-                "direction":   {"type": "STRING", "description": "up | down | left | right"},
-                "amount":      {"type": "INTEGER", "description": "Scroll amount (default: 3)"},
-                "seconds":     {"type": "NUMBER",  "description": "Seconds to wait"},
-                "title":       {"type": "STRING",  "description": "Window title for focus_window"},
-                "description": {"type": "STRING",  "description": "Element description for screen_find/screen_click"},
-                "type":        {"type": "STRING",  "description": "Data type for random_data"},
-                "field":       {"type": "STRING",  "description": "Field for user_data: name|email|city"},
-                "clear_first": {"type": "BOOLEAN", "description": "Clear field before typing (default: true)"},
-                "path":        {"type": "STRING",  "description": "Save path for screenshot"},
-            },
-            "required": ["action"]
-        }
-    },
-    {
         "name": "game_updater",
         "description": (
             "THE ONLY tool for ANY Steam or Epic Games request. "
@@ -916,7 +890,7 @@ TOOL_DECLARATIONS = [
             "Creates, edits, redesigns, or extends an editable Microsoft PowerPoint (.pptx) presentation. "
             "Use this directly whenever the user asks to make a PowerPoint, presentation, "
             "slide deck, pitch deck, briefing deck, or slideshow. Do not use "
-            "file_processor or computer_control. First ask whether the user wants "
+            "file_processor. First ask whether the user wants "
             "a native 3D model, then ask whether they want to see the task or keep it in the background."
         ),
         "parameters": {
@@ -1211,6 +1185,7 @@ FERRAMENTAS_DESLIGADAS = {
     "agent_task": "multi-step tasks that write and run AI-generated code",
     "code_helper": "writing, running and building code",
     "dev_agent": "building projects, installing packages and running code",
+    "computer_control": "clicking, typing and moving the mouse anywhere on the screen",
 }
 
 
@@ -2672,10 +2647,6 @@ class JarvisLive:
                 r = await asyncio.to_thread(
                     lambda: file_processor(parameters=args, player=self.ui, speak=self.speak)
                 )
-                result = r or "Done."
-
-            elif name == "computer_control":
-                r = await asyncio.to_thread(lambda: computer_control(parameters=args, player=self.ui))
                 result = r or "Done."
 
             elif name == "game_updater":
