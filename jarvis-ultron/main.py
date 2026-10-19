@@ -138,42 +138,6 @@ _SELF_QUIT_PATTERNS = tuple(re.compile(pattern, re.IGNORECASE) for pattern in (
 ))
 
 
-def _exception_leaves(exc: BaseException):
-    nested = getattr(exc, "exceptions", None)
-    if nested:
-        for child in nested:
-            yield from _exception_leaves(child)
-    else:
-        yield exc
-
-
-def _is_normal_live_close_error(exc: BaseException) -> bool:
-    for leaf in _exception_leaves(exc):
-        name = leaf.__class__.__name__.lower()
-        message = str(leaf).lower()
-        if name == "connectionclosedok" or "1000 (ok)" in message:
-            return True
-        if isinstance(leaf, genai.errors.APIError) and "1000" in message:
-            return True
-    return False
-
-
-def _is_transient_live_connection_error(exc: BaseException) -> bool:
-    transient_markers = (
-        "connection reset", "connection aborted", "temporarily unavailable",
-        "timed out", "timeout", "network is unreachable", "broken pipe",
-    )
-    return any(
-        isinstance(leaf, (ConnectionResetError, ConnectionAbortedError, TimeoutError))
-        or any(marker in str(leaf).lower() for marker in transient_markers)
-        for leaf in _exception_leaves(exc)
-    )
-
-
-def _live_reconnect_delay(attempt: int) -> float:
-    return min(30.0, float(2 ** max(0, int(attempt) - 1)))
-
-
 def _live_response_audio_bytes(response) -> bytes | None:
     server_content = getattr(response, "server_content", None)
     model_turn = getattr(server_content, "model_turn", None)

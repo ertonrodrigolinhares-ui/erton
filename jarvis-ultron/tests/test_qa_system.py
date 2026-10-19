@@ -188,43 +188,6 @@ class QAModeSafetyTests(unittest.TestCase):
 
         self.assertEqual(main._live_response_audio_bytes(Response()), audio)
 
-    def test_clean_websocket_close_is_recognized_inside_task_group(self):
-        import main
-
-        class ConnectionClosedOK(Exception):
-            pass
-
-        clean_close = ConnectionClosedOK(
-            "sent 1000 (OK); then received 1000 (OK)"
-        )
-        wrapped = ExceptionGroup("tour pause", [clean_close])
-        self.assertTrue(main._is_normal_live_close_error(clean_close))
-        self.assertTrue(main._is_normal_live_close_error(wrapped))
-        self.assertFalse(
-            main._is_normal_live_close_error(RuntimeError("network failed"))
-        )
-
-    def test_connection_reset_is_retryable_inside_task_group(self):
-        import main
-
-        reset = ConnectionResetError(54, "Connection reset by peer")
-        wrapped = ExceptionGroup("live connection", [reset])
-        self.assertTrue(main._is_transient_live_connection_error(reset))
-        self.assertTrue(main._is_transient_live_connection_error(wrapped))
-        self.assertFalse(
-            main._is_transient_live_connection_error(
-                ValueError("invalid configuration")
-            )
-        )
-
-    def test_live_reconnect_backoff_is_bounded(self):
-        import main
-
-        self.assertEqual(
-            [main._live_reconnect_delay(attempt) for attempt in range(1, 9)],
-            [1.0, 2.0, 4.0, 8.0, 16.0, 30.0, 30.0, 30.0],
-        )
-
     def test_reconnect_wait_exits_immediately_during_shutdown(self):
         import main
 
