@@ -85,7 +85,8 @@ class LeiaMeBateComOCodigoTests(unittest.TestCase):
         self.assertNotIn('continuam funcionando, sem o seu "ok"', LEIA_ME)
         self.assertIn('digitar também, agora com o seu "ok"', secao)
         ok = _secao("## Antes de desligar, reiniciar, digitar ou apertar teclas, o Jarvis pergunta")
-        for trecho in ('**só acontecem com o seu "ok"**', "Enter", "em que janela", "aparece escrita na tela",
+        for trecho in ('**só acontecem com o seu "ok"**', "Enter", "em que janela",
+                       "aparece escrita num aviso do Windows, perto do relógio",
                        '**resposta seguinte**', '**"ok, pode fazer"**', '"Não", ou qualquer outra resposta, cancela',
                        "antes da pergunta, não vale", "uma vez só", "Se a janela da frente mudar", "`shutdown /a`",
                        "Continuam sem perguntar", "volume, brilho", "abrir as Configurações",
@@ -174,11 +175,15 @@ class LeiaMeBateComOCodigoTests(unittest.TestCase):
         novidades = _uma_linha(VERSAO[:VERSAO.index("Versão anterior")])
         for trecho in ("tarefas livres na área de trabalho", "não roda comandos", "não abre nem cria programas"):
             self.assertIn(trecho, novidades)
-        # o open_app recusa um nome desconhecido que começa com um comando do PC ("Docker Desktop": a busca do
-        # menu Iniciar rodaria "docker Desktop"); o Erton precisa saber que esses abrem pelo menu Iniciar
+        # o open_app recusa um nome que começa com um comando do PC ("PowerShell 7": a busca do menu Iniciar
+        # rodaria "powershell 7") quando o menu Iniciar não tem um atalho com esse nome exato (o "Docker
+        # Desktop" tem); o Erton precisa saber que esses abrem pelo menu Iniciar
         for texto in (secao, novidades):
-            for trecho in ("começa com um comando do PC", '"Docker Desktop"', "pelo menu Iniciar"):
+            for trecho in ("começa com um comando do PC", "atalho com esse nome exato", '"Docker Desktop"',
+                           "pelo menu Iniciar", "abre o aplicativo Claude"):
                 self.assertIn(trecho, texto)
+        self.assertIn("aparece escrita num aviso do Windows, perto do relógio", novidades)
+        self.assertIn("avisa que não conseguiu", novidades)
         self.assertIn("git bash", oa._APP_ALIASES)
         self.assertIn('"abre o Git Bash"', secao)
 

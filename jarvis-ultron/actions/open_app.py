@@ -71,6 +71,9 @@ _APP_ALIASES: dict[str, dict[str, str]] = {
 def _normalize(raw: str) -> str:
     key = raw.lower().strip()
 
+    if key in _NOMES_INTEIROS:  # Jarvis Ultron: só o nome inteiro, sem a busca por pedaço abaixo
+        return _NOMES_INTEIROS[key].get(_SYSTEM, raw)
+
     if key in _APP_ALIASES:
         return _APP_ALIASES[key].get(_SYSTEM, raw)
 
@@ -88,10 +91,41 @@ def _normalize(raw: str) -> str:
 # shutdown desliga em 1 minuto). Desligar e reiniciar só pelo computer_settings, com o "ok" do Erton.
 # Antes, "shutdown.exe /s /t 0" desligava o PC na hora. Um nome conhecido (_APP_ALIASES, como "git bash")
 # é conferido e aberto pelo apelido, que é fixo: as palavras ditas não vão para a busca do menu Iniciar.
+# Um nome que começa com um comando ("Docker Desktop", "Git GUI") só abre pelo atalho do menu Iniciar com
+# esse nome exato (é ele que a busca abriria): as palavras ditas só escolhem o atalho, nenhuma vira argumento.
 _DESLIGAM = {"shutdown", "logoff", "logout", "tsdiscon", "slidetoshutdown", "psshutdown", "psshutdown64",
              "rundll32", "poweroff", "reboot", "halt", "gnome-session-quit"}
 _SINAIS_DO_CMD = re.compile(r'[&|<>^%"`\\\x00-\x1f\x7f]')
 _ENDERECO = re.compile(r"([a-z][a-z0-9+.-]+):\S*", re.IGNORECASE)  # "ms-settings:", "spotify:" (não "C:")
+
+# Nomes que valem só inteiros (a busca por pedaço do _normalize mandaria o "NVIDIA Control Panel" para o
+# Painel de Controle do Windows e o "Desktop" para o Claude). "claude" é o aplicativo Claude, aberto pelo
+# atalho do menu Iniciar ou pela busca, nunca pelo PATH (_SO_PELO_MENU): o claude.exe do PATH é o Claude
+# Code de terminal (o Instalar Claude.bat o põe lá), que abriria escondido, sem janela.
+_CLAUDE = {"Windows": "Claude", "Darwin": "Claude", "Linux": "claude-desktop"}
+_PAINEL = {"Windows": "control.exe", "Darwin": "System Preferences", "Linux": "gnome-control-center"}
+_NOMES_INTEIROS = {"claude": _CLAUDE, "claude desktop": _CLAUDE, "claude app": _CLAUDE,
+                   "control panel": _PAINEL, "painel de controle": _PAINEL}
+_SO_PELO_MENU = {"claude"}
+
+
+def _comeca_com_comando(app_name: str) -> bool:
+    """Mais de uma palavra, e a primeira é um programa que o which acha ("powershell Stop-Computer")."""
+    palavras = app_name.split()
+    return len(palavras) > 1 and bool(shutil.which(palavras[0]))
+
+
+def _atalho_do_menu_iniciar(app_name: str) -> str | None:
+    """O atalho (.lnk) do menu Iniciar, do PC ou do Erton, com este nome exato ("Docker Desktop.lnk"), ou None."""
+    alvo = " ".join(app_name.split()).lower() + ".lnk"
+    for base in (os.environ.get("ProgramData"), os.environ.get("APPDATA")):
+        if not base:
+            continue
+        for pasta, _subpastas, arquivos in os.walk(os.path.join(base, "Microsoft", "Windows", "Start Menu", "Programs")):
+            for arquivo in arquivos:
+                if arquivo.lower() == alvo:
+                    return os.path.join(pasta, arquivo)
+    return None
 
 
 def _recusa(app_name: str, sistema: str) -> str | None:
@@ -109,7 +143,7 @@ def _recusa(app_name: str, sistema: str) -> str | None:
         return (f"Not opened: open_app opens an application by its name only, and '{app_name}' has command "
                 "arguments, a path or special characters. Use file_controller for files and folders, and "
                 "browser_control for websites.")
-    if len(palavras) > 1 and shutil.which(palavras[0]):  # "powershell Stop-Computer" rodaria pela busca
+    if _comeca_com_comando(app_name) and not _atalho_do_menu_iniciar(app_name):  # rodaria pela busca
         return (f"Not opened: '{app_name}' starts with '{palavras[0]}', a command on this PC, and the Start "
                 "menu search would run the rest of the name as that command's arguments. open_app opens an "
                 "application by its name only. Tell the user, in one short Portuguese sentence, to open it "
@@ -122,7 +156,19 @@ def _launch_windows(app_name: str) -> bool:
     if _recusa(app_name, "Windows"):  # o open_app já recusou antes; a trava fica também aqui
         return False
 
-    caminho = shutil.which(app_name)
+    comeca_com_comando, pelo_menu = _comeca_com_comando(app_name), app_name.lower() in _SO_PELO_MENU
+    if comeca_com_comando or pelo_menu:
+        atalho = _atalho_do_menu_iniciar(app_name)  # sem argumento, pelo Windows, sem o shell
+        if atalho:
+            try:
+                os.startfile(atalho)
+                return True
+            except Exception as e:
+                print(f"[open_app] Start Menu shortcut failed: {e}")
+        if comeca_com_comando:  # nunca pela busca, que rodaria o resto do nome como argumento
+            return False
+
+    caminho = None if pelo_menu else shutil.which(app_name)
     if caminho:
         try:
             # o caminho achado, sem argumento e sem o shell
@@ -271,13 +317,15 @@ def open_app(
         return f"Unsupported operating system: {_SYSTEM}"
 
     # nome conhecido: confere o apelido, que é o que abre (a volta pelo nome dito passa de novo pelo _recusa)
-    conhecido = app_name.lower() in _APP_ALIASES
+    conhecido = app_name.lower() in _APP_ALIASES or app_name.lower() in _NOMES_INTEIROS
     recusa = _recusa(_normalize(app_name) if conhecido else app_name, _SYSTEM)
     if recusa:
         print(f"[open_app] Refused: {app_name!r}")
         return recusa
 
     normalized = _normalize(app_name)
+    if _SYSTEM == "Windows" and not conhecido and _comeca_com_comando(app_name):
+        normalized = app_name  # passou pelo _recusa só pelo atalho com este nome exato: abre ele, e não um apelido
     print(f"[open_app] Launching: '{app_name}' → '{normalized}' ({_SYSTEM})")
 
     if player:

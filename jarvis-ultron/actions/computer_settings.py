@@ -513,25 +513,37 @@ def toggle_wifi():
         except Exception as e:
             print(f"[Settings] toggle_wifi Linux failed: {e}")
 
+def _energia(comando: list) -> None:
+    """Jarvis Ultron: roda o comando de desligar ou reiniciar e, se o sistema recusar (o Windows devolve 1190
+    quando já há um desligamento agendado), lança o erro: o _depois_do_ok avisa "Não consegui ..." em vez de
+    escrever "Feito"."""
+    resultado = subprocess.run(comando, capture_output=True)
+    if resultado.returncode:
+        saida = resultado.stderr or resultado.stdout or b""
+        if isinstance(saida, bytes):
+            try:
+                saida = saida.decode("oem")  # a saída dos comandos do Windows (no Brasil, o cp850)
+            except (LookupError, UnicodeDecodeError):
+                saida = saida.decode("utf-8", "replace")
+        raise RuntimeError(" ".join(str(saida).split()) or f"o sistema recusou (código {resultado.returncode})")
+
 def restart_computer():
     if _OS == "Windows":
-        subprocess.run(["shutdown", "/r", "/t", "10"], capture_output=True)
+        _energia(["shutdown", "/r", "/t", "10"])
     elif _OS == "Darwin":
-        subprocess.run(["osascript", "-e",
-            'tell application "System Events" to restart'],
-            capture_output=True)
+        _energia(["osascript", "-e",
+            'tell application "System Events" to restart'])
     else:
-        subprocess.run(["systemctl", "reboot"], capture_output=True)
+        _energia(["systemctl", "reboot"])
 
 def shutdown_computer():
     if _OS == "Windows":
-        subprocess.run(["shutdown", "/s", "/t", "10"], capture_output=True)
+        _energia(["shutdown", "/s", "/t", "10"])
     elif _OS == "Darwin":
-        subprocess.run(["osascript", "-e",
-            'tell application "System Events" to shut down'],
-            capture_output=True)
+        _energia(["osascript", "-e",
+            'tell application "System Events" to shut down'])
     else:
-        subprocess.run(["systemctl", "poweroff"], capture_output=True)
+        _energia(["systemctl", "poweroff"])
 
 ACTION_MAP: dict[str, callable] = {
     "volume_up":           volume_up,
@@ -704,7 +716,8 @@ def _has_explicit_computer_power_target(params: dict, description: str, value) -
 # Desligar ou reiniciar o PC, e escrever ou apertar teclas no programa da frente (TECLAS_PEDEM_OK), só
 # acontece com o "ok" dele conferido pelo core/aprovacao.py, como no approve_publication e nos vídeos. A
 # primeira chamada não faz nada: guarda o pedido, com a marca da fala atual dele, e devolve a pergunta com
-# o texto ou as teclas e a janela da frente (que também aparece na tela). Numa chamada seguinte com o MESMO
+# o texto ou as teclas e a janela da frente (que também aparece num aviso do Windows, perto do relógio, e no
+# alto da tela do Jarvis). Numa chamada seguinte com o MESMO
 # pedido (mesmo texto, mesma tecla, mesma janela, pelo número e pelo título), só faz se a PRIMEIRA fala nova
 # dele depois da pergunta for um "ok" claro; um "não", ou qualquer outra resposta, cancela. O confirmed=yes
 # que o modelo preenche não conta. O ok vale uma vez só e só para aquele pedido. Uma pergunta por vez:
@@ -785,6 +798,17 @@ def _log(jarvis, texto: str) -> None:
         ui.write_log(texto)
 
 
+def _mostrar_pergunta(jarvis, pergunta: str) -> None:
+    """A pergunta num aviso do Windows, perto do relógio, e no alto da tela do Jarvis (ui.notificar): o registro
+    (write_log) só aparece na tela antiga, embaixo do anel, e ao digitar o programa da frente cobre o Jarvis."""
+    notificar = getattr(getattr(jarvis, "ui", None), "notificar", None)
+    if callable(notificar):
+        try:
+            notificar("Pergunta", pergunta)
+        except Exception as erro:  # a pergunta falada continua valendo
+            print(f"[Settings] Could not show the question: {erro}")
+
+
 def _avisar(jarvis, aviso: str) -> None:
     anunciar = getattr(jarvis, "anunciar", None)
     if callable(anunciar):  # respeita o modo chamada: guarda o aviso até o "Hey Jarvis"
@@ -845,6 +869,7 @@ def _pedir_ok(jarvis, chave: tuple, o_que: str, janela, fazer) -> str:
             pergunta = f"Posso {o_que} {onde}?"
         pergunta += ' Para confirmar, diga "ok, pode fazer".'
         _log(jarvis, f"SYS: ✋ Antes de agir, pergunto: {pergunta}")
+        _mostrar_pergunta(jarvis, pergunta)
         return ("Not done yet: Jarvis needs the user's ok first. Ask the user now, in Portuguese, exactly this "
                 f"question: {pergunta} Then stop and wait for the answer. Only if the user's next answer is a "
                 "clear ok in their own words (for example 'ok, pode fazer'), call computer_settings again with "

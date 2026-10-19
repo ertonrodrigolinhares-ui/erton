@@ -2,9 +2,10 @@ Jarvis Ultron - versão 2026-10-19
 
 Novidades desta versão:
 - Desligar, reiniciar, digitar e apertar teclas só com o seu "ok": o Jarvis pergunta antes e diz
-  exatamente o que vai digitar ou que teclas vai apertar, e em que janela (a pergunta também aparece na
-  tela). Ele só faz se a sua resposta seguinte for "ok" (ou "ok, pode fazer"); "não", ou qualquer outra
-  resposta, cancela. Um "ok" dito antes da pergunta não vale, e o "ok" vale uma vez, só para aquilo.
+  exatamente o que vai digitar ou que teclas vai apertar, e em que janela (a pergunta também aparece
+  escrita num aviso do Windows, perto do relógio). Ele só faz se a sua resposta seguinte for "ok" (ou
+  "ok, pode fazer"); "não", ou qualquer outra resposta, cancela. Um "ok" dito antes da pergunta não
+  vale, e o "ok" vale uma vez, só para aquilo.
   Para digitar ou apertar teclas, responda falando, com o programa certo na frente (se você clicar no
   campo do Jarvis para digitar o "ok", a janela da frente passa a ser a dele, e na janela do próprio
   Jarvis ele nunca digita nem aperta teclas: ponha o programa certo na frente e peça de novo). Pedidos
@@ -19,8 +20,12 @@ Novidades desta versão:
   programa, o Jarvis não roda comandos (como "shutdown /s") nem abre os programas de desligar; e ele não
   abre nem cria programas, scripts e atalhos pelos arquivos (.exe, .bat, .py...). Abrir programas pelo
   nome, abrir documentos, fotos e pastas, o papel de parede e organizar a área de trabalho continuam. Um
-  nome que começa com um comando do PC, como "Docker Desktop" ou "PowerShell ISE", não abre por voz:
-  abra esses pelo menu Iniciar (o Git Bash abre normalmente).
+  nome que começa com um comando do PC, como "PowerShell 7" ou "Python IDLE", só abre por voz se o menu
+  Iniciar tiver um atalho com esse nome exato, como o "Docker Desktop"; sem o atalho, abra pelo menu
+  Iniciar (o Git Bash abre normalmente). "Abre o Claude" abre o aplicativo Claude (antes podia abrir, sem
+  janela, o Claude Code de terminal), e "abre o Painel de Controle" abre o Painel de Controle. Se o Windows
+  recusar desligar ou reiniciar (por exemplo, porque já há um desligamento marcado), o Jarvis avisa que não
+  conseguiu, em vez de dizer que fez.
 
 Versão anterior (2026-10-17):
 

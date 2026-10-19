@@ -43,16 +43,16 @@ Para cada passo, o que fazer e o que tem de acontecer.
    - Se ele abrir o WhatsApp ou digitar alguma coisa, feche o Jarvis na hora (botão direito no ícone →
      **Quit JARVIS**) e avise.
 8. **Reiniciar com "não":** salve o que estiver aberto antes, por garantia. Diga **"Jarvis, reinicia o
-   computador"**. Ele pergunta se pode reiniciar (a pergunta também aparece escrita na tela): responda
-   **"não"**.
+   computador"**. Ele pergunta se pode reiniciar (a pergunta também aparece escrita num aviso do Windows,
+   perto do relógio): responda **"não"**.
    - Nada acontece: o computador não reinicia, e o Windows não mostra aviso de que vai reiniciar.
    - Se ele reiniciar sem perguntar, ou se aparecer o aviso do Windows de que vai reiniciar, aperte
      Windows+R, digite `shutdown /a` e aperte Enter (isso cancela), feche o Jarvis e avise.
 9. **Digitar com "ok":** abra o **Bloco de Notas** e clique dentro dele. Diga **"Jarvis, digita olá
-   mundo"**. Ele pergunta antes, e a pergunta aparece na tela com o texto ("olá mundo") e o nome da
-   janela (algo como "Sem título - Bloco de Notas"). Responda **"ok, pode fazer"** (responda falando: se
-   clicar no campo do Jarvis para digitar, a janela da frente passa a ser a dele, e na janela dele o
-   Jarvis não digita nada).
+   mundo"**. Ele pergunta antes, e a pergunta aparece também num aviso do Windows, perto do relógio, com o
+   texto ("olá mundo") e o nome da janela (algo como "Sem título - Bloco de Notas"). Responda
+   **"ok, pode fazer"** (responda falando: se clicar no campo do Jarvis para digitar, a janela da frente
+   passa a ser a dele, e na janela dele o Jarvis não digita nada).
    - Uns segundos depois, "olá mundo" aparece no Bloco de Notas, uma vez só. Feche o Bloco de Notas sem
      salvar.
    - Se ele digitar sem perguntar, ou se a pergunta mostrar outra janela, responda "não", feche o Jarvis

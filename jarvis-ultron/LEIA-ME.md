@@ -417,9 +417,12 @@ no código. Elas foram **desligadas**: se você pedir, o Jarvis diz que não faz
   ("abre o Bloco de Notas", "abre o Git Bash"), mas não roda mais comandos (como "shutdown /s"), não abre
   os programas de desligar ou sair da conta e não abre nem cria programas, scripts e atalhos pelos
   arquivos (.exe, .bat, .ps1, .py, .lnk...). Antes, um pedido assim desligava o PC sem perguntar.
-  Documentos, fotos, vídeos e pastas abrem normalmente. Um nome que começa com um comando do PC, como
-  "Docker Desktop" ou "PowerShell ISE" ("docker" e "powershell" são comandos), não abre por voz, porque
-  a busca do menu Iniciar rodaria o resto do nome como parte do comando: abra esses pelo menu Iniciar.
+  Documentos, fotos, vídeos e pastas abrem normalmente. "Abre o Claude" abre o aplicativo Claude (e não o
+  Claude Code de terminal), e "abre o Painel de Controle" abre o Painel de Controle. Um nome que começa
+  com um comando do PC, como "PowerShell 7" ou "Python IDLE" ("powershell" e "python" são comandos), só
+  abre por voz se o menu Iniciar tiver um atalho com esse nome exato, como o "Docker Desktop" (ele abre
+  esse atalho). Sem o atalho, a busca do menu Iniciar rodaria o resto do nome como parte do comando: o
+  Jarvis diz que não abriu, e você abre esses pelo menu Iniciar.
 
 Os arquivos dessas ferramentas continuam na pasta por enquanto. Se alguma fizer falta, avise; para
 voltar na hora, abra o "Iniciar Jarvis Ultron" da pasta da versão anterior.
@@ -435,7 +438,8 @@ Espaço) **só acontecem com o seu "ok"**, conferido no código. Não é a IA qu
 1. Você pede, por exemplo: "Jarvis, digita olá mundo" ou "Jarvis, reinicia o computador".
 2. O Jarvis pergunta antes e diz exatamente o que vai digitar ou que teclas vai apertar, e em que janela.
    Por exemplo: *Posso digitar "olá mundo" na janela "Sem título - Bloco de Notas"?* A pergunta também
-   aparece escrita na tela.
+   aparece escrita num aviso do Windows, perto do relógio (e, por alguns segundos, no alto da janela do
+   Jarvis).
 3. Ele só faz se a sua **resposta seguinte** for um "ok" claro: **"ok"** ou **"ok, pode fazer"**. "Não",
    ou qualquer outra resposta, cancela. Um "ok" dito junto com o pedido, antes da pergunta, não vale.
    Para digitar ou apertar teclas, responda **falando**, com o programa certo na frente: se você clicar

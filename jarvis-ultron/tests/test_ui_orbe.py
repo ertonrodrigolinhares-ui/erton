@@ -3,13 +3,13 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import ANY, Mock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from PyQt6.QtGui import QPixmap
-from PyQt6.QtWidgets import QApplication, QWidget
+from PyQt6.QtWidgets import QApplication, QLabel, QWidget
 
 import ui
 import ui_orbe
@@ -124,6 +124,44 @@ class CenaTests(unittest.TestCase):
             win._orbe.ver_texto("Jarvis: São dez horas.")
             win._orbe.ver_texto("SYS: conectado")
             self.assertEqual(falas, [("VOCÊ", "que horas são?"), ("JARVIS", "São dez horas.")])
+        finally:
+            win.close()
+            win.deleteLater()
+
+    def test_pergunta_antes_de_agir_aparece_por_cima_do_anel(self):
+        # a pergunta do computer_settings ("Posso digitar ...?") vai pela ui.notificar: o registro (SYS:) fica
+        # embaixo da cena e o canal nem aparece na tela limpa (a padrão). O aviso do Windows, perto do relógio,
+        # leva o texto inteiro; o aviso da janela aparece por cima do anel
+        os.environ.pop("JARVIS_VISUAL", None)
+        os.environ.pop("JARVIS_CENA", None)
+        win = ui.MainWindow("face.png")
+        try:
+            for nome in ("_overlay", "_name_overlay"):
+                if getattr(win, nome, None) is not None:
+                    getattr(win, nome).hide()
+            win.resize(1366, 768)
+            win.show()
+            win._tray = Mock(isVisible=Mock(return_value=True))  # sem balão de verdade no PC de quem testa
+            cena, central = win._orbe.cena, win.centralWidget()
+            self.assertTrue(cena.isVisible())
+            self.assertEqual(cena.geometry(), central.rect())  # a cena cobre a janela inteira
+            jarvis_ui = object.__new__(ui.JarvisUI)
+            jarvis_ui._win = win
+            pergunta = ('Posso digitar "olá mundo" na janela "Sem título - Bloco de Notas"? Para confirmar, '
+                        'diga "ok, pode fazer".')
+            with patch("core.na_tela.executar", side_effect=lambda funcao: funcao()):
+                jarvis_ui.notificar("Pergunta", pergunta)
+            for _ in range(5):
+                self.app.processEvents()
+            win._tray.showMessage.assert_called_once_with("Jarvis · Pergunta", pergunta, ANY, 10000)
+            avisos = [t for t in central.findChildren(ui.ToastNotification) if t.isVisible()
+                      and any(pergunta in rotulo.text() for rotulo in t.findChildren(QLabel))]
+            self.assertEqual(len(avisos), 1)
+            aviso = avisos[0]
+            self.assertFalse(cena.isAncestorOf(aviso))
+            # o que aparece no meio do aviso é ele, e não a cena que cobre a janela
+            no_meio = central.childAt(aviso.geometry().center())
+            self.assertTrue(no_meio is aviso or aviso.isAncestorOf(no_meio), no_meio)
         finally:
             win.close()
             win.deleteLater()

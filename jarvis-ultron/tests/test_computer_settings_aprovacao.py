@@ -58,8 +58,8 @@ class JarvisFalso:
 
     def __init__(self, fala=""):
         self._fala_n, self._fala_texto = 0, ""
-        self.avisos, self.logs = [], []
-        self.ui = NS(write_log=self.logs.append)
+        self.avisos, self.logs, self.na_tela = [], [], []
+        self.ui = NS(write_log=self.logs.append, notificar=lambda titulo, texto: self.na_tela.append((titulo, texto)))
         if fala:
             self.falar(fala)
 
@@ -77,7 +77,7 @@ class BaseTests(unittest.TestCase):
     def setUp(self):
         self.teclado = Mock()
         self.sistema = Mock()
-        self.sistema.run.return_value = NS(returncode=1, stdout="", stderr="")
+        self.sistema.run.return_value = NS(returncode=0, stdout=b"", stderr=b"")
         self.ctypes = Mock()
         for alvo in (patch.object(cs, "_PYAUTOGUI", True), patch.object(cs, "pyautogui", self.teclado, create=True),
                      patch.object(cs, "_PYPERCLIP", False), patch.object(cs, "subprocess", self.sistema),
@@ -198,11 +198,25 @@ class DesligarEReiniciarTests(BaseTests):
         self.assertEqual(len(jarvis.avisos), 1)
         self.assertIn('Não vou reiniciar o computador: a sua resposta não foi um "ok" claro', jarvis.avisos[0])
 
-    def test_a_pergunta_aparece_na_tela(self):
+    def test_a_pergunta_aparece_num_aviso_na_tela(self):
+        # o registro (write_log) só aparece na tela antiga, embaixo do anel da tela azul, e ao digitar o programa
+        # da frente cobre o Jarvis: a pergunta vai também para o aviso do Windows, perto do relógio, e para o
+        # alto da tela do Jarvis (ui.notificar; o test_ui_orbe confere que esse aviso fica por cima do anel)
         jarvis = JarvisFalso("reinicia o computador")
         self.chamar(REINICIAR, jarvis)
-        self.assertTrue(any(log.startswith("SYS: ✋") and "Posso reiniciar o computador agora?" in log
-                            and '"ok, pode fazer"' in log for log in jarvis.logs), jarvis.logs)
+        pergunta = 'Posso reiniciar o computador agora? Salve antes o que estiver aberto. Para confirmar, diga "ok, pode fazer".'
+        self.assertEqual(jarvis.na_tela, [("Pergunta", pergunta)])
+        self.assertIn(f"SYS: ✋ Antes de agir, pergunto: {pergunta}", jarvis.logs)
+        # com o ok, não aparece outra pergunta; e sem a tela (ou com a tela fechando) a pergunta continua
+        jarvis.falar("ok, pode fazer")
+        self.assertIn("Approved", self.chamar(REINICIAR, jarvis))
+        self.assertEqual(len(jarvis.na_tela), 1)
+        for ui in (NS(write_log=print), NS(write_log=print, notificar=Mock(side_effect=OSError("tela fechou")))):
+            with self.subTest(ui=ui):
+                cs._pendente.clear()
+                jarvis = JarvisFalso("reinicia o computador")
+                jarvis.ui = ui
+                self.assertIn(pergunta, self.chamar(REINICIAR, jarvis))
 
     def test_alvo_explicito_e_desligar_o_jarvis_continuam(self):
         jarvis = JarvisFalso("reinicia")
@@ -230,6 +244,27 @@ class DesligarEReiniciarTests(BaseTests):
         self.assertIn("Approved", self.chamar(REINICIAR, jarvis))
         self.assertEqual(jarvis.avisos, ["Não consegui reiniciar o computador: shutdown não encontrado"])
         self.assertFalse(any("Feito com o seu ok" in log for log in jarvis.logs), jarvis.logs)
+
+    def test_windows_que_recusa_o_comando_avisa(self):
+        # "desliga o computador", ok, e logo "não, reinicia", ok: o Windows recusa o segundo (erro 1190, já há um
+        # desligamento agendado) e o PC desliga. O "Feito" seria mentira: o Erton ouve o aviso do Windows
+        self.sistema.run.return_value = NS(returncode=1190, stdout=b"",
+                                           stderr="Já foi agendado um desligamento do sistema.(1190)\r\n".encode("utf-8"))
+        jarvis = JarvisFalso("reinicia o computador")
+        self.chamar(REINICIAR, jarvis)
+        jarvis.falar("ok, pode fazer")
+        self.assertIn("Approved", self.chamar(REINICIAR, jarvis))
+        self.assertEqual(self.desligou(), [["shutdown", "/r", "/t", "10"]])
+        self.assertEqual(jarvis.avisos,
+                         ["Não consegui reiniciar o computador: Já foi agendado um desligamento do sistema.(1190)"])
+        self.assertFalse(any("Feito com o seu ok" in log for log in jarvis.logs), jarvis.logs)
+        # sem texto do Windows, o aviso diz o código; e o desligar também confere
+        self.sistema.run.return_value = NS(returncode=5, stdout=b"", stderr=b"")
+        jarvis = JarvisFalso("desliga o computador")
+        self.chamar(DESLIGAR, jarvis)
+        jarvis.falar("ok")
+        self.assertIn("Approved", self.chamar(DESLIGAR, jarvis))
+        self.assertEqual(jarvis.avisos, ["Não consegui desligar o computador: o sistema recusou (código 5)"])
 
 
 class TecladoTests(BaseTests):
@@ -306,17 +341,18 @@ class TecladoTests(BaseTests):
 
     def test_tecla_do_mapa_com_outra_janela_na_confirmacao_pergunta_de_novo(self):
         # a janela da frente entra também na chave das teclas do TECLAS_PEDEM_OK: o ok dado com o Bloco de
-        # Notas na frente não vale para o Enter, o Ctrl+V ou o Alt+F4 no WhatsApp
+        # Notas na frente não vale para o Enter, o Ctrl+V, o Alt+F4 ou o F5 (reload_n) no WhatsApp
         whats = (77, "Conversa com Ana - WhatsApp")
-        for acao in ("enter", "paste", "close_app"):
-            with self.subTest(acao=acao):
+        for args in ({"action": "enter"}, {"action": "paste"}, {"action": "close_app"},
+                     {"action": "reload_n", "value": "2"}):
+            with self.subTest(acao=args["action"]):
                 cs._pendente.clear()
-                jarvis, frente = JarvisFalso(f"faz {acao}"), [JANELA]
+                jarvis, frente = JarvisFalso(f"faz {args['action']}"), [JANELA]
                 with patch.object(cs, "_janela_da_frente", side_effect=lambda: frente[0]):
-                    self.assertIn('na janela "Sem título - Bloco de Notas"', self.chamar({"action": acao}, jarvis))
+                    self.assertIn('na janela "Sem título - Bloco de Notas"', self.chamar(args, jarvis))
                     jarvis.falar("ok, pode fazer")
                     frente[0] = whats  # o WhatsApp vem para a frente antes da confirmação
-                    resposta = self.chamar({"action": acao}, jarvis)
+                    resposta = self.chamar(args, jarvis)
                 self.assertIn("Not done yet", resposta)
                 self.assertIn('na janela "Conversa com Ana - WhatsApp"', resposta)
         self.assertEqual(self.teclado.method_calls, [])
@@ -395,6 +431,24 @@ class TecladoTests(BaseTests):
             jarvis.falar("ok, pode fazer")
             self.assertIn("Approved", self.chamar(args, jarvis))
         self.assertEqual(self.teclado.method_calls, [])
+        self.assertIn("a janela da frente mudou", jarvis.avisos[0])
+        # dois Blocos de Notas "Sem título" (ou duas janelas do Chrome na mesma página): o mesmo título, outra
+        # janela. O número conta, antes da confirmação e entre o ok e a digitação
+        outro = (43, JANELA[1])
+        cs._pendente.clear()
+        jarvis = JarvisFalso("digita oi e aperta enter")
+        with patch.object(cs, "_janela_da_frente", side_effect=[JANELA, outro]):
+            self.chamar(args, jarvis)
+            jarvis.falar("ok, pode fazer")
+            self.assertIn("Not done yet", self.chamar(args, jarvis))
+        cs._pendente.clear()
+        jarvis = JarvisFalso("digita oi e aperta enter")
+        with patch.object(cs, "_janela_da_frente", side_effect=[JANELA, JANELA, outro]):
+            self.chamar(args, jarvis)
+            jarvis.falar("ok, pode fazer")
+            self.assertIn("Approved", self.chamar(args, jarvis))
+        self.assertEqual(self.teclado.method_calls, [])
+        self.assertEqual(len(jarvis.avisos), 1)
         self.assertIn("a janela da frente mudou", jarvis.avisos[0])
 
     def test_marca_de_nao_salvo_no_titulo_e_a_mesma_janela(self):
@@ -627,6 +681,29 @@ class JanelaDoJarvisTests(BaseTests):
             self.assertIn("has not answered", self.chamar(REINICIAR, jarvis))
         self.assertEqual(digitado, [])
         self.assertEqual(self.desligou(), [])
+
+    def test_ok_digitado_no_campo_do_jarvis_depois_da_pergunta(self):
+        # o caso do LEIA-ME (item 3): a pergunta é feita com o Bloco de Notas na frente, e o Erton clica no campo
+        # do Jarvis e digita o "ok", que passa a ser a janela da frente. Nada é digitado, e o Jarvis não faz uma
+        # pergunta nova "na janela do Jarvis", que um segundo "ok" aprovaria: o fio digitaria "sim" + Enter no
+        # campo dele. Com o Bloco de Notas de volta na frente, a pergunta é feita de novo (os "ok" não valem)
+        args = {"action": "type_text", "value": "sim", "press_enter": "true"}
+        jarvis, frente = JarvisFalso("digita sim e aperta enter"), [JANELA]
+        with patch.object(cs, "_janela_da_frente", side_effect=lambda: frente[0]):
+            respostas = [self.chamar(args, jarvis)]
+            frente[0] = JANELA_DO_JARVIS
+            for _ in range(2):
+                jarvis.falar("ok, pode fazer")
+                respostas.append(self.chamar(args, jarvis))
+            frente[0] = JANELA
+            de_volta = self.chamar(args, jarvis)
+        self.assertIn('na janela "Sem título - Bloco de Notas"', respostas[0])
+        for resposta in respostas[1:]:
+            self.assertIn("Not done: the window in front is Jarvis itself", resposta)
+        self.assertIn("Not done yet", de_volta)
+        self.assertFalse(any('na janela "J.A.R.V.I.S' in texto for texto in respostas + jarvis.logs))
+        self.assertEqual(self.teclado.method_calls, [])
+        self.assertEqual(jarvis.avisos, [])
 
     def test_janela_do_jarvis_pelo_programa_dono(self):
         # o painel Ultron e as outras janelas da tela têm outro título: vale o programa dono da janela, que é
