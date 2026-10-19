@@ -44,9 +44,8 @@ lista escrita à mão).
 - `send_message` e `prepare_message_reply` (digitavam e podiam enviar no WhatsApp, Telegram e Discord) e
   `check_messages` (lia as mensagens; sai junto porque o Erton não usa mensagens): **desligadas**.
 - `agent_task` (escrevia e rodava código gerado pela IA, em `agent/executor.py`): **desligada**.
-- `code_helper` e `dev_agent` (rodavam código e `pip install`): **desligadas**. O `code_helper` continua
-  na `CLOUD_SAFE_ACTIONS` (modo servidor, que sai nas Etapas 11 e 14): lá ele também não é mais
-  oferecido (não está declarado) e, chamado, responde que está desligado.
+- `code_helper` e `dev_agent` (rodavam código e `pip install`): **desligadas**. O `code_helper` saiu
+  também da `CLOUD_SAFE_ACTIONS` (modo servidor): lá só é oferecido o que está declarado.
 - `computer_control` (clicava e digitava em qualquer lugar): **desligada**.
 - `game_updater` (podia desligar o PC): **desligada**.
 

@@ -484,6 +484,7 @@ class DesligadasTests(unittest.TestCase):
         oferecidas = main.get_tool_declarations()
         self.assertEqual({d["name"] for d in oferecidas} & set(DESLIGADAS), set())
         self.assertEqual(set(main.JarvisLive.RESERVA_FERRAMENTAS_ESSENCIAIS) & set(DESLIGADAS), set())
+        self.assertEqual(set(main.CLOUD_SAFE_ACTIONS) & set(DESLIGADAS), set())  # nem no modo servidor
         # nem o texto de outra ferramenta manda o Gemini para uma delas
         texto = json.dumps(oferecidas, ensure_ascii=False)
         self.assertEqual({nome for nome in DESLIGADAS if re.search(rf"\b{nome}\b", texto)}, set())

@@ -1102,7 +1102,6 @@ CLOUD_SAFE_ACTIONS = frozenset({
     "create_presentation",
     "flight_finder",
     "email_control",
-    "code_helper",
     "youtube_video",
 })
 
