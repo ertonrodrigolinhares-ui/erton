@@ -50,8 +50,6 @@ media_control = _lazy_action("actions.media_control", "media_control")
 desktop_control = _lazy_action("actions.desktop", "desktop_control")
 browser_control = _lazy_action("actions.browser_control", "browser_control")
 file_controller = _lazy_action("actions.file_controller", "file_controller")
-code_helper = _lazy_action("actions.code_helper", "code_helper")
-dev_agent = _lazy_action("actions.dev_agent", "dev_agent")
 web_search_action = _lazy_action("actions.web_search", "web_search")
 computer_control = _lazy_action("actions.computer_control", "computer_control")
 game_updater = _lazy_action("actions.game_updater", "game_updater")
@@ -758,38 +756,6 @@ TOOL_DECLARATIONS = [
         }
     },
     {
-        "name": "code_helper",
-        "description": "Writes, edits, explains, runs, or builds code files.",
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "action":      {"type": "STRING", "description": "write | edit | explain | run | build | auto (default: auto)"},
-                "description": {"type": "STRING", "description": "What the code should do or what change to make"},
-                "language":    {"type": "STRING", "description": "Programming language (default: python)"},
-                "output_path": {"type": "STRING", "description": "Where to save the file"},
-                "file_path":   {"type": "STRING", "description": "Path to existing file for edit/explain/run/build"},
-                "code":        {"type": "STRING", "description": "Raw code string for explain"},
-                "args":        {"type": "STRING", "description": "CLI arguments for run/build"},
-                "timeout":     {"type": "INTEGER", "description": "Execution timeout in seconds (default: 30)"},
-            },
-            "required": ["action"]
-        }
-    },
-    {
-        "name": "dev_agent",
-        "description": "Builds complete multi-file projects from scratch: plans, writes files, installs deps, opens VSCode, runs and fixes errors.",
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "description":  {"type": "STRING", "description": "What the project should do"},
-                "language":     {"type": "STRING", "description": "Programming language (default: python)"},
-                "project_name": {"type": "STRING", "description": "Optional project folder name"},
-                "timeout":      {"type": "INTEGER", "description": "Run timeout in seconds (default: 30)"},
-            },
-            "required": ["description"]
-        }
-    },
-    {
         "name": "computer_control",
         "description": "Direct computer control: type, click, hotkeys, scroll, move mouse, screenshots, find elements on screen.",
         "parameters": {
@@ -949,8 +915,8 @@ TOOL_DECLARATIONS = [
         "description": (
             "Creates, edits, redesigns, or extends an editable Microsoft PowerPoint (.pptx) presentation. "
             "Use this directly whenever the user asks to make a PowerPoint, presentation, "
-            "slide deck, pitch deck, briefing deck, or slideshow. Do not use code_helper, "
-            "file_processor, or computer_control. First ask whether the user wants "
+            "slide deck, pitch deck, briefing deck, or slideshow. Do not use "
+            "file_processor or computer_control. First ask whether the user wants "
             "a native 3D model, then ask whether they want to see the task or keep it in the background."
         ),
         "parameters": {
@@ -1243,6 +1209,8 @@ FERRAMENTAS_DESLIGADAS = {
     "prepare_message_reply": "drafting and sending message replies",
     "check_messages": "reading messages and contacts",
     "agent_task": "multi-step tasks that write and run AI-generated code",
+    "code_helper": "writing, running and building code",
+    "dev_agent": "building projects, installing packages and running code",
 }
 
 
@@ -2693,14 +2661,6 @@ class JarvisLive:
 
             elif name == "desktop_control":
                 r = await asyncio.to_thread(lambda: desktop_control(parameters=args, player=self.ui))
-                result = r or "Done."
-
-            elif name == "code_helper":
-                r = await asyncio.to_thread(lambda: code_helper(parameters=args, player=self.ui, speak=self.speak))
-                result = r or "Done."
-
-            elif name == "dev_agent":
-                r = await asyncio.to_thread(lambda: dev_agent(parameters=args, player=self.ui, speak=self.speak))
                 result = r or "Done."
 
             elif name == "web_search":

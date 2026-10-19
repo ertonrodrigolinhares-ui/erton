@@ -208,8 +208,6 @@ RESPOSTAS_PADRAO = (
     ("browser_control", {}, "Done."),
     ("file_controller", {"action": "list"}, "Done."),
     ("desktop_control", {}, "Done."),
-    ("code_helper", {}, "Done."),
-    ("dev_agent", {}, "Done."),
     ("computer_control", {}, "Done."),
     ("game_updater", {}, "Done."),
     ("flight_finder", {}, "Done."),
@@ -236,8 +234,7 @@ ACAO = {
     "youtube_video": ("main", "youtube_video"), "media_control": ("main", "media_control"),
     "screen_process": ("main", "screen_process"), "computer_settings": ("main", "computer_settings"),
     "browser_control": ("main", "browser_control"), "file_controller": ("main", "file_controller"),
-    "desktop_control": ("main", "desktop_control"), "code_helper": ("main", "code_helper"),
-    "dev_agent": ("main", "dev_agent"), "computer_control": ("main", "computer_control"),
+    "desktop_control": ("main", "desktop_control"), "computer_control": ("main", "computer_control"),
     "game_updater": ("main", "game_updater"), "flight_finder": ("main", "flight_finder"),
     "deep_research": ("main", "request_deep_research"), "create_presentation": ("main", "request_presentation"),
     "file_processor": ("main", "file_processor"),
@@ -260,6 +257,8 @@ DESLIGADAS = {
     "prepare_message_reply": ("actions.send_message",),
     "check_messages": ("actions.message_monitor", "actions.send_message"),
     "agent_task": ("agent.executor", "agent.planner"),
+    "code_helper": ("actions.code_helper",),
+    "dev_agent": ("actions.dev_agent",),
 }
 
 

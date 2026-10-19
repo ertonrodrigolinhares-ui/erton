@@ -8690,7 +8690,7 @@ class MainWindow(QMainWindow):
         tl = text.lower()
 
         # Context mode detection
-        if any(k in tl for k in ("code_helper", "dev_agent", "coding", "python", "javascript")):
+        if any(k in tl for k in ("coding", "python", "javascript")):
             mode = "coding"
         elif any(k in tl for k in ("file_processor", "screen_process", "analyzing", "document")):
             mode = "analyzing"
@@ -8723,8 +8723,6 @@ class MainWindow(QMainWindow):
             "desktop_control": "Desktop Control",
             "email_control": "Email",
             "media_control": "Media Control",
-            "code_helper": "Code Assistant",
-            "dev_agent": "Dev Agent",
             "web_search": "Web Search",
             "file_processor": "File Processor",
             "computer_control": "Computer Control",

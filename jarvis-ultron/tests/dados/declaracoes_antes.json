@@ -539,78 +539,6 @@
     }
   },
   {
-    "name": "code_helper",
-    "description": "Writes, edits, explains, runs, or builds code files.",
-    "parameters": {
-      "type": "OBJECT",
-      "properties": {
-        "action": {
-          "type": "STRING",
-          "description": "write | edit | explain | run | build | auto (default: auto)"
-        },
-        "description": {
-          "type": "STRING",
-          "description": "What the code should do or what change to make"
-        },
-        "language": {
-          "type": "STRING",
-          "description": "Programming language (default: python)"
-        },
-        "output_path": {
-          "type": "STRING",
-          "description": "Where to save the file"
-        },
-        "file_path": {
-          "type": "STRING",
-          "description": "Path to existing file for edit/explain/run/build"
-        },
-        "code": {
-          "type": "STRING",
-          "description": "Raw code string for explain"
-        },
-        "args": {
-          "type": "STRING",
-          "description": "CLI arguments for run/build"
-        },
-        "timeout": {
-          "type": "INTEGER",
-          "description": "Execution timeout in seconds (default: 30)"
-        }
-      },
-      "required": [
-        "action"
-      ]
-    }
-  },
-  {
-    "name": "dev_agent",
-    "description": "Builds complete multi-file projects from scratch: plans, writes files, installs deps, opens VSCode, runs and fixes errors.",
-    "parameters": {
-      "type": "OBJECT",
-      "properties": {
-        "description": {
-          "type": "STRING",
-          "description": "What the project should do"
-        },
-        "language": {
-          "type": "STRING",
-          "description": "Programming language (default: python)"
-        },
-        "project_name": {
-          "type": "STRING",
-          "description": "Optional project folder name"
-        },
-        "timeout": {
-          "type": "INTEGER",
-          "description": "Run timeout in seconds (default: 30)"
-        }
-      },
-      "required": [
-        "description"
-      ]
-    }
-  },
-  {
     "name": "computer_control",
     "description": "Direct computer control: type, click, hotkeys, scroll, move mouse, screenshots, find elements on screen.",
     "parameters": {
@@ -888,7 +816,7 @@
   },
   {
     "name": "create_presentation",
-    "description": "Creates, edits, redesigns, or extends an editable Microsoft PowerPoint (.pptx) presentation. Use this directly whenever the user asks to make a PowerPoint, presentation, slide deck, pitch deck, briefing deck, or slideshow. Do not use code_helper, file_processor, or computer_control. First ask whether the user wants a native 3D model, then ask whether they want to see the task or keep it in the background.",
+    "description": "Creates, edits, redesigns, or extends an editable Microsoft PowerPoint (.pptx) presentation. Use this directly whenever the user asks to make a PowerPoint, presentation, slide deck, pitch deck, briefing deck, or slideshow. Do not use file_processor or computer_control. First ask whether the user wants a native 3D model, then ask whether they want to see the task or keep it in the background.",
     "parameters": {
       "type": "OBJECT",
       "properties": {

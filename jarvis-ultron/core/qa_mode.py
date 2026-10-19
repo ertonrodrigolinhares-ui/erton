@@ -118,6 +118,8 @@ def guard_tool_call(name: str, args: dict[str, Any] | None = None) -> QAGuardDec
     if tool == "save_memory" and not _opt_in("JARVIS_QA_ALLOW_MEMORY"):
         return QAGuardDecision(False, "QA memory writes require JARVIS_QA_ALLOW_MEMORY=1.")
 
+    # code_helper e dev_agent estão desligadas no Jarvis Ultron (Etapa 3 da reorganização): ficam aqui
+    # como trava a mais até os arquivos delas saírem (Etapa 18).
     write_capable = {
         "file_controller", "file_processor", "code_helper", "dev_agent",
         "create_presentation",

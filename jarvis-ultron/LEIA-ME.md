@@ -403,6 +403,9 @@ no código. Elas foram **desligadas**: se você pedir, o Jarvis diz que não faz
 - **"Faça tal tarefa no PC"** (o agente antigo, de vários passos): ele escrevia e rodava programas
   feitos pela IA, sem mostrar nada antes. Para tarefas grandes, peça ao Claude ("Jarvis, pede para o
   Claude ...") ou ao Hermes.
+- **O programador antigo** (escrever, rodar e montar programas, criar projetos e instalar
+  componentes): ele rodava código e instalava coisas no PC sem o seu "ok". Para escrever um programa,
+  peça ao Claude: ele escreve na pasta dele e não roda nada sozinho.
 
 Os arquivos dessas ferramentas continuam na pasta por enquanto. Se alguma fizer falta, avise; para
 voltar na hora, abra o "Iniciar Jarvis Ultron" da pasta da versão anterior.

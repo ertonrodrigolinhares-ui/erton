@@ -7,6 +7,8 @@ Novidades desta versão:
     Discord, Instagram), porque você não usa.
   - "faça tal tarefa no PC" (o agente antigo): escrevia e rodava programas feitos pela IA sem
     mostrar antes. Para tarefas grandes, use o Claude ou o Hermes.
+  - o programador antigo (escrever, rodar e montar programas): rodava código e instalava
+    componentes sem o seu "ok". Para escrever um programa, peça ao Claude.
 - Reserva com outra empresa (Cerebras, OpenRouter, Mistral, DeepSeek, OpenAI...) quando o limite do
   Groq acaba: JARVIS_RESERVA e JARVIS_RESERVA_CHAVE no .env; ficam em fila com o Groq.
 - "Instalar voz local": transcrição da voz no PC para o modo privado (o Iniciar também instala sozinho).
