@@ -14,8 +14,9 @@
 # test_botao_roda_automacao_direto_e_fecha falhou uma vez; depois passou em todas as rodadas (inteiras,
 # só o arquivo e só ele, 12 vezes), por isso não entrou como "instavel". Se voltar a falhar, investigar.
 #
-# 1 teste do tests/test_action_helpers.py: a normalização do open_app (a Etapa 2 decide se é defeito).
-tests/test_action_helpers.py::ActionHelperTests::test_open_app_normalization_removes_polite_noise
+# O teste da normalização do open_app (tests/test_action_helpers.py) também saiu da lista: não era
+# defeito, era teste velho. Ele esperava o nome do macOS ("Google Chrome") em qualquer sistema; no
+# Windows o open_app dá "chrome", que é o certo. O teste foi ajustado para o Windows e passa.
 #
 # 1 defeito de verdade, só visual (anotado na Etapa 2): a tela da chave do Gemini nasce com a posição
 # calculada antes de a janela abrir (a área do meio ainda com 640x480) e nada a traz para o centro depois:

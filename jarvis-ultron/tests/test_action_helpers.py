@@ -33,7 +33,10 @@ class ActionHelperTests(unittest.TestCase):
         self.assertEqual(browser_control._normalize_url("http://localhost:8000"), "http://localhost:8000")
 
     def test_open_app_normalization_removes_polite_noise(self):
-        self.assertEqual(open_app._normalize("Please open Google Chrome"), "Google Chrome")
+        # Jarvis Ultron: o teste antigo esperava o nome do macOS ("Google Chrome") em qualquer sistema;
+        # o Jarvis roda no Windows, onde o nome certo para abrir o Chrome é "chrome"
+        with patch.object(open_app, "_SYSTEM", "Windows"):
+            self.assertEqual(open_app._normalize("Please open Google Chrome"), "chrome")
 
     def test_successful_macos_direct_launch_has_no_artificial_post_wait(self):
         completed = MagicMock(returncode=0)
