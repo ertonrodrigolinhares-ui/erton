@@ -41,6 +41,7 @@ _APP_ALIASES: dict[str, dict[str, str]] = {
     "powershell":         {"Windows": "powershell.exe",          "Darwin": "Terminal",             "Linux": "bash"},
     "postman":            {"Windows": "Postman",                 "Darwin": "Postman",              "Linux": "postman"},
     "git":                {"Windows": "git-bash",                "Darwin": "Terminal",             "Linux": "bash"},
+    "git bash":           {"Windows": "git-bash",                "Darwin": "Terminal",             "Linux": "bash"},
     "figma":              {"Windows": "Figma",                   "Darwin": "Figma",                "Linux": "figma"},
     "blender":            {"Windows": "blender",                 "Darwin": "Blender",              "Linux": "blender"},
     "word":               {"Windows": "winword",                 "Darwin": "Microsoft Word",       "Linux": "libreoffice --writer"},
@@ -85,7 +86,8 @@ def _normalize(raw: str) -> str:
 # (& | < > ^ % ") ou com caractere de controle é recusado; e os programas que desligam, reiniciam ou
 # saem da conta não abrem por aqui, nem sem argumento (o logoff sai da conta na hora; no Linux, o
 # shutdown desliga em 1 minuto). Desligar e reiniciar só pelo computer_settings, com o "ok" do Erton.
-# Antes, "shutdown.exe /s /t 0" desligava o PC na hora.
+# Antes, "shutdown.exe /s /t 0" desligava o PC na hora. Um nome conhecido (_APP_ALIASES, como "git bash")
+# é conferido e aberto pelo apelido, que é fixo: as palavras ditas não vão para a busca do menu Iniciar.
 _DESLIGAM = {"shutdown", "logoff", "logout", "tsdiscon", "slidetoshutdown", "psshutdown", "psshutdown64",
              "rundll32", "poweroff", "reboot", "halt", "gnome-session-quit"}
 _SINAIS_DO_CMD = re.compile(r'[&|<>^%"`\\\x00-\x1f\x7f]')
@@ -103,11 +105,15 @@ def _recusa(app_name: str, sistema: str) -> str | None:
     endereco = _ENDERECO.fullmatch(app_name)
     palavras = app_name.split()
     if _SINAIS_DO_CMD.search(app_name) or (endereco and endereco.group(1).lower() == "file") or (
-            not endereco and ("/" in app_name or re.search(r"\s-", app_name)
-                              or (len(palavras) > 1 and shutil.which(palavras[0])))):
+            not endereco and ("/" in app_name or re.search(r"\s-", app_name))):
         return (f"Not opened: open_app opens an application by its name only, and '{app_name}' has command "
                 "arguments, a path or special characters. Use file_controller for files and folders, and "
                 "browser_control for websites.")
+    if len(palavras) > 1 and shutil.which(palavras[0]):  # "powershell Stop-Computer" rodaria pela busca
+        return (f"Not opened: '{app_name}' starts with '{palavras[0]}', a command on this PC, and the Start "
+                "menu search would run the rest of the name as that command's arguments. open_app opens an "
+                "application by its name only. Tell the user, in one short Portuguese sentence, to open it "
+                "from the Start menu.")
     return None
 
 
@@ -264,7 +270,9 @@ def open_app(
     if launcher is None:
         return f"Unsupported operating system: {_SYSTEM}"
 
-    recusa = _recusa(app_name, _SYSTEM)
+    # nome conhecido: confere o apelido, que é o que abre (a volta pelo nome dito passa de novo pelo _recusa)
+    conhecido = app_name.lower() in _APP_ALIASES
+    recusa = _recusa(_normalize(app_name) if conhecido else app_name, _SYSTEM)
     if recusa:
         print(f"[open_app] Refused: {app_name!r}")
         return recusa

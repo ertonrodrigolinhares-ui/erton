@@ -127,20 +127,28 @@ class LeiaMeBateComOCodigoTests(unittest.TestCase):
         self.assertIn("ir para a barra de endereço", (RAIZ / "core" / "SEGURANCA.md").read_text(encoding="utf-8"))
 
     def test_leia_me_conta_o_ok_falado_uma_pergunta_por_vez_e_a_aba(self):
-        # o ok DIGITADO no campo do Jarvis põe a janela do Jarvis na frente: para digitar ou apertar teclas,
-        # ele pergunta de novo, agora com a janela do Jarvis (test_computer_settings_aprovacao); duas ações
-        # pedidas juntas vão uma de cada vez; outra aba do navegador é outra janela; e texto de várias linhas
-        # não é digitado
+        # o ok DIGITADO no campo do Jarvis põe a janela do Jarvis na frente, e nela o Jarvis nunca digita nem
+        # aperta teclas: o texto viraria uma fala do Erton (test_computer_settings_aprovacao,
+        # JanelaDoJarvisTests); duas ações pedidas juntas vão uma de cada vez; outra aba do navegador é outra
+        # janela; texto de várias linhas não é digitado; e a tecla Sleep pergunta se pode suspender
+        import actions.computer_settings as cs
+
         ok = _secao("## Antes de desligar, reiniciar, digitar ou apertar teclas, o Jarvis pergunta")
-        for trecho in ('responda **falando**', "campo do Jarvis", 'responder "não"', "uma de cada vez",
-                       "outra aba do navegador", "numa linha só"):
+        for trecho in ('responda **falando**', "campo do Jarvis",
+                       "**na janela do próprio Jarvis ele nunca digita nem aperta teclas**", "uma de cada vez",
+                       "outra aba do navegador", "numa linha só", "tecla Sleep, que suspende o computador"):
             self.assertIn(trecho, ok)
+        self.assertNotIn('responder "não"', ok)  # antes ele perguntava de novo com a janela dele
+        self.assertEqual(cs.TECLAS_DE_ENERGIA, {"sleep": "suspender o computador"})
         novidades = _uma_linha(VERSAO[:VERSAO.index("Versão anterior")])
-        for trecho in ("responda falando", "uma de cada vez", "numa linha só"):
+        for trecho in ("responda falando", "uma de cada vez", "numa linha só",
+                       "na janela do próprio Jarvis ele nunca digita nem aperta teclas",
+                       "A tecla Sleep, que suspende o computador, também pergunta"):
             self.assertIn(trecho, novidades)
         roteiro = _uma_linha((RAIZ / "dev" / "ROTEIRO_DE_5_MINUTOS.md").read_text(encoding="utf-8"))
         digitar = roteiro[roteiro.index('**Digitar com "ok":**'):roteiro.index("**F2:**")]
         self.assertIn("responda falando", digitar)
+        self.assertIn("na janela dele o Jarvis não digita nada", digitar)
 
     def test_outras_portas_de_desligar_e_de_digitar_estao_contadas(self):
         # o LEIA-ME e o VERSAO prometem que desligar e reiniciar só acontecem com o "ok": o open_app (comando
@@ -148,6 +156,7 @@ class LeiaMeBateComOCodigoTests(unittest.TestCase):
         # com o teclado) também desligavam ou digitavam sem pergunta (tests/test_outras_portas.py). O mapa
         # das travas e o LEIA-ME contam onde cada porta foi fechada
         import actions.desktop as desktop
+        import actions.open_app as oa
         import main
 
         declaracao = next(d for d in main.get_tool_declarations() if d["name"] == "desktop_control")
@@ -165,6 +174,13 @@ class LeiaMeBateComOCodigoTests(unittest.TestCase):
         novidades = _uma_linha(VERSAO[:VERSAO.index("Versão anterior")])
         for trecho in ("tarefas livres na área de trabalho", "não roda comandos", "não abre nem cria programas"):
             self.assertIn(trecho, novidades)
+        # o open_app recusa um nome desconhecido que começa com um comando do PC ("Docker Desktop": a busca do
+        # menu Iniciar rodaria "docker Desktop"); o Erton precisa saber que esses abrem pelo menu Iniciar
+        for texto in (secao, novidades):
+            for trecho in ("começa com um comando do PC", '"Docker Desktop"', "pelo menu Iniciar"):
+                self.assertIn(trecho, texto)
+        self.assertIn("git bash", oa._APP_ALIASES)
+        self.assertIn('"abre o Git Bash"', secao)
 
     def test_o_x_da_janela_so_esconde_o_jarvis(self):
         secao = _secao("## Tela e cérebro separados")

@@ -51,7 +51,8 @@ Para cada passo, o que fazer e o que tem de acontecer.
 9. **Digitar com "ok":** abra o **Bloco de Notas** e clique dentro dele. Diga **"Jarvis, digita olá
    mundo"**. Ele pergunta antes, e a pergunta aparece na tela com o texto ("olá mundo") e o nome da
    janela (algo como "Sem título - Bloco de Notas"). Responda **"ok, pode fazer"** (responda falando: se
-   clicar no campo do Jarvis para digitar, a janela da frente passa a ser a dele).
+   clicar no campo do Jarvis para digitar, a janela da frente passa a ser a dele, e na janela dele o
+   Jarvis não digita nada).
    - Uns segundos depois, "olá mundo" aparece no Bloco de Notas, uma vez só. Feche o Bloco de Notas sem
      salvar.
    - Se ele digitar sem perguntar, ou se a pergunta mostrar outra janela, responda "não", feche o Jarvis

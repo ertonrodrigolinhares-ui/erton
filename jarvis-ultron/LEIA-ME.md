@@ -414,10 +414,12 @@ no código. Elas foram **desligadas**: se você pedir, o Jarvis diz que não faz
   à IA e o rodava com o teclado e o mouse, sem mostrar antes, e podia digitar e apertar Enter em qualquer
   janela. Papel de parede, organizar, limpar e listar a área de trabalho continuam.
 - **Abrir ou criar programas pelo nome ou por arquivo**: o Jarvis continua abrindo programas pelo nome
-  ("abre o Bloco de Notas"), mas não roda mais comandos (como "shutdown /s"), não abre os programas de
-  desligar ou sair da conta e não abre nem cria programas, scripts e atalhos pelos arquivos (.exe, .bat,
-  .ps1, .py, .lnk...). Antes, um pedido assim desligava o PC sem perguntar. Documentos, fotos, vídeos e
-  pastas abrem normalmente.
+  ("abre o Bloco de Notas", "abre o Git Bash"), mas não roda mais comandos (como "shutdown /s"), não abre
+  os programas de desligar ou sair da conta e não abre nem cria programas, scripts e atalhos pelos
+  arquivos (.exe, .bat, .ps1, .py, .lnk...). Antes, um pedido assim desligava o PC sem perguntar.
+  Documentos, fotos, vídeos e pastas abrem normalmente. Um nome que começa com um comando do PC, como
+  "Docker Desktop" ou "PowerShell ISE" ("docker" e "powershell" são comandos), não abre por voz, porque
+  a busca do menu Iniciar rodaria o resto do nome como parte do comando: abra esses pelo menu Iniciar.
 
 Os arquivos dessas ferramentas continuam na pasta por enquanto. Se alguma fizer falta, avise; para
 voltar na hora, abra o "Iniciar Jarvis Ultron" da pasta da versão anterior.
@@ -437,9 +439,10 @@ Espaço) **só acontecem com o seu "ok"**, conferido no código. Não é a IA qu
 3. Ele só faz se a sua **resposta seguinte** for um "ok" claro: **"ok"** ou **"ok, pode fazer"**. "Não",
    ou qualquer outra resposta, cancela. Um "ok" dito junto com o pedido, antes da pergunta, não vale.
    Para digitar ou apertar teclas, responda **falando**, com o programa certo na frente: se você clicar
-   no campo do Jarvis para digitar o "ok", a janela da frente passa a ser a do Jarvis, e ele pergunta de
-   novo, agora com a janela dele. Aí é só responder "não" e pedir de novo. (Para desligar e reiniciar, o
-   "ok" digitado também vale.)
+   no campo do Jarvis para digitar o "ok", a janela da frente passa a ser a do Jarvis, e **na janela do
+   próprio Jarvis ele nunca digita nem aperta teclas** (o que ele digitasse ali contaria como uma fala
+   sua): ele diz que não fez. Aí é só pôr o programa certo na frente e pedir de novo. (Para desligar e
+   reiniciar, o "ok" digitado também vale.)
 4. O "ok" vale para aquilo, uma vez só. Outro texto, outra tecla ou outra janela na frente (também outra
    aba do navegador): ele pergunta de novo. Se a janela da frente mudar depois do seu "ok", ele não digita
    nada e avisa.
@@ -448,7 +451,8 @@ Espaço) **só acontecem com o seu "ok"**, conferido no código. Não é a IA qu
 6. O texto vai numa linha só: com quebra de linha, tab ou caractere invisível no meio, ele não digita.
 
 Reiniciar e desligar acontecem uns 10 segundos depois do "ok" (dá tempo de salvar algo). Para cancelar
-nesse tempo: aperte Windows+R, digite `shutdown /a` e aperte Enter.
+nesse tempo: aperte Windows+R, digite `shutdown /a` e aperte Enter. Apertar a tecla Sleep, que suspende o
+computador, também pergunta antes, e a pergunta diz que ele vai suspender o computador.
 
 Continuam sem perguntar, porque não escrevem nem apertam teclas no programa da frente: volume, brilho,
 Wi-Fi, tema escuro, apagar a tela, rolar a página com o mouse, minimizar, maximizar e encaixar janelas,

@@ -6,8 +6,10 @@ Novidades desta versão:
   tela). Ele só faz se a sua resposta seguinte for "ok" (ou "ok, pode fazer"); "não", ou qualquer outra
   resposta, cancela. Um "ok" dito antes da pergunta não vale, e o "ok" vale uma vez, só para aquilo.
   Para digitar ou apertar teclas, responda falando, com o programa certo na frente (se você clicar no
-  campo do Jarvis para digitar o "ok", ele pergunta de novo com a janela dele: responda "não"). Pedidos
+  campo do Jarvis para digitar o "ok", a janela da frente passa a ser a dele, e na janela do próprio
+  Jarvis ele nunca digita nem aperta teclas: ponha o programa certo na frente e peça de novo). Pedidos
   juntos ("digita e aperta Enter") vão uma de cada vez, um "ok" para cada, e o texto vai numa linha só.
+  A tecla Sleep, que suspende o computador, também pergunta, e a pergunta diz que ele vai suspender.
   Antes, para desligar e reiniciar bastava a própria IA confirmar, e digitar e apertar teclas (inclusive o
   Enter) não pediam nada. Volume, brilho, Wi-Fi, minimizar e maximizar janelas e abrir as Configurações
   continuam sem perguntar. No navegador que o Jarvis controla, ele ainda digita sem perguntar (veja
@@ -16,7 +18,9 @@ Novidades desta versão:
   de trabalho (a IA escrevia um programa e o rodava com o teclado e o mouse) foram desligadas; ao abrir um
   programa, o Jarvis não roda comandos (como "shutdown /s") nem abre os programas de desligar; e ele não
   abre nem cria programas, scripts e atalhos pelos arquivos (.exe, .bat, .py...). Abrir programas pelo
-  nome, abrir documentos, fotos e pastas, o papel de parede e organizar a área de trabalho continuam.
+  nome, abrir documentos, fotos e pastas, o papel de parede e organizar a área de trabalho continuam. Um
+  nome que começa com um comando do PC, como "Docker Desktop" ou "PowerShell ISE", não abre por voz:
+  abra esses pelo menu Iniciar (o Git Bash abre normalmente).
 
 Versão anterior (2026-10-17):
 

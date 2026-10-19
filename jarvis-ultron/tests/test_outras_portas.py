@@ -120,6 +120,34 @@ class OpenAppTests(BaseTests):
                          [call.press("win"), call.write("Microsoft Store", interval=0.05), call.press("enter")])
         self.sistema.Popen.assert_not_called()
 
+    def test_nome_conhecido_abre_mesmo_comecando_com_um_comando(self):
+        # no PC do Erton o Git está no PATH (o Hermes instala), e "Git Bash" começa com "git": é um nome
+        # conhecido (_APP_ALIASES), que abre pelo apelido fixo "git-bash", sem as palavras ditas irem para a
+        # busca do menu Iniciar. Um nome desconhecido que começa com um comando continua recusado, e a
+        # resposta diz por quê
+        programas = dict(PROGRAMAS, git=r"C:\Program Files\Git\cmd\git.exe",
+                         docker=r"C:\Program Files\Docker\Docker\resources\bin\docker.exe")
+        which = NS(which=lambda nome: programas.get(nome.lower().removesuffix(".exe")))
+        with patch.object(oa, "shutil", which):
+            self.assertEqual(self.ferramenta("open_app", {"app_name": "Git Bash"}), "Opened Git Bash.")
+            self.assertEqual(self.teclado.method_calls,
+                             [call.press("win"), call.write("git-bash", interval=0.05), call.press("enter")])
+            for nome, motivo in (("Docker Desktop", "starts with 'Docker', a command"),
+                                 ("PowerShell ISE", "starts with 'PowerShell', a command"),
+                                 ("powershell Stop-Computer", "starts with 'powershell', a command"),
+                                 ("git push --force", "has command arguments")):
+                with self.subTest(nome=nome):
+                    resposta = self.ferramenta("open_app", {"app_name": nome})
+                    self.assertTrue(resposta.startswith("Not opened"), resposta)
+                    self.assertIn(motivo, resposta)
+            # se a busca pelo apelido falhar, a volta pelo nome dito passa de novo pela recusa
+            self.teclado.reset_mock()
+            self.teclado.press.side_effect = RuntimeError("sem teclado")
+            self.assertTrue(self.ferramenta("open_app", {"app_name": "git bash"}).startswith("Could not confirm"))
+            self.assertEqual(self.teclado.method_calls, [call.press("win")])
+        self.sistema.Popen.assert_not_called()
+        self.sistema.run.assert_not_called()
+
     def test_no_linux_tambem_nao_abre_o_de_desligar(self):
         # sem argumento, o "shutdown" do Linux desliga em 1 minuto, e o "poweroff" na hora
         with patch.object(oa, "_SYSTEM", "Linux"), \

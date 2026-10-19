@@ -669,6 +669,9 @@ NAO_PEDEM_OK = {
     "scroll_up":       "rodinha do mouse, sem teclas",
     "scroll_down":     "rodinha do mouse, sem teclas",
 }
+# Teclas do press_key que vão para o Windows, e não para a janela da frente: a pergunta diz o que acontece com
+# o PC, sem janela, como desligar e reiniciar. Tecla (como o pyautogui a lê, em minúsculas) -> o que faz.
+TECLAS_DE_ENERGIA = {"sleep": "suspender o computador"}
 
 
 def _power_target_text(params: dict, description: str, value) -> str:
@@ -708,10 +711,13 @@ def _has_explicit_computer_power_target(params: dict, description: str, value) -
 # enquanto uma espera a resposta, outro pedido na mesma fala não é guardado (senão o ok dado à pergunta
 # falada faria a outra, guardada calada). Como nos vídeos, a ação roda num fio depois de
 # ainda_aprovado (no Gemini ao vivo o resto da fala só chega depois que a ferramenta responde): se o resto
-# da resposta desfizer o "ok", ou se a janela da frente mudar, nada é feito e ele é avisado. Chamada sem o
+# da resposta desfizer o "ok", ou se a janela da frente não for mais a que apareceu na pergunta, nada é
+# feito e ele é avisado. Na janela do próprio Jarvis nada é digitado nem apertado, nem com o ok: o campo de
+# texto dela manda o que recebe como fala nova do Erton, que responderia a outra pergunta. Chamada sem o
 # jarvis (fora da conversa) não faz nada.
 
 VALIDADE_PEDIDO = 2 * 60  # segundos que a pergunta espera a resposta dele
+TITULO_DO_JARVIS = "J.A.R.V.I.S — MARK XXXIX"  # o da janela da tela (ui.py, setWindowTitle)
 
 _pendente: dict = {}
 _trava = threading.Lock()
@@ -741,6 +747,38 @@ def _a_mesma(janela) -> tuple:
     return janela[0], janela[1].lstrip("*●• ")
 
 
+def _programas_do_jarvis() -> set:
+    """Os números (pid) dos programas do Jarvis: este (o cérebro, ou o programa único) e os de Python acima
+    dele, entre eles o da tela, que abriu o cérebro (às vezes por um python.exe do ambiente virtual)."""
+    numeros = {os.getpid()}
+    try:
+        import psutil
+
+        for pai in psutil.Process().parents():
+            if pai.name().lower().startswith("python"):
+                numeros.add(pai.pid)
+    except Exception:
+        pass
+    return numeros
+
+
+def _janela_do_jarvis(janela) -> bool:
+    """A janela da frente é do próprio Jarvis (a tela, o painel Ultron...)? Pelo título da tela e, no Windows,
+    pelo programa dono da janela."""
+    if _a_mesma(janela)[1] == TITULO_DO_JARVIS:
+        return True
+    if _OS != "Windows" or not janela[0]:
+        return False
+    try:
+        import ctypes
+
+        dono = ctypes.c_ulong(0)
+        ctypes.windll.user32.GetWindowThreadProcessId(janela[0], ctypes.byref(dono))
+        return bool(dono.value) and dono.value in _programas_do_jarvis()
+    except Exception:
+        return False
+
+
 def _log(jarvis, texto: str) -> None:
     ui = getattr(jarvis, "ui", None)
     if ui is not None:
@@ -762,11 +800,18 @@ def _pedir_ok(jarvis, chave: tuple, o_que: str, janela, fazer) -> str:
     """Pergunta antes de agir ou, se a pergunta já foi feita, confere a resposta do Erton e, com o "ok",
     faz (num fio). Devolve o texto para o modelo. o_que: o que vai ser feito, em português ("reiniciar o
     computador"). janela: (número, título) da janela da frente quando a ação vai para ela, que entra na
-    chave (pelo _a_mesma) e é conferida de novo antes de agir; None quando a janela não importa (desligar e
-    reiniciar)."""
+    chave (pelo _a_mesma) e, a que apareceu na pergunta, é conferida de novo antes de agir; None quando a
+    janela não importa (desligar, reiniciar, suspender). Na janela do próprio Jarvis, recusa sem perguntar."""
     if jarvis is None:  # sem a conversa não há como conferir o "ok" dele
         return ("Not done: this needs the user's ok, which Jarvis checks in the conversation, and this call "
                 "did not come from the conversation.")
+    if janela is not None and _janela_do_jarvis(janela):
+        # o texto e o Enter iriam para o campo do Jarvis e virariam uma fala nova do Erton, que responderia a
+        # outra pergunta (reiniciar, um vídeo pago, uma publicação); as teclas apertariam os botões dele
+        return ("Not done: the window in front is Jarvis itself, and text or keys sent there would count as "
+                "the user speaking (or press Jarvis's own buttons). Jarvis never types or presses keys in its "
+                "own window. Tell the user, in one short Portuguese sentence, to bring the right program to "
+                "the front and ask again.")
     from core import aprovacao
 
     agora = time.monotonic()
@@ -783,12 +828,13 @@ def _pedir_ok(jarvis, chave: tuple, o_que: str, janela, fazer) -> str:
                     "wait for the answer, and call this one again only after that one is done or cancelled; "
                     "then it asks its own question.")
         if pedido and fala == marca + 1:
+            janela = _pendente.get("janela")  # a que apareceu na pergunta, e não a desta chamada
             _pendente.clear()  # a primeira resposta decide, uma vez só: o "ok" faz, qualquer outra cancela
             fala_do_ok = aprovacao.fala_que_aprovou(jarvis, marca)
         else:  # pedido novo (ou outro pedido, ou a pergunta venceu, ou já houve outras falas): pergunta
             pedido = False
             _pendente.clear()
-            _pendente.update(chave=chave, em=agora, marca=fala)
+            _pendente.update(chave=chave, em=agora, marca=fala, janela=janela)
 
     if not pedido:
         if janela is None:
@@ -817,7 +863,8 @@ def _pedir_ok(jarvis, chave: tuple, o_que: str, janela, fazer) -> str:
 
 
 def _depois_do_ok(jarvis, fala_do_ok: int, o_que: str, janela, fazer) -> None:
-    """Fio: confere o "ok" de novo, com a fala inteira, e a janela da frente; só então faz."""
+    """Fio: confere o "ok" de novo, com a fala inteira, e se a janela da frente ainda é a da pergunta; só
+    então faz."""
     from core import aprovacao
 
     # A ferramenta pode ter chegado com só o começo da resposta transcrito ("Ok," ... "não, espera"):
@@ -949,6 +996,9 @@ def computer_settings(
         key = str(value or params.get("key", "")).strip()
         if not key:
             return "No key specified."
+        if key.lower() in TECLAS_DE_ENERGIA:  # suspende o PC: pergunta como desligar e reiniciar, sem janela
+            return _pedir_ok(jarvis, ("press_key", key.lower()), TECLAS_DE_ENERGIA[key.lower()], None,
+                             lambda: press_key(key))
         janela = _janela_da_frente()
         return _pedir_ok(jarvis, ("press_key", key, _a_mesma(janela)), f'apertar a tecla "{key}"', janela,
                          lambda: press_key(key))

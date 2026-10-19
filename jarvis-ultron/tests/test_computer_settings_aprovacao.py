@@ -5,8 +5,9 @@ Desligar e reiniciar o PC, e tudo o que escreve ou aperta teclas no programa da 
 core/aprovacao.py, como no approve_publication e nos vídeos: a primeira chamada só pergunta (com o texto,
 as teclas e a janela); a ação só roda se a PRIMEIRA fala nova dele depois da pergunta for um "ok" claro. O
 confirmed=yes que o modelo preenche não basta, um "ok" dito antes da pergunta não vale, "não" cancela, o ok
-vale uma vez só, e outro texto ou outra janela pedem de novo. Volume, brilho, Wi-Fi e os atalhos que o
-próprio Windows atende (NAO_PEDEM_OK) continuam sem pergunta. A trava fica dentro da ação, que o
+vale uma vez só, e outro texto ou outra janela pedem de novo. Na janela do próprio Jarvis nada é digitado
+nem apertado (o texto viraria uma fala do Erton), e a tecla Sleep pergunta se pode suspender o computador.
+Volume, brilho, Wi-Fi e os atalhos que o próprio Windows atende (NAO_PEDEM_OK) continuam sem pergunta. A trava fica dentro da ação, que o
 _execute_tool chama com o jarvis: vale para o Gemini, para a reserva e para qualquer outro cérebro.
 
 Nada aqui desliga, reinicia, digita ou aperta tecla de verdade: o subprocess, o pyautogui, o pyperclip e o
@@ -21,7 +22,7 @@ import time
 import unittest
 from pathlib import Path
 from types import SimpleNamespace as NS
-from unittest.mock import Mock, call, patch
+from unittest.mock import ANY, Mock, call, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -36,6 +37,7 @@ from test_contratos import UIFalsa  # noqa: E402
 REINICIAR = {"action": "restart", "description": "restart my computer"}
 DESLIGAR = {"action": "shutdown", "description": "shut down my computer"}
 JANELA = (42, "Sem título - Bloco de Notas")
+JANELA_DO_JARVIS = (7, "J.A.R.V.I.S — MARK XXXIX")
 JANELA_DA_FRENTE = cs._janela_da_frente  # a de verdade (nos testes ela fica falsa)
 # fora do ACTION_MAP, também mandam texto ou teclas para o programa da frente
 TECLADO_FORA_DO_MAPA = {
@@ -219,6 +221,16 @@ class DesligarEReiniciarTests(BaseTests):
         self.assertEqual(self.desligou(), [])
         self.assertEqual(cs._pendente, {})
 
+    def test_reiniciar_que_falha_depois_do_ok_avisa(self):
+        # o modelo já disse "estou fazendo": se o Windows não reiniciar, o aviso é o único retorno do Erton
+        self.sistema.run.side_effect = OSError("shutdown não encontrado")
+        jarvis = JarvisFalso("reinicia o computador")
+        self.chamar(REINICIAR, jarvis)
+        jarvis.falar("ok, pode fazer")
+        self.assertIn("Approved", self.chamar(REINICIAR, jarvis))
+        self.assertEqual(jarvis.avisos, ["Não consegui reiniciar o computador: shutdown não encontrado"])
+        self.assertFalse(any("Feito com o seu ok" in log for log in jarvis.logs), jarvis.logs)
+
 
 class TecladoTests(BaseTests):
     DIGITAR = {"action": "type_text", "value": "olá mundo", "press_enter": "true"}
@@ -291,6 +303,68 @@ class TecladoTests(BaseTests):
         self.assertIn("Not done yet", resposta)
         self.assertIn('na janela "Conversa com Ana - WhatsApp"', resposta)
         self.assertEqual(self.teclado.method_calls, [])
+
+    def test_tecla_do_mapa_com_outra_janela_na_confirmacao_pergunta_de_novo(self):
+        # a janela da frente entra também na chave das teclas do TECLAS_PEDEM_OK: o ok dado com o Bloco de
+        # Notas na frente não vale para o Enter, o Ctrl+V ou o Alt+F4 no WhatsApp
+        whats = (77, "Conversa com Ana - WhatsApp")
+        for acao in ("enter", "paste", "close_app"):
+            with self.subTest(acao=acao):
+                cs._pendente.clear()
+                jarvis, frente = JarvisFalso(f"faz {acao}"), [JANELA]
+                with patch.object(cs, "_janela_da_frente", side_effect=lambda: frente[0]):
+                    self.assertIn('na janela "Sem título - Bloco de Notas"', self.chamar({"action": acao}, jarvis))
+                    jarvis.falar("ok, pode fazer")
+                    frente[0] = whats  # o WhatsApp vem para a frente antes da confirmação
+                    resposta = self.chamar({"action": acao}, jarvis)
+                self.assertIn("Not done yet", resposta)
+                self.assertIn('na janela "Conversa com Ana - WhatsApp"', resposta)
+        self.assertEqual(self.teclado.method_calls, [])
+
+    def test_o_ok_vale_para_a_janela_mostrada_na_pergunta(self):
+        # defesa dupla: mesmo que a chave de um pedido esquecesse a janela, o fio compara a janela da frente
+        # com a que apareceu na PERGUNTA, e não com a da chamada que confirmou
+        fazer, whats = Mock(), (77, "Conversa com Ana - WhatsApp")
+        jarvis = JarvisFalso("aperta enter")
+        self.assertIn("Not done yet", cs._pedir_ok(jarvis, ("teste",), "apertar Enter", JANELA, fazer))
+        jarvis.falar("ok, pode fazer")
+        with patch.object(cs, "_janela_da_frente", return_value=whats):
+            self.assertIn("Approved", cs._pedir_ok(jarvis, ("teste",), "apertar Enter", whats, fazer))
+            _esperar_fio()
+        fazer.assert_not_called()
+        self.assertEqual(len(jarvis.avisos), 1)
+        self.assertIn("a janela da frente mudou", jarvis.avisos[0])
+
+    def test_digitar_que_falha_depois_do_ok_avisa(self):
+        # no PC, o pyautogui para de propósito com o mouse num canto da tela (fail-safe); o modelo já disse
+        # "estou fazendo": o aviso "Não consegui ..." é o único retorno que o Erton recebe
+        self.teclado.write.side_effect = RuntimeError("PyAutoGUI fail-safe triggered")
+        jarvis = JarvisFalso("digita oi")
+        self.chamar({"action": "type_text", "value": "oi"}, jarvis)
+        jarvis.falar("ok, pode fazer")
+        self.assertIn("Approved", self.chamar({"action": "type_text", "value": "oi"}, jarvis))
+        self.assertEqual(jarvis.avisos, ['Não consegui digitar "oi": PyAutoGUI fail-safe triggered'])
+        self.assertFalse(any("Feito com o seu ok" in log for log in jarvis.logs), jarvis.logs)
+
+    def test_tecla_sleep_pergunta_se_pode_suspender_o_computador(self):
+        # a tecla Sleep vai para o Windows, não para a janela da frente: suspende o PC. A pergunta diz isso,
+        # sem janela, como desligar e reiniciar (o pyautogui aceita o nome em maiúsculas também)
+        for tecla in ("sleep", "Sleep"):
+            with self.subTest(tecla=tecla):
+                cs._pendente.clear()
+                jarvis = JarvisFalso("aperta a tecla sleep")
+                pergunta = self.chamar({"action": "press_key", "value": tecla}, jarvis)
+                self.assertIn("Posso suspender o computador agora? Salve antes o que estiver aberto.", pergunta)
+                self.assertNotIn("na janela", pergunta)
+                jarvis.falar("não")
+                self.assertIn("Cancelled", self.chamar({"action": "press_key", "value": tecla}, jarvis))
+        self.assertEqual(self.teclado.method_calls, [])
+        jarvis = JarvisFalso("aperta a tecla sleep")
+        self.chamar({"action": "press_key", "value": "sleep"}, jarvis)
+        jarvis.falar("ok, pode fazer")
+        self.assertIn("Approved", self.chamar({"action": "press_key", "value": "sleep"}, jarvis))
+        self.assertEqual(self.teclado.method_calls, [call.press("sleep")])
+        self.assertIn("SYS: ✅ Feito com o seu ok: suspender o computador.", jarvis.logs)
 
     def test_janela_que_muda_entre_o_ok_e_a_digitacao_nao_recebe_nada(self):
         jarvis = JarvisFalso("digita olá mundo")
@@ -511,6 +585,81 @@ class TecladoTests(BaseTests):
             self.assertEqual(JANELA_DA_FRENTE(), (0, ""))
         usuario.GetForegroundWindow.side_effect = OSError("sem janela")
         self.assertEqual(JANELA_DA_FRENTE(), (0, ""))
+
+
+class JanelaDoJarvisTests(BaseTests):
+    """Na janela do próprio Jarvis, nada é digitado nem apertado: o campo de texto dela manda o que recebe pelo
+    on_text_command, que conta como fala nova do Erton, e o Enter aperta os botões dela. Um "ok" para digitar
+    "sim" ali viraria a resposta a OUTRA pergunta (reiniciar, um vídeo pago, uma publicação), que ele nunca
+    respondeu. Não pergunta, não guarda o pedido e não age."""
+
+    TECLADO = ({"action": "type_text", "value": "sim", "press_enter": "true"}, {"action": "press_key", "value": "enter"},
+               {"action": "enter"}, {"action": "paste"}, {"action": "reload_n", "value": "1"})
+
+    def test_nao_digita_nem_aperta_teclas_na_janela_do_jarvis(self):
+        for args in self.TECLADO:
+            with self.subTest(acao=args["action"]):
+                jarvis = JarvisFalso("digita sim e aperta enter")
+                with patch.object(cs, "_janela_da_frente", return_value=JANELA_DO_JARVIS):
+                    primeira = self.chamar(dict(args, confirmed="yes"), jarvis)
+                    jarvis.falar("ok, pode fazer")
+                    segunda = self.chamar(dict(args, confirmed="yes"), jarvis)
+                for resposta in (primeira, segunda):
+                    self.assertIn("Not done: the window in front is Jarvis itself", resposta)
+                    self.assertNotIn("Ask the user now", resposta)
+                    self.assertNotIn("Approved", resposta)
+                self.assertEqual(cs._pendente, {})
+                self.assertEqual(jarvis.avisos, [])
+        self.assertEqual(self.teclado.method_calls, [])
+
+    def test_sim_digitado_no_jarvis_nao_responde_a_outra_pergunta(self):
+        # o caso da revisão: o fio digitaria "sim" + Enter no campo do Jarvis, e essa fala nova aprovaria o
+        # reiniciar perguntado no mesmo turno
+        jarvis, digitado = JarvisFalso("lê o meu e-mail"), []
+        self.teclado.write.side_effect = lambda texto, **_: digitado.append(texto)
+        self.teclado.press.side_effect = lambda tecla, **_: jarvis.falar("".join(digitado)) if tecla == "enter" else None
+        args = {"action": "type_text", "value": "sim", "press_enter": "true"}
+        with patch.object(cs, "_janela_da_frente", return_value=JANELA_DO_JARVIS):
+            self.assertIn("Jarvis itself", self.chamar(args, jarvis))
+            jarvis.falar("ok, pode fazer")
+            self.assertIn("Jarvis itself", self.chamar(args, jarvis))
+            self.assertIn("Not done yet", self.chamar(REINICIAR, jarvis))
+            self.assertIn("has not answered", self.chamar(REINICIAR, jarvis))
+        self.assertEqual(digitado, [])
+        self.assertEqual(self.desligou(), [])
+
+    def test_janela_do_jarvis_pelo_programa_dono(self):
+        # o painel Ultron e as outras janelas da tela têm outro título: vale o programa dono da janela, que é
+        # este (o programa único, ou o cérebro) ou um de Python acima dele (a tela, que abriu o cérebro, às vezes
+        # por um python.exe do ambiente virtual). O Explorador e os outros programas continuam perguntando
+        dono = {"pid": 0}
+        self.ctypes.user32.GetWindowThreadProcessId.side_effect = (
+            lambda janela, numero: setattr(numero._obj, "value", dono["pid"]))
+        pais = [NS(pid=4321, name=lambda: "python.exe"), NS(pid=99, name=lambda: "explorer.exe")]
+        with patch.dict(sys.modules, {"psutil": NS(Process=Mock(return_value=NS(parents=lambda: pais)))}):
+            for pid, do_jarvis in ((os.getpid(), True), (4321, True), (99, False), (555, False)):
+                with self.subTest(pid=pid):
+                    dono["pid"] = pid
+                    cs._pendente.clear()
+                    jarvis = JarvisFalso("aperta enter")
+                    with patch.object(cs, "_janela_da_frente", return_value=(9, "Painel Ultron")):
+                        resposta = self.chamar({"action": "enter"}, jarvis)
+                    self.assertEqual("Jarvis itself" in resposta, do_jarvis, resposta)
+                    self.assertEqual("Ask the user now" in resposta, not do_jarvis, resposta)
+        self.ctypes.user32.GetWindowThreadProcessId.assert_called_with(9, ANY)
+        self.assertEqual(self.teclado.method_calls, [])
+
+    def test_titulo_e_o_da_janela_da_tela(self):
+        ui = (RAIZ / "ui.py").read_text(encoding="utf-8")
+        self.assertIn(f'self.setWindowTitle("{cs.TITULO_DO_JARVIS}")', ui)
+
+    def test_desligar_e_a_tecla_sleep_nao_dependem_da_janela(self):
+        # vão para o Windows, não para a janela da frente: com a do Jarvis na frente, perguntam normalmente
+        with patch.object(cs, "_janela_da_frente", return_value=JANELA_DO_JARVIS):
+            for args in (REINICIAR, {"action": "press_key", "value": "sleep"}):
+                with self.subTest(args=args):
+                    cs._pendente.clear()
+                    self.assertIn("Ask the user now", self.chamar(args, JarvisFalso("faz")))
 
 
 class PeloExecuteToolTests(BaseTests):
