@@ -398,18 +398,25 @@ Algumas ferramentas antigas, que vieram do projeto original, agiam sozinhas, sem
 no código. Elas foram **desligadas**: se você pedir, o Jarvis diz que não faz isso, e nada acontece.
 
 - **Mensagens** (WhatsApp, Telegram, Discord, Instagram, iMessage): o Jarvis não envia, não responde e
-  não lê mais mensagens. Antes ele podia digitar e apertar Enter sozinho. Você disse que não usa.
-  O Hermes pelo Telegram continua: ali é você que manda mensagem para o robô.
+  não lê mais mensagens. A ferramenta antiga de mensagens digitava e apertava Enter sozinha. Você
+  disse que não usa. O Hermes pelo Telegram continua: ali é você que manda mensagem para o robô.
 - **"Faça tal tarefa no PC"** (o agente antigo, de vários passos): ele escrevia e rodava programas
   feitos pela IA, sem mostrar nada antes. Para tarefas grandes, peça ao Claude ("Jarvis, pede para o
   Claude ...") ou ao Hermes.
 - **O programador antigo** (escrever, rodar e montar programas, criar projetos e instalar
   componentes): ele rodava código e instalava coisas no PC sem o seu "ok". Para escrever um programa,
   peça ao Claude: ele escreve na pasta dele e não roda nada sozinho.
-- **Controle livre do mouse e do teclado** (clicar em qualquer ponto da tela, mover o mouse, procurar
-  um botão na tela e clicar nele). Volume, brilho, janelas, atalhos e o resto das configurações do PC
-  continuam funcionando.
+- **Controle livre do mouse** (clicar em qualquer ponto da tela, mover o mouse, procurar um botão na
+  tela e clicar nele). Volume, brilho, janelas, atalhos e o resto das configurações do PC continuam
+  funcionando, e digitar também (veja logo abaixo).
 - **Atualizar jogos** (Steam e Epic): ele podia desligar o PC sozinho no fim do download.
+
+**Digitar e apertar teclas continuam funcionando, sem o seu "ok" conferido no código.** O Jarvis ainda
+escreve um texto na janela que estiver na frente e aperta qualquer tecla, inclusive o Enter (pelo mesmo
+comando do volume e das janelas); no navegador que ele controla, também digita e aperta Enter. Ele não
+confere em que janela está escrevendo. O que hoje o impede de mandar uma mensagem por esse caminho é só a
+instrução dada à IA, não uma trava no código. Por isso, ao falar com o Jarvis, não deixe uma conversa do
+WhatsApp (ou de outro aplicativo de mensagem) aberta na frente. Isso está anotado para uma próxima versão.
 
 Desligar e reiniciar o PC continuam funcionando, mas hoje quem confirma é a própria IA, sem o seu "ok"
 conferido no código. Isso muda numa próxima versão.

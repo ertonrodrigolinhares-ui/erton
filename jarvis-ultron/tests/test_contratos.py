@@ -553,6 +553,58 @@ class DesligadasTests(unittest.TestCase):
         self.assertIn("não tente pelo navegador nem digitando", INSTRUCOES)
         self.assertIn("modo reserva (Groq)", INSTRUCOES)  # o core/reserva_outra.py troca o nome por aqui
 
+    def test_digitar_pelo_computer_settings_continua_sem_ok_e_esta_no_mapa(self):
+        # o computer_control saiu, mas o computer_settings continua oferecido ao Gemini e, pelo _execute_tool
+        # de verdade, escreve na janela da frente e aperta qualquer tecla (Enter inclusive), sem o "ok" do
+        # core/aprovacao.py e sem conferir o campo de texto. Enquanto for assim, o mapa das travas tem de
+        # contar essa porta; quem a fechar atualiza o core/SEGURANCA.md e este teste no mesmo commit
+        import actions.computer_settings as cs
+        import main
+
+        self.assertIn("computer_settings", {d["name"] for d in main.get_tool_declarations()})
+        jarvis = object.__new__(main.JarvisLive)
+        jarvis.ui = jarvis.client = UIFalsa()
+        jarvis.cloud_safe = False
+        jarvis.speak_error = Mock()
+        teclado = Mock()
+        respostas = []
+        with patch.dict(os.environ, {"JARVIS_CEREBRO": "gemini", "JARVIS_QA_MODE": "0"}), \
+                patch.object(cs, "_PYAUTOGUI", True), patch.object(cs, "pyautogui", teclado, create=True), \
+                patch.object(cs, "_PYPERCLIP", False):
+            for args in ({"action": "type_text", "value": "oi Ana", "press_enter": "true"},
+                         {"action": "press_key", "value": "enter"}):
+                chamada = NS(id="1", name="computer_settings", args=args)
+                respostas.append(asyncio.run(jarvis._execute_tool(chamada)).response["result"])
+        self.assertEqual(respostas, ["Typed: oi Ana", "Pressed: enter"])
+        teclado.write.assert_called_once_with("oi Ana", interval=0.03)
+        self.assertEqual([c.args for c in teclado.press.call_args_list], [("enter",), ("enter",)])
+        mapa = (RAIZ / "core" / "SEGURANCA.md").read_text(encoding="utf-8")
+        secao = mapa[mapa.index("## 1."):mapa.index("## 2.")]
+        pendencias = [re.sub(r"\s+", " ", trecho) for trecho in secao.split("\n\n")
+                      if trecho.startswith("**Pendência") and "`computer_settings`" in trecho]
+        self.assertEqual(len(pendencias), 1, "o core/SEGURANCA.md não conta que o computer_settings digita sem o ok")
+        for nome in ("`type_text`", "`press_enter`", "`press_key`", "`core/aprovacao.py`", "`core/prompt.txt`"):
+            self.assertIn(nome, pendencias[0])
+
+    def test_prompt_nao_promete_conferir_o_campo_de_texto(self):
+        # quem conferia se a janela da frente era um campo de texto (actions/safe_text_entry.py) e recusava
+        # era o computer_control e as mensagens, desligados; o computer_settings digita onde estiver o
+        # cursor. O prompt não pode prometer ao Gemini uma conferência (e uma recusa) que nenhuma ferramenta
+        # ligada faz, e a regra de digitar tem de continuar fechada
+        import main
+
+        prompt = (RAIZ / "core" / "prompt.txt").read_text(encoding="utf-8")
+        ligadas = {d["name"] for d in main.get_tool_declarations()}
+        conferem = {arquivo.stem for arquivo in (RAIZ / "actions").glob("*.py")
+                    if re.search(r"^from actions\.safe_text_entry import", arquivo.read_text(encoding="utf-8"), re.M)}
+        self.assertEqual(conferem & ligadas, set())
+        self.assertNotIn("verified text field", prompt)
+        self.assertNotIn("if the tool refuses, tell the user", prompt)
+        regra = next(linha for linha in prompt.splitlines() if linha.startswith("Typing safety:"))
+        for trecho in ("computer_settings", "only when the user explicitly asks", "never in a chat or messaging app",
+                       "Enter", "never work around it with key presses, paste, or another typing tool"):
+            self.assertIn(trecho, regra)
+
 
 if __name__ == "__main__":
     if "--gravar-fotos" in sys.argv:

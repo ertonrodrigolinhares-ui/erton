@@ -53,7 +53,7 @@ class LeiaMeBateComOCodigoTests(unittest.TestCase):
                     "check_messages": "**Mensagens**",
                     "agent_task": '**"Faça tal tarefa no PC"**',
                     "code_helper": "**O programador antigo**", "dev_agent": "**O programador antigo**",
-                    "computer_control": "**Controle livre do mouse e do teclado**",
+                    "computer_control": "**Controle livre do mouse**",
                     "game_updater": "**Atualizar jogos**"}
         for nome in main.FERRAMENTAS_DESLIGADAS:
             self.assertIn(nome, contadas, f"{nome} foi desligada e o LEIA-ME não conta")
@@ -63,6 +63,28 @@ class LeiaMeBateComOCodigoTests(unittest.TestCase):
         # desligar/reiniciar (só confirmed=yes até a Etapa 4), o navegador e a lixeira ainda agem sem o "ok"
         self.assertNotIn('nada age sem o seu "ok"', LEIA_ME)
         self.assertIn("Desligar e reiniciar o PC continuam", secao)
+
+    def test_digitar_e_apertar_teclas_continua_e_o_leia_me_conta(self):
+        # o computer_control saiu, mas o computer_settings (oferecido ao Gemini: "typing text on screen")
+        # ainda escreve na janela da frente e aperta qualquer tecla, Enter inclusive, sem o "ok" conferido no
+        # código: o LEIA-ME e o VERSAO não podem dizer que o teclado saiu nem que ele não digita e aperta
+        # Enter sozinho (test_contratos confere o comportamento)
+        import actions.computer_settings as cs
+        import main
+
+        declaracao = next(d for d in main.get_tool_declarations() if d["name"] == "computer_settings")
+        self.assertIn("typing text on screen", declaracao["description"])
+        self.assertTrue(callable(cs.type_text) and callable(cs.press_key))
+        secao = _secao("## O que o Jarvis não faz mais")
+        self.assertNotIn("mouse e do teclado", secao)
+        self.assertNotIn("Antes ele podia digitar e apertar Enter sozinho", secao)
+        self.assertIn('**Digitar e apertar teclas continuam funcionando, sem o seu "ok" conferido no código.**', secao)
+        self.assertIn("inclusive o Enter", secao)
+        self.assertIn("não deixe uma conversa do WhatsApp", secao)
+        linha = _uma_linha(VERSAO[VERSAO.index("- Ferramentas antigas"):VERSAO.index("- Reserva com outra empresa")])
+        self.assertNotIn("mouse e do teclado", linha)
+        self.assertIn("digitar e apertar teclas também", linha)
+        self.assertIn("aperta Enter sem o seu \"ok\"", linha)
 
     def test_o_x_da_janela_so_esconde_o_jarvis(self):
         secao = _secao("## Tela e cérebro separados")

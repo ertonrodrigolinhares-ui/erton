@@ -46,7 +46,8 @@ lista escrita à mão).
 - `agent_task` (escrevia e rodava código gerado pela IA, em `agent/executor.py`): **desligada**.
 - `code_helper` e `dev_agent` (rodavam código e `pip install`): **desligadas**. O `code_helper` saiu
   também da `CLOUD_SAFE_ACTIONS` (modo servidor): lá só é oferecido o que está declarado.
-- `computer_control` (clicava e digitava em qualquer lugar): **desligada**.
+- `computer_control` (clicava e digitava em qualquer lugar): **desligada**. Digitar e apertar teclas
+  continua pelo `computer_settings` (veja a pendência abaixo).
 - `game_updater` (podia desligar o PC): **desligada**.
 
 Os nomes das desligadas continuam reservados: uma automação em `automacoes/` com um deles não carrega
@@ -58,6 +59,21 @@ nem pelo navegador (teste `test_reserva_nao_manda_mensagem`).
 (lista "Não mexer" do plano) ainda diz "Nunca publique, envie mensagens ... sem o 'ok' do Erton". Nenhuma
 ferramenta de mensagem é oferecida ao Gemma, mas ele tem o `browser_control`, que digita e aperta Enter.
 Falta a mesma frase da reserva.
+
+**Pendência (porta aberta no Gemini, sem o "ok"): digitar e apertar teclas pelo `computer_settings`.** O
+`computer_control` saiu, mas o `computer_settings` continua oferecido ao Gemini (a declaração diz "typing text
+on screen") e não passa pelo `core/aprovacao.py`: o `type_text` (e `write_on_screen`, `type`, `write`)
+escreve qualquer texto na janela que estiver na frente e, com `press_enter`, aperta Enter depois; o
+`press_key` (e a ação `enter`) aperta qualquer tecla. Nada confere se a janela é um campo de texto (o
+`actions/safe_text_entry.py` só era usado pelo `computer_control` e pelas mensagens). Com uma conversa do
+WhatsApp na frente, dá para digitar e enviar: hoje só as linhas "Messaging" e "Typing safety" do
+`core/prompt.txt` impedem, não o código. Já era assim antes da Etapa 3. O modo privado recusa o
+`computer_settings` inteiro, e o modo QA (`core/qa_mode.py`) recusa digitar e apertar teclas sem
+`JARVIS_QA_ALLOW_DESKTOP=1`. Para fechar:
+estender a trava da Etapa 4 (`marca`, `aprovou_depois`, `ainda_aprovado`) a essas ações, a decidir antes
+dela (o plano hoje só põe o "ok" em desligar e reiniciar). Teste: `test_contratos.py`
+(`DesligadasTests.test_digitar_pelo_computer_settings_continua_sem_ok_e_esta_no_mapa` e
+`test_prompt_nao_promete_conferir_o_campo_de_texto`).
 
 **Como desfazer uma só (para quem programa):** os commits da Etapa 3 mexem nas mesmas linhas (a
 `FERRAMENTAS_DESLIGADAS`, as declarações, o LEIA-ME, o VERSAO.txt, este arquivo, os testes e as fotos), então

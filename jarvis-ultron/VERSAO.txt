@@ -9,8 +9,10 @@ Novidades desta versão:
     mostrar antes. Para tarefas grandes, use o Claude ou o Hermes.
   - o programador antigo (escrever, rodar e montar programas): rodava código e instalava
     componentes sem o seu "ok". Para escrever um programa, peça ao Claude.
-  - controle livre do mouse e do teclado (clicar em qualquer ponto da tela). Volume, janelas, atalhos
-    e o resto das configurações do PC continuam.
+  - controle livre do mouse (clicar em qualquer ponto da tela). Volume, janelas, atalhos e o resto
+    das configurações do PC continuam, e digitar e apertar teclas também: o Jarvis ainda escreve na
+    janela da frente e aperta Enter sem o seu "ok" conferido no código (só a instrução da IA o impede
+    de mandar mensagem). Não deixe uma conversa do WhatsApp aberta na frente ao falar com ele.
   - atualizar jogos (Steam e Epic): podia desligar o PC sozinho no fim do download.
 - Reserva com outra empresa (Cerebras, OpenRouter, Mistral, DeepSeek, OpenAI...) quando o limite do
   Groq acaba: JARVIS_RESERVA e JARVIS_RESERVA_CHAVE no .env; ficam em fila com o Groq.
