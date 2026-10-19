@@ -913,15 +913,6 @@ CLOUD_SAFE_ACTIONS = frozenset({
     "youtube_video",
 })
 
-LOCAL_MACHINE_ONLY_ACTIONS = frozenset({
-    "computer_control",
-    "open_app",
-    "file_controller",
-    "media_control",
-    "desktop_control",
-    "computer_settings",
-})
-
 # Jarvis Ultron: no modo privado (JARVIS_CEREBRO=gemma) nada vai para IA na nuvem. Estas ferramentas
 # mandam o pedido (ou a tela) para o Gemini, o Hermes (modelos grátis da Nous) ou outra IA na nuvem:
 # não são oferecidas ao Gemma e são recusadas em _execute_tool. As automações da pasta marcam isso
