@@ -410,6 +410,14 @@ no código. Elas foram **desligadas**: se você pedir, o Jarvis diz que não faz
   tela e clicar nele). Volume, brilho, janelas, atalhos e o resto das configurações do PC continuam
   funcionando, e digitar também, agora com o seu "ok" (veja a seção seguinte).
 - **Atualizar jogos** (Steam e Epic): ele podia desligar o PC sozinho no fim do download.
+- **Tarefas livres na área de trabalho** (pedir "faz tal coisa na área de trabalho"): ele pedia um programa
+  à IA e o rodava com o teclado e o mouse, sem mostrar antes, e podia digitar e apertar Enter em qualquer
+  janela. Papel de parede, organizar, limpar e listar a área de trabalho continuam.
+- **Abrir ou criar programas pelo nome ou por arquivo**: o Jarvis continua abrindo programas pelo nome
+  ("abre o Bloco de Notas"), mas não roda mais comandos (como "shutdown /s"), não abre os programas de
+  desligar ou sair da conta e não abre nem cria programas, scripts e atalhos pelos arquivos (.exe, .bat,
+  .ps1, .py, .lnk...). Antes, um pedido assim desligava o PC sem perguntar. Documentos, fotos, vídeos e
+  pastas abrem normalmente.
 
 Os arquivos dessas ferramentas continuam na pasta por enquanto. Se alguma fizer falta, avise; para
 voltar na hora, abra o "Iniciar Jarvis Ultron" da pasta da versão anterior.

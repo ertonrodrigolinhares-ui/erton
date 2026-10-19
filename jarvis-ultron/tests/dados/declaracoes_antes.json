@@ -514,7 +514,7 @@
       "properties": {
         "action": {
           "type": "STRING",
-          "description": "wallpaper | wallpaper_url | organize | clean | list | stats | task"
+          "description": "wallpaper | wallpaper_url | organize | clean | list | stats"
         },
         "path": {
           "type": "STRING",
@@ -527,10 +527,6 @@
         "mode": {
           "type": "STRING",
           "description": "by_type or by_date for organize"
-        },
-        "task": {
-          "type": "STRING",
-          "description": "Natural language desktop task"
         }
       },
       "required": [

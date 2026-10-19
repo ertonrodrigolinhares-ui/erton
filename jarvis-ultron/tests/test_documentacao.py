@@ -142,6 +142,30 @@ class LeiaMeBateComOCodigoTests(unittest.TestCase):
         digitar = roteiro[roteiro.index('**Digitar com "ok":**'):roteiro.index("**F2:**")]
         self.assertIn("responda falando", digitar)
 
+    def test_outras_portas_de_desligar_e_de_digitar_estao_contadas(self):
+        # o LEIA-ME e o VERSAO prometem que desligar e reiniciar só acontecem com o "ok": o open_app (comando
+        # com argumentos), o file_controller (abrir um .bat) e o modo 'task' do desktop_control (código da IA
+        # com o teclado) também desligavam ou digitavam sem pergunta (tests/test_outras_portas.py). O mapa
+        # das travas e o LEIA-ME contam onde cada porta foi fechada
+        import actions.desktop as desktop
+        import main
+
+        declaracao = next(d for d in main.get_tool_declarations() if d["name"] == "desktop_control")
+        self.assertNotIn("task", str(declaracao))
+        self.assertIn("turned off", desktop.TAREFA_DESLIGADA)
+        mapa = (RAIZ / "core" / "SEGURANCA.md").read_text(encoding="utf-8")
+        desligar = _uma_linha(mapa[mapa.index("## 4. Desligar"):mapa.index("## 5.")])
+        for trecho in ("`actions/open_app.py`", "`actions/file_controller.py`", "`actions/desktop.py`"):
+            self.assertIn(trecho, desligar)
+        ok = _uma_linha(mapa[mapa.index("## 1."):mapa.index("## 2.")])
+        self.assertIn("`desktop_control` com `action='task'`", ok)
+        secao = _secao("## O que o Jarvis não faz mais")
+        self.assertIn("**Tarefas livres na área de trabalho**", secao)
+        self.assertIn("**Abrir ou criar programas pelo nome ou por arquivo**", secao)
+        novidades = _uma_linha(VERSAO[:VERSAO.index("Versão anterior")])
+        for trecho in ("tarefas livres na área de trabalho", "não roda comandos", "não abre nem cria programas"):
+            self.assertIn(trecho, novidades)
+
     def test_o_x_da_janela_so_esconde_o_jarvis(self):
         secao = _secao("## Tela e cérebro separados")
         self.assertNotIn("Fechando a janela, o cérebro fecha junto", secao)

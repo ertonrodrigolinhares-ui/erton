@@ -414,6 +414,19 @@ def get_desktop_stats() -> str:
         f"  Path    : {desktop}"
     )
 
+# Jarvis Ultron (reparo da Etapa 4): o modo 'task' e as ações desconhecidas estão DESLIGADOS. Eles pediam um
+# código à IA e o rodavam com o teclado e o mouse (pyautogui) e, no Windows, com o ctypes, sem o "ok" do
+# Erton: digitavam e apertavam Enter na janela da frente (até um "ok" no campo do próprio Jarvis) e podiam
+# desligar o PC. É o mesmo caso do agent_task, desligado na Etapa 3. Papel de parede, organizar, limpar,
+# listar e as estatísticas continuam (o resto do desktop_control o Erton decide na Etapa 18).
+TAREFA_DESLIGADA = (
+    "Desktop task mode (action 'task' and free-form actions, which wrote and ran AI-generated code with the "
+    "keyboard and mouse) is turned off in Jarvis Ultron. Only wallpaper, wallpaper_url, current_wallpaper, "
+    "organize, clean, list and stats work. Do not try to do this with another tool. Tell the user, in one "
+    "short sentence in Portuguese, that you do not do this."
+)
+
+
 def desktop_control(
     parameters: dict = None,
     response=None,
@@ -423,12 +436,11 @@ def desktop_control(
     """
     parameters:
         action : wallpaper | wallpaper_url | current_wallpaper |
-                 organize  | clean | list | stats |
-                 task (AI-powered)
+                 organize  | clean | list | stats
+                 (task, o modo que rodava código gerado pela IA, está desligado)
         path   : image path for 'wallpaper'
         url    : image URL for 'wallpaper_url'
         mode   : 'by_type' or 'by_date' for 'organize'
-        task   : natural language description for AI-powered actions
     """
     params = parameters or {}
     action = params.get("action", "").lower().strip()
@@ -461,22 +473,12 @@ def desktop_control(
         elif action == "stats":
             return get_desktop_stats()
 
-        elif action == "task" or task:
-            actual_task = task or params.get("description", "")
-            if not actual_task:
-                return "Please describe what you want to do on the desktop."
-
-            print(f"[Desktop] Asking Gemini: {actual_task}")
-            if player:
-                player.write_log("[Desktop] Generating action...")
-
-            code = _ask_gemini_for_desktop_action(actual_task)
-            return _execute_generated_code(code, player=player)
+        elif action or task:  # "task" ou qualquer outra ação
+            # desligado: não pede código à IA nem roda nada (veja TAREFA_DESLIGADA)
+            print(f"[Desktop] Task mode is turned off: {action or task[:40]}")
+            return TAREFA_DESLIGADA
 
         else:
-            if action:
-                code = _ask_gemini_for_desktop_action(action)
-                return _execute_generated_code(code, player=player)
             return "No action or task specified."
 
     except Exception as e:

@@ -51,6 +51,12 @@ lista escrita à mão).
 - `computer_control` (clicava e digitava em qualquer lugar): **desligada**. Digitar e apertar teclas
   continua pelo `computer_settings`, só com o "ok" do Erton desde a Etapa 4 (veja a porta fechada abaixo).
 - `game_updater` (podia desligar o PC): **desligada**.
+- `desktop_control` com `action='task'` (ou qualquer ação fora da lista dele): pedia um código à IA e o rodava
+  com o teclado e o mouse (`pyautogui`) e, no Windows, com o `ctypes`. Digitava e apertava Enter na janela da
+  frente, até um "ok" no campo do próprio Jarvis (que contaria como fala nova do Erton), e podia desligar o PC.
+  **Desligado** no reparo da Etapa 4, dentro da ação (`actions/desktop.py`, `TAREFA_DESLIGADA`: não pede o
+  código nem roda nada), e o "task" saiu da declaração. Papel de parede, organizar, limpar, listar e as
+  estatísticas continuam até a Etapa 18. Teste: `test_outras_portas.py` (`DesktopControlTests`).
 
 Os nomes das desligadas continuam reservados: uma automação em `automacoes/` com um deles não carrega
 (`main.carregar_automacoes`; teste `test_automacao_com_nome_de_desligada_nao_carrega`). A reserva (Groq e
@@ -139,6 +145,9 @@ tela), `test_gemini_acesso.py`, `test_api_key_validation.py`, `test_claude_chefe
 | `main.py`, `JarvisLive._intercept_ui_tool_call` e `_is_explicit_self_quit_transcript` | "Desliga o Jarvis" só com pedido claro na fala atual do Erton; senão responde "Ignored an unverified shutdown request". |
 | `main.py`, `_queue_self_quit_after_farewell` e `_complete_self_quit_after_audio` | O Jarvis só fecha depois de terminar a despedida (`SELF_QUIT_GOODBYE`). O `quit_jarvis` não é oferecido ao Gemini. |
 | `actions/computer_settings.py`, `computer_settings` | Desligar ou reiniciar o PC: exige alvo explícito ("meu computador"), recusa "desligar o Jarvis", espera 10 s, não usa `/f` e só acontece com o "ok" do Erton conferido no código (`_pedir_ok` com o `core/aprovacao.py`, Etapa 4; veja a seção 1). O `confirmed=yes` que o próprio modelo preenche não basta mais. |
+| `actions/open_app.py` (`_recusa`, `_launch_windows`) | O nome do programa vem do modelo e nunca vira comando (reparo da Etapa 4; antes, "shutdown.exe /s /t 0" desligava na hora, em qualquer cérebro): nada passa pelo shell; nome com argumento (inclusive uma palavra depois de um programa que o `which` acha, que a busca do menu Iniciar rodaria), caminho ou sinais do cmd é recusado; e os programas que desligam, reiniciam ou saem da conta (`shutdown`, `logoff`, `rundll32`...) não abrem por aqui, nem sem argumento. Um nome que não é achado ainda vai para a busca do menu Iniciar, que abre o que o Windows achar primeiro. |
+| `actions/file_controller.py` (`_e_programa`) | Não abre programa, script nem atalho (.exe, .bat, .ps1, .py, .lnk... e o que o `PATHEXT` rodar: abrir os rodaria) e não cria um (escrever, renomear, copiar ou mover para um nome assim), para não deixar nenhum pronto para rodar depois, como na pasta Inicializar do Windows (reparo da Etapa 4; antes, escrever um .bat com "shutdown /s /t 0" e abri-lo desligava o PC). |
+| `actions/desktop.py` (`TAREFA_DESLIGADA`) | O modo 'task', que rodava código da IA com o teclado, o mouse e o `ctypes`, está desligado (reparo da Etapa 4; veja a seção 1). |
 | `actions/game_updater.py` | Podia desligar o PC ao fim de um download. Desligado na Etapa 3: fora da lista do Gemini e, chamado mesmo assim, responde que está desligado. |
 | `core/qa_mode.py` | No modo de teste (QA), desligar, reiniciar e travar a tela ficam sempre bloqueados. |
 
@@ -147,7 +156,9 @@ Testes: `test_qa_system.py` (`test_live_quit_tool_requires_explicit_current_user
 `test_power_actions_remain_blocked_even_with_desktop_opt_in`), `test_jarvis_ultron.py` (`IdiomaTests`,
 frases de "desliga o Jarvis"), `test_core_resilience.py` (alvo explícito), `test_invariantes.py`
 (`OrdemDasTravasTests.test_desligar_o_jarvis_so_com_pedido_claro_antes_de_qualquer_ferramenta`),
-`test_computer_settings_aprovacao.py` (`DesligarEReiniciarTests`, `PeloExecuteToolTests`).
+`test_computer_settings_aprovacao.py` (`DesligarEReiniciarTests`, `PeloExecuteToolTests`),
+`test_outras_portas.py` (`OpenAppTests`, `FileControllerTests`, `DesktopControlTests`, pelo `_execute_tool`; o
+`open_app` e o `file_controller` também no Gemma).
 
 ## 5. A ordem das travas no começo do `_execute_tool`
 

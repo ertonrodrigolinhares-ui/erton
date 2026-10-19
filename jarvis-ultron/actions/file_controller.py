@@ -30,6 +30,32 @@ def _is_safe_path(target: Path) -> bool:
     except Exception:
         return False
 
+# Jarvis Ultron (Etapa 4): o file_controller não roda nem cria programa. Abrir um programa, script ou atalho
+# o roda (um .bat com "shutdown /s /t 0" desligava o PC sem o "ok" do Erton), e escrever, renomear, copiar
+# ou mover para um nome assim deixaria um pronto para rodar depois (na pasta Inicializar do Windows, no
+# próximo login). Os dois são recusados; ler, listar, apagar (vai para a lixeira) e organizar continuam.
+_PROGRAMAS = {
+    ".exe", ".com", ".bat", ".cmd", ".ps1", ".psm1", ".psd1", ".vbs", ".vbe", ".js", ".jse", ".wsf", ".wsh",
+    ".msc", ".msi", ".msp", ".scr", ".pif", ".hta", ".cpl", ".lnk", ".url", ".reg", ".inf", ".scf", ".jar",
+    ".py", ".pyw", ".pyz", ".pyc", ".appref-ms", ".application", ".settingcontent-ms", ".library-ms",
+    ".sh", ".command", ".app", ".desktop", ".appimage", ".run",
+}
+
+
+def _e_programa(nome) -> bool:
+    """O nome é de um programa, script ou atalho? (O Windows corta o "." e o espaço do fim do nome, e o
+    "::$DATA" escreve no próprio arquivo; o PATHEXT diz o que mais ele roda.)"""
+    nome = str(nome or "").replace("\\", "/").rsplit("/", 1)[-1].split(":")[0].rstrip(" .")
+    sufixo = os.path.splitext(nome)[1].lower()
+    roda = {e.strip().lower() for e in os.environ.get("PATHEXT", "").split(";") if e.strip()}
+    return sufixo in _PROGRAMAS or sufixo in roda
+
+
+def _nao_cria(nome) -> str:
+    return (f"Not done: Jarvis does not create programs, scripts or shortcuts ('{nome}'), which could run later "
+            "without the user's ok. Use another extension, like .txt.")
+
+
 def _get_desktop() -> Path:
     if _OS == "Linux":
         xdg = os.environ.get("XDG_DESKTOP_DIR", "")
@@ -144,6 +170,8 @@ def create_file(path: str, name: str = "", content: str = "") -> str:
         target = (base / name) if name else base
         if not _is_safe_path(target):
             return f"Access denied: {target}"
+        if _e_programa(target.name):
+            return _nao_cria(target.name)
         target.parent.mkdir(parents=True, exist_ok=True)
         write_text_with_stamp(
             target,
@@ -209,6 +237,8 @@ def move_file(path: str, name: str = "", destination: str = "") -> str:
 
         if dst.is_dir():
             dst = dst / src.name
+        if _e_programa(dst.name):
+            return _nao_cria(dst.name)
 
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(src), str(dst))
@@ -235,6 +265,8 @@ def copy_file(path: str, name: str = "", destination: str = "") -> str:
 
         if dst.is_dir():
             dst = dst / src.name
+        if _e_programa(dst.name):
+            return _nao_cria(dst.name)
 
         dst.parent.mkdir(parents=True, exist_ok=True)
 
@@ -263,6 +295,8 @@ def rename_file(path: str, name: str = "", new_name: str = "") -> str:
             return f"Not found: {target.name}"
         if not new_name:
             return "No new name provided."
+        if _e_programa(new_name):
+            return _nao_cria(new_name)
 
         new_path = target.parent / new_name
         if new_path.exists():
@@ -302,6 +336,10 @@ def open_file(path: str, name: str = "") -> str:
         target = (base / name) if name else base
         if not _is_safe_path(target):
             return f"Access denied: {target}"
+        if _e_programa(target.name):
+            return (f"Not opened: '{target.name}' is a program, script or shortcut, and opening it would run it "
+                    "without the user's ok. Jarvis does not run programs from files; to open an application, "
+                    "use open_app.")
         if not target.exists():
             return f"Not found: {target.name or target}"
 
@@ -336,6 +374,8 @@ def write_file(path: str, name: str = "", content: str = "",
         target = (base / name) if name else base
         if not _is_safe_path(target):
             return f"Access denied: {target}"
+        if _e_programa(target.name):
+            return _nao_cria(target.name)
         target.parent.mkdir(parents=True, exist_ok=True)
         existed_before = target.exists()
         if not append or not existed_before:

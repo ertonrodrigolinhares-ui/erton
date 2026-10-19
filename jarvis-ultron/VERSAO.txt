@@ -12,6 +12,11 @@ Novidades desta versão:
   Enter) não pediam nada. Volume, brilho, Wi-Fi, minimizar e maximizar janelas e abrir as Configurações
   continuam sem perguntar. No navegador que o Jarvis controla, ele ainda digita sem perguntar (veja
   "Antes de desligar, reiniciar, digitar ou apertar teclas" no LEIA-ME).
+- Outros caminhos que desligavam o PC ou digitavam sem perguntar foram fechados: as tarefas livres na área
+  de trabalho (a IA escrevia um programa e o rodava com o teclado e o mouse) foram desligadas; ao abrir um
+  programa, o Jarvis não roda comandos (como "shutdown /s") nem abre os programas de desligar; e ele não
+  abre nem cria programas, scripts e atalhos pelos arquivos (.exe, .bat, .py...). Abrir programas pelo
+  nome, abrir documentos, fotos e pastas, o papel de parede e organizar a área de trabalho continuam.
 
 Versão anterior (2026-10-17):
 
