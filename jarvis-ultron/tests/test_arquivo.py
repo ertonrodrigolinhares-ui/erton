@@ -17,6 +17,7 @@ GUARDADOS = (
     # awareness/ (Etapa 5)
     "awareness",
     # memory/answer_cache.py (Etapa 5)
+    "memory.answer_cache",
     # core/graphics_capability.py (Etapa 5)
 )
 

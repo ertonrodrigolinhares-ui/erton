@@ -25,5 +25,8 @@ volta para o lugar, junto com os testes e as linhas que saíram de outros arquiv
   está em `teste-que-saiu.md`.
 
 <!-- memory/answer_cache.py (Etapa 5) -->
+- **`pecas-sem-uso/answer_cache/`** (commit "Reorganização etapa 5: guarda o answer_cache"): um
+  cache de respostas herdado do JARVIS-OS. Vinha de `memory/answer_cache.py`. Nada o usava: o
+  arquivo de respostas nunca era criado. Os testes que saíram estão em `teste-que-saiu.md`.
 
 <!-- core/graphics_capability.py (Etapa 5) -->

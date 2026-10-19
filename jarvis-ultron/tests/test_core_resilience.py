@@ -12,7 +12,7 @@ from agent import error_handler
 from agent.task_queue import TaskPriority, TaskQueue
 from api import status as api_status
 from core import api_key_validator, live_model
-from memory import answer_cache, config_manager, memory_manager
+from memory import config_manager, memory_manager
 
 
 class CoreResilienceTests(unittest.TestCase):
@@ -49,18 +49,6 @@ class CoreResilienceTests(unittest.TestCase):
             self.assertEqual(memory_manager.load_memory()["identity"], {})
             memory_manager.update_memory({"identity": {"name": {"value": "Mirsab"}}})
             self.assertEqual(memory_manager.load_memory()["identity"]["name"]["value"], "Mirsab")
-
-    def test_answer_cache_ignores_commands_and_time_sensitive_questions(self):
-        self.assertFalse(answer_cache.is_cacheable_question("Open Safari"))
-        self.assertFalse(answer_cache.is_cacheable_question("What is the weather today?"))
-        self.assertTrue(answer_cache.is_cacheable_question("What is polymorphism?"))
-
-    def test_answer_cache_round_trip_uses_temporary_file(self):
-        with tempfile.TemporaryDirectory() as directory, patch.object(
-            answer_cache, "CACHE_PATH", Path(directory) / "answers.json"
-        ):
-            answer_cache.save_cached_answer("What is polymorphism?", "One interface, multiple implementations.")
-            self.assertIn("multiple implementations", answer_cache.get_cached_answer("What is polymorphism?"))
 
     def test_error_handler_stops_retrying_at_limit_without_network(self):
         result = error_handler.analyze_error({"step": "test"}, "failed", attempt=2, max_attempts=2)
