@@ -48,7 +48,7 @@ lista escrita à mão).
   na `CLOUD_SAFE_ACTIONS` (modo servidor, que sai nas Etapas 11 e 14): lá ele também não é mais
   oferecido (não está declarado) e, chamado, responde que está desligado.
 - `computer_control` (clicava e digitava em qualquer lugar): **desligada**.
-- `game_updater` (pode desligar o PC): ainda aberta.
+- `game_updater` (podia desligar o PC): **desligada**.
 
 ## 2. Modo privado (nada vai para IA na nuvem)
 
@@ -95,7 +95,7 @@ tela), `test_gemini_acesso.py`, `test_api_key_validation.py`, `test_claude_chefe
 | `main.py`, `JarvisLive._intercept_ui_tool_call` e `_is_explicit_self_quit_transcript` | "Desliga o Jarvis" só com pedido claro na fala atual do Erton; senão responde "Ignored an unverified shutdown request". |
 | `main.py`, `_queue_self_quit_after_farewell` e `_complete_self_quit_after_audio` | O Jarvis só fecha depois de terminar a despedida (`SELF_QUIT_GOODBYE`). O `quit_jarvis` não é oferecido ao Gemini. |
 | `actions/computer_settings.py`, `computer_settings` | Desligar ou reiniciar o PC: exige alvo explícito ("meu computador"), recusa "desligar o Jarvis", espera 10 s e não usa `/f`. **Ponto fraco de hoje:** basta `confirmed=yes`, que o próprio modelo preenche. A Etapa 4 passa a exigir o "ok" do `core/aprovacao.py`. |
-| `actions/game_updater.py` | Pode desligar o PC ao fim de um download. Sai da lista do Gemini na Etapa 3. |
+| `actions/game_updater.py` | Podia desligar o PC ao fim de um download. Desligado na Etapa 3: fora da lista do Gemini e, chamado mesmo assim, responde que está desligado. |
 | `core/qa_mode.py` | No modo de teste (QA), desligar, reiniciar e travar a tela ficam sempre bloqueados. |
 
 Testes: `test_qa_system.py` (`test_live_quit_tool_requires_explicit_current_user_transcript`,

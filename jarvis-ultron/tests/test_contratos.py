@@ -208,7 +208,6 @@ RESPOSTAS_PADRAO = (
     ("browser_control", {}, "Done."),
     ("file_controller", {"action": "list"}, "Done."),
     ("desktop_control", {}, "Done."),
-    ("game_updater", {}, "Done."),
     ("flight_finder", {}, "Done."),
     ("graphics_quality", {"quality": "low"}, "JARVIS graphics quality changed to low."),
     ("jarvis_ui_control", {"action": "open_settings"}, "JARVIS interface action completed: open settings."),
@@ -234,7 +233,7 @@ ACAO = {
     "screen_process": ("main", "screen_process"), "computer_settings": ("main", "computer_settings"),
     "browser_control": ("main", "browser_control"), "file_controller": ("main", "file_controller"),
     "desktop_control": ("main", "desktop_control"),
-    "game_updater": ("main", "game_updater"), "flight_finder": ("main", "flight_finder"),
+    "flight_finder": ("main", "flight_finder"),
     "deep_research": ("main", "request_deep_research"), "create_presentation": ("main", "request_presentation"),
     "file_processor": ("main", "file_processor"),
     "listening_mode": ("jarvis", "_definir_modo_escuta"), "school_tasks": ("jarvis", "_geekie_pendencias"),
@@ -259,6 +258,7 @@ DESLIGADAS = {
     "code_helper": ("actions.code_helper",),
     "dev_agent": ("actions.dev_agent",),
     "computer_control": ("actions.computer_control",),
+    "game_updater": ("actions.game_updater",),
 }
 
 

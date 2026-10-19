@@ -409,6 +409,7 @@ no código. Elas foram **desligadas**: se você pedir, o Jarvis diz que não faz
 - **Controle livre do mouse e do teclado** (clicar em qualquer ponto da tela, mover o mouse, procurar
   um botão na tela e clicar nele). Volume, brilho, janelas, atalhos e o resto das configurações do PC
   continuam funcionando.
+- **Atualizar jogos** (Steam e Epic): ele podia desligar o PC sozinho no fim do download.
 
 Os arquivos dessas ferramentas continuam na pasta por enquanto. Se alguma fizer falta, avise; para
 voltar na hora, abra o "Iniciar Jarvis Ultron" da pasta da versão anterior.

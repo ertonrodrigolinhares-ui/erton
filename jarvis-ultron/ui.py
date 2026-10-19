@@ -8725,7 +8725,6 @@ class MainWindow(QMainWindow):
             "media_control": "Media Control",
             "web_search": "Web Search",
             "file_processor": "File Processor",
-            "game_updater": "Game Updater",
             "flight_finder": "Flight Finder",
         }
         for key, label in TOOL_MAP.items():

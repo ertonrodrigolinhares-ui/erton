@@ -109,6 +109,8 @@ def guard_tool_call(name: str, args: dict[str, Any] | None = None) -> QAGuardDec
         if action not in safe_reads and not _opt_in("JARVIS_QA_ALLOW_DESKTOP"):
             return QAGuardDecision(False, "QA desktop changes require JARVIS_QA_ALLOW_DESKTOP=1.")
 
+    # game_updater está desligada no Jarvis Ultron (Etapa 3 da reorganização): fica aqui como trava a mais
+    # até o arquivo dela sair (Etapa 18).
     if tool == "game_updater":
         safe_reads = {"status", "download_status", "schedule_status", "list", "list_games"}
         if action not in safe_reads:

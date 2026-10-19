@@ -51,7 +51,6 @@ desktop_control = _lazy_action("actions.desktop", "desktop_control")
 browser_control = _lazy_action("actions.browser_control", "browser_control")
 file_controller = _lazy_action("actions.file_controller", "file_controller")
 web_search_action = _lazy_action("actions.web_search", "web_search")
-game_updater = _lazy_action("actions.game_updater", "game_updater")
 request_presentation = _lazy_action("actions.presentation_maker", "request_presentation")
 request_deep_research = _lazy_action("actions.deep_research", "request_deep_research")
 
@@ -755,29 +754,6 @@ TOOL_DECLARATIONS = [
         }
     },
     {
-        "name": "game_updater",
-        "description": (
-            "THE ONLY tool for ANY Steam or Epic Games request. "
-            "Use for: installing, downloading, updating games, listing installed games, "
-            "checking download status, scheduling updates. "
-            "ALWAYS call directly for any Steam/Epic/game request. "
-            "NEVER use browser_control or web_search for Steam/Epic."
-        ),
-        "parameters": {
-            "type": "OBJECT",
-            "properties": {
-                "action":    {"type": "STRING",  "description": "update | install | list | download_status | schedule | cancel_schedule | schedule_status (default: update)"},
-                "platform":  {"type": "STRING",  "description": "steam | epic | both (default: both)"},
-                "game_name": {"type": "STRING",  "description": "Game name (partial match supported)"},
-                "app_id":    {"type": "STRING",  "description": "Steam AppID for install (optional)"},
-                "hour":      {"type": "INTEGER", "description": "Hour for scheduled update 0-23 (default: 3)"},
-                "minute":    {"type": "INTEGER", "description": "Minute for scheduled update 0-59 (default: 0)"},
-                "shutdown_when_done": {"type": "BOOLEAN", "description": "Shut down PC when download finishes"},
-            },
-            "required": []
-        }
-    },
-    {
         "name": "flight_finder",
         "description": "Searches Google Flights and speaks the best options.",
         "parameters": {
@@ -1186,6 +1162,7 @@ FERRAMENTAS_DESLIGADAS = {
     "code_helper": "writing, running and building code",
     "dev_agent": "building projects, installing packages and running code",
     "computer_control": "clicking, typing and moving the mouse anywhere on the screen",
+    "game_updater": "installing and updating Steam and Epic games, which could shut down the computer",
 }
 
 
@@ -2647,10 +2624,6 @@ class JarvisLive:
                 r = await asyncio.to_thread(
                     lambda: file_processor(parameters=args, player=self.ui, speak=self.speak)
                 )
-                result = r or "Done."
-
-            elif name == "game_updater":
-                r = await asyncio.to_thread(lambda: game_updater(parameters=args, player=self.ui, speak=self.speak))
                 result = r or "Done."
 
             elif name == "flight_finder":
