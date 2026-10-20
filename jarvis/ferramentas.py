@@ -335,7 +335,7 @@ def criar_ferramentas(
         Use quando o usuário pedir para lembrar algo ou contar um fato pessoal importante.
 
         Args:
-          assunto: título curto, por exemplo "aniversário da Yvnna".
+          assunto: título curto, por exemplo "aniversário da Maria".
           informacao: o que guardar.
         """
         return memoria.lembrar(assunto, informacao)

@@ -65,7 +65,7 @@ class Config:
         _carregar_dotenv()
         ia = os.getenv("JARVIS_IA", "gemini").lower()
         return cls(
-            nome_usuario=os.getenv("JARVIS_USUARIO", "Erton"),
+            nome_usuario=os.getenv("JARVIS_USUARIO", "") or "você",
             palavra_ativacao=os.getenv("JARVIS_PALAVRA_ATIVACAO", "jarvis").lower(),
             ia=ia if ia in NOME_CHAVE else "gemini",
             gemini_modelo=os.getenv("JARVIS_GEMINI_MODELO", "gemini-flash-latest"),
