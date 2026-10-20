@@ -68,6 +68,9 @@ Dos 22 agentes do Claude (e os 6 do Hermes), três grupos:
    comercial do Google e da Anthropic antes de vender.
 4. **Código fechado**: o repositório é público no GitHub; quem quiser baixa de graça. Tornar privado
    (ou decidir vender serviço, não software) **(decisão sua)**.
+   Observação: nada que o cliente vê (telas, falas, manual, instruções das IAs) tem nome de dono; os
+   comentários internos do código ainda dizem "o Erton" no sentido de "quem usa". Só vale limpar isso se
+   o código for entregue aberto.
 5. **Instalação e atualização**: hoje é .bat + Python (10 a 20 minutos na primeira vez) e a versão
    nova é "extrair numa pasta nova e copiar o .env". Para vender: um instalador único (já existe um
    começo em `JARVIS.spec`) e atualização sem perder dados: o perfil já sobrevive; a memória
