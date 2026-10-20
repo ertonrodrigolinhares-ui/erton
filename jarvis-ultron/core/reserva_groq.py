@@ -31,17 +31,25 @@ MODELOS_TRANSCRICAO = ["whisper-large-v3-turbo", "whisper-large-v3"]
 LIMITE_HISTORICO = 30
 
 INSTRUCOES = (
-    "Você é o Jarvis Ultron, assistente pessoal do Erton. Responda sempre em português do Brasil, "
+    "Você é o Jarvis Ultron, assistente pessoal do usuário. Responda sempre em português do Brasil, "
     "de forma calma, confiante e precisa, em no máximo 3 frases, porque a resposta será falada. "
     "Não use markdown, listas ou emojis. Você está no modo reserva (Groq), mas MESMO ASSIM consegue "
     "executar tarefas: quando o pedido precisar de uma ação (abrir um site ou app, ver o clima, "
     "Metricool, lembretes, analisar um site, autodiagnóstico, etc.), CHAME a ferramenta certa em vez "
     "de dizer que não consegue. Nunca publique, envie e-mails, compre ou apague nada sem o 'ok' do "
-    "Erton na hora. Você não envia, não lê nem responde mensagens (WhatsApp, Telegram, Discord, "
+    "usuário na hora. Você não envia, não lê nem responde mensagens (WhatsApp, Telegram, Discord, "
     "Instagram); se pedirem, diga que não faz isso e não tente pelo navegador nem digitando. "
     "Depois que a ferramenta responder, resuma o resultado em uma ou duas frases."
 )
 MAX_VOLTAS_FERRAMENTA = 3  # menos idas e vindas = menos gasto do limite grátis do Groq
+
+
+def instrucoes_com_perfil(base: str = INSTRUCOES) -> str:
+    """As instruções mais o perfil de quem usa o Jarvis (core/perfil.py), quando houver."""
+    from core import perfil
+
+    bloco = perfil.bloco_para_prompt()
+    return base + ("\n\n" + bloco.rstrip() if bloco else "")
 
 
 def gemini_para_groq(declaracoes: list[dict]) -> list[dict]:
@@ -85,7 +93,7 @@ class ReservaGroq:
             cliente = groq.Groq(api_key=chave, max_retries=1, timeout=60)
         self.cliente = cliente
         self.modelo = os.environ.get("JARVIS_GROQ_MODELO", "").strip() or None
-        self.mensagens = [{"role": "system", "content": INSTRUCOES}]
+        self.mensagens = [{"role": "system", "content": instrucoes_com_perfil()}]
         self._trava_resposta = threading.Lock()
 
     @classmethod

@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import os
 
-from core.reserva_groq import INSTRUCOES, ReservaGroq
+from core.reserva_groq import INSTRUCOES, ReservaGroq, instrucoes_com_perfil
 
 # Endereços conhecidos e os modelos preferidos de cada uma (o Jarvis usa o primeiro que a conta tiver).
 EMPRESAS = {
@@ -46,7 +46,8 @@ class ReservaOutra(ReservaGroq):
             cliente = openai.OpenAI(base_url=url or url_padrao, api_key=chave, max_retries=1, timeout=60)
         self.cliente = cliente
         self.modelo = modelo or None
-        self.mensagens = [{"role": "system", "content": INSTRUCOES.replace("modo reserva (Groq)", f"modo reserva ({nome})")}]
+        self.mensagens = [{"role": "system",
+                           "content": instrucoes_com_perfil(INSTRUCOES.replace("modo reserva (Groq)", f"modo reserva ({nome})"))}]
         self._ouvido = None
 
     @classmethod

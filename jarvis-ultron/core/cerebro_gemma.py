@@ -1,4 +1,4 @@
-"""Cérebro Gemma 4 do Jarvis Ultron, rodando no PC do Erton (pelo Ollama).
+"""Cérebro Gemma 4 do Jarvis Ultron, rodando no PC de quem usa (pelo Ollama).
 
 Liga com JARVIS_CEREBRO="gemma" no .env (o "Instalar Gemma 4" já faz isso). Nesse modo o Jarvis
 não usa o Gemini: ouve você, transcreve, pensa no Gemma 4 e fala a resposta. O raciocínio fica no
@@ -28,19 +28,19 @@ import time
 import urllib.request
 import wave
 
-from core.reserva_groq import ReservaGroq
+from core.reserva_groq import ReservaGroq, instrucoes_com_perfil
 
 URL_PADRAO = "http://localhost:11434/v1"
 MODELO_PADRAO = "jarvis-gemma"
 WHISPER_PADRAO = "small"
 
 INSTRUCOES_GEMMA = (
-    "Você é o Jarvis Ultron, assistente pessoal do Erton. Responda sempre em português do Brasil, "
+    "Você é o Jarvis Ultron, assistente pessoal do usuário. Responda sempre em português do Brasil, "
     "de forma calma, confiante e precisa, em no máximo 3 frases, porque a resposta será falada. "
     "Não use markdown, listas ou emojis. Quando o pedido precisar de uma ação (abrir um site ou app, "
     "ver o clima, lembretes, Metricool, analisar um site, autodiagnóstico, etc.), CHAME a ferramenta "
     "certa em vez de dizer que não consegue. Nunca publique, envie mensagens, compre ou apague nada "
-    "sem o 'ok' do Erton na hora. Depois que a ferramenta responder, resuma o resultado em uma ou "
+    "sem o 'ok' do usuário na hora. Depois que a ferramenta responder, resuma o resultado em uma ou "
     "duas frases. Se não souber algo, diga que não sabe; não invente."
 )
 
@@ -161,7 +161,7 @@ class CerebroGemma(ReservaGroq):
             cliente = openai.OpenAI(base_url=_url_base(), api_key="ollama", max_retries=0, timeout=300)
         self.cliente = cliente
         self.modelo = modelo or os.environ.get("JARVIS_GEMMA_MODELO", "").strip() or MODELO_PADRAO
-        self.mensagens = [{"role": "system", "content": INSTRUCOES_GEMMA}]
+        self.mensagens = [{"role": "system", "content": instrucoes_com_perfil(INSTRUCOES_GEMMA)}]
         self._trava_resposta = threading.Lock()
         self._ouvido = ouvido          # quem transcreve (Whisper local, no PC); escolhido no 1º uso
         self._ouvido_escolhido = ouvido is not None

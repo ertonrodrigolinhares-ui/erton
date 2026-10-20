@@ -105,7 +105,7 @@ Titulo "2/7  Perfil 'jarvis'"
 $raizHermes = if ($env:HERMES_HOME) { $env:HERMES_HOME } else { Join-Path $env:LOCALAPPDATA "hermes" }
 $perfil = Join-Path $raizHermes "profiles\jarvis"
 if (-not (Test-Path $perfil)) {
-    & $hermes profile create jarvis --description "Jarvis Ultron: orquestrador do Erton (redes do atleta, anuncios, navegador)."
+    & $hermes profile create jarvis --description "Jarvis Ultron: orquestrador de tarefas (redes sociais, anuncios, navegador)."
 }
 if (-not (Test-Path $perfil)) { New-Item -ItemType Directory -Force $perfil | Out-Null }
 $pastaJarvis = Join-Path $perfil "jarvis"
@@ -115,7 +115,9 @@ Write-Host "Perfil: $perfil" -ForegroundColor Green
 
 # ---------------------------------------------------------------- 3. Personalidade, habilidades e trava
 Titulo "3/7  Habilidades, sub-agentes e trava de aprovacao"
-Copy-Item (Join-Path $kit "SOUL.md") (Join-Path $perfil "SOUL.md") -Force
+# O perfil de quem usa entra no lugar de __PERFIL__ quando o Jarvis abre (core/automacoes.py)
+$soul = [System.IO.File]::ReadAllText((Join-Path $kit "SOUL.md"))
+Gravar (Join-Path $perfil "SOUL.md") ($soul.Replace("__PERFIL__", ""))
 $destinoSkills = Join-Path $perfil "skills\jarvis"
 New-Item -ItemType Directory -Force $destinoSkills | Out-Null
 Copy-Item (Join-Path $kit "skills\jarvis\*") $destinoSkills -Recurse -Force
@@ -216,7 +218,7 @@ if ($conectar) {
 Titulo "7/7  Rotinas (8h e Geekie 7h/18h) e inicio automatico"
 $rotinas = (& $hermes -p jarvis cron list 2>&1 | Out-String)
 if ($rotinas -notmatch "Rotina do atleta 8h") {
-    & $hermes -p jarvis cron create "0 8 * * *" "Execute a rotina diaria do perfil de atleta do Erton." --skill rotina-atleta-8h --name "Rotina do atleta 8h" --deliver local
+    & $hermes -p jarvis cron create "0 8 * * *" "Execute a rotina diaria do perfil de atleta." --skill rotina-atleta-8h --name "Rotina do atleta 8h" --deliver local
 }
 if ($rotinas -notmatch "Geekie pendencias") {
     & $hermes -p jarvis cron create "0 7,18 * * *" "Leia as atividades pendentes do Geekie One (somente leitura)." --skill geekie-pendencias --name "Geekie pendencias" --deliver local

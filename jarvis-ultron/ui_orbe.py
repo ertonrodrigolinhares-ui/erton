@@ -16,7 +16,7 @@ Configurações (.env):
 - JARVIS_TELA=paineis     abre já com os painéis dos lados (o padrão é a tela limpa do vídeo:
                           só o anel; o botão PAINÉIS, no canto, mostra e esconde os painéis).
 - JARVIS_BIOMETRIA=0      pula a câmera no "bom dia".
-- JARVIS_NOME=Erton       nome usado na saudação.
+- JARVIS_NOME=...        nome na saudação, se o perfil (tela "Sobre você") não tiver um.
 Tecla F2 alterna entre a cena e a tela antiga.
 """
 
@@ -1242,8 +1242,31 @@ def nome_da_cidade(cidade: str) -> str:
     return " ".join(p if (i and p in pequenas) else p.capitalize() for i, p in enumerate(texto.split(" ")))
 
 
+def _nome_para_saudacao() -> str:
+    """O nome do perfil (tela "Sobre você"); o JARVIS_NOME do .env só se o perfil não tiver."""
+    try:
+        from core import perfil
+
+        chamar = perfil.tratamento()
+    except Exception:
+        chamar = ""
+    return chamar or os.environ.get("JARVIS_NOME", "").strip()
+
+
+def _cidade() -> str:
+    """A cidade do perfil (ou JARVIS_CIDADE do .env); vazia se ninguém disse."""
+    try:
+        from core import perfil
+
+        return perfil.cidade()
+    except Exception:
+        return os.environ.get("JARVIS_CIDADE", "").strip()
+
+
 def _clima() -> dict:
-    cidade = os.environ.get("JARVIS_CIDADE", "Campina Grande")
+    cidade = _cidade()
+    if not cidade:  # sem cidade não se pergunta ao serviço: ele localizaria pelo IP
+        return {"cidade": "", "ok": False}
     try:
         from ui_stark import buscar_clima
         linhas = buscar_clima(cidade).splitlines()
@@ -1432,7 +1455,7 @@ class Resumo(QWidget):
     def _mostrar_etapa(self):
         nome, titulo, sub = ETAPAS[self._etapa]
         if nome == "CLIMA":
-            sub = f"Previsão do dia para {os.environ.get('JARVIS_CIDADE', 'Campina Grande')}."
+            sub = f"Previsão do dia para {_cidade() or 'a sua cidade'}."
         self.etapas.mostrar(self._etapa, titulo, sub)
 
     def _passo(self):
@@ -1477,7 +1500,7 @@ class Resumo(QWidget):
         self.etapas.hide()
         self._limpar_cartoes()
         hoje = dt.date.today()
-        nome = os.environ.get("JARVIS_NOME", "").strip()
+        nome = _nome_para_saudacao()
         emails, clima = d["emails"], d["clima"]
 
         # Cartão grande: e-mails (ou notícias, se o Gmail não estiver conectado)
@@ -1619,7 +1642,7 @@ def juntar_resumo() -> dict:
         fios.append(th)
     for th in fios:
         th.join(timeout=20)
-    saida.setdefault("clima", {"cidade": os.environ.get("JARVIS_CIDADE", "Campina Grande"), "ok": False})
+    saida.setdefault("clima", {"cidade": _cidade(), "ok": False})
     saida.setdefault("noticias", [])
     saida.setdefault("lembretes", [])
     saida.setdefault("emails", {"conectado": False, "itens": []})

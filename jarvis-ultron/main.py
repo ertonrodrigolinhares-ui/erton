@@ -22,6 +22,7 @@ import importlib
 import time
 
 from core.live_model import pick_live_model
+from core import perfil as _perfil
 
 
 def _lazy_action(module_name: str, attribute: str):
@@ -192,19 +193,25 @@ def _load_voice_name() -> str:
         return DEFAULT_VOICE_NAME
 
 
+def _como_chamar() -> str:
+    """Jarvis Ultron: como o modelo chama a pessoa, pelo perfil (core/perfil.py), nunca 'Sir'."""
+    chamar = _perfil.tratamento()
+    if chamar:
+        return (f"Always address the user as '{chamar}' (never as 'Sir' or 'Madam'), "
+                "while remaining efficient and direct.")
+    return "Address the user politely, without 'Sir' or 'Madam', while remaining efficient and direct."
+
+
 def _load_system_prompt() -> str:
     try:
         prompt = PROMPT_PATH.read_text(encoding="utf-8").strip()
-        return (
-            prompt
-            + "\n\nAlways address the user respectfully as 'Sir' or 'Madam' where appropriate, while remaining efficient and direct."
-        )
+        return prompt + "\n\n" + _como_chamar()
     except Exception:
         return (
             "You are JARVIS, Tony Stark's AI assistant. "
             "Be concise, direct, and always use the provided tools to complete tasks. "
             "Never simulate or guess results — always call the appropriate tool. "
-            "Always address the user respectfully as 'Sir' or 'Madam' where appropriate, while remaining efficient and direct."
+            + _como_chamar()
         )
 
 _CTRL_RE = re.compile(r"<ctrl\d+>", re.IGNORECASE)
@@ -1273,7 +1280,7 @@ class JarvisLive:
     def speak_error(self, tool_name: str, error: str):
         short = str(error)[:120]
         self.ui.write_log(f"ERR: {tool_name} — {short}")
-        self.speak(f"Sir, {tool_name} encountered an error. {short}")
+        self.speak(f"{tool_name} encountered an error. {short}")
 
     @staticmethod
     def _is_explicit_self_quit_transcript(text: str) -> bool:
@@ -1621,6 +1628,12 @@ class JarvisLive:
 
         carga = carregar_automacoes()
         habilidades = sincronizar_habilidades()
+        try:  # a personalidade do Hermes leva o perfil de quem usa (muda quando o perfil muda)
+            from core.automacoes import sincronizar_personalidade
+
+            sincronizar_personalidade()
+        except Exception as erro:
+            print(f"[Hermes] Não consegui atualizar a personalidade: {erro}")
         com_ferramenta = {a.arquivo.name for a in carga.ferramentas.values()}
         nomes = list(carga.ferramentas) + [a.rsplit(".", 1)[0] for a, _ in carga.inicios if a not in com_ferramenta]
         nomes += [f"{n} (Hermes)" for n in habilidades.habilidades]
@@ -1708,16 +1721,10 @@ class JarvisLive:
             return
         self._ja_cumprimentou = True
         try:
-            memory = load_memory()
-            name_entry = memory.get("identity", {}).get("name")
-            name = None
-            if isinstance(name_entry, dict):
-                name = name_entry.get("value")
-            elif isinstance(name_entry, str):
-                name = name_entry
-            # Jarvis Ultron: saudação em português
+            # Jarvis Ultron: saudação em português, pelo nome do perfil (core/perfil.py)
+            name = _perfil.tratamento()
             greeting = (
-                f"(Sistema iniciado. Cumprimente {name or 'o Erton'} em português do Brasil, "
+                f"(Sistema iniciado. Cumprimente {name or 'quem está falando com você'} em português do Brasil, "
                 "em uma frase curta e marcante, como o Jarvis Ultron, e pergunte como pode ajudar.)"
             )
             await self.session.send_client_content(
@@ -1745,6 +1752,9 @@ class JarvisLive:
         parts = [REGRA_IDIOMA, time_ctx]
         if mem_str:
             parts.append(mem_str)
+        bloco_perfil = _perfil.bloco_para_prompt()  # Jarvis Ultron: quem é a pessoa (tela "Sobre você")
+        if bloco_perfil:
+            parts.append(bloco_perfil)
         parts.append(sys_prompt)
         parts.append(REGRA_IDIOMA)
 

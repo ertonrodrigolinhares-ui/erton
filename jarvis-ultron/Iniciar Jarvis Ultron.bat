@@ -87,8 +87,7 @@ rem ---- Uma vez so: cidade do painel de clima ----
 findstr /c:"JARVIS_CIDADE" .env >nul 2>nul && goto iniciar
 echo.
 set "CIDADE="
-set /p "CIDADE=Sua cidade para o clima (Enter = Campina Grande): "
-if "%CIDADE%"=="" set "CIDADE=Campina Grande"
+set /p "CIDADE=Sua cidade para o clima (Enter = deixar para depois): "
 >> .env echo JARVIS_CIDADE="%CIDADE%"
 
 :iniciar

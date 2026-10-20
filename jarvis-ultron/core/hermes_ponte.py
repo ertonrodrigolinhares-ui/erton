@@ -205,7 +205,7 @@ def aprovar_e_executar(tipo: str, detalhes: str, jarvis, confirmar: bool = False
         with _trava:
             _proposta.clear()
             _proposta.update(chave=chave, em=time.monotonic(), marca=aprovacao.marca(jarvis))
-        return ("Proposta registrada, nada foi publicado ainda. Diga ao Erton, em português, exatamente o que "
+        return ("Proposta registrada, nada foi publicado ainda. Diga ao usuário, em português, exatamente o que "
                 "vai ser publicado ou mudado e pergunte se pode. Só depois de ele aprovar com as palavras dele "
                 "(por exemplo 'ok, pode publicar'), chame de novo com confirm=true e o mesmo kind e details.")
     with _trava:
@@ -217,15 +217,15 @@ def aprovar_e_executar(tipo: str, detalhes: str, jarvis, confirmar: bool = False
             _proposta.clear()
     if not proposta_ok:
         return ("Não registrei aprovação: primeiro chame com confirm=false e exatamente o que vai ser "
-                "publicado, conte isso ao Erton e espere o ok dele.")
+                "publicado, conte isso ao usuário e espere o ok dele.")
     if not fala_do_ok:
-        return ("Não registrei aprovação: o Erton precisa dizer claramente, depois de ouvir a proposta, "
+        return ("Não registrei aprovação: o usuário precisa dizer claramente, depois de ouvir a proposta, "
                 "por exemplo 'ok, pode publicar'. Pergunte a ele antes.")
     # em segundo plano: no Gemini ao vivo o resto da fala do "ok" só chega depois que a ferramenta
     # responde (o laço que recebe a transcrição fica parado enquanto ela roda)
     threading.Thread(target=_publicar, args=(tipo, detalhes, jarvis, fala_do_ok, proposta),
                      daemon=True, name="HermesPublicar").start()
-    return ("Aprovado. O Hermes está publicando em segundo plano só o que foi aprovado. Diga ao Erton, em uma "
+    return ("Aprovado. O Hermes está publicando em segundo plano só o que foi aprovado. Diga ao usuário, em uma "
             "frase curta em português, que você avisa quando terminar. Não chame ferramentas de novo para isso.")
 
 
@@ -244,7 +244,7 @@ def _publicar(tipo: str, detalhes: str, jarvis, fala_do_ok: int, proposta: dict)
     ate = registrar_aprovacao(tipo)
     skill = "publicar-aprovados" if tipo == "redes" else "anuncios-meta"
     try:
-        resposta = perguntar(f"O Erton aprovou agora ({tipo}): {detalhes}. Use a skill {skill} e execute "
+        resposta = perguntar(f"O usuário aprovou agora ({tipo}): {detalhes}. Use a skill {skill} e execute "
                              "somente o que foi aprovado.")
     except Exception as erro:  # nunca deixa o fio morrer calado
         resposta = f"O Hermes falhou: {str(erro)[:160]}"

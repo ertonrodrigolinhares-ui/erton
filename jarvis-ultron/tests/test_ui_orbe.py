@@ -328,6 +328,45 @@ class UltronNaCenaTests(unittest.TestCase):
         self.assertFalse(ui_orbe._ULTRON)
 
 
+class PerfilNaTelaTests(unittest.TestCase):
+    """A saudação e a cidade vêm do perfil (tela "Sobre você"); o .env só vale se o perfil não tiver."""
+
+    def setUp(self):
+        from core import perfil
+        from memory import memory_manager
+
+        self.pasta = Path(tempfile.mkdtemp())
+        self.trocas = [patch.object(perfil, "pasta_dados", lambda: self.pasta / "Jarvis Ultron"),
+                       patch.object(memory_manager, "MEMORY_PATH", self.pasta / "long_term.json"),
+                       patch.dict(os.environ)]
+        for troca in self.trocas:
+            troca.start()
+        os.environ.pop("JARVIS_NOME", None)
+        os.environ.pop("JARVIS_CIDADE", None)
+
+    def tearDown(self):
+        for troca in reversed(self.trocas):
+            troca.stop()
+
+    def test_sem_perfil_vale_o_env(self):
+        os.environ["JARVIS_NOME"], os.environ["JARVIS_CIDADE"] = "Fulano", "Recife"
+        self.assertEqual(ui_orbe._nome_para_saudacao(), "Fulano")
+        self.assertEqual(ui_orbe._cidade(), "Recife")
+
+    def test_perfil_ganha_do_env(self):
+        from core import perfil
+
+        os.environ["JARVIS_NOME"], os.environ["JARVIS_CIDADE"] = "Fulano", "Recife"
+        perfil.salvar({"nome": "Maria Souza", "cidade": "Natal"})
+        self.assertEqual(ui_orbe._nome_para_saudacao(), "Maria")
+        self.assertEqual(ui_orbe._cidade(), "Natal")
+
+    def test_sem_nome_nem_cidade_nada_e_inventado_e_o_clima_nao_localiza_pelo_ip(self):
+        self.assertEqual(ui_orbe._nome_para_saudacao(), "")
+        with patch("ui_stark.buscar_clima", side_effect=AssertionError("não devia perguntar ao serviço")):
+            self.assertEqual(ui_orbe._clima(), {"cidade": "", "ok": False})
+
+
 if __name__ == "__main__":
     unittest.main()
 

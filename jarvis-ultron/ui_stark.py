@@ -6,7 +6,7 @@
 - Embaixo: botões redondos que mandam comandos ao Jarvis.
 
 Ligada por padrão. Para voltar à tela original: JARVIS_TEMA_STARK=0 no .env.
-Configurações: JARVIS_CIDADE (clima, padrão "Campina Grande").
+Configurações: JARVIS_CIDADE (clima; a cidade do perfil, da tela "Sobre você", vale primeiro).
 """
 
 from __future__ import annotations
@@ -145,6 +145,16 @@ def _duracao(segundos: float) -> str:
     horas, resto = divmod(int(segundos), 3600)
     dias, horas = divmod(horas, 24)
     return f"{dias}d {horas}h {resto // 60}min" if dias else f"{horas}h {resto // 60}min"
+
+
+def _cidade() -> str:
+    """A cidade do perfil (tela "Sobre você") ou JARVIS_CIDADE do .env; vazia se ninguém disse."""
+    try:
+        from core import perfil
+
+        return perfil.cidade()
+    except Exception:
+        return os.environ.get("JARVIS_CIDADE", "").strip()
 
 
 def buscar_clima(cidade: str) -> str:
@@ -620,7 +630,7 @@ class TelaStark(QWidget):
         lay.setSpacing(8)
         lay.addWidget(Titulo("STARK INDUSTRIES", 16))
 
-        clima = Moldura(f"Clima · {os.environ.get('JARVIS_CIDADE', 'Campina Grande')}")
+        clima = Moldura(f"Clima · {_cidade() or 'sua cidade'}")
         self.clima = _rotulo("Carregando...", 10)
         clima.corpo.addWidget(self.clima)
         lay.addWidget(clima)
@@ -688,13 +698,16 @@ class TelaStark(QWidget):
         self.swap.definir(d["swap"] / 100, f"{d['swap']:.0f}%")
 
     def _buscar_da_internet(self) -> None:
-        cidade = os.environ.get("JARVIS_CIDADE", "Campina Grande")
+        cidade = _cidade()
 
         def trabalhar():
             try:
+                if not cidade:  # sem cidade não se pergunta ao serviço: ele localizaria pelo IP
+                    raise ValueError("sem cidade")
                 self._clima_pronto.emit(buscar_clima(cidade))
             except Exception:
-                self._clima_pronto.emit("Sem conexão com o serviço de clima.")
+                self._clima_pronto.emit("Sem conexão com o serviço de clima." if cidade else
+                                        'Diga a sua cidade na tela "Sobre você" para ver o clima.')
             try:
                 self._noticias_prontas.emit(buscar_noticias())
             except Exception:

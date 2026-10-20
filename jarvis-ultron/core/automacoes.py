@@ -137,6 +137,21 @@ def _hermes() -> str | None:
     return str(candidato) if candidato.exists() else shutil.which("hermes")
 
 
+def sincronizar_personalidade(pasta_perfil: Path | str | None = None, modelo: Path | None = None) -> bool:
+    """Escreve o SOUL.md do perfil jarvis do Hermes a partir de hermes/SOUL.md, com o perfil de quem
+    usa o Jarvis (core/perfil.py) no lugar de __PERFIL__. Roda a cada abertura: se o perfil mudar, o
+    Hermes acompanha. False se o Hermes não está instalado."""
+    pasta_perfil = str(pasta_perfil or os.environ.get("HERMES_JARVIS_HOME", "")).strip()
+    modelo = modelo or Path(__file__).resolve().parents[1] / "hermes" / "SOUL.md"
+    if not pasta_perfil or not Path(pasta_perfil).is_dir() or not modelo.is_file():
+        return False
+    from core import perfil
+
+    texto = modelo.read_text(encoding="utf-8").replace("__PERFIL__", perfil.bloco_para_prompt().rstrip())
+    (Path(pasta_perfil) / "SOUL.md").write_text(texto, encoding="utf-8")
+    return True
+
+
 def sincronizar_habilidades(pasta: Path | None = None, perfil: Path | str | None = None,
                             criar_rotinas: bool = True) -> Carga:
     """Copia automacoes/*.md para as skills do perfil jarvis do Hermes (e cria as rotinas)."""

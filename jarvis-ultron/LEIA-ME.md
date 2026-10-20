@@ -1,6 +1,6 @@
 # Jarvis Ultron
 
-Cópia do projeto **JARVIS-OS V.2** (licença MIT, veja `LICENSE`), com ajustes para o Erton:
+Cópia do projeto **JARVIS-OS V.2** (licença MIT, veja `LICENSE`), com ajustes próprios:
 
 - **Voz Ultron**: a voz do Gemini ao vivo passa por um efeito metálico (`core/efeito_ultron.py`).
 - **Voz grave "Charon"** como padrão.
@@ -389,11 +389,11 @@ Abra com o Bloco de Notas para mudar:
 | `JARVIS_EFEITO_ULTRON=leve` | Voz metálica sem eco (padrão). `ultron` = com eco (mais "atrasada"), `robo` = robô, `0` = desliga |
 | `JARVIS_LATENCIA_AUDIO=low` | Som com menos atraso (padrão). Se picotar, use `high` |
 | `JARVIS_TEMA_STARK=1` | Tela Stark ligada. `0` = volta para a tela original |
-| `JARVIS_CIDADE=Campina Grande` | Cidade do painel de clima |
+| `JARVIS_CIDADE=Sua cidade` | Cidade do painel de clima (a da tela "Sobre você" vale primeiro) |
 | `JARVIS_VISUAL=orbe` | Tela azul com anel de energia e painéis de vidro (padrão). `classico` = volta para a esfera antiga |
 | `JARVIS_CENA=1` | A tela azul ocupa a janela toda (padrão). `0` = anel dentro da tela antiga. A tecla **F2** também alterna |
 | `JARVIS_BIOMETRIA=1` | No "bom dia", abre a câmera dentro do anel antes do resumo. `0` = pula a câmera |
-| `JARVIS_NOME=Erton` | Nome usado no "Bom dia, ..." dos cartões do resumo |
+| `JARVIS_NOME=Seu nome` | Nome do "Bom dia, ..." dos cartões, se a tela "Sobre você" não tiver um |
 | `JARVIS_VERSAO_MINIMA=3.0` | Modelos mais antigos que isso (ex.: Gemini 2.5, que o Google está aposentando) só são usados como última reserva |
 | `JARVIS_PRIORIDADE=rapidez` | Padrão: modelos estáveis, mais rápidos e que travam menos. `versao` + `JARVIS_GEMINI_VERSAO=3.5` = usar a versão 3.5 mesmo em teste (preview) |
 | `JARVIS_PALAVRA_ATIVACAO=1` | Começa no modo chamada (esperando o "Hey Jarvis"). `0` = começa em mãos livres |

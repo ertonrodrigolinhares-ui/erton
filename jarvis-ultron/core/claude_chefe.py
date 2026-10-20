@@ -81,12 +81,12 @@ PASTAS_FORA = {".git", "__pycache__", ".venv", "venv", "env", "ENV", "node_modul
                ".mypy_cache", ".ruff_cache", "tmp", "outputs", "memory", "build", "dist", ".qa-artifacts"}
 ARQUIVOS_FORA = {".env", "api_keys.json", "ui_settings.json"}
 
-REGRAS = """Você é o "chefe de tarefas" do Jarvis Ultron, o assistente de voz do Erton Rodrigo Linhares Coelho
-(empresário; atleta de triathlon, Ironman 70.3 Hawaii). Escreva sempre em português do Brasil.
+REGRAS = """Você é o "chefe de tarefas" do Jarvis Ultron, o assistente de voz de quem usa o Jarvis (o perfil
+dessa pessoa, quando houver, vem no bloco [SOBRE O USUÁRIO]). Escreva sempre em português do Brasil.
 
 Regras:
 - Nunca publique, envie mensagens ou e-mails, compre, agende ou apague nada. Prepare rascunhos e diga
-  o que precisa do "ok" do Erton.
+  o que precisa do "ok" do usuário.
 - Nunca tente invadir, escanear ou acessar sistemas, redes, sites ou arquivos de terceiros.
 - Dados de clientes são sigilosos: use só o necessário para a tarefa e nunca os coloque em sites.
 - Não invente: quando não souber ou não achar, diga. Cite as fontes (links) das pesquisas.
@@ -95,8 +95,8 @@ Regras:
 
 REGRAS_TAREFA = """
 Pasta de trabalho: {pasta}. Arquivos que você criar devem ficar aqui (relatórios em "Relatorios").
-O Erton deixa arquivos para você analisar em "Entrada". Você também pode LER (sem alterar) os arquivos
-de {dados} (por exemplo clientes.txt, carteira.txt, a pasta Faturas).
+Quem usa o Jarvis deixa arquivos para você analisar em "Entrada". Você também pode LER (sem alterar)
+os arquivos de {dados}.
 Especialistas extras: a pasta "Agency" tem centenas de agentes prontos (finanças, vendas, marketing,
 gestão, jurídico, pesquisa...). Quando o pedido ganhar com um especialista, leia "Agency/INDICE.md"
 (a lista das áreas), depois o INDICE.md da área que serve, escolha o agente certo e siga o arquivo
@@ -106,19 +106,27 @@ Brasil, e as regras acima valem mais que as deles. A pasta "Agency" é só para 
 REGRAS_PLANO = """
 TAREFA: planejar uma mudança no código do próprio Jarvis Ultron (pasta atual). NÃO altere nada agora:
 leia o código e escreva o PLANO: o que vai mudar, em quais arquivos, os riscos, e como testar.
-Na linha "FALA:" resuma o plano em 2 frases simples (o Erton não é programador) e termine perguntando
+Na linha "FALA:" resuma o plano em 2 frases simples (quem usa o Jarvis não é programador) e termine perguntando
 se ele aprova. Não mexa em .env, chaves, memória nem na pasta .git. Você não pode mudar a .venv, pastas
 que começam com ponto, tmp/outputs/build/dist nem core/claude_chefe.py (as suas travas): se o pedido
 precisar disso, diga no plano que não dá."""
 
 REGRAS_APLICAR = """
-O Erton APROVOU o plano abaixo. Aplique exatamente esse plano, com mudanças pequenas e cuidadosas,
+O usuário APROVOU o plano abaixo. Aplique exatamente esse plano, com mudanças pequenas e cuidadosas,
 no estilo do código ao redor. Não rode comandos (não estão liberados): o Jarvis faz o backup, roda os
 testes e desfaz tudo sozinho se algo quebrar. Não mexa em .env, chaves, memória nem na pasta .git.
 Na linha "FALA:" diga em 1 ou 2 frases o que você mudou.
 
 PLANO APROVADO:
 {plano}"""
+
+
+def _regras() -> str:
+    """As REGRAS mais o perfil de quem usa o Jarvis (core/perfil.py), quando houver."""
+    from core import perfil
+
+    bloco = perfil.bloco_para_prompt()
+    return REGRAS + ("\n\n" + bloco.rstrip() if bloco else "")
 
 
 @dataclass
@@ -287,7 +295,7 @@ def preparar_pasta() -> Path:
 # vira o novo, e se só o parágrafo "Quem é o Erton" ainda for aquele, só o parágrafo é trocado.
 CLAUDE_MD_ANTIGO = "82df4793001f34208cbd154ffd1051cfd2c91fde24b7c92e7b523557c68408d1"
 QUEM_E_ANTIGO = "989cf1fb8d1c1a723cfda9756a25ccac272c7c3ca3d98f031c534603898888df"
-_QUEM_E = re.compile(r"^## Quem é o Erton\n(.*?)(?=\n\n|\Z)", re.S | re.M)
+_QUEM_E = re.compile(r"^## Quem (?:é o Erton|usa o Jarvis)\n(.*?)(?=\n\n|\Z)", re.S | re.M)
 
 
 def _impressao(texto: str) -> str:
@@ -705,15 +713,15 @@ def _instrucao_do_agente(agente: str | None) -> str:
     dica = " ".join(re.sub(r"[^\w &+-]", " ", agente).split())[:60]
     if not dica:
         return ""
-    return (f"\nO Erton pediu o especialista \"{dica}\", que não achei pelo nome: procure o mais parecido "
+    return (f"\nO usuário pediu o especialista \"{dica}\", que não achei pelo nome: procure o mais parecido "
             "nos índices da pasta Agency e, se nenhum servir, diga isso e faça a tarefa sem ele.")
 
 
 def fazer_tarefa(pedido: str, agente: str | None = None, sessao: str | None = None) -> Resposta:
     pasta = preparar_pasta()
-    texto = REGRAS + REGRAS_TAREFA.format(pasta=pasta, dados=pasta_dados())
+    texto = _regras() + REGRAS_TAREFA.format(pasta=pasta, dados=pasta_dados())
     texto += _instrucao_do_agente(agente)
-    texto += f"\n\nPEDIDO DO ERTON:\n{pedido.strip()}"
+    texto += f"\n\nPEDIDO DO USUÁRIO:\n{pedido.strip()}"
     permitir = [*LEITURA, *_ler(pasta, pasta_dados()), f"Edit({regra_de_pasta(pasta)}/**)"]
     return rodar(texto, permitir, pasta, sessao=sessao, pastas_extras=[pasta_dados()])
 
@@ -721,7 +729,7 @@ def fazer_tarefa(pedido: str, agente: str | None = None, sessao: str | None = No
 # ---------------- código do Jarvis: plano -> ok -> backup -> testes -> aplica -> confere ----------------
 def planejar(pedido: str) -> Resposta:
     pasta = pasta_jarvis()
-    texto = REGRAS + REGRAS_PLANO + f"\n\nPEDIDO DO ERTON:\n{pedido.strip()}"
+    texto = _regras() + REGRAS_PLANO + f"\n\nPEDIDO DO USUÁRIO:\n{pedido.strip()}"
     return rodar(texto, [*LEITURA, *_ler(pasta)], pasta)  # sem Edit: no plano ele não consegue mudar nada
 
 
@@ -1147,7 +1155,7 @@ def _aplicar_plano(plano: str, sessao: str | None, pedido: str) -> Resultado:
 def _aplicar_e_conferir(pasta: Path, antes: dict[str, str], backup: Path, falhas_antes, plano: str,
                         sessao: str | None, pedido: str) -> Resultado:
     permitir = [*LEITURA, *_ler(pasta), f"Edit({regra_de_pasta(pasta)}/**)"]
-    texto = REGRAS + REGRAS_APLICAR.format(plano=plano.strip())
+    texto = _regras() + REGRAS_APLICAR.format(plano=plano.strip())
     resposta = rodar(texto, permitir, pasta, sessao=sessao, turnos=MAX_TURNOS + 20)
     if not resposta.ok and sessao and "session" in resposta.erro.lower():
         resposta = rodar(texto, permitir, pasta, turnos=MAX_TURNOS + 20)  # a conversa do plano sumiu
