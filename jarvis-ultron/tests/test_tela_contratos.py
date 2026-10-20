@@ -25,7 +25,9 @@ from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import QApplication, QLineEdit
 
 import ui
+from core import perfil
 from core.api_key_validator import ApiKeyValidationResult
+from memory import memory_manager
 from core.ponte import METODOS_TELA
 
 
@@ -47,6 +49,9 @@ class TelaContratosTests(unittest.TestCase):
             patch.object(ui, "API_FILE", pasta / "api_keys.json"),
             patch.object(ui, "get_secret_store", return_value=_CofreVazio()),
             patch.object(ui, "BASE_DIR", pasta),  # o .env que a tela regrava ao aceitar uma chave
+            # o perfil (tela "Sobre você") e a memória: nunca os do Erton
+            patch.object(perfil, "pasta_dados", lambda: pasta / "Jarvis Ultron"),
+            patch.object(memory_manager, "MEMORY_PATH", pasta / "long_term.json"),
             # a tela importa o validador na hora de conferir: ele nunca chega ao Google no teste
             patch("core.api_key_validator.validate_gemini_api_key", side_effect=cls._validador_falso),
         ]
@@ -153,6 +158,73 @@ class TelaContratosTests(unittest.TestCase):
         cena._atualizar()  # de volta ao Gemini: o selo sai
         self.assertNotIn("🔒", cena.topo_esq.text())
         self.assertIn("PRINCIPAL", cena.topo_esq.text())
+
+
+    # ---- a tela "Sobre você" (core/perfil.py)
+    def _limpar_perfil(self):
+        perfil.arquivo().unlink(missing_ok=True)
+        memory_manager.MEMORY_PATH.unlink(missing_ok=True)
+        self.janela._update_name_btn()
+
+    def test_sobre_voce_abre_so_sem_perfil_e_salva_no_perfil(self):
+        # abre quando o perfil não foi preenchido, salva no perfil e na memória (pasta temporária),
+        # avisa o cérebro (on_name_change) e não abre de novo
+        self.assertIsNone(self.janela._name_overlay)
+        chamados = []
+        self.janela.on_name_change = chamados.append
+        try:
+            self.janela._check_and_show_name_signin()
+            self.app.processEvents()
+            ov = self.janela._name_overlay
+            self.assertIsNotNone(ov)
+            self.assertTrue(ov.isVisible())
+            ov._submit()  # sem nome não salva nem fecha
+            self.assertIs(self.janela._name_overlay, ov)
+            ov._campos["nome"].setText("Maria Souza")
+            ov._campos["cidade"].setText("Natal")
+            ov._preferencias.setPlainText("respostas curtas")
+            ov._submit()
+            self.app.processEvents()
+            self.assertIsNone(self.janela._name_overlay)
+            p = perfil.carregar()
+            self.assertEqual((p["nome"], p["cidade"], p["preferencias"]), ("Maria Souza", "Natal", "respostas curtas"))
+            self.assertEqual(memory_manager.load_memory()["identity"]["name"]["value"], "Maria Souza")
+            self.assertEqual(chamados, ["Maria Souza"])
+            self.assertIn("Maria", self.janela._name_btn.text())
+            self.janela._check_and_show_name_signin()
+            self.app.processEvents()
+            self.assertIsNone(self.janela._name_overlay)  # perfil completo: não pergunta de novo
+        finally:
+            self.janela.on_name_change = None
+            self._limpar_perfil()
+
+    def test_pular_a_tela_nao_pergunta_de_novo_nem_inventa_nome(self):
+        self.janela._check_and_show_name_signin()
+        self.app.processEvents()
+        try:
+            ov = self.janela._name_overlay
+            self.assertIsNotNone(ov)
+            ov.done.emit({})  # "Pular por agora"
+            self.app.processEvents()
+            self.assertIsNone(self.janela._name_overlay)
+            self.assertTrue(perfil.completo())
+            self.assertEqual(perfil.nome(), "")
+            self.assertIn("preencher", self.janela._name_btn.text())
+            self.janela._check_and_show_name_signin()
+            self.assertIsNone(self.janela._name_overlay)
+        finally:
+            self._limpar_perfil()
+
+    def test_botao_sobre_voce_da_tela_azul_abre_a_tela(self):
+        cena = self.janela._orbe.cena
+        self.assertTrue(cena.b_perfil.isVisible())
+        cena.b_perfil.click()
+        self.app.processEvents()
+        try:
+            self.assertIsNotNone(self.janela._name_overlay)
+            self.assertTrue(self.janela._name_overlay.isVisible())
+        finally:
+            self.janela._close_name_overlay()
 
 
 if __name__ == "__main__":

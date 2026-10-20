@@ -145,7 +145,7 @@ METODOS_DA_JARVISLIVE = frozenset({
     "_receive_audio", "_recusar_troca", "_responder_pela_reserva", "_send_realtime", "_speak_vision_result",
     "_suspender", "_trava_avisos", "_trava_da_fala", "_trava_textos", "_troca_pela_voz_indisponivel",
     "_trocar_cerebro", "_verificar_lembretes_geekie", "_voltar_da_suspensao", "_wait_before_reconnect",
-    "anunciar", "request_shutdown", "rodar_automacao_ultron", "run", "send_audio_chunk", "send_text",
+    "anunciar", "atualizar_perfil", "request_shutdown", "rodar_automacao_ultron", "run", "send_audio_chunk", "send_text",
     "set_speaking", "speak", "speak_error", "update_voice",
 })
 

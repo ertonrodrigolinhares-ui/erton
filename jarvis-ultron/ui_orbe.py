@@ -730,6 +730,11 @@ class Cena(QWidget):
         self.b_paineis.setCursor(Qt.CursorShape.PointingHandCursor)
         self.b_paineis.setFont(fonte(MONO, 7.5, QFont.Weight.Bold, 2))
         self.b_paineis.clicked.connect(self.alternar_paineis)
+        self.b_perfil = QPushButton("☺  SOBRE VOCÊ", self)  # a tela "Sobre você" (core/perfil.py)
+        self.b_perfil.setToolTip("Quem você é: nome, como quer ser chamado, cidade, profissão e preferências")
+        self.b_perfil.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.b_perfil.setFont(fonte(MONO, 7.5, QFont.Weight.Bold, 2))
+        self.b_perfil.clicked.connect(lambda _=False: self.win._show_name_signin())
         self.entrada_rapida = QLineEdit(self)
         self.entrada_rapida.setPlaceholderText("Converse com o JARVIS...")
         self.entrada_rapida.setFont(fonte(SANS, 9.5))
@@ -738,7 +743,7 @@ class Cena(QWidget):
         self._estilo_tela_limpa()
 
         self._painel = [self.b_chamada, self.b_maos, self.p_voz, self.p_sistema, self.p_status, self.p_ultron,
-                        self.p_ativ, self.p_hist, self.p_rede, self.canal, self.b_paineis, self.entrada_rapida]
+                        self.p_ativ, self.p_hist, self.p_rede, self.canal, self.b_paineis, self.b_perfil, self.entrada_rapida]
 
         self._t = QTimer(self); self._t.timeout.connect(self._atualizar); self._t.start(1000)
         self._t_voz = QTimer(self); self._t_voz.timeout.connect(self._amostra_voz); self._t_voz.start(1000)
@@ -763,8 +768,8 @@ class Cena(QWidget):
         return False
 
     def _trazer_janelas(self):
-        """A tela de chave do Gemini e a de nome precisam ficar por cima da cena."""
-        for nome in ("_overlay", "_name_overlay"):
+        """As telas de chave, "Sobre você" e de voz precisam ficar por cima da cena."""
+        for nome in ("_overlay", "_name_overlay", "_voice_overlay"):
             w = getattr(self.win, nome, None)
             if w is not None and w.isVisible():
                 w.raise_()
@@ -806,6 +811,7 @@ class Cena(QWidget):
         self.botao.move(int(W / 2 - 23), H - 58)
         self.b_paineis.setText("✕  ESCONDER PAINÉIS" if not self.limpa else "☰  PAINÉIS")
         self.b_paineis.setGeometry(m, H - 40, 168 if not self.limpa else 104, 26)
+        self.b_perfil.setGeometry(W - m - 124, H - 40, 124, 26)
         larg_e = int(min(440, W * 0.42))
         self.entrada_rapida.setGeometry(int((W - larg_e) / 2), H - 104, larg_e, 34)
         self.entrada_rapida.setVisible(self.limpa)
@@ -844,10 +850,11 @@ class Cena(QWidget):
         self.canal._enviar()
 
     def _estilo_tela_limpa(self):
-        self.b_paineis.setStyleSheet(
-            f"QPushButton {{ color:{cor(TEXTO2).name()}; background: {_rgba('#041438', 150)};"
-            f" border:1px solid {_rgba('#3a78d8', 110)}; border-radius:13px; padding:2px 10px; }}"
-            f" QPushButton:hover {{ color:{cor(CIANO).name()}; border-color:{cor(CIANO).name()}; }}")
+        for b in (self.b_paineis, self.b_perfil):
+            b.setStyleSheet(
+                f"QPushButton {{ color:{cor(TEXTO2).name()}; background: {_rgba('#041438', 150)};"
+                f" border:1px solid {_rgba('#3a78d8', 110)}; border-radius:13px; padding:2px 10px; }}"
+                f" QPushButton:hover {{ color:{cor(CIANO).name()}; border-color:{cor(CIANO).name()}; }}")
         self.entrada_rapida.setStyleSheet(
             f"QLineEdit{{color:{cor(TEXTO).name()}; background: {_rgba('#041438', 120)};"
             f" border:1px solid {_rgba('#5fb4ff', 60)}; border-radius:17px; padding:6px 14px;}}"

@@ -1418,6 +1418,16 @@ class JarvisLive:
             except Exception as e:
                 print(f"[JARVIS] ⚠️ Could not close session after voice change: {e}")
 
+    def atualizar_perfil(self, nome: str):
+        """Jarvis Ultron: a tela "Sobre você" salvou o perfil (core/perfil.py). A conversa reabre,
+        como na troca de voz, para o Gemini já receber o perfil novo."""
+        self.ui.write_log(f"SYS: Perfil atualizado: {nome}." if nome else "SYS: Perfil atualizado.")
+        if self.session and self._loop:
+            try:
+                asyncio.run_coroutine_threadsafe(self.session.close(), self._loop)
+            except Exception as e:
+                print(f"[JARVIS] ⚠️ Could not close session after profile change: {e}")
+
     def _get_current_voice(self) -> str:
         if getattr(self, "voice_name", None):
             return _normalize_voice_name(self.voice_name)
@@ -3105,6 +3115,7 @@ def rodar_cerebro(ui):
         _vigiar_fim_do_teste(jarvis)
 
     ui.on_voice_change = jarvis.update_voice
+    ui.on_name_change = jarvis.atualizar_perfil
     def _on_tts_change(provider, api_key, voice_id):
         if provider == "gemini":
             jarvis._tts_engine = None

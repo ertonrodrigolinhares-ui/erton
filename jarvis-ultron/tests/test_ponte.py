@@ -211,6 +211,9 @@ class RodarCerebroTests(unittest.TestCase):
             def update_voice(self, voz):
                 vozes.append(voz)
 
+            def atualizar_perfil(self, nome):  # a tela "Sobre você" avisa o cérebro por aqui
+                pass
+
             def request_shutdown(self):
                 pass
 
@@ -244,6 +247,9 @@ class RodarCerebroTests(unittest.TestCase):
                 self.ui, self.session, self._loop = tela, None, None
 
             def update_voice(self, voz):
+                pass
+
+            def atualizar_perfil(self, nome):
                 pass
 
             def request_shutdown(self):

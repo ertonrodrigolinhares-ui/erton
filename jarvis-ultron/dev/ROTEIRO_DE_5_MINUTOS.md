@@ -9,6 +9,8 @@ confere, no seu PC, o que os testes automáticos não veem: a voz, a tela e as t
    da tradução da tela, o nome passa a ser **Sair do Jarvis**). O X só esconde.
 2. **Guarde a pasta da versão anterior** (não apague): é a sua volta segura.
 3. Extraia a versão nova numa pasta nova e **copie o seu `.env`** da pasta antiga para a nova.
+4. Se, ao abrir, aparecer a tela **Sobre você** (o Jarvis ainda não sabia o seu nome), preencha ou
+   pule e siga o roteiro.
 
 ## O roteiro
 

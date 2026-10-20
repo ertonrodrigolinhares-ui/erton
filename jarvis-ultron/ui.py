@@ -5538,11 +5538,19 @@ class SettingsOverlay(_OverlayBase):
 
 
 class NameSignInOverlay(_OverlayBase):
-    """Overlay that asks the user for their name so JARVIS can address them personally."""
-    done = pyqtSignal(str)   # emits the entered name (or "" if skipped)
+    """Tela "Sobre você": quem usa o Jarvis se apresenta (core/perfil.py). Aparece na primeira
+    abertura, depois da chave e da voz, e de novo pelo botão SOBRE VOCÊ (tela azul) ou PERFIL (F2).
+    Só o nome é obrigatório; "Pular por agora" guarda vazio e a tela não volta sozinha."""
+    done = pyqtSignal(dict)   # o perfil preenchido ({} = pulou)
 
-    def __init__(self, parent=None, existing_name: str = ""):
+    CAMPOS = (("nome", "SEU NOME", "ex.: Maria Souza"),
+              ("tratamento", "COMO QUER SER CHAMADO  (opcional)", "ex.: Maria, Dra. Maria"),
+              ("cidade", "CIDADE  (opcional, para o clima)", "ex.: Natal"),
+              ("profissao", "PROFISSÃO OU ÁREA  (opcional)", "ex.: advogada, lojista, estudante"))
+
+    def __init__(self, parent=None, existente: dict | None = None):
         super().__init__(parent)
+        existente = existente or {}
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setStyleSheet(f"""
             NameSignInOverlay {{
@@ -5553,8 +5561,8 @@ class NameSignInOverlay(_OverlayBase):
         """)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(36, 28, 36, 28)
-        layout.setSpacing(10)
+        layout.setContentsMargins(36, 24, 36, 22)
+        layout.setSpacing(6)
 
         def _lbl(txt, font_size=9, bold=False, color=C.PRI,
                  align=Qt.AlignmentFlag.AlignCenter):
@@ -5565,40 +5573,44 @@ class NameSignInOverlay(_OverlayBase):
             w.setStyleSheet(f"color: {color}; background: transparent;")
             return w
 
-        title_txt = "◈  UPDATE IDENTITY" if existing_name else "◈  IDENTITY PROTOCOL"
-        sub_txt   = f"Currently: {existing_name}" if existing_name else "JARVIS needs to know who it's talking to."
-        layout.addWidget(_lbl(title_txt, 13, True))
-        layout.addWidget(_lbl(sub_txt, 9, color=C.PRI_DIM))
-        layout.addSpacing(4)
-
-        sep = QFrame(); sep.setFrameShape(QFrame.Shape.HLine)
-        sep.setStyleSheet(f"color: {C.BORDER};"); layout.addWidget(sep)
-        layout.addSpacing(6)
-
-        layout.addWidget(_lbl("ENTER YOUR NAME", 8, color=C.TEXT_DIM,
-                               align=Qt.AlignmentFlag.AlignLeft))
-
-        self._name_input = QLineEdit()
-        self._name_input.setPlaceholderText("e.g.  Tony,  Mirsab,  Alex …")
-        if existing_name:
-            self._name_input.setText(existing_name)
-            self._name_input.selectAll()
-        self._name_input.setFont(QFont("Courier New", 11))
-        self._name_input.setFixedHeight(36)
-        self._name_input.setStyleSheet(f"""
-            QLineEdit {{
+        estilo_campo = f"""
+            QLineEdit, QTextEdit {{
                 background: {C.DARK}; color: {C.WHITE};
                 border: 1px solid {C.BORDER_B}; border-radius: 4px;
-                padding: 4px 10px; letter-spacing: 1px;
+                padding: 4px 10px;
             }}
-            QLineEdit:focus {{ border: 1px solid {C.PRI}; }}
-        """)
-        self._name_input.returnPressed.connect(self._submit)
-        layout.addWidget(self._name_input)
+            QLineEdit:focus, QTextEdit:focus {{ border: 1px solid {C.PRI}; }}
+        """
+        layout.addWidget(_lbl("◈  ATUALIZAR PERFIL" if existente.get("nome") else "◈  SOBRE VOCÊ", 13, True))
+        layout.addWidget(_lbl("O Jarvis guarda isto no seu PC e usa nas conversas com a IA.", 8, color=C.PRI_DIM))
+        sep = QFrame(); sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setStyleSheet(f"color: {C.BORDER};"); layout.addWidget(sep)
 
+        self._campos: dict[str, QLineEdit] = {}
+        for campo, rotulo, exemplo in self.CAMPOS:
+            layout.addWidget(_lbl(rotulo, 7, color=C.TEXT_DIM, align=Qt.AlignmentFlag.AlignLeft))
+            entrada = QLineEdit()
+            entrada.setPlaceholderText(exemplo)
+            entrada.setText(existente.get(campo, "") or "")
+            entrada.setFont(QFont("Courier New", 10))
+            entrada.setFixedHeight(30)
+            entrada.setStyleSheet(estilo_campo)
+            entrada.returnPressed.connect(self._submit)
+            layout.addWidget(entrada)
+            self._campos[campo] = entrada
+        self._name_input = self._campos["nome"]
+        layout.addWidget(_lbl("PREFERÊNCIAS E OBJETIVOS  (opcional)", 7, color=C.TEXT_DIM,
+                              align=Qt.AlignmentFlag.AlignLeft))
+        self._preferencias = QTextEdit()
+        self._preferencias.setPlaceholderText("ex.: respostas curtas; me ajude com a agenda e os e-mails")
+        self._preferencias.setPlainText(existente.get("preferencias", "") or "")
+        self._preferencias.setFont(QFont("Courier New", 10))
+        self._preferencias.setFixedHeight(62)
+        self._preferencias.setStyleSheet(estilo_campo)
+        layout.addWidget(self._preferencias)
         layout.addSpacing(4)
 
-        confirm_btn = QPushButton("▸  CONFIRM IDENTITY")
+        confirm_btn = QPushButton("▸  SALVAR")
         confirm_btn.setFixedHeight(34)
         confirm_btn.setFont(QFont("Courier New", 9, QFont.Weight.Bold))
         confirm_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -5612,7 +5624,7 @@ class NameSignInOverlay(_OverlayBase):
         confirm_btn.clicked.connect(self._submit)
         layout.addWidget(confirm_btn)
 
-        skip_btn = QPushButton("Skip — default to Sir")
+        skip_btn = QPushButton("Pular por agora")
         skip_btn.setFixedHeight(26)
         skip_btn.setFont(QFont("Courier New", 7))
         skip_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -5623,27 +5635,33 @@ class NameSignInOverlay(_OverlayBase):
             }}
             QPushButton:hover {{ color: {C.TEXT_MED}; border: 1px solid {C.BORDER_B}; }}
         """)
-        skip_btn.clicked.connect(lambda: self.done.emit("Sir"))
+        skip_btn.clicked.connect(lambda: self.done.emit({}))
         layout.addWidget(skip_btn)
 
-        layout.addSpacing(4)
+        layout.addSpacing(2)
         layout.addWidget(_lbl(
-            "Your name is stored locally and never sent to any server.",
+            "Fica em Documentos\\Jarvis Ultron\\perfil.json, neste PC; vai para a IA só nas conversas.",
             7, color=C.TEXT_DIM
         ))
 
         self._drag_pos = None
         self._setup_overlay_base(close_callback=self.hide)
 
+    def dados(self) -> dict:
+        dados = {campo: entrada.text().strip() for campo, entrada in self._campos.items()}
+        dados["preferencias"] = self._preferencias.toPlainText().strip()
+        return dados
+
     def _submit(self):
-        name = self._name_input.text().strip()
-        if not name:
+        dados = self.dados()
+        if not dados["nome"]:
             self._name_input.setStyleSheet(
                 self._name_input.styleSheet()
                 + f" QLineEdit {{ border: 1px solid {C.RED}; }}"
             )
+            self._name_input.setFocus()
             return
-        self.done.emit(name)
+        self.done.emit(dados)
 
 
 class VoiceSelectOverlay(_OverlayBase):
@@ -7553,7 +7571,7 @@ class MainWindow(QMainWindow):
                 ow, oh,
             )
         if self._name_overlay and self._name_overlay.isVisible():
-            ow, oh = 420, 310
+            ow, oh = 470, 560
             self._name_overlay.setGeometry(
                 (cw.width()  - ow) // 2,
                 (cw.height() - oh) // 2,
@@ -8337,9 +8355,9 @@ class MainWindow(QMainWindow):
         track_lay.addWidget(self._tts_btn)
         track_lay.addWidget(_track_separator())
 
-        self._name_btn = _ctrl_btn("NAME", 142)
-        self._name_btn.setToolTip("Change operator name")
-        self._name_btn.setAccessibleName("Change operator name")
+        self._name_btn = _ctrl_btn("PERFIL", 142)
+        self._name_btn.setToolTip("Sobre você: nome, cidade, profissão, preferências")
+        self._name_btn.setAccessibleName("Sobre você")
         self._name_btn.clicked.connect(self._show_name_signin)
         self._update_name_btn()
         track_lay.addWidget(self._name_btn)
@@ -8902,18 +8920,10 @@ class MainWindow(QMainWindow):
         self._show_voice_select_then_name()
 
     def _check_and_show_name_signin(self):
-        """Show the name sign-in overlay only if no name is saved in memory."""
+        """A tela "Sobre você" só aparece enquanto o perfil não foi preenchido nem pulado."""
         try:
-            from memory.memory_manager import load_memory
-            memory = load_memory()
-            name_entry = memory.get("identity", {}).get("name")
-            name = None
-            if isinstance(name_entry, dict):
-                name = name_entry.get("value")
-            elif isinstance(name_entry, str):
-                name = name_entry
-            if name and name.strip():
-                # Name already known — no need to ask
+            from core import perfil
+            if perfil.completo():
                 return
         except Exception:
             pass
@@ -8962,27 +8972,21 @@ class MainWindow(QMainWindow):
         self._voice_overlay = ov
 
     def _show_name_signin(self):
-        # Pre-fill with existing name if one is saved
-        existing_name = ""
+        """Abre a tela "Sobre você" (core/perfil.py), já com o que estiver salvo."""
         try:
-            from memory.memory_manager import load_memory
-            memory = load_memory()
-            name_entry = memory.get("identity", {}).get("name")
-            if isinstance(name_entry, dict):
-                existing_name = name_entry.get("value", "")
-            elif isinstance(name_entry, str):
-                existing_name = name_entry
+            from core import perfil
+            existente = perfil.carregar()
         except Exception:
-            pass
+            existente = {}
 
         # Don't open a second copy if already visible
         if self._name_overlay and self._name_overlay.isVisible():
             self._name_overlay.raise_()
             return
 
-        ov = NameSignInOverlay(self.centralWidget(), existing_name=existing_name)
+        ov = NameSignInOverlay(self.centralWidget(), existente=existente)
         cw = self.centralWidget()
-        ow, oh = 420, 310
+        ow, oh = 470, 560
         ov.setGeometry(
             (cw.width()  - ow) // 2,
             (cw.height() - oh) // 2,
@@ -9000,55 +9004,53 @@ class MainWindow(QMainWindow):
             self._name_overlay.deleteLater()
             self._name_overlay = None
 
-    def _on_name_done(self, name: str):
+    def _on_name_done(self, dados):
+        """Salva o perfil (core/perfil.py): o dict da tela "Sobre você" ({} = pulou) ou só o nome
+        (str), vindo dos Ajustes. Avisa o cérebro, que reabre a conversa com o perfil novo."""
         if self._name_overlay:
             self._name_overlay.hide()
             self._name_overlay.deleteLater()
             self._name_overlay = None
-        if not name or not name.strip():
-            # X button was pressed — don't overwrite saved name
-            return
-        # Always save — "Sir" is the default when skipped
-        save_name = name.strip() if name.strip() else "Sir"
+        from core import perfil
+        if isinstance(dados, str):
+            if not dados.strip():
+                return  # o X: não mexe no que está salvo
+            dados = {**perfil.carregar(), "nome": dados.strip()}
         try:
-            from memory.memory_manager import update_memory
-            update_memory({"identity": {"name": {"value": save_name}}})
-            self._log.append_log(f"SYS: Identity set — {save_name}.")
-            self._log.append_log(f"JARVIS: The workshop is now at your disposal, {save_name}.")
-            self._log.append_log("JARVIS: All systems nominal. How may I assist you today?")
+            salvo = perfil.salvar(dados)
+            chamar = perfil.tratamento(salvo)
+            if chamar:
+                self._log.append_log(f"SYS: Perfil salvo — {salvo['nome']}.")
+                self._log.append_log(f"JARVIS: Prazer, {chamar}. Pode falar comigo quando quiser.")
+            else:
+                self._log.append_log("SYS: Perfil pulado. Preencha quando quiser pelo botão SOBRE VOCÊ.")
         except Exception as e:
-            self._log.append_log(f"SYS: Could not save name: {e}")
+            self._log.append_log(f"SYS: Não consegui salvar o perfil: {e}")
+            return
         # Notify JarvisLive so it can update the running session immediately
         if self.on_name_change:
             try:
-                self.on_name_change(save_name)
+                self.on_name_change(salvo["nome"])
             except Exception as e:
                 self._log.append_log(f"SYS: Name callback error: {e}")
         # Refresh the button label to show current name
         self._update_name_btn()
 
     def _update_name_btn(self):
-        """Update the Change Name button to show the currently saved name."""
+        """O botão PERFIL (tela antiga) mostra como a pessoa quer ser chamada (core/perfil.py)."""
         if not hasattr(self, "_name_btn"):
             return
         try:
-            from memory.memory_manager import load_memory
-            memory = load_memory()
-            name_entry = memory.get("identity", {}).get("name")
-            name = None
-            if isinstance(name_entry, dict):
-                name = name_entry.get("value")
-            elif isinstance(name_entry, str):
-                name = name_entry
-            if name and name.strip() and name.strip().lower() not in ("sir", "madam"):
-                display_name = name.strip()
-                if len(display_name) > 14:
-                    display_name = display_name[:13].rstrip() + "…"
-                self._name_btn.setText(f"NAME  ·  {display_name}")
+            from core import perfil
+            chamar = perfil.tratamento()
+            if chamar:
+                if len(chamar) > 14:
+                    chamar = chamar[:13].rstrip() + "…"
+                self._name_btn.setText(f"PERFIL  ·  {chamar}")
             else:
-                self._name_btn.setText("NAME  ·  SET")
+                self._name_btn.setText("PERFIL  ·  preencher")
         except Exception:
-            self._name_btn.setText("NAME")
+            self._name_btn.setText("PERFIL")
 
     def _show_voice_select(self):
         if self._voice_overlay and self._voice_overlay.isVisible():

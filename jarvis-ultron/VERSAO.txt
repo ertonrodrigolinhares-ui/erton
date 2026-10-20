@@ -1,4 +1,17 @@
-Jarvis Ultron - versão 2026-10-19.2
+Jarvis Ultron - versão 2026-10-20
+
+Novidades desta versão:
+- Tela "Sobre você": na primeira abertura, depois da chave e da voz, o Jarvis pergunta seu nome, como
+  quer ser chamado, cidade, profissão e preferências (só o nome é obrigatório; dá para pular). Fica em
+  Documentos\Jarvis Ultron\perfil.json, no seu PC, e vai para a IA só nas conversas. Para mudar: botão
+  ☺ SOBRE VOCÊ (tela azul, canto de baixo à direita) ou PERFIL (tela antiga, F2). Quem já usava o
+  Jarvis continua com o nome que ele sabia.
+- Nenhum nome fixo no Jarvis: o Gemini, o Gemma, o Groq, o Claude e o Hermes recebem o perfil e chamam
+  você pelo nome escolhido (nunca mais "Sir"). O "Bom dia" e o clima usam o perfil; sem cidade, o
+  clima não é consultado (o serviço localizaria você pelo IP) e a tela pede a cidade. Se você usa o
+  Hermes, rode o "Instalar Hermes" de novo para ele receber a personalidade nova.
+
+Versão anterior (2026-10-19.2):
 
 Novidades desta versão:
 - 282 especialistas extras para o Claude (coleção agency-agents, licença MIT): finanças, vendas,

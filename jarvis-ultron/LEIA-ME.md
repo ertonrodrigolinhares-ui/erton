@@ -61,8 +61,13 @@ Cópia do projeto **JARVIS-OS V.2** (licença MIT, veja `LICENSE`), com ajustes 
      Não feche a janela preta.
 2. Quando pedir a chave do Gemini, o site do Google abre sozinho: entre com o Gmail, clique em
    **Create API key**, copie, volte à janela preta, **clique com o botão direito** para colar e aperte **Enter**.
-3. Depois ele pergunta a chave do **Groq** (reserva grátis, opcional) e a **cidade** do clima.
-4. A tela do Jarvis abre. Na primeira vez ele mostra uma apresentação (em inglês). Depois é só **falar**.
+3. Depois ele pergunta a chave do **Groq** (reserva grátis, opcional) e a **cidade** do clima (pode
+   deixar em branco e dizer depois na tela Sobre você).
+4. A tela do Jarvis abre e, na primeira vez, pergunta **sobre você**: nome, como quer ser chamado,
+   cidade, profissão e preferências (só o nome é obrigatório; dá para pular). O Jarvis guarda isso no
+   seu PC (`Documentos\Jarvis Ultron\perfil.json`) e usa nas conversas com a IA. Para mudar depois:
+   botão **☺ SOBRE VOCÊ** (canto de baixo, à direita da tela azul) ou **PERFIL** na tela antiga (F2).
+   Depois é só **falar**.
 5. **Deixe a janela preta aberta** enquanto usa. Ela mostra o que o Jarvis está fazendo.
 6. Para os agentes (posts, Metricool, rotina das 8h): dê dois cliques em **`Instalar Hermes`**.
 
