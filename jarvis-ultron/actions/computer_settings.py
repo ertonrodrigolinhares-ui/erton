@@ -10,6 +10,8 @@ import unicodedata
 import platform
 from pathlib import Path
 
+from core import marca
+
 try:
     import pyautogui
     pyautogui.FAILSAFE = True
@@ -742,7 +744,7 @@ def _has_explicit_computer_power_target(params: dict, description: str, value) -
 
 VALIDADE_PEDIDO = 2 * 60  # segundos que a pergunta espera a resposta dele
 RECARREGAR_NO_MAXIMO = 20  # vezes do reload_n por ok (o número vem do modelo; cada F5 leva 0,8 s)
-TITULO_DO_JARVIS = "J.A.R.V.I.S — MARK XXXIX"  # o da janela da tela (ui.py, setWindowTitle)
+TITULO_DO_JARVIS = marca.TITULO_DA_JANELA  # o da janela da tela (ui.py, setWindowTitle): os dois leem de core/marca.py
 
 _pendente: dict = {}
 _trava = threading.Lock()

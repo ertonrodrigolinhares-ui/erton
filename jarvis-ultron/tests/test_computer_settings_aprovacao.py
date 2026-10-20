@@ -37,7 +37,7 @@ from test_contratos import UIFalsa  # noqa: E402
 REINICIAR = {"action": "restart", "description": "restart my computer"}
 DESLIGAR = {"action": "shutdown", "description": "shut down my computer"}
 JANELA = (42, "Sem título - Bloco de Notas")
-JANELA_DO_JARVIS = (7, "J.A.R.V.I.S — MARK XXXIX")
+JANELA_DO_JARVIS = (7, cs.TITULO_DO_JARVIS)
 JANELA_DA_FRENTE = cs._janela_da_frente  # a de verdade (nos testes ela fica falsa)
 # fora do ACTION_MAP, também mandam texto ou teclas para o programa da frente
 TECLADO_FORA_DO_MAPA = {
@@ -749,7 +749,7 @@ class JanelaDoJarvisTests(BaseTests):
         for resposta in respostas[1:]:
             self.assertIn("Not done: the window in front is Jarvis itself", resposta)
         self.assertIn("Not done yet", de_volta)
-        self.assertFalse(any('na janela "J.A.R.V.I.S' in texto for texto in respostas + jarvis.logs))
+        self.assertFalse(any(f'na janela "{cs.TITULO_DO_JARVIS}' in texto for texto in respostas + jarvis.logs))
         self.assertEqual(self.teclado.method_calls, [])
         self.assertEqual(jarvis.avisos, [])
 
@@ -775,8 +775,12 @@ class JanelaDoJarvisTests(BaseTests):
         self.assertEqual(self.teclado.method_calls, [])
 
     def test_titulo_e_o_da_janela_da_tela(self):
+        # a tela e a trava leem o mesmo título de core/marca.py (senão a trava não reconheceria a janela)
+        from core import marca
+
         ui = (RAIZ / "ui.py").read_text(encoding="utf-8")
-        self.assertIn(f'self.setWindowTitle("{cs.TITULO_DO_JARVIS}")', ui)
+        self.assertIn("self.setWindowTitle(marca.TITULO_DA_JANELA)", ui)
+        self.assertEqual(cs.TITULO_DO_JARVIS, marca.TITULO_DA_JANELA)
 
     def test_desligar_e_a_tecla_sleep_nao_dependem_da_janela(self):
         # vão para o Windows, não para a janela da frente: com a do Jarvis na frente, perguntam normalmente

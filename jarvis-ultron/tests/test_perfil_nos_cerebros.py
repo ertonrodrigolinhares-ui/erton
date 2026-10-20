@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from core import perfil  # noqa: E402
+from core import marca, perfil  # noqa: E402
 from memory import memory_manager  # noqa: E402
 
 RAIZ = Path(__file__).resolve().parents[1]
@@ -109,8 +109,8 @@ class ReservasEGemmaTests(Base):
         from core.cerebro_gemma import INSTRUCOES_GEMMA, CerebroGemma
         from core.reserva_groq import INSTRUCOES, ReservaGroq
 
-        self.assertEqual(CerebroGemma(cliente=object()).mensagens[0]["content"], INSTRUCOES_GEMMA)
-        self.assertEqual(ReservaGroq("chave", cliente=object()).mensagens[0]["content"], INSTRUCOES)
+        self.assertEqual(CerebroGemma(cliente=object()).mensagens[0]["content"], marca.aplicar(INSTRUCOES_GEMMA))
+        self.assertEqual(ReservaGroq("chave", cliente=object()).mensagens[0]["content"], marca.aplicar(INSTRUCOES))
 
 
 class ClaudeChefeTests(Base):

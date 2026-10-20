@@ -31,7 +31,7 @@ MODELOS_TRANSCRICAO = ["whisper-large-v3-turbo", "whisper-large-v3"]
 LIMITE_HISTORICO = 30
 
 INSTRUCOES = (
-    "Você é o Jarvis Ultron, assistente pessoal do usuário. Responda sempre em português do Brasil, "
+    "Você é o __MARCA__, assistente pessoal do usuário. Responda sempre em português do Brasil, "
     "de forma calma, confiante e precisa, em no máximo 3 frases, porque a resposta será falada. "
     "Não use markdown, listas ou emojis. Você está no modo reserva (Groq), mas MESMO ASSIM consegue "
     "executar tarefas: quando o pedido precisar de uma ação (abrir um site ou app, ver o clima, "
@@ -45,11 +45,11 @@ MAX_VOLTAS_FERRAMENTA = 3  # menos idas e vindas = menos gasto do limite grátis
 
 
 def instrucoes_com_perfil(base: str = INSTRUCOES) -> str:
-    """As instruções mais o perfil de quem usa o Jarvis (core/perfil.py), quando houver."""
-    from core import perfil
+    """As instruções, com o nome do produto (core/marca.py) e o perfil de quem usa (core/perfil.py)."""
+    from core import marca, perfil
 
     bloco = perfil.bloco_para_prompt()
-    return base + ("\n\n" + bloco.rstrip() if bloco else "")
+    return marca.aplicar(base) + ("\n\n" + bloco.rstrip() if bloco else "")
 
 
 def gemini_para_groq(declaracoes: list[dict]) -> list[dict]:

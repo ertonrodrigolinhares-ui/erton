@@ -5582,7 +5582,7 @@ class NameSignInOverlay(_OverlayBase):
             QLineEdit:focus, QTextEdit:focus {{ border: 1px solid {C.PRI}; }}
         """
         layout.addWidget(_lbl("◈  ATUALIZAR PERFIL" if existente.get("nome") else "◈  SOBRE VOCÊ", 13, True))
-        layout.addWidget(_lbl("O Jarvis guarda isto no seu PC e usa nas conversas com a IA.", 8, color=C.PRI_DIM))
+        layout.addWidget(_lbl(f"O {marca.NOME_CURTO} guarda isto no seu PC e usa nas conversas com a IA.", 8, color=C.PRI_DIM))
         sep = QFrame(); sep.setFrameShape(QFrame.Shape.HLine)
         sep.setStyleSheet(f"color: {C.BORDER};"); layout.addWidget(sep)
 
@@ -6151,6 +6151,7 @@ def _minimize_or_restore(win: QMainWindow):
 
 
 from core.secret_store import get_secret_store
+from core import marca
 
 
 class _SubtitleWidget(QWidget):
@@ -6767,7 +6768,7 @@ class MainWindow(QMainWindow):
     def __init__(self, face_path: str):
         super().__init__()
         _load_bundled_fonts()
-        self.setWindowTitle("J.A.R.V.I.S — MARK XXXIX")
+        self.setWindowTitle(marca.TITULO_DA_JANELA)
         self.setMinimumSize(_MIN_W, _MIN_H)
 
         # Set dark palette so no white leaks through any unstyled widget
@@ -7110,7 +7111,7 @@ class MainWindow(QMainWindow):
         p.drawEllipse(10, 10, 12, 12)
         p.end()
         self._tray.setIcon(QIcon(px))
-        self._tray.setToolTip("J.A.R.V.I.S — MARK XXXIX")
+        self._tray.setToolTip(marca.TITULO_DA_JANELA)
 
         tray_menu = QMenu()
         tray_menu.setStyleSheet(f"""
@@ -8909,13 +8910,13 @@ class MainWindow(QMainWindow):
             self._overlay.hide()
             self._overlay = None
         self._apply_state("LISTENING")
-        self._log.append_log("SYS: INITIATING SYSTEMS, SIR...")
+        self._log.append_log(f"SYS: Iniciando o {marca.NOME}...")
         self._log.append_log("SYS: CORE SYSTEMS ONLINE")
         self._log.append_log("SYS: NEURAL NETWORK ACTIVE  [OK]")
         self._log.append_log("SYS: PARALLAX UI COMPLETE   [OK]")
         self._log.append_log("SYS: VOICE SYNTHESIS READY  [OK]")
         self._log.append_log(f"SYS: PLATFORM {os_name.upper()} DETECTED")
-        self._log.append_log("SYS: JARVIS MARK XXXIX - ALL SYSTEMS NOMINAL")
+        self._log.append_log(f"SYS: {marca.NOME} pronto.")
         # After setup: show voice popup first, then name popup
         self._show_voice_select_then_name()
 

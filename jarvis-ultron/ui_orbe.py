@@ -35,6 +35,8 @@ import unicodedata
 from collections import deque
 from pathlib import Path
 
+from core import marca
+
 from PyQt6.QtCore import QEasingCurve, QEvent, QObject, QPointF, QPropertyAnimation, QRect, QRectF, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import (QBrush, QColor, QFont, QImage, QKeySequence, QLinearGradient, QPainter, QPainterPath, QPen,
                          QPixmap, QRadialGradient, QShortcut)
@@ -548,14 +550,14 @@ class Canal(Vidro):
     """Conversa: últimas falas e campo para digitar."""
 
     def __init__(self, win, parent=None):
-        super().__init__("Jarvis · canal ativo", parent, forte=True)
+        super().__init__(f"{marca.NOME_CURTO} · canal ativo", parent, forte=True)
         self.win = win
         self.lista = QVBoxLayout()
         self.lista.setSpacing(6)
         self.corpo.addLayout(self.lista)
         self.corpo.addStretch(1)
         self.entrada = QLineEdit()
-        self.entrada.setPlaceholderText("Converse com o JARVIS...")
+        self.entrada.setPlaceholderText(f"Converse com o {marca.NOME_CURTO.upper()}...")
         self.entrada.setFont(fonte(SANS, 9.5))
         self.entrada.returnPressed.connect(self._enviar)
         self.corpo.addWidget(self.entrada)
@@ -657,7 +659,7 @@ class Cena(QWidget):
         self.hud.show()
 
         # Barra do topo
-        self.topo_esq = rotulo("◉  JARVIS ULTRON  ·  PRINCIPAL", TEXTO2, 7.5, QFont.Weight.Bold, MONO, False)
+        self.topo_esq = rotulo(f"◉  {marca.NOME.upper()}  ·  PRINCIPAL", TEXTO2, 7.5, QFont.Weight.Bold, MONO, False)
         self.topo_dir = rotulo("", TEXTO2, 7.5, QFont.Weight.Bold, MONO, False)
         for w in (self.topo_esq, self.topo_dir):
             w.setParent(self)
@@ -736,7 +738,7 @@ class Cena(QWidget):
         self.b_perfil.setFont(fonte(MONO, 7.5, QFont.Weight.Bold, 2))
         self.b_perfil.clicked.connect(lambda _=False: self.win._show_name_signin())
         self.entrada_rapida = QLineEdit(self)
-        self.entrada_rapida.setPlaceholderText("Converse com o JARVIS...")
+        self.entrada_rapida.setPlaceholderText(f"Converse com o {marca.NOME_CURTO.upper()}...")
         self.entrada_rapida.setFont(fonte(SANS, 9.5))
         self.entrada_rapida.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.entrada_rapida.returnPressed.connect(self._enviar_rapido)
@@ -908,7 +910,7 @@ class Cena(QWidget):
         if not self.isVisible():
             return
         privado = os.environ.get("JARVIS_CEREBRO", "").strip().lower() in ("gemma", "gemma4", "gemma 4", "local")
-        titulo = ("🔒  JARVIS ULTRON  ·  MODO PRIVADO" if privado else "◉  JARVIS ULTRON  ·  PRINCIPAL")
+        titulo = (f"🔒  {marca.NOME.upper()}  ·  MODO PRIVADO" if privado else f"◉  {marca.NOME.upper()}  ·  PRINCIPAL")
         if self.topo_esq.text() != titulo:
             self.topo_esq.setText(titulo)
         agora = dt.datetime.now()

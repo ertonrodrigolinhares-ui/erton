@@ -117,7 +117,7 @@ Write-Host "Perfil: $perfil" -ForegroundColor Green
 Titulo "3/7  Habilidades, sub-agentes e trava de aprovacao"
 # O perfil de quem usa entra no lugar de __PERFIL__ quando o Jarvis abre (core/automacoes.py)
 $soul = [System.IO.File]::ReadAllText((Join-Path $kit "SOUL.md"))
-Gravar (Join-Path $perfil "SOUL.md") ($soul.Replace("__PERFIL__", ""))
+Gravar (Join-Path $perfil "SOUL.md") ($soul.Replace("__PERFIL__", "").Replace("__MARCA__", "Jarvis Ultron").Replace("__MARCA_CURTA__", "Jarvis"))
 $destinoSkills = Join-Path $perfil "skills\jarvis"
 New-Item -ItemType Directory -Force $destinoSkills | Out-Null
 Copy-Item (Join-Path $kit "skills\jarvis\*") $destinoSkills -Recurse -Force

@@ -22,6 +22,7 @@ import importlib
 import time
 
 from core.live_model import pick_live_model
+from core import marca as _marca
 from core import perfil as _perfil
 
 
@@ -208,7 +209,7 @@ def _load_system_prompt() -> str:
         return prompt + "\n\n" + _como_chamar()
     except Exception:
         return (
-            "You are JARVIS, Tony Stark's AI assistant. "
+            f"You are {_marca.NOME}, a personal AI assistant. "
             "Be concise, direct, and always use the provided tools to complete tasks. "
             "Never simulate or guess results — always call the appropriate tool. "
             + _como_chamar()
@@ -973,7 +974,7 @@ FERRAMENTAS_DESLIGADAS = {
 
 def resposta_de_desligada(nome: str) -> str:
     """O que volta para o modelo quando ele chama uma ferramenta desligada (nada é chamado)."""
-    return (f"Tool '{nome}' ({FERRAMENTAS_DESLIGADAS[nome]}) is turned off in Jarvis Ultron. "
+    return (f"Tool '{nome}' ({FERRAMENTAS_DESLIGADAS[nome]}) is turned off in {_marca.NOME}. "
             "Do not try to do this with another tool. Tell the user, in one short sentence in Portuguese, "
             "that you do not do this.")
 
@@ -1735,7 +1736,7 @@ class JarvisLive:
             name = _perfil.tratamento()
             greeting = (
                 f"(Sistema iniciado. Cumprimente {name or 'quem está falando com você'} em português do Brasil, "
-                "em uma frase curta e marcante, como o Jarvis Ultron, e pergunte como pode ajudar.)"
+                f"em uma frase curta e marcante, como o {_marca.NOME}, e pergunte como pode ajudar.)"
             )
             await self.session.send_client_content(
                 turns={"parts": [{"text": greeting}]},

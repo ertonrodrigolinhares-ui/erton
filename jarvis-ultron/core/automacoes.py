@@ -145,9 +145,9 @@ def sincronizar_personalidade(pasta_perfil: Path | str | None = None, modelo: Pa
     modelo = modelo or Path(__file__).resolve().parents[1] / "hermes" / "SOUL.md"
     if not pasta_perfil or not Path(pasta_perfil).is_dir() or not modelo.is_file():
         return False
-    from core import perfil
+    from core import marca, perfil
 
-    texto = modelo.read_text(encoding="utf-8").replace("__PERFIL__", perfil.bloco_para_prompt().rstrip())
+    texto = marca.aplicar(modelo.read_text(encoding="utf-8")).replace("__PERFIL__", perfil.bloco_para_prompt().rstrip())
     (Path(pasta_perfil) / "SOUL.md").write_text(texto, encoding="utf-8")
     return True
 

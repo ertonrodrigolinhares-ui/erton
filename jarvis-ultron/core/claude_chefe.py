@@ -44,6 +44,8 @@ import zlib
 from dataclasses import dataclass, field
 from datetime import datetime
 from functools import lru_cache
+
+from core import marca
 from pathlib import Path, PurePosixPath
 
 TEMPO_TAREFA = 20 * 60    # uma tarefa do Claude pode levar alguns minutos
@@ -81,7 +83,7 @@ PASTAS_FORA = {".git", "__pycache__", ".venv", "venv", "env", "ENV", "node_modul
                ".mypy_cache", ".ruff_cache", "tmp", "outputs", "memory", "build", "dist", ".qa-artifacts"}
 ARQUIVOS_FORA = {".env", "api_keys.json", "ui_settings.json"}
 
-REGRAS = """Você é o "chefe de tarefas" do Jarvis Ultron, o assistente de voz de quem usa o Jarvis (o perfil
+REGRAS = """Você é o "chefe de tarefas" do __MARCA__, o assistente de voz de quem usa o __MARCA_CURTA__ (o perfil
 dessa pessoa, quando houver, vem no bloco [SOBRE O USUÁRIO]). Escreva sempre em português do Brasil.
 
 Regras:
@@ -95,7 +97,7 @@ Regras:
 
 REGRAS_TAREFA = """
 Pasta de trabalho: {pasta}. Arquivos que você criar devem ficar aqui (relatórios em "Relatorios").
-Quem usa o Jarvis deixa arquivos para você analisar em "Entrada". Você também pode LER (sem alterar)
+Quem usa o __MARCA_CURTA__ deixa arquivos para você analisar em "Entrada". Você também pode LER (sem alterar)
 os arquivos de {dados}.
 Especialistas extras: a pasta "Agency" tem centenas de agentes prontos (finanças, vendas, marketing,
 gestão, jurídico, pesquisa...). Quando o pedido ganhar com um especialista, leia "Agency/INDICE.md"
@@ -104,9 +106,9 @@ dele. Eles estão em inglês e são de outros países: responda em português, u
 Brasil, e as regras acima valem mais que as deles. A pasta "Agency" é só para ler."""
 
 REGRAS_PLANO = """
-TAREFA: planejar uma mudança no código do próprio Jarvis Ultron (pasta atual). NÃO altere nada agora:
+TAREFA: planejar uma mudança no código do próprio __MARCA__ (pasta atual). NÃO altere nada agora:
 leia o código e escreva o PLANO: o que vai mudar, em quais arquivos, os riscos, e como testar.
-Na linha "FALA:" resuma o plano em 2 frases simples (quem usa o Jarvis não é programador) e termine perguntando
+Na linha "FALA:" resuma o plano em 2 frases simples (quem usa o __MARCA_CURTA__ não é programador) e termine perguntando
 se ele aprova. Não mexa em .env, chaves, memória nem na pasta .git. Você não pode mudar a .venv, pastas
 que começam com ponto, tmp/outputs/build/dist nem core/claude_chefe.py (as suas travas): se o pedido
 precisar disso, diga no plano que não dá."""
@@ -122,11 +124,11 @@ PLANO APROVADO:
 
 
 def _regras() -> str:
-    """As REGRAS mais o perfil de quem usa o Jarvis (core/perfil.py), quando houver."""
+    """As REGRAS, com o nome do produto (core/marca.py) e o perfil de quem usa (core/perfil.py)."""
     from core import perfil
 
     bloco = perfil.bloco_para_prompt()
-    return REGRAS + ("\n\n" + bloco.rstrip() if bloco else "")
+    return marca.aplicar(REGRAS) + ("\n\n" + bloco.rstrip() if bloco else "")
 
 
 @dataclass
@@ -719,7 +721,7 @@ def _instrucao_do_agente(agente: str | None) -> str:
 
 def fazer_tarefa(pedido: str, agente: str | None = None, sessao: str | None = None) -> Resposta:
     pasta = preparar_pasta()
-    texto = _regras() + REGRAS_TAREFA.format(pasta=pasta, dados=pasta_dados())
+    texto = _regras() + marca.aplicar(REGRAS_TAREFA.format(pasta=pasta, dados=pasta_dados()))
     texto += _instrucao_do_agente(agente)
     texto += f"\n\nPEDIDO DO USUÁRIO:\n{pedido.strip()}"
     permitir = [*LEITURA, *_ler(pasta, pasta_dados()), f"Edit({regra_de_pasta(pasta)}/**)"]
@@ -729,7 +731,7 @@ def fazer_tarefa(pedido: str, agente: str | None = None, sessao: str | None = No
 # ---------------- código do Jarvis: plano -> ok -> backup -> testes -> aplica -> confere ----------------
 def planejar(pedido: str) -> Resposta:
     pasta = pasta_jarvis()
-    texto = _regras() + REGRAS_PLANO + f"\n\nPEDIDO DO USUÁRIO:\n{pedido.strip()}"
+    texto = _regras() + marca.aplicar(REGRAS_PLANO) + f"\n\nPEDIDO DO USUÁRIO:\n{pedido.strip()}"
     return rodar(texto, [*LEITURA, *_ler(pasta)], pasta)  # sem Edit: no plano ele não consegue mudar nada
 
 
