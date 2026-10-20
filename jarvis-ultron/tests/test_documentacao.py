@@ -16,6 +16,12 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 RAIZ = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RAIZ))
 
+from core import marca  # noqa: E402  (os manuais escrevem o nome de agora)
+
+SAIR = f"Sair do {marca.NOME}"  # o rótulo do item do ícone perto do relógio (o comando interno continua "Quit JARVIS")
+NAO_FAZ_MAIS = f"## O que o {marca.NOME_CURTO} não faz mais"
+PERGUNTA = f"## Antes de desligar, reiniciar, digitar ou apertar teclas, o {marca.NOME_CURTO} pergunta"
+
 LEIA_ME = (RAIZ / "LEIA-ME.md").read_text(encoding="utf-8")
 VERSAO = (RAIZ / "VERSAO.txt").read_text(encoding="utf-8")
 
@@ -48,7 +54,7 @@ class LeiaMeBateComOCodigoTests(unittest.TestCase):
         # main.FERRAMENTAS_DESLIGADAS (Etapa 3): o que o Jarvis não faz mais tem de estar contado ao Erton
         import main
 
-        secao = _secao("## O que o Jarvis não faz mais")
+        secao = _secao(NAO_FAZ_MAIS)
         contadas = {"send_message": "**Mensagens**", "prepare_message_reply": "**Mensagens**",
                     "check_messages": "**Mensagens**",
                     "agent_task": '**"Faça tal tarefa no PC"**',
@@ -79,18 +85,18 @@ class LeiaMeBateComOCodigoTests(unittest.TestCase):
         self.assertLessEqual({"enter", "paste", "close_tab", "pause_video"}, set(cs.TECLAS_PEDEM_OK))
         self.assertLessEqual({"volume_up", "brightness_up", "toggle_wifi", "minimize", "open_settings"},
                              set(cs.NAO_PEDEM_OK))
-        secao = _secao("## O que o Jarvis não faz mais")
+        secao = _secao(NAO_FAZ_MAIS)
         self.assertNotIn("mouse e do teclado", secao)
         self.assertNotIn("Antes ele podia digitar e apertar Enter sozinho", secao)
         self.assertNotIn('continuam funcionando, sem o seu "ok"', LEIA_ME)
         self.assertIn('digitar também, agora com o seu "ok"', secao)
-        ok = _secao("## Antes de desligar, reiniciar, digitar ou apertar teclas, o Jarvis pergunta")
+        ok = _secao(PERGUNTA)
         for trecho in ('**só acontecem com o seu "ok"**', "Enter", "em que janela",
                        "aparece escrita num aviso do Windows, perto do relógio",
                        '**resposta seguinte**', '**"ok, pode fazer"**', '"Não", ou qualquer outra resposta, cancela',
                        "antes da pergunta, não vale", "uma vez só", "Se a janela da frente mudar", "`shutdown /a`",
                        "Continuam sem perguntar", "volume, brilho", "abrir as Configurações",
-                       "**navegador que o Jarvis controla**", 'sem esse "ok"', "não deixe uma conversa do WhatsApp"):
+                       f"**navegador que o {marca.NOME_CURTO} controla**", 'sem esse "ok"', "não deixe uma conversa do WhatsApp"):
             self.assertIn(trecho, ok)
         novidades = _uma_linha(VERSAO[:VERSAO.index("Versão anterior (2026-10-17)")])  # as duas últimas versões
         for trecho in ('Desligar, reiniciar, digitar e apertar teclas só com o seu "ok"', "pergunta antes",
@@ -121,7 +127,7 @@ class LeiaMeBateComOCodigoTests(unittest.TestCase):
             "enter": "(Enter, Esc", "escape": "(Enter, Esc",
         }
         self.assertEqual(set(no_leia_me), set(cs.TECLAS_PEDEM_OK))
-        ok = _secao("## Antes de desligar, reiniciar, digitar ou apertar teclas, o Jarvis pergunta")
+        ok = _secao(PERGUNTA)
         lista = ok[:ok.index("1. Você pede")]
         for acao, trecho in no_leia_me.items():
             self.assertIn(trecho, lista, acao)
@@ -134,9 +140,9 @@ class LeiaMeBateComOCodigoTests(unittest.TestCase):
         # janela; texto de várias linhas não é digitado; e a tecla Sleep pergunta se pode suspender
         import actions.computer_settings as cs
 
-        ok = _secao("## Antes de desligar, reiniciar, digitar ou apertar teclas, o Jarvis pergunta")
-        for trecho in ('responda **falando**', "campo do Jarvis",
-                       "**na janela do próprio Jarvis ele nunca digita nem aperta teclas**", "uma de cada vez",
+        ok = _secao(PERGUNTA)
+        for trecho in ('responda **falando**', f"campo do {marca.NOME_CURTO}",
+                       f"**na janela do próprio {marca.NOME_CURTO} ele nunca digita nem aperta teclas**", "uma de cada vez",
                        "outra aba do navegador", "numa linha só", "tecla Sleep, que suspende o computador"):
             self.assertIn(trecho, ok)
         self.assertNotIn('responder "não"', ok)  # antes ele perguntava de novo com a janela dele
@@ -149,7 +155,7 @@ class LeiaMeBateComOCodigoTests(unittest.TestCase):
         roteiro = _uma_linha((RAIZ / "dev" / "ROTEIRO_DE_5_MINUTOS.md").read_text(encoding="utf-8"))
         digitar = roteiro[roteiro.index('**Digitar com "ok":**'):roteiro.index("**F2:**")]
         self.assertIn("responda falando", digitar)
-        self.assertIn("na janela dele o Jarvis não digita nada", digitar)
+        self.assertIn(f"na janela dele o {marca.NOME_CURTO} não digita nada", digitar)
 
     def test_outras_portas_de_desligar_e_de_digitar_estao_contadas(self):
         # o LEIA-ME e o VERSAO prometem que desligar e reiniciar só acontecem com o "ok": o open_app (comando
@@ -169,7 +175,7 @@ class LeiaMeBateComOCodigoTests(unittest.TestCase):
             self.assertIn(trecho, desligar)
         ok = _uma_linha(mapa[mapa.index("## 1."):mapa.index("## 2.")])
         self.assertIn("`desktop_control` com `action='task'`", ok)
-        secao = _secao("## O que o Jarvis não faz mais")
+        secao = _secao(NAO_FAZ_MAIS)
         self.assertIn("**Tarefas livres na área de trabalho**", secao)
         self.assertIn("**Abrir ou criar programas pelo nome ou por arquivo**", secao)
         novidades = _uma_linha(VERSAO[:VERSAO.index("Versão anterior (2026-10-17)")])  # as duas últimas versões
@@ -191,10 +197,10 @@ class LeiaMeBateComOCodigoTests(unittest.TestCase):
         secao = _secao("## Tela e cérebro separados")
         self.assertNotIn("Fechando a janela, o cérebro fecha junto", secao)
         self.assertIn("continua ouvindo", secao)
-        self.assertIn("Quit JARVIS", secao)
+        self.assertIn(SAIR, secao)
         claude = _secao("## Claude como chefe de tarefas")
         self.assertNotIn("valem quando você reabrir o Jarvis", claude)
-        self.assertIn("Quit JARVIS", claude)
+        self.assertIn(SAIR, claude)
 
     def test_modo_privado_avisa_da_voz_da_microsoft(self):
         # main._falar_reserva manda o texto para a voz da internet sem JARVIS_VOZ_PRIVADA=1
@@ -224,7 +230,7 @@ class LeiaMeBateComOCodigoTests(unittest.TestCase):
         travas = _uma_linha(LEIA_ME[LEIA_ME.index("Travas (no código"):LEIA_ME.index("No **modo privado** nada vai para o Claude")])
         self.assertNotIn("fora das pastas dele, não lê nada", travas)
         self.assertIn("Nas **tarefas**", travas)
-        self.assertIn("pasta do programa do Jarvis", travas)
+        self.assertIn(f"pasta do programa do {marca.NOME_CURTO}", travas)
         linha = _uma_linha(VERSAO[VERSAO.index("- Claude como chefe"):VERSAO.index("- Modo privado por voz")])
         self.assertIn("Nas tarefas, ele só escreve", linha)
         self.assertIn("lê e muda a pasta do programa", linha)
@@ -236,11 +242,11 @@ class LeiaMeBateComOCodigoTests(unittest.TestCase):
                      "hermes/instalar_hermes.ps1"):
             texto = (RAIZ / nome).read_text(encoding="ascii")  # .ps1 só em ASCII (PowerShell 5.1)
             final = texto[texto.rindex("Pronto!" if "Pronto!" in texto else "voltou a usar o Gemini"):]
-            self.assertIn("Quit JARVIS", final, nome)
+            self.assertIn(SAIR, final, nome)
             self.assertNotIn("Feche e abra o Jarvis de novo", texto, nome)
         gemma = _secao("## Cérebro Gemma 4 no seu PC")
         passo = gemma[gemma.index("2. "):gemma.index("Para voltar ao Gemini")]
-        self.assertIn("Quit JARVIS", passo)
+        self.assertIn(SAIR, passo)
         self.assertNotIn("Abra o **\"Iniciar Jarvis Ultron\"** normalmente", gemma)
 
     def test_voz_privada_na_reserva_nao_promete_que_nada_sai_do_pc(self):
@@ -273,7 +279,7 @@ class FecharNoXTests(unittest.TestCase):
         janela.hide.assert_called_once()
         titulo, texto = bandeja.showMessage.call_args[0][:2]
         self.assertIn("continua ouvindo", texto)
-        self.assertIn("Quit JARVIS", texto)
+        self.assertIn(SAIR, texto)
         self.assertNotIn("Running in background", titulo + texto)
 
 
@@ -287,14 +293,14 @@ class RoteiroBateComOCodigoTests(unittest.TestCase):
 
         roteiro = _uma_linha((RAIZ / "dev" / "ROTEIRO_DE_5_MINUTOS.md").read_text(encoding="utf-8"))
         reiniciar = roteiro[roteiro.index('**Reiniciar com "não":**'):roteiro.index('**Digitar com "ok":**')]
-        self.assertIn('**"Jarvis, reinicia o computador"**', reiniciar)
+        self.assertIn(f'**"{marca.NOME_CURTO}, reinicia o computador"**', reiniciar)
         self.assertIn('responda **"não"**', reiniciar)
         self.assertIn("Nada acontece", reiniciar)
         self.assertIn("`shutdown /a`", reiniciar)
         self.assertIn('"shutdown", "/r", "/t", "10"', inspect.getsource(cs.restart_computer))
         digitar = roteiro[roteiro.index('**Digitar com "ok":**'):roteiro.index("**F2:**")]
         self.assertIn("**Bloco de Notas**", digitar)
-        self.assertIn('**"Jarvis, digita olá mundo"**', digitar)
+        self.assertIn(f'**"{marca.NOME_CURTO}, digita olá mundo"**', digitar)
         self.assertIn("o nome da janela", digitar)
         self.assertIn('Responda **"ok, pode fazer"**', digitar)
         self.assertIn("uma vez só", digitar)
@@ -336,11 +342,11 @@ class RoteiroBateComOCodigoTests(unittest.TestCase):
         self.assertLessEqual({"send_message", "prepare_message_reply", "check_messages"}, set(main.FERRAMENTAS_DESLIGADAS))
         roteiro = _uma_linha((RAIZ / "dev" / "ROTEIRO_DE_5_MINUTOS.md").read_text(encoding="utf-8"))
         passo = roteiro[roteiro.index("**Mensagem"):roteiro.index("**F2:**")]
-        self.assertIn('**"Jarvis, manda oi no WhatsApp para a Ana"**', passo)
+        self.assertIn(f'**"{marca.NOME_CURTO}, manda oi no WhatsApp para a Ana"**', passo)
         self.assertIn("**feche o WhatsApp**", passo)
         self.assertIn("não envia mensagens", passo)
         self.assertIn("nada pode ser digitado", passo)
-        self.assertIn("Quit JARVIS", passo)
+        self.assertIn(SAIR, passo)
 
 
 if __name__ == "__main__":

@@ -13,7 +13,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 RAIZ = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RAIZ))
 
-from core import ponte
+from core import marca, ponte
 from core.ponte import JarvisNaTela, PonteTela, UIRemota
 
 
@@ -187,7 +187,7 @@ class AutomacoesDeTelaTests(unittest.TestCase):
         mod = util.module_from_spec(spec); spec.loader.exec_module(mod)
         self.assertEqual(mod.texto_voz(jarvis), ("Cérebro: Gemma 4 (no PC)", True))
         jarvis.parado = True  # a tela desistiu de religar o cérebro: nada de verde
-        self.assertEqual(mod.texto_voz(jarvis), ("Cérebro parado — feche e abra o Jarvis", False))
+        self.assertEqual(mod.texto_voz(jarvis), (f"Cérebro parado — feche e abra o {marca.NOME_CURTO}", False))
         jarvis.atualizar({"modo_reserva": False, "conectado": True, "cerebro": "gemini"})
         self.assertEqual(mod.texto_voz(jarvis), ("Voz: Gemini ao vivo", True))
 
@@ -437,13 +437,13 @@ class PonteTelaSemCerebroTests(unittest.TestCase):
         for _ in range(ponte.MAX_RELIGADAS):
             self.p._cerebro_caiu(1)
         self.assertIsNone(self.p._processo)  # desistiu
-        self.assertEqual(self._texto_voz(), ("Cérebro parado — feche e abra o Jarvis", False))
+        self.assertEqual(self._texto_voz(), (f"Cérebro parado — feche e abra o {marca.NOME_CURTO}", False))
 
     def test_painel_mostra_parado_quando_a_religada_falha(self):
         self.p._ja_conectou = True
         self.p.jarvis.atualizar({"modo_reserva": False, "conectado": True, "cerebro": "gemini"})
         self.p._falhou("o cérebro não respondeu a tempo")
-        self.assertEqual(self._texto_voz(), ("Cérebro parado — feche e abra o Jarvis", False))
+        self.assertEqual(self._texto_voz(), (f"Cérebro parado — feche e abra o {marca.NOME_CURTO}", False))
 
     def test_na_primeira_abertura_sem_cerebro_o_pedido_vai_para_o_cerebro_local(self):
         self.p.ao_falhar = lambda: None  # (main.py abre o cérebro local num fio)

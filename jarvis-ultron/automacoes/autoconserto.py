@@ -20,13 +20,15 @@ import sys
 import time
 from pathlib import Path
 
+from core import marca
+
 FERRAMENTA = {
     "name": "self_repair",
     "description": (
-        "Runs JARVIS's self-repair: diagnoses the system and automatically fixes what is safe to fix "
+        f"Runs {marca.NOME}'s self-repair: diagnoses the system and automatically fixes what is safe to fix "
         "(restarts Hermes, switches to the Groq backup, lowers graphics quality, installs the automation "
         "browser, enables hands-free if the wake word failed, disables a broken automation file). Use when "
-        "the user asks JARVIS to fix/repair itself or its problems. Then tell the user in Portuguese what "
+        f"the user asks {marca.NOME} to fix/repair itself or its problems. Then tell the user in Portuguese what "
         "was fixed and what still needs them."
     ),
     "parameters": {"type": "OBJECT", "properties": {}},

@@ -22,10 +22,12 @@ import threading
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+from core import marca
+
 FERRAMENTA = {
     "name": "spoken_reminders",
     "description": (
-        "Spoken reminders: JARVIS says the reminder out loud at the right time (and shows it on screen). "
+        f"Spoken reminders: {marca.NOME} says the reminder out loud at the right time (and shows it on screen). "
         "Use this (not 'reminder') whenever the user asks to be reminded of something, to list reminders or "
         "to cancel one. For 'in N minutes' use in_minutes; for a clock time use time (HH:MM, 24h) and, if "
         "not today, date (YYYY-MM-DD). repeat: none | daily | weekdays | weekly. Answer the user in Portuguese."

@@ -6,6 +6,7 @@ from pathlib import Path
 from datetime import datetime
 
 from actions.jarvis_file_stamp import write_sidecar_metadata, write_text_with_stamp
+from core import marca
 
 try:
     import send2trash
@@ -52,7 +53,7 @@ def _e_programa(nome) -> bool:
 
 
 def _nao_cria(nome) -> str:
-    return (f"Not done: Jarvis does not create programs, scripts or shortcuts ('{nome}'), which could run later "
+    return (f"Not done: {marca.NOME} does not create programs, scripts or shortcuts ('{nome}'), which could run later "
             "without the user's ok. Use another extension, like .txt.")
 
 
@@ -176,7 +177,7 @@ def create_file(path: str, name: str = "", content: str = "") -> str:
         write_text_with_stamp(
             target,
             content,
-            f"Created through JARVIS file_controller create_file action for {target.name}.",
+            f"Created through {marca.NOME} file_controller create_file action for {target.name}.",
         )
         return f"File saved: {target} ({target.stat().st_size} bytes)"
     except Exception as e:
@@ -274,10 +275,10 @@ def copy_file(path: str, name: str = "", destination: str = "") -> str:
             shutil.copytree(str(src), str(dst))
             for child in dst.rglob("*"):
                 if child.is_file() and not child.name.endswith(".jarvis_meta.json"):
-                    write_sidecar_metadata(child, f"Copied by JARVIS from {src}.")
+                    write_sidecar_metadata(child, f"Copied by {marca.NOME} from {src}.")
         else:
             shutil.copy2(str(src), str(dst))
-            write_sidecar_metadata(dst, f"Copied by JARVIS from {src}.")
+            write_sidecar_metadata(dst, f"Copied by {marca.NOME} from {src}.")
 
         return f"Copied: {src.name} → {dst.parent.name}/"
 
@@ -338,7 +339,7 @@ def open_file(path: str, name: str = "") -> str:
             return f"Access denied: {target}"
         if _e_programa(target.name):
             return (f"Not opened: '{target.name}' is a program, script or shortcut, and opening it would run it "
-                    "without the user's ok. Jarvis does not run programs from files; to open an application, "
+                    f"without the user's ok. {marca.NOME} does not run programs from files; to open an application, "
                     "use open_app.")
         if not target.exists():
             return f"Not found: {target.name or target}"
@@ -382,7 +383,7 @@ def write_file(path: str, name: str = "", content: str = "",
             write_text_with_stamp(
                 target,
                 content,
-                f"Written through JARVIS file_controller write action for {target.name}.",
+                f"Written through {marca.NOME} file_controller write action for {target.name}.",
             )
             return f"Written to: {target.name}"
         mode = "a" if append else "w"

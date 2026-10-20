@@ -42,7 +42,7 @@ $chave = $ultronEnv["HERMES_API_KEY"]
 $url = if ($ultronEnv["HERMES_API_URL"]) { $ultronEnv["HERMES_API_URL"] } else { "http://127.0.0.1:8642/p/jarvis" }
 $raizEnv = Ler-Env (Join-Path $raizHermes ".env")
 if (-not $chave -or $raizEnv["API_SERVER_ENABLED"] -ne "true") {
-    Write-Host "Falta configurar a ligacao Jarvis-Hermes. Rode o 'Instalar Hermes' de novo e depois este." -ForegroundColor Yellow
+    Write-Host "Falta configurar a ligacao Luiz-Hermes. Rode o 'Instalar Hermes' de novo e depois este." -ForegroundColor Yellow
     Read-Host "Aperte Enter para sair"; exit 1
 }
 
@@ -57,8 +57,8 @@ if (-not $ok) {
 
 if ($ok) {
     Write-Host ""
-    Write-Host "PRONTO: o Hermes esta ligado e o Jarvis consegue falar com ele." -ForegroundColor Green
-    Write-Host "Pode fechar esta janela e perguntar ao Jarvis: 'quais sao os posts de hoje?'"
+    Write-Host "PRONTO: o Hermes esta ligado e o Luiz consegue falar com ele." -ForegroundColor Green
+    Write-Host "Pode fechar esta janela e perguntar ao Luiz: 'quais sao os posts de hoje?'"
     Read-Host "Aperte Enter para fechar"
     exit 0
 }
@@ -67,6 +67,6 @@ Write-Host ""
 Write-Host "O servico automatico do Hermes nao ligou. Situacao do servico:" -ForegroundColor Yellow
 & $hermes gateway status
 Write-Host ""
-Write-Host "Plano B: vou ligar o Hermes NESTA janela. Deixe ela aberta (pode minimizar) enquanto usa o Jarvis." -ForegroundColor Yellow
+Write-Host "Plano B: vou ligar o Hermes NESTA janela. Deixe ela aberta (pode minimizar) enquanto usa o Luiz." -ForegroundColor Yellow
 Write-Host "Tire um print desta tela e mande para o suporte, para arrumarmos o inicio automatico."
 & $hermes gateway run

@@ -23,5 +23,5 @@ Sempre que for abrir sites ou painéis para ler informações ou fazer uma taref
 - Apagar dados, mudar configurações de conta, aceitar termos.
 
 ## Se precisar de login
-Pare e diga ao usuário: "Preciso que você entre no <site> uma vez no navegador do Jarvis." Depois
+Pare e diga ao usuário: "Preciso que você entre no <site> uma vez no navegador do Luiz Conrado." Depois
 continue a tarefa.

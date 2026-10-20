@@ -9,6 +9,8 @@ import mimetypes
 from pathlib import Path
 from typing import Callable
 
+from core import marca
+
 from .models import PresentationRequest, SourceBundle, SourceRecord
 from .models3d import inspect_native_3d
 
@@ -264,7 +266,7 @@ def ingest_sources(
             research = web_search({"query": request.topic, "mode": "search"}, player=None)
             if research:
                 bundle.records.append(SourceRecord(
-                    label="JARVIS web research",
+                    label=f"{marca.NOME} web research",
                     kind="research",
                     location=f"web search: {request.topic}",
                     text=str(research)[:80_000],

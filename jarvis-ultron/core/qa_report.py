@@ -10,6 +10,8 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+from core import marca
+
 
 _SECRET_PATTERNS = (
     re.compile(r"AIza[0-9A-Za-z_-]{20,}"),
@@ -90,7 +92,7 @@ class QAReport:
         passed = sum(check.status == "passed" for check in self.checks)
         failed = sum(check.status == "failed" for check in self.checks)
         lines = [
-            "# JARVIS QA Report",
+            f"# {marca.NOME} QA Report",
             "",
             f"- Run: `{self.run_id}`",
             f"- Mode: `{self.mode}`",

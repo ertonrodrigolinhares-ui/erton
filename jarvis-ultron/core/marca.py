@@ -11,9 +11,21 @@ a palavra de ativação "Hey Jarvis" (um modelo treinado), as pastas e os nomes 
 e os nomes dos arquivos .bat.
 """
 
-NOME = "Jarvis Ultron"
-NOME_CURTO = "Jarvis"
+NOME = "Luiz Conrado"
+NOME_CURTO = "Luiz"
 TITULO_DA_JANELA = NOME
+# Como as falas chamam o assistente, além do nome: a palavra de ativação continua "Hey Jarvis" (modelo
+# treinado), então "jarvis" segue valendo nas falas; e a transcrição pode escrever o nome curto de outro
+# jeito ("Luís", "Luis"). Quem reconhece falas ("desliga o Luiz", "modo luiz", "Luiz, ok") lê nomes_falados().
+APELIDOS = ("jarvis",)
+VARIANTES_FALADAS = ("luis", "luís")
+
+
+def nomes_falados() -> tuple[str, ...]:
+    """Os nomes pelos quais as falas chamam o assistente, em minúsculas, do mais longo para o mais curto
+    (para montar regex): o nome, o curto, as variantes da transcrição e os apelidos."""
+    nomes = {NOME.lower(), NOME_CURTO.lower(), *VARIANTES_FALADAS, *APELIDOS}
+    return tuple(sorted(nomes, key=lambda nome: (-len(nome), nome)))
 
 
 def aplicar(texto: str) -> str:

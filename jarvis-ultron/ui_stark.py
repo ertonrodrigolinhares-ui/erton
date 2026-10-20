@@ -22,6 +22,8 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from urllib.parse import quote
 
+from core import marca
+
 from PyQt6.QtCore import QPointF, QRectF, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen, QRadialGradient
 from PyQt6.QtWidgets import (QHBoxLayout, QLabel, QPlainTextEdit, QPushButton, QSizePolicy,
@@ -54,7 +56,7 @@ BOTOES = [
     ("✉", "E-mails", "tenho e-mails não lidos?"),
     ("♫", "Música", "toque uma música no Spotify"),
     ("⏸", "Suspender 10 min", "fique suspenso por 10 minutos"),
-    ("⌂", "Pasta do Jarvis", "@pasta"),
+    ("⌂", f"Pasta do {marca.NOME_CURTO}", "@pasta"),
     ("⚡", "Resumo do dia", "me dê um resumo do meu dia"),
     ("✚", "Autodiagnóstico", "faça um autodiagnóstico do sistema"),
 ]
@@ -531,7 +533,7 @@ class TelaStark(QWidget):
         meio.addWidget(self.esquerda)
         centro_coluna = QVBoxLayout()
         centro_coluna.setSpacing(0)
-        centro_coluna.addWidget(Titulo("JARVIS  ULTRON", 24))
+        centro_coluna.addWidget(Titulo(marca.NOME.upper(), 24))
         self.selo = SeloEscuta()
         centro_coluna.addWidget(self.selo)
         linha_modos = QHBoxLayout()

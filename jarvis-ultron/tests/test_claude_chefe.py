@@ -19,6 +19,7 @@ sys.path.insert(0, str(RAIZ))
 
 from core import claude_chefe as chefe
 from core import aprovacao
+from core import marca
 from core.aprovacao import fechar_fala, mais_um_pedaco, nova_fala
 
 # Um "claude" de mentira: responde no mesmo formato JSON do Claude Code e anota como foi chamado.
@@ -214,7 +215,7 @@ class MudarCodigoTests(Base):
         # o X da janela só esconde o Jarvis perto do relógio: "reabrir" assim deixava dois Jarvis ouvindo
         r = self._aplicar("def soma(a, b):\n    return a - b\n")
         self.assertTrue(r.ok, r.fala)
-        self.assertIn("Quit JARVIS", r.fala)
+        self.assertIn(f"Sair do {marca.NOME}", r.fala)
         self.assertNotIn("quando você reabrir", r.fala)
 
     def test_claude_sem_mudar_nada(self):
@@ -751,7 +752,7 @@ class MudancaInterrompidaTests(Base):
         self.assertEqual(visto["outro"], "''")  # não desfez nem avisou nada
         self.assertIn("a - b", visto["modulo"])
         self.assertTrue(visto["anotacao"])  # e não apagou a anotação de quem está mudando
-        self.assertIn("Outro Jarvis", visto["aplicar"])  # nem começou outra mudança por cima
+        self.assertIn(f"Outro {marca.NOME_CURTO}", visto["aplicar"])  # nem começou outra mudança por cima
         self.assertTrue(r.ok, r.fala)
         self.assertIn("2 arquivo", r.fala)
         self.assertIn("a - b", (self.jarvis_dir / "modulo.py").read_text(encoding="utf-8"))
@@ -1252,8 +1253,8 @@ class ClaudeMdInstaladoTests(Base):
         self.instalado = chefe.pasta_trabalho() / "CLAUDE.md"
         self.instalado.parent.mkdir(parents=True)
         quem_e = "Texto antigo\nem duas linhas."
-        self.patches += [patch.object(chefe, "CLAUDE_MD_ANTIGO", chefe._impressao(self.ANTIGO)),
-                         patch.object(chefe, "QUEM_E_ANTIGO", chefe._impressao(quem_e))]
+        self.patches += [patch.object(chefe, "CLAUDE_MD_ANTIGOS", frozenset({chefe._impressao(self.ANTIGO)})),
+                         patch.object(chefe, "QUEM_E_ANTIGOS", frozenset({chefe._impressao(quem_e)}))]
         for p in self.patches[-2:]:
             p.start()
 
@@ -1294,8 +1295,14 @@ class ClaudeMdDeVerdadeTests(unittest.TestCase):
         texto = (RAIZ / "claude" / "CLAUDE.md").read_text(encoding="utf-8")
         achado = chefe._QUEM_E.search(texto)
         self.assertIsNotNone(achado)
-        self.assertNotEqual(chefe._impressao(texto), chefe.CLAUDE_MD_ANTIGO)
-        self.assertNotEqual(chefe._impressao(achado.group(1)), chefe.QUEM_E_ANTIGO)
+        self.assertNotIn(chefe._impressao(texto), chefe.CLAUDE_MD_ANTIGOS)
+        self.assertNotIn(chefe._impressao(achado.group(1)), chefe.QUEM_E_ANTIGOS)
+
+    def test_modelo_novo_diz_o_nome_de_agora(self):
+        texto = (RAIZ / "claude" / "CLAUDE.md").read_text(encoding="utf-8")
+        self.assertTrue(texto.startswith(f"# {marca.NOME} — "))
+        self.assertIn(f"## Quem usa o {marca.NOME}\n", texto)
+        self.assertNotIn("o Jarvis", texto)  # só o caminho Documentos\\Jarvis Ultron ainda diz Jarvis
 
     def test_impressoes_sao_as_do_claude_md_que_o_jarvis_instalava(self):
         import subprocess
@@ -1307,8 +1314,73 @@ class ClaudeMdDeVerdadeTests(unittest.TestCase):
         if saida.returncode != 0:
             self.skipTest("sem o histórico do git")
         antigo = saida.stdout.decode("utf-8").replace("\r\n", "\n")
-        self.assertEqual(chefe._impressao(antigo), chefe.CLAUDE_MD_ANTIGO)
-        self.assertEqual(chefe._impressao(chefe._QUEM_E.search(antigo).group(1)), chefe.QUEM_E_ANTIGO)
+        self.assertIn(chefe._impressao(antigo), chefe.CLAUDE_MD_ANTIGOS)
+        self.assertIn(chefe._impressao(chefe._QUEM_E.search(antigo).group(1)), chefe.QUEM_E_ANTIGOS)
+
+
+# O CLAUDE.md que o Jarvis instalava em 20/10/2026 (cabeçalho "Quem usa o Jarvis"), inteiro, para o
+# teste não depender do histórico do git.
+CLAUDE_MD_DE_20_10 = r"""# Jarvis Ultron — pasta de trabalho do Claude
+
+Esta pasta é onde o Claude Code trabalha quando o Jarvis Ultron entrega uma tarefa para ele
+(pesquisas, análises, relatórios, agentes). O Jarvis copia este arquivo e os agentes
+(`.claude/skills`) para cá; pode editar à vontade: depois de copiado, ele não sobrescreve este
+arquivo (só troca o modelo antigo que ele instalava até 19/10/2026, se ainda estiver aqui).
+
+## Quem usa o Jarvis
+O perfil de quem usa (nome, como quer ser chamado, cidade, profissão e preferências) vem em cada
+pedido, no bloco [SOBRE O USUÁRIO]. Trate a pessoa pelo nome que ela escolheu.
+
+## Regras
+- Escreva sempre em português do Brasil, de forma clara e direta.
+- Nunca publique, envie mensagens ou e-mails, compre, agende ou apague nada: prepare o rascunho e
+  diga o que precisa do "ok" do usuário.
+- Nunca tente invadir, escanear ou acessar sistemas, redes, sites ou arquivos de terceiros.
+- Dados de clientes são sigilosos. Para análises com dados sensíveis de clientes, quem usa pode
+  usar o "modo privado" do Jarvis (Gemma 4, no próprio PC).
+- Não invente: diga quando não souber e cite as fontes das pesquisas.
+
+## Pastas
+- `Entrada`: arquivos que o usuário deixa para você analisar.
+- `Relatorios`: relatórios e rascunhos prontos.
+- `Mudancas`: registro das mudanças feitas no código do Jarvis (com o plano aprovado e o backup).
+- `Agency`: os especialistas extras (comece pelo `Agency/INDICE.md`) — só leitura.
+- `..\` (Documentos\Jarvis Ultron): os arquivos de quem usa (Vídeos, perfil...) — só leitura.
+"""
+
+
+class ClaudeMdDe2010Tests(Base):
+    """Um CLAUDE.md instalado igual ao modelo de 20/10/2026 vira o novo; se só a parte "Quem usa o
+    Jarvis" ainda for a daquele modelo, só ela é trocada (com o cabeçalho) e o resto fica."""
+
+    def setUp(self):
+        super().setUp()
+        modelo = self.jarvis_dir / "claude" / "CLAUDE.md"
+        modelo.parent.mkdir(parents=True)
+        shutil.copy2(RAIZ / "claude" / "CLAUDE.md", modelo)
+        self.novo = modelo.read_text(encoding="utf-8")
+        self.instalado = chefe.pasta_trabalho() / "CLAUDE.md"
+        self.instalado.parent.mkdir(parents=True)
+
+    def test_as_impressoes_do_modelo_de_20_10_estao_guardadas(self):
+        self.assertIn(chefe._impressao(CLAUDE_MD_DE_20_10), chefe.CLAUDE_MD_ANTIGOS)
+        paragrafo = chefe._QUEM_E.search(CLAUDE_MD_DE_20_10)
+        self.assertTrue(paragrafo.group(0).startswith("## Quem usa o Jarvis\n"))
+        self.assertIn(chefe._impressao(paragrafo.group(1)), chefe.QUEM_E_ANTIGOS)
+
+    def test_modelo_de_20_10_intacto_vira_o_novo(self):
+        self.instalado.write_bytes(("\ufeff" + CLAUDE_MD_DE_20_10.replace("\n", "\r\n")).encode("utf-8"))
+        chefe.preparar_pasta()
+        self.assertEqual(self.instalado.read_text(encoding="utf-8"), self.novo)
+
+    def test_arquivo_mexido_troca_so_a_parte_quem_usa_com_o_cabecalho(self):
+        self.instalado.write_text(CLAUDE_MD_DE_20_10 + "\n## Minhas notas\n- Prefiro tabelas.\n", encoding="utf-8")
+        chefe.preparar_pasta()
+        texto = self.instalado.read_text(encoding="utf-8")
+        self.assertIn(chefe._QUEM_E.search(self.novo).group(0), texto)
+        self.assertNotIn("## Quem usa o Jarvis", texto)
+        self.assertIn("- Prefiro tabelas.", texto)
+        self.assertTrue(texto.startswith("# Jarvis Ultron — "))  # o resto do arquivo é do usuário: fica
 
 
 class ColecaoAgencyTests(unittest.TestCase):

@@ -22,6 +22,8 @@ import unicodedata
 from datetime import datetime
 from pathlib import Path
 
+from core import marca
+
 JANELA_APROVACAO = 10 * 60  # no máximo isso com a trava aberta (ela fecha quando o Hermes termina)
 VALIDADE_PROPOSTA = 10 * 60  # segundos que a proposta contada ao Erton espera o "ok" dele
 TEMPO_MAXIMO = 15 * 60  # tarefas de agentes podem demorar
@@ -55,7 +57,7 @@ MAX_PALAVRAS_OK = 8
 
 DEMOROU = "O Hermes demorou demais para responder. A tarefa pode continuar rodando; pergunte de novo daqui a pouco."
 SEM_HERMES = ("O Hermes ainda não está configurado. Dê dois cliques em 'Instalar Hermes' na pasta "
-              "do Jarvis Ultron e depois abra o Jarvis de novo.")
+              f"do {marca.NOME} e depois abra o {marca.NOME_CURTO} de novo.")
 
 
 def _normalizar(texto: str) -> str:
@@ -71,7 +73,8 @@ def usuario_aprovou(fala: str) -> bool:
     bruto = str(fala or "")
     if "?" in bruto:
         return False
-    palavras = [p for p in re.sub(r"[^a-z0-9 ]", " ", _normalizar(bruto)).split() if p != "jarvis"]
+    nomes = set(_normalizar(" ".join(marca.nomes_falados())).split())  # chamar pelo nome vale como "Jarvis, ok"
+    palavras = [p for p in re.sub(r"[^a-z0-9 ]", " ", _normalizar(bruto)).split() if p not in nomes]
     while palavras and (palavras[0] in VOCATIVOS or palavras[0] in ANTES_DO_OK):
         palavras.pop(0)
     if not palavras or len(palavras) > MAX_PALAVRAS_OK:
@@ -125,7 +128,7 @@ def perguntar(pedido: str, tempo_maximo: float = TEMPO_MAXIMO) -> str:
         return ("O Hermes está desligado. Ele liga sozinho com o Windows; se não ligou, abra o "
                 "'Instalar Hermes' de novo ou reinicie o computador.")
     if resposta.status_code in (401, 404):
-        return "O Hermes não reconheceu o Jarvis (chave ou endereço). Rode o 'Instalar Hermes' de novo."
+        return f"O Hermes não reconheceu o {marca.NOME_CURTO} (chave ou endereço). Rode o 'Instalar Hermes' de novo."
     if resposta.status_code >= 400:
         return f"O Hermes respondeu com erro {resposta.status_code}: {resposta.text[:200]}"
     try:

@@ -11,6 +11,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6.QtWidgets import QApplication
 
 import ui
+from core import marca
 
 
 class _NoSecrets:
@@ -96,15 +97,15 @@ class UIRegressionTests(unittest.TestCase):
     def test_quit_button_is_visible_and_accessible(self):
         button = self.window._quit_btn
         self.assertEqual(button.objectName(), "JarvisQuitButton")
-        self.assertEqual(button.accessibleName(), "Quit JARVIS")
-        self.assertEqual(button.toolTip(), "Quit JARVIS")
+        self.assertEqual(button.accessibleName(), f"Sair do {marca.NOME}")
+        self.assertEqual(button.toolTip(), f"Sair do {marca.NOME}")
         self.assertFalse(button.isHidden())
 
     def test_dock_uses_crisp_command_rail_visual_language(self):
         rail = self.window._dock_frame
         style = rail.styleSheet().lower()
         self.assertEqual(rail.objectName(), "JarvisCommandRail")
-        self.assertEqual(rail.accessibleName(), "JARVIS command rail")
+        self.assertEqual(rail.accessibleName(), f"{marca.NOME} command rail")
         self.assertIsNone(rail.graphicsEffect())
         self.assertNotIn("qlineargradient", style)
         self.assertNotIn("border-radius: 24px", style)

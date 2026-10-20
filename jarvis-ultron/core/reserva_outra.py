@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import os
 
+from core import marca
 from core.reserva_groq import INSTRUCOES, ReservaGroq, instrucoes_com_perfil
 
 # Endereços conhecidos e os modelos preferidos de cada uma (o Jarvis usa o primeiro que a conta tiver).
@@ -108,7 +109,7 @@ class ReservaOutra(ReservaGroq):
             return "Estou sem conexão com a internet no momento."
         if tipo == "NotFoundError":
             return (f"A {self.nome} não tem o modelo {self.modelo}. Apague a linha JARVIS_RESERVA_MODELO do .env "
-                    "para o Jarvis escolher sozinho.")
+                    f"para o {marca.NOME_CURTO} escolher sozinho.")
         return f"A reserva ({self.nome}) não conseguiu responder agora ({tipo})."
 
 

@@ -28,6 +28,7 @@ import time
 import urllib.request
 import wave
 
+from core import marca
 from core.reserva_groq import ReservaGroq, instrucoes_com_perfil
 
 URL_PADRAO = "http://localhost:11434/v1"
@@ -53,14 +54,23 @@ def cerebro_gemma() -> bool:
 import re
 import unicodedata
 
+
+def _sem_acento(texto: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFKD", texto.lower()) if not unicodedata.combining(c))
+
+
 _PRIVADO = re.compile(r"\bmodo (privado|sigiloso|confidencial|seguro)\b")
 _NORMAL = re.compile(r"\b(modo normal|modo publico|sair do modo (privado|sigiloso|confidencial|seguro))\b")
 # "não quero sair do modo privado", "nada de modo normal": negação nunca tira do modo privado
 _NEGACAO = re.compile(r"\b(nao|nunca|nem|jamais|sem)\b|\bnada de\b")
 # Sair do modo privado (ir para a nuvem) só com o pedido inteiro, sem mais nada na frase:
 # "Jarvis, modo normal", "sair do modo privado", "volta para o modo normal".
+# Jarvis Ultron: o nome que pode vir antes do pedido: "jarvis" (a palavra de ativação continua "Hey Jarvis")
+# ou o nome de core/marca.py, sem acentos como o texto comparado, o mais longo primeiro
+_NOMES_DO_ASSISTENTE = "(?:" + "|".join(re.escape(nome) for nome in sorted(
+    {_sem_acento(nome) for nome in marca.nomes_falados()}, key=len, reverse=True)) + ")"
 _NORMAL_EXATO = re.compile(
-    r"^(?:(?:ok|ei|hey|oi) )?(?:jarvis )?(?:por favor )?(?:(?:pode )?(?:volta|voltar|volte) (?:para o|pro|ao) )?"
+    r"^(?:(?:ok|ei|hey|oi) )?(?:" + _NOMES_DO_ASSISTENTE + r" )?(?:por favor )?(?:(?:pode )?(?:volta|voltar|volte) (?:para o|pro|ao) )?"
     r"(?:modo normal|modo publico|sair do modo (?:privado|sigiloso|confidencial|seguro))(?: por favor)?$")
 
 
@@ -82,7 +92,7 @@ def pedido_de_privacidade(fala: str) -> str | None:
 
 AVISO_SEM_WHISPER = ("No modo privado não consigo ouvir sua voz: a transcrição local (Whisper) não está "
                      "instalada, e a voz não vai para a internet. Dê dois cliques em 'Instalar voz local' "
-                     "na pasta do Jarvis. "
+                     f"na pasta do {marca.NOME_CURTO}. "
                      "Enquanto isso, digite.")
 AVISO_WHISPER_FALHOU = ("Não consegui carregar a transcrição local da voz (Whisper). Na primeira vez ela precisa "
                         "da internet para baixar o modelo; tento de novo em 1 minuto. Enquanto isso, digite.")
@@ -269,5 +279,5 @@ class CerebroGemma(ReservaGroq):
             return "O Gemma demorou demais para responder. Tente de novo."
         if nome == "NotFoundError" or "not found" in texto:
             return (f"Não encontrei o modelo {self.modelo} no Ollama. Rode o 'Instalar Gemma 4' de novo "
-                    "na pasta do Jarvis.")
+                    f"na pasta do {marca.NOME_CURTO}.")
         return f"O Gemma teve um problema: {str(erro)[:120]}"

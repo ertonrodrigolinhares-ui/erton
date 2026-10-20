@@ -39,6 +39,7 @@ from actions.presentations.quality import (
     verify_pptx,
 )
 from actions.presentations.sources import ingest_sources, source_manifest
+from core import marca
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -144,14 +145,14 @@ def _output_lock_for(path: Path) -> threading.Lock:
 def _safe_filename(value: str) -> str:
     cleaned = re.sub(r"[^A-Za-z0-9._ -]+", "", str(value or "")).strip(" .")
     cleaned = re.sub(r"\s+", "_", cleaned)
-    cleaned = cleaned[:80] or "JARVIS_Presentation"
+    cleaned = cleaned[:80] or f"{marca.NOME.replace(' ', '_')}_Presentation"
     return cleaned if cleaned.lower().endswith(".pptx") else cleaned + ".pptx"
 
 
 def _output_path(raw_path: str, title: str) -> Path:
     raw = str(raw_path or "").strip().strip('"').strip("'")
     if not raw:
-        return Path.home() / "Desktop" / "JARVIS Presentations" / _safe_filename(title)
+        return Path.home() / "Desktop" / f"{marca.NOME} Presentations" / _safe_filename(title)
     path = Path(raw).expanduser()
     if not path.is_absolute():
         path = Path.home() / "Desktop" / path
@@ -250,7 +251,7 @@ This redesigns an existing deck. Use its facts and brand cues but rebuild the
 narrative and slide compositions. Do not fabricate or approximate identity assets.
 """
 
-    prompt = f"""You are JARVIS, an elite presentation editor and data storyteller.
+    prompt = f"""You are {marca.NOME}, an elite presentation editor and data storyteller.
 Task mode: {mode}
 Quality mode: {quality}
 Presentation appearance: {appearance}
@@ -517,7 +518,7 @@ def _quota_fallback_plan(
         if index == 0:
             slides.append({
                 "type": "cover",
-                "kicker": "JARVIS BRIEFING",
+                "kicker": f"{marca.NOME.upper()} BRIEFING",
                 "title": topic,
                 "subtitle": evidence_at(0, "A clear, focused presentation built around the essential ideas."),
             })
@@ -554,7 +555,7 @@ def _quota_fallback_plan(
         slides.append(slide)
     return {
         "title": topic,
-        "subtitle": "A concise JARVIS briefing",
+        "subtitle": f"A concise {marca.NOME} briefing",
         "deck_profile": "general",
         "design_system": {},
         "citations": [],
@@ -853,7 +854,7 @@ def _render_presentation(
         prs.slide_height = Inches(7.5)
     prs.core_properties.title = plan["title"]
     prs.core_properties.author = generated_by()
-    prs.core_properties.subject = "Editable presentation created by JARVIS"
+    prs.core_properties.subject = f"Editable presentation created by {marca.NOME}"
     blank = next(
         (layout for layout in prs.slide_layouts if "blank" in str(layout.name).lower()),
         prs.slide_layouts[-1],
@@ -1522,7 +1523,7 @@ def build_presentation(
         if _presentation_quota_cooldown_active() and mode in {"create", "redesign"}:
             ai_quota_exhausted = True
             warnings.append(
-                "Gemini presentation planning is in a short quota cooldown. JARVIS completed "
+                f"Gemini presentation planning is in a short quota cooldown. {marca.NOME} completed "
                 "a minimal local deck without making another API request."
             )
             qa["quota_fallback"] = {
@@ -1550,7 +1551,7 @@ def build_presentation(
                 _mark_presentation_quota_cooldown()
                 ai_quota_exhausted = True
                 warnings.append(
-                    "Gemini planning quota was unavailable. JARVIS completed a minimal local deck "
+                    f"Gemini planning quota was unavailable. {marca.NOME} completed a minimal local deck "
                     "instead of failing or making more API requests."
                 )
                 qa["quota_fallback"] = {
@@ -1726,7 +1727,7 @@ def build_presentation(
                                     ai_quota_exhausted = True
                                     warnings.append(
                                         "Gemini quota was reached during optional premium repair. "
-                                        "JARVIS kept the verified PowerPoint instead of failing."
+                                        f"{marca.NOME} kept the verified PowerPoint instead of failing."
                                     )
                                 else:
                                     warnings.append(f"Premium visual repair was unavailable: {exc}")

@@ -1,4 +1,20 @@
-Jarvis Ultron - versão 2026-10-20
+Luiz Conrado - versão 2026-10-20.2
+
+Novidades desta versão:
+- O assistente agora se chama Luiz Conrado ("Luiz", para quem fala com ele): nas telas (título da janela
+  e do ícone perto do relógio, avisos, campo de digitar, tela "Sobre você"), nas falas, nos cérebros
+  (Gemini, Gemma, Groq e reserva), no Claude, no Hermes e nos manuais. O nome fica num lugar só do
+  código (core/marca.py).
+  O que NÃO mudou: "Hey Jarvis" continua sendo a palavra de ativação (é um modelo treinado para essa
+  frase); os nomes dos .bat ("Iniciar Jarvis Ultron", "Instalar Hermes"...), a pasta
+  Documentos\Jarvis Ultron e as variáveis JARVIS_* do .env ficam como estão (as suas chaves, o perfil
+  e a memória continuam no lugar).
+- O item do menu do ícone perto do relógio agora é "Sair do Luiz Conrado" (era "Quit JARVIS").
+- "Desliga o Luiz" e "modo Luiz" funcionam, e "desliga o Jarvis" e "modo Jarvis" continuam funcionando.
+- Se você usa o Hermes, rode o "Instalar Hermes" de novo para a personalidade e a descrição do perfil
+  pegarem o nome novo.
+
+Versão anterior (2026-10-20):
 
 Novidades desta versão:
 - Tela "Sobre você": na primeira abertura, depois da chave e da voz, o Jarvis pergunta seu nome, como

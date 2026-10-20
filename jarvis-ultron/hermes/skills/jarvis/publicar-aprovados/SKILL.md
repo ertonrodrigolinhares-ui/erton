@@ -1,6 +1,6 @@
 ---
 name: publicar-aprovados
-description: Publica ou agenda no Metricool somente os posts que o usuário aprovou (ele diz "ok" ao Jarvis). Use depois de uma aprovação explícita.
+description: Publica ou agenda no Metricool somente os posts que o usuário aprovou (ele diz "ok" ao Luiz Conrado). Use depois de uma aprovação explícita.
 version: 1.0.0
 metadata:
   hermes:

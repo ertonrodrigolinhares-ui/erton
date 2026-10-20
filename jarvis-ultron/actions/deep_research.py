@@ -15,6 +15,7 @@ from typing import Callable
 from urllib.parse import parse_qs, unquote, urlparse
 
 from memory.config_manager import get_gemini_key
+from core import marca
 
 
 def _base_dir() -> Path:
@@ -505,7 +506,7 @@ def _fallback_synthesis(
     evidence_text = "\n".join(findings) or "- No readable evidence extracts were returned."
     return f"""## Executive summary
 
-JARVIS reviewed {len(sources)} distinct web sources for this question. The synthesis model was unavailable, so this report preserves the retrieved evidence directly instead of inventing a conclusion. The strongest probable answer should be drawn from the recurring claims below and checked against the linked sources.
+{marca.NOME} reviewed {len(sources)} distinct web sources for this question. The synthesis model was unavailable, so this report preserves the retrieved evidence directly instead of inventing a conclusion. The strongest probable answer should be drawn from the recurring claims below and checked against the linked sources.
 
 ## Retrieved evidence
 
@@ -562,9 +563,9 @@ def _save_report(result: ResearchResult, destination: str, output_path: str = ""
             else candidate / f"{_slug(result.question)}-{stamp}.md"
         )
     elif destination == "desktop":
-        report_path = Path.home() / "Desktop" / "JARVIS Research" / f"{_slug(result.question)}-{stamp}.md"
+        report_path = Path.home() / "Desktop" / f"{marca.NOME} Research" / f"{_slug(result.question)}-{stamp}.md"
     else:
-        report_path = Path.home() / "Documents" / "JARVIS Research" / f"{_slug(result.question)}-{stamp}.md"
+        report_path = Path.home() / "Documents" / f"{marca.NOME} Research" / f"{_slug(result.question)}-{stamp}.md"
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(result.report_markdown, encoding="utf-8")
     if report_path not in result.saved_paths:

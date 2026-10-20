@@ -172,7 +172,7 @@ if (-not $escolhido) { Sair-Com-Erro "Nao consegui baixar o Gemma 4 (confira a i
 Write-Host "Gemma 4 pronto: $escolhido" -ForegroundColor Green
 
 # ---------------------------------------------------------------- 5. perfil do Jarvis no Ollama
-Titulo "5/6  Preparando o Gemma para o Jarvis"
+Titulo "5/6  Preparando o Gemma para o Luiz Conrado"
 # Memoria de conversa maior que o padrao (4 mil), senao as ferramentas do Jarvis nao cabem.
 $modelfile = Join-Path $kit "Modelfile"
 [System.IO.File]::WriteAllText($modelfile, "FROM $escolhido`nPARAMETER num_ctx $contexto`n", $utf8)
@@ -183,12 +183,12 @@ Write-Host "Modelo '$apelido' criado (base: $escolhido, memoria de conversa: $co
 Write-Host "Testando o Gemma (a primeira resposta demora porque ele carrega na memoria)..."
 try {
     $corpo = @{ model = $apelido; stream = $false
-                messages = @(@{ role = "user"; content = "Responda apenas: Jarvis pronto." }) } | ConvertTo-Json -Depth 5
+                messages = @(@{ role = "user"; content = "Responda apenas: Luiz Conrado pronto." }) } | ConvertTo-Json -Depth 5
     $r = Invoke-RestMethod -Uri "http://localhost:11434/api/chat" -Method Post -Body $corpo `
          -ContentType "application/json; charset=utf-8" -TimeoutSec 600
     Write-Host "Gemma respondeu: $($r.message.content)" -ForegroundColor Green
 } catch {
-    Write-Host "O teste nao respondeu a tempo ($($_.Exception.Message)). O Jarvis tenta de novo ao abrir." -ForegroundColor Yellow
+    Write-Host "O teste nao respondeu a tempo ($($_.Exception.Message)). O Luiz Conrado tenta de novo ao abrir." -ForegroundColor Yellow
 }
 
 # ---------------------------------------------------------------- 6. ouvir sem internet
@@ -212,8 +212,8 @@ if ($whisperOk) {
     Definir-Env "JARVIS_GEMMA_MODELO" $apelido
     Write-Host ""
     Write-Host "O Whisper local nao foi instalado agora, entao o modo privado NAO foi ligado." -ForegroundColor Yellow
-    Write-Host "Sem ele o Jarvis nao consegue ouvir a sua voz no modo privado (ela nunca vai para a internet)."
-    Write-Host "Abra o 'Iniciar Jarvis Ultron' uma vez (ele prepara o Jarvis), feche e rode este"
+    Write-Host "Sem ele o Luiz Conrado nao consegue ouvir a sua voz no modo privado (ela nunca vai para a internet)."
+    Write-Host "Abra o 'Iniciar Jarvis Ultron' uma vez (ele prepara o Luiz Conrado), feche e rode este"
     Write-Host "instalador de novo: ele pula o que ja esta pronto e termina a instalacao."
     Read-Host "Aperte Enter para fechar"
     exit 0
@@ -224,16 +224,16 @@ Definir-Env "JARVIS_CEREBRO" "gemma"
 Definir-Env "JARVIS_GEMMA_MODELO" $apelido
 
 Write-Host ""
-Write-Host "Voz do Jarvis no modo Gemma:"
+Write-Host "Voz do Luiz Conrado no modo Gemma:"
 Write-Host "  N = voz da Microsoft pela internet (mais natural; o texto da resposta vai para a Microsoft)"
 Write-Host "  S = voz do proprio Windows (mais robotica; nada sai do PC)"
 $privada = (Read-Host "Quer a voz 100% privada? Digite S ou N (Enter = N)").Trim().ToUpper()
 Definir-Env "JARVIS_VOZ_PRIVADA" ($(if ($privada -eq "S") { "1" } else { "0" }))
 
 Write-Host ""
-Write-Host "Pronto! O cerebro do Jarvis agora e o Gemma 4, rodando no seu computador." -ForegroundColor Green
+Write-Host "Pronto! O cerebro do Luiz Conrado agora e o Gemma 4, rodando no seu computador." -ForegroundColor Green
 # O X da janela so esconde o Jarvis: o que ja estava aberto continuaria no Gemini, ouvindo
-Write-Host "Se o Jarvis estiver aberto (ou no icone perto do relogio), feche de verdade: botao direito"
-Write-Host "no icone > Quit JARVIS. Depois abra o 'Iniciar Jarvis Ultron'."
+Write-Host "Se o Luiz Conrado estiver aberto (ou no icone perto do relogio), feche de verdade: botao direito"
+Write-Host "no icone > Sair do Luiz Conrado. Depois abra o 'Iniciar Jarvis Ultron'."
 Write-Host "Para voltar ao Gemini: 'Voltar para o Gemini'."
 Read-Host "Aperte Enter para fechar"

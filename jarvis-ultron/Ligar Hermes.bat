@@ -1,4 +1,4 @@
 @echo off
-title Ligar Hermes (Jarvis Ultron)
+title Ligar Hermes (Luiz Conrado)
 cd /d "%~dp0"
 powershell -NoProfile -ExecutionPolicy Bypass -File "hermes\ligar_hermes.ps1"

@@ -522,7 +522,7 @@ class ChatBubbleWidget(QWidget):
         ib_lay.setSpacing(6)
 
         self._input = QLineEdit()
-        self._input.setPlaceholderText("Type a message to JARVIS…")
+        self._input.setPlaceholderText(f"Type a message to {marca.NOME}…")
         self._input.setFont(QFont(UI_FONT, 10))
         self._input.setFixedHeight(32)
         self._input.setStyleSheet(f"""
@@ -625,7 +625,7 @@ class ChatBubbleWidget(QWidget):
             self._skip_typing = True
             self._on_message(self._typing_full)
             return
-        partial = 'JARVIS: ' + self._typing_body[:self._typing_idx]
+        partial = f'{marca.NOME_CURTO.upper()}: ' + self._typing_body[:self._typing_idx]
         if hasattr(self, '_typing_bubble') and self._typing_bubble:
             self._c_lay.removeWidget(self._typing_bubble)
             self._typing_bubble.deleteLater()
@@ -682,7 +682,7 @@ class ChatBubbleWidget(QWidget):
             bg_col = C.PRI_GHO
             border_col = C.PRI
             text_col = C.PRI
-            name = "JARVIS"
+            name = marca.NOME_CURTO.upper()
         elif tl.startswith("file:"):
             sender = "file"
             display = text[5:].strip()
@@ -820,7 +820,7 @@ class FocusDialogueWidget(QWidget):
 
         message_row = QHBoxLayout()
         message_row.setSpacing(10)
-        self._speaker_lbl = QLabel("JARVIS")
+        self._speaker_lbl = QLabel(marca.NOME_CURTO.upper())
         self._speaker_lbl.setFixedWidth(62)
         self._speaker_lbl.setFont(QFont(DISPLAY_FONT, 8, QFont.Weight.DemiBold))
         message_row.addWidget(self._speaker_lbl, alignment=Qt.AlignmentFlag.AlignTop)
@@ -834,7 +834,7 @@ class FocusDialogueWidget(QWidget):
         input_row = QHBoxLayout()
         input_row.setSpacing(7)
         self._input = QLineEdit()
-        self._input.setPlaceholderText("Give JARVIS a command")
+        self._input.setPlaceholderText(f"Give {marca.NOME} a command")
         self._input.setFont(QFont(UI_FONT, 9))
         self._input.setFixedHeight(30)
         self._input.returnPressed.connect(self._submit)
@@ -863,7 +863,7 @@ class FocusDialogueWidget(QWidget):
         if lower.startswith("you:"):
             speaker, body, color = "YOU", clean[4:].strip(), C.WHITE
         elif lower.startswith("jarvis:"):
-            speaker, body, color = "JARVIS", clean[7:].strip(), C.PRI
+            speaker, body, color = marca.NOME_CURTO.upper(), clean[7:].strip(), C.PRI
         elif lower.startswith("err:") or "error" in lower:
             speaker, body, color = "ALERT", clean.replace("ERR:", "").strip(), C.RED
         else:
@@ -4601,7 +4601,7 @@ class FileDropZone(QWidget):
 
     def _browse(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "Select a file for JARVIS", str(Path.home()),
+            self, f"Select a file for {marca.NOME}", str(Path.home()),
             "All Files (*.*);;"
             "Images (*.jpg *.jpeg *.png *.gif *.webp *.bmp *.svg);;"
             "Documents (*.pdf *.docx *.txt *.md *.pptx);;"
@@ -4769,7 +4769,7 @@ class SetupOverlay(QWidget):
             return w
 
         layout.addWidget(_lbl("◈  INITIALISATION REQUIRED", 13, True))
-        layout.addWidget(_lbl("Configure J.A.R.V.I.S. before first boot.", 9, color=C.PRI_DIM))
+        layout.addWidget(_lbl(f"Configure {marca.NOME} before first boot.", 9, color=C.PRI_DIM))
         layout.addSpacing(6)
 
         sep = QFrame(); sep.setFrameShape(QFrame.Shape.HLine)
@@ -4863,7 +4863,7 @@ class SetupOverlay(QWidget):
         self._reserva_btn.setFont(QFont("Courier New", 9, QFont.Weight.Bold))
         self._reserva_btn.setFixedHeight(32)
         self._reserva_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._reserva_btn.setToolTip("Abre o Jarvis conversando pelo Groq (sem as ferramentas) "
+        self._reserva_btn.setToolTip(f"Abre o {marca.NOME_CURTO} conversando pelo Groq (sem as ferramentas) "
                                      "até a chave do Gemini voltar a funcionar.")
         self._reserva_btn.setStyleSheet(f"""
             QPushButton {{
@@ -5695,7 +5695,7 @@ class VoiceSelectOverlay(_OverlayBase):
             return w
 
         layout.addWidget(_lbl("◈  VOICE SELECTION", 13, True))
-        layout.addWidget(_lbl("Choose the voice JARVIS will speak with.", 9, color=C.PRI_DIM))
+        layout.addWidget(_lbl(f"Choose the voice {marca.NOME} will speak with.", 9, color=C.PRI_DIM))
         layout.addSpacing(4)
 
         sep = QFrame(); sep.setFrameShape(QFrame.Shape.HLine)
@@ -6461,7 +6461,7 @@ class VisionPreviewWindow(QWidget):
         super().__init__(parent)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setObjectName("visionPreview")
-        self.setAccessibleName("JARVIS live vision preview")
+        self.setAccessibleName(f"{marca.NOME} live vision preview")
         self.setFixedSize(360, 248)
         self._source = "screen"
         self._drag_origin_global = None
@@ -7081,9 +7081,9 @@ class MainWindow(QMainWindow):
                 self.hide()
                 # Jarvis Ultron: o X não fecha; em português, para o Erton saber que ele continua ouvindo
                 self._tray.showMessage(
-                    "Jarvis continua ligado",
+                    f"{marca.NOME_CURTO} continua ligado",
                     "Ele continua ouvindo, no ícone perto do relógio. Clique no ícone para voltar; para "
-                    "fechar de verdade: botão direito no ícone → Quit JARVIS.",
+                    f"fechar de verdade: botão direito no ícone → Sair do {marca.NOME}.",
                     QSystemTrayIcon.MessageIcon.Information, 6000
                 )
                 return
@@ -7122,7 +7122,7 @@ class MainWindow(QMainWindow):
             QMenu::item:selected {{ background: {C.PRI_GHO}; color: {C.PRI}; }}
         """)
 
-        show_action = QAction("Show JARVIS", self)
+        show_action = QAction(f"Show {marca.NOME}", self)
         show_action.triggered.connect(self._tray_show)
         tray_menu.addAction(show_action)
 
@@ -7132,7 +7132,7 @@ class MainWindow(QMainWindow):
 
         tray_menu.addSeparator()
 
-        quit_action = QAction("Quit JARVIS", self)
+        quit_action = QAction(f"Sair do {marca.NOME}", self)
         quit_action.triggered.connect(self._tray_quit)
         tray_menu.addAction(quit_action)
 
@@ -7905,7 +7905,7 @@ class MainWindow(QMainWindow):
         left_col = QVBoxLayout(); left_col.setSpacing(1)
         left_col.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
-        stark = QLabel("JARVIS")
+        stark = QLabel(marca.NOME_CURTO.upper())
         self._header_brand_lbl = stark
         stark.setObjectName("headerTitle")
         stark.setFont(QFont("Arial", 15, QFont.Weight.DemiBold))
@@ -8273,7 +8273,7 @@ class MainWindow(QMainWindow):
         w = QWidget()
         self._dock_frame = w
         w.setObjectName("JarvisCommandRail")
-        w.setAccessibleName("JARVIS command rail")
+        w.setAccessibleName(f"{marca.NOME} command rail")
         w.setFixedHeight(72)
         lay = QHBoxLayout(w)
         lay.setContentsMargins(14, 8, 14, 8)
@@ -8292,7 +8292,7 @@ class MainWindow(QMainWindow):
         title_row.setSpacing(7)
         self._rail_status_dot = QLabel("●")
         self._rail_status_dot.setFont(QFont(TECH_FONT, 7, QFont.Weight.Medium))
-        self._rail_status_dot.setAccessibleName("JARVIS status indicator")
+        self._rail_status_dot.setAccessibleName(f"{marca.NOME} status indicator")
         title_row.addWidget(self._rail_status_dot)
         self._command_title_lbl = QLabel("COMMAND RAIL")
         self._command_title_lbl.setFont(QFont(UI_FONT, 9, QFont.Weight.DemiBold))
@@ -8302,7 +8302,7 @@ class MainWindow(QMainWindow):
 
         self._rail_mode_lbl = QLabel("LOCAL  /  LISTENING")
         self._rail_mode_lbl.setFont(QFont(TECH_FONT, 7, QFont.Weight.Medium))
-        self._rail_mode_lbl.setAccessibleName("JARVIS current state")
+        self._rail_mode_lbl.setAccessibleName(f"{marca.NOME} current state")
         anchor_lay.addWidget(self._rail_mode_lbl)
         lay.addWidget(anchor)
 
@@ -8349,8 +8349,8 @@ class MainWindow(QMainWindow):
         track_lay.addWidget(_track_separator())
 
         self._tts_btn = _ctrl_btn("VOICE", 142)
-        self._tts_btn.setToolTip("Change JARVIS voice")
-        self._tts_btn.setAccessibleName("Change JARVIS voice")
+        self._tts_btn.setToolTip(f"Change {marca.NOME} voice")
+        self._tts_btn.setAccessibleName(f"Change {marca.NOME} voice")
         self._tts_btn.clicked.connect(self._show_tts_select)
         self._update_tts_btn()
         track_lay.addWidget(self._tts_btn)
@@ -8366,8 +8366,8 @@ class MainWindow(QMainWindow):
 
         # Theme cycle button
         self._theme_btn = _ctrl_btn("THEME", 176)
-        self._theme_btn.setToolTip("Cycle JARVIS theme")
-        self._theme_btn.setAccessibleName("Cycle JARVIS theme")
+        self._theme_btn.setToolTip(f"Cycle {marca.NOME} theme")
+        self._theme_btn.setAccessibleName(f"Cycle {marca.NOME} theme")
         self._theme_btn.clicked.connect(self._cycle_theme)
         track_lay.addWidget(self._theme_btn)
         lay.addWidget(track)
@@ -8401,8 +8401,8 @@ class MainWindow(QMainWindow):
 
         self._quit_btn = QPushButton("QUIT")
         self._quit_btn.setObjectName("JarvisQuitButton")
-        self._quit_btn.setAccessibleName("Quit JARVIS")
-        self._quit_btn.setToolTip("Quit JARVIS")
+        self._quit_btn.setAccessibleName(f"Sair do {marca.NOME}")
+        self._quit_btn.setToolTip(f"Sair do {marca.NOME}")
         self._quit_btn.setFixedSize(78, 44)
         self._quit_btn.setFont(QFont(UI_FONT, 8, QFont.Weight.DemiBold))
         self._quit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -8418,7 +8418,7 @@ class MainWindow(QMainWindow):
         strip = QWidget()
         self._maker_signature = strip
         strip.setObjectName("JarvisMakerSignature")
-        strip.setAccessibleName("JARVIS creator trademark")
+        strip.setAccessibleName(f"{marca.NOME} creator trademark")
         strip.setFixedHeight(20)
 
         lay = QHBoxLayout(strip)
@@ -8432,7 +8432,7 @@ class MainWindow(QMainWindow):
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
         )
         self._maker_signature_lbl.setAccessibleName("amd.creationz trademark")
-        self._maker_signature_lbl.setToolTip("JARVIS interface by amd.creationz")
+        self._maker_signature_lbl.setToolTip(f"{marca.NOME} interface by amd.creationz")
         lay.addWidget(self._maker_signature_lbl)
 
         self._style_maker_signature()
@@ -8513,7 +8513,7 @@ class MainWindow(QMainWindow):
         cat  = _file_category(p)
         icon, _ = _FILE_ICONS.get(cat, _FILE_ICONS["unknown"])
         size = _fmt_size(p.stat().st_size)
-        self._file_hint.setText(f"{icon}  {p.name}  ·  {size}  ·  Tell JARVIS what to do with it")
+        self._file_hint.setText(f"{icon}  {p.name}  ·  {size}  ·  Tell {marca.NOME} what to do with it")
         self._log.append_log(f"FILE: {p.name} ({size}) loaded")
         if self.on_text_command:
             msg = (
@@ -8703,7 +8703,7 @@ class MainWindow(QMainWindow):
 
         # Show toast for state transitions
         if state == "THINKING":
-            self._show_toast("JARVIS is thinking...", "info")
+            self._show_toast(f"{marca.NOME} is thinking...", "info")
         elif state == "PROCESSING":
             self._show_toast("Processing request...", "info")
 
@@ -9353,7 +9353,7 @@ class JarvisUI:
         def mostrar():
             bandeja = getattr(janela, "_tray", None)
             if bandeja is not None and bandeja.isVisible():
-                bandeja.showMessage(f"Jarvis · {titulo}", texto, QSystemTrayIcon.MessageIcon.Information, 10000)
+                bandeja.showMessage(f"{marca.NOME_CURTO} · {titulo}", texto, QSystemTrayIcon.MessageIcon.Information, 10000)
             mostrar_aviso = getattr(janela, "_show_toast", None)
             if callable(mostrar_aviso):
                 if titulo == "Pergunta":  # a pergunta antes de agir (computer_settings): ele lê, confere e responde

@@ -23,6 +23,8 @@ NA_TELA = True
 
 import threading
 
+from core import marca
+
 # Botões do painel: (nome_da_ferramenta, emoji, título, subtítulo, argumentos).
 # Só entram os que valem um clique (sem digitar nada). Só aparece o que estiver instalado.
 BOTOES = [
@@ -105,7 +107,7 @@ def _construir(jarvis):
             self._grade.setSpacing(12)
             self._botoes = []
             coluna.addLayout(self._grade)
-            self._sem_agentes = QLabel('Ligue agentes no "Ativar Agentes" (pasta do Jarvis) e eles aparecem aqui.')
+            self._sem_agentes = QLabel(f'Ligue agentes no "Ativar Agentes" (pasta do {marca.NOME_CURTO}) e eles aparecem aqui.')
             self._sem_agentes.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self._sem_agentes.setWordWrap(True)
             coluna.addWidget(self._sem_agentes)
@@ -116,7 +118,7 @@ def _construir(jarvis):
             self._fechar.setCursor(Qt.CursorShape.PointingHandCursor)
             self._fechar.clicked.connect(lambda: self.abrir(False))
             coluna.addWidget(self._fechar, alignment=Qt.AlignmentFlag.AlignCenter)
-            self._rodape = QLabel('ou diga "modo Jarvis"')
+            self._rodape = QLabel(f'ou diga "modo {marca.NOME_CURTO}"')
             self._rodape.setAlignment(Qt.AlignmentFlag.AlignCenter)
             coluna.addWidget(self._rodape)
             linha = QHBoxLayout()

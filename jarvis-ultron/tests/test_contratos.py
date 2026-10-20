@@ -38,6 +38,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 RAIZ = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RAIZ))
 
+from core import marca  # noqa: E402
+
 DADOS = RAIZ / "tests" / "dados"
 FOTO_DECLARACOES = DADOS / "declaracoes_antes.json"
 FOTO_POLITICAS = DADOS / "politicas_antes.json"
@@ -209,11 +211,11 @@ RESPOSTAS_PADRAO = (
     ("file_controller", {"action": "list"}, "Done."),
     ("desktop_control", {}, "Done."),
     ("flight_finder", {}, "Done."),
-    ("graphics_quality", {"quality": "low"}, "JARVIS graphics quality changed to low."),
-    ("jarvis_ui_control", {"action": "open_settings"}, "JARVIS interface action completed: open settings."),
-    ("jarvis_ui_control", {"action": "change_theme", "theme": "platinum"}, "JARVIS theme changed to platinum."),
+    ("graphics_quality", {"quality": "low"}, f"{marca.NOME} graphics quality changed to low."),
+    ("jarvis_ui_control", {"action": "open_settings"}, f"{marca.NOME} interface action completed: open settings."),
+    ("jarvis_ui_control", {"action": "change_theme", "theme": "platinum"}, f"{marca.NOME} theme changed to platinum."),
     ("jarvis_ui_control", {"action": "change_graphics_quality", "graphics_quality": "high"},
-     "JARVIS graphics quality changed to high."),
+     f"{marca.NOME} graphics quality changed to high."),
     ("deep_research", {}, "Deep research preference requested."),
     ("create_presentation", {}, "Presentation preference requested."),
     ("task_status", {"action": "all"}, "{}"),
@@ -517,7 +519,7 @@ class DesligadasTests(unittest.TestCase):
                 self.assertIn("is turned off", resposta.response["result"])
                 self.assertEqual(usados, [])
                 self.assertEqual(_chamadas(falsas), [])
-                self.assertIn(("log", f"SYS: ⛔ {nome} está desligada no Jarvis."), ui.eventos)
+                self.assertIn(("log", f"SYS: ⛔ {nome} está desligada no {marca.NOME_CURTO}."), ui.eventos)
 
     def test_automacao_com_nome_de_desligada_nao_carrega(self):
         # o nome de uma desligada continua reservado: um automacoes/send_message.py não volta a ser oferecido
@@ -540,7 +542,7 @@ class DesligadasTests(unittest.TestCase):
                 main._AUTOMACOES = guardadas
         self.assertEqual(carga.ferramentas, {})
         self.assertEqual(sorted(a for a, _ in carga.erros), sorted(f"{nome}.py" for nome in DESLIGADAS))
-        self.assertTrue(all("já existe no Jarvis" in erro for _, erro in carga.erros))
+        self.assertTrue(all(f"já existe no {marca.NOME_CURTO}" in erro for _, erro in carga.erros))
         self.assertEqual(oferecidas & set(DESLIGADAS), set())
 
     def test_reserva_nao_manda_mensagem(self):
@@ -592,6 +594,20 @@ class DesligadasTests(unittest.TestCase):
         for nome in ("`type_text`", "`press_enter`", "`press_key`", "`TECLAS_PEDEM_OK`", "`NAO_PEDEM_OK`",
                      "`core/aprovacao.py`", "`core/prompt.txt`"):
             self.assertIn(nome, fechadas[0])
+
+    def test_prompt_carregado_traz_o_nome_do_produto(self):
+        # o core/prompt.txt fala do assistente pelas marcas __MARCA__/__MARCA_CURTA__ (core/marca.py), que o
+        # _load_system_prompt preenche; "Hey Jarvis" (a palavra de ativação) e os nomes das ferramentas ficam
+        import main
+
+        bruto = (RAIZ / "core" / "prompt.txt").read_text(encoding="utf-8")
+        self.assertIn("__MARCA__", bruto)
+        self.assertNotIn("JARVIS", bruto)
+        self.assertIn("Hey Jarvis", bruto)
+        prompt = main._load_system_prompt()
+        self.assertIn(marca.NOME, prompt)
+        self.assertNotIn("__MARCA", prompt)
+        self.assertIn(main.SELF_QUIT_GOODBYE, prompt)
 
     def test_prompt_nao_promete_conferir_o_campo_de_texto(self):
         # quem conferia se a janela da frente era um campo de texto (actions/safe_text_entry.py) e recusava

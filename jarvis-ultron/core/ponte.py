@@ -30,6 +30,8 @@ import time
 from collections import deque
 from pathlib import Path
 
+from core import marca
+
 # Métodos da tela que o cérebro pode chamar (todos de mão única: não devolvem nada).
 METODOS_TELA = frozenset({
     "write_log", "set_state", "set_voice_level", "set_muted_threadsafe", "set_listening_status",
@@ -226,7 +228,7 @@ class UIRemota:
         elif tipo == "rodar_ultron":
             nome, args = str(mensagem[1]), dict(mensagem[2] or {})
             if self._guardar(("rodar_ultron", nome, args)):
-                self.write_log(f"SYS: O cérebro do Jarvis ainda está abrindo; rodo {nome} assim que ele "
+                self.write_log(f"SYS: O cérebro do {marca.NOME_CURTO} ainda está abrindo; rodo {nome} assim que ele "
                                "ficar pronto.")
                 return
             self._jarvis.rodar_automacao_ultron(nome, args)
@@ -458,11 +460,11 @@ class PonteTela:
         if len(self._religadas) >= MAX_RELIGADAS:
             self._processo = None
             self.jarvis.parado = True
-            self.ui.write_log("ERR: O cérebro do Jarvis parou várias vezes. Feche e abra o Jarvis "
+            self.ui.write_log(f"ERR: O cérebro do {marca.NOME_CURTO} parou várias vezes. Feche e abra o {marca.NOME_CURTO} "
                               f"(ou rode o autodiagnóstico).{self._sem_entregar()}")
             return
         self._religadas.append(agora)
-        self.ui.write_log(f"SYS: O cérebro do Jarvis parou (código {codigo}). Religando...")
+        self.ui.write_log(f"SYS: O cérebro do {marca.NOME_CURTO} parou (código {codigo}). Religando...")
         self.ui.set_state("LISTENING")
         self.iniciar()
 
@@ -472,7 +474,7 @@ class PonteTela:
         if self._ja_conectou:
             # já funcionou antes (é uma religada): não troca de modo no meio do uso
             self.jarvis.parado = True
-            self.ui.write_log(f"ERR: Não consegui religar o cérebro: {motivo}. Feche e abra o Jarvis."
+            self.ui.write_log(f"ERR: Não consegui religar o cérebro: {motivo}. Feche e abra o {marca.NOME_CURTO}."
                               f"{self._sem_entregar()}")
             return
         print(f"[Ponte] {motivo}. Voltando ao modo de um programa só.")
@@ -520,7 +522,7 @@ class PonteTela:
         """O cérebro saiu com SAIDA_FIM_DO_TESTE: fecha o Jarvis inteiro (não religa)."""
         self._processo = None
         self._fechar_conexao()
-        self.ui.write_log("SYS: O tempo de teste do Jarvis acabou. Fechando...")
+        self.ui.write_log(f"SYS: O tempo de teste do {marca.NOME_CURTO} acabou. Fechando...")
         self.ui.handle_ui_command("quit jarvis")  # o mesmo caminho do botão de sair
 
     def trocar_cerebro(self, destino: str) -> None:
@@ -533,7 +535,7 @@ class PonteTela:
             atualizar_env(self._pasta / ".env", "JARVIS_CEREBRO", valor)
         except Exception as erro:
             print(f"[Ponte] Não gravei o modo no .env: {erro}")
-            self.ui.write_log("ERR: Não consegui gravar o modo no .env; ao abrir o Jarvis de novo, "
+            self.ui.write_log(f"ERR: Não consegui gravar o modo no .env; ao abrir o {marca.NOME_CURTO} de novo, "
                               "ele volta ao modo anterior.")
         self.ui.write_log("SYS: 🔒 Modo privado ligado (Gemma 4 no PC). Religando o cérebro..." if valor == "gemma"
                           else "SYS: Modo normal (Gemini). Religando o cérebro...")
@@ -572,12 +574,12 @@ class PonteTela:
                 self._pendentes.append(mensagem)
             avisar = not parado and len(self._pendentes) == 1
         if parado:
-            self.ui.write_log("ERR: O cérebro do Jarvis está parado. Feche e abra o Jarvis.")
+            self.ui.write_log(f"ERR: O cérebro do {marca.NOME_CURTO} está parado. Feche e abra o {marca.NOME_CURTO}.")
         elif avisar and self._ja_conectou:
-            self.ui.write_log("SYS: O cérebro do Jarvis está religando; entrego o seu pedido assim que "
+            self.ui.write_log(f"SYS: O cérebro do {marca.NOME_CURTO} está religando; entrego o seu pedido assim que "
                               "ele voltar.")
         elif avisar:  # primeira abertura: o cérebro ainda não conectou nenhuma vez
-            self.ui.write_log("SYS: O cérebro do Jarvis ainda está abrindo; entrego o seu pedido assim "
+            self.ui.write_log(f"SYS: O cérebro do {marca.NOME_CURTO} ainda está abrindo; entrego o seu pedido assim "
                               "que ele ficar pronto.")
 
     def _repassar(self, nome):

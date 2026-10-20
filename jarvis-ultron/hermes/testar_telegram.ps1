@@ -78,7 +78,7 @@ if (-not $token -and $ultronEnv["TELEGRAM_BOT_TOKEN"]) {
     $ultronEnv.Remove("TELEGRAM_BOT_TOKEN")
     $ultronEnv.Remove("TELEGRAM_ALLOWED_USERS")
     Gravar-Env $envUltronCaminho $ultronEnv
-    Aviso "O codigo do robo estava no .env do Jarvis (lugar errado). Mudei para o Hermes."
+    Aviso "O codigo do robo estava no .env do Luiz (lugar errado). Mudei para o Hermes."
 }
 if (-not $token) {
     Problema "O Hermes nao tem o codigo do robo. Rode o 'Ligar Telegram' e cole o codigo (token)."

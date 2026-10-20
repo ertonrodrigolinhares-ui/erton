@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Optional
 
 from memory.config_manager import get_gemini_key
+from core import marca
 
 import numpy as np
 import sounddevice as sd
@@ -95,7 +96,7 @@ _last_capture_time = 0.0
 _MIN_CAPTURE_INTERVAL = 0.5  # seconds
 
 _SYSTEM_PROMPT = (
-    "You are JARVIS, an advanced AI assistant. "
+    f"You are {marca.NOME}, an advanced AI assistant. "
     "Analyze the provided image with precision and intelligence. "
     "Be concise and direct — maximum two sentences unless the user's question "
     "requires more detail. "

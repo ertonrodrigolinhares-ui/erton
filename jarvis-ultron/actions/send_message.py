@@ -10,6 +10,7 @@ import unicodedata
 from pathlib import Path
 
 from actions.safe_text_entry import safe_type_then_enter
+from core import marca
 from actions.instagram_browser import (
     prepare_instagram_draft as _controlled_instagram_prepare_draft,
     send_instagram_draft as _controlled_instagram_send_draft,
@@ -30,7 +31,7 @@ try:
 except ImportError:
     _PYPERCLIP = False
 
-JARVIS_TEXT_FOOTER = "CREATED BY JARVIS"
+JARVIS_TEXT_FOOTER = f"CREATED BY {marca.NOME.upper()}"
 AMBIGUOUS_PREFIX = "RECIPIENT_AMBIGUOUS|"
 NO_MATCH_PREFIX = "RECIPIENT_NOT_FOUND|"
 MESSAGE_DUPLICATE_TTL_SECONDS = 120.0
@@ -122,7 +123,8 @@ def _name_norm(text: str) -> str:
 
 def _message_norm(text: str) -> str:
     value = str(text or "")
-    value = re.sub(r"\bcreated\s+by\s+jarvis\b", "", value, flags=re.IGNORECASE)
+    value = re.sub(r"\b" + r"\s+".join(map(re.escape, JARVIS_TEXT_FOOTER.split())) + r"\b", "", value,
+                   flags=re.IGNORECASE)
     value = _strip_accents(value).lower()
     return re.sub(r"[^a-z0-9]+", "", value)
 
@@ -1523,7 +1525,7 @@ def _screen_find(description: str, retries: int = 2, delay: float = 0.6) -> tupl
             img.save(buf, format="PNG")
 
             prompt = (
-                f"You are controlling a {w}x{h} screen for JARVIS messaging. "
+                f"You are controlling a {w}x{h} screen for {marca.NOME} messaging. "
                 f"Find this exact UI target: {description}. "
                 "Prefer visible text fields, buttons, or list results in the active browser/app. "
                 "Return ONLY the center coordinate as x,y. If not visible, return NOT_FOUND."

@@ -31,6 +31,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
+from core import marca
+
 NOME_VALIDO = re.compile(r"^[a-z][a-z0-9_]{2,40}$")
 
 
@@ -88,7 +90,7 @@ def carregar_ferramentas(pasta: Path | None = None, reservados: set[str] | None 
             if not NOME_VALIDO.match(nome):
                 raise ValueError(f"nome inválido '{nome}' (use letras minúsculas, números e _)")
             if nome in reservados or nome in carga.ferramentas:
-                raise ValueError(f"o nome '{nome}' já existe no Jarvis")
+                raise ValueError(f"o nome '{nome}' já existe no {marca.NOME_CURTO}")
             if not callable(executar):
                 raise ValueError("falta a função executar(args, jarvis)")
             if not str(declaracao.get("description", "")).strip():

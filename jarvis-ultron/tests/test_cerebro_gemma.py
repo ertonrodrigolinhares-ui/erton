@@ -10,7 +10,7 @@ from unittest.mock import patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from core import cerebro_gemma
+from core import cerebro_gemma, marca
 from core.cerebro_gemma import CerebroGemma
 
 
@@ -51,7 +51,8 @@ class CerebroGemmaTests(unittest.TestCase):
             cerebro = CerebroGemma(cliente=cliente)
         self.assertEqual(cerebro.responder("oi"), "Olá, Erton.")
         self.assertEqual(cliente.pedidos[0]["model"], "jarvis-gemma")
-        self.assertIn("Jarvis Ultron", cliente.pedidos[0]["messages"][0]["content"])
+        self.assertIn(f"Você é o {marca.NOME}, assistente pessoal", cliente.pedidos[0]["messages"][0]["content"])
+        self.assertNotIn("__MARCA", cliente.pedidos[0]["messages"][0]["content"])
         self.assertNotIn("Groq", cliente.pedidos[0]["messages"][0]["content"])
 
     def test_modelo_do_env(self):
@@ -574,6 +575,13 @@ class PedidoDePrivacidadeTests(unittest.TestCase):
             self.assertEqual(cerebro_gemma.pedido_de_privacidade(fala), "gemini", fala)
         for fala in ("ele quer sair do modo privado", "o cliente usa o modo normal"):
             self.assertIsNone(cerebro_gemma.pedido_de_privacidade(fala), fala)
+
+    def test_o_nome_do_produto_vale_como_o_jarvis(self):
+        # a palavra de ativação continua "Hey Jarvis": "Jarvis" e o nome de core/marca.py valem os dois
+        for fala in (f"{marca.NOME}, modo normal", f"{marca.NOME_CURTO}, sair do modo privado.",
+                     f"ok {marca.NOME_CURTO}, volta pro modo normal", f"{marca.NOME}, modo privado"):
+            self.assertEqual(cerebro_gemma.pedido_de_privacidade(fala), "gemma" if "privado" in fala and "sair" not in fala else "gemini", fala)
+        self.assertIsNone(cerebro_gemma.pedido_de_privacidade(f"{marca.NOME_CURTO}, não quero sair do modo privado"))
 
     def test_entrar_no_modo_privado_continua_facil(self):
         for fala in ("Jarvis, modo privado", "modo privado", "Jarvis, modo sigiloso agora",

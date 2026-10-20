@@ -115,7 +115,7 @@ precisar disso, diga no plano que não dá."""
 
 REGRAS_APLICAR = """
 O usuário APROVOU o plano abaixo. Aplique exatamente esse plano, com mudanças pequenas e cuidadosas,
-no estilo do código ao redor. Não rode comandos (não estão liberados): o Jarvis faz o backup, roda os
+no estilo do código ao redor. Não rode comandos (não estão liberados): o __MARCA_CURTA__ faz o backup, roda os
 testes e desfaz tudo sozinho se algo quebrar. Não mexa em .env, chaves, memória nem na pasta .git.
 Na linha "FALA:" diga em 1 ou 2 frases o que você mudou.
 
@@ -295,9 +295,15 @@ def preparar_pasta() -> Path:
 # O CLAUDE.md que o Jarvis instalava até 19/10/2026 (é guardada só a impressão, não o texto). O
 # arquivo da pasta do Claude é copiado uma vez e depois é do Erton; mas, se ainda for aquele, ele
 # vira o novo, e se só o parágrafo "Quem é o Erton" ainda for aquele, só o parágrafo é trocado.
-CLAUDE_MD_ANTIGO = "82df4793001f34208cbd154ffd1051cfd2c91fde24b7c92e7b523557c68408d1"
-QUEM_E_ANTIGO = "989cf1fb8d1c1a723cfda9756a25ccac272c7c3ca3d98f031c534603898888df"
-_QUEM_E = re.compile(r"^## Quem (?:é o Erton|usa o Jarvis)\n(.*?)(?=\n\n|\Z)", re.S | re.M)
+CLAUDE_MD_ANTIGOS = frozenset({
+    "82df4793001f34208cbd154ffd1051cfd2c91fde24b7c92e7b523557c68408d1",  # até 19/10/2026 ("Quem é o Erton")
+    "257bf33f995b92c0a3f7bce34cbef4184ad0d8c314a06deb04c036ab993508e6",  # 20/10/2026 ("Quem usa o Jarvis")
+})
+QUEM_E_ANTIGOS = frozenset({
+    "989cf1fb8d1c1a723cfda9756a25ccac272c7c3ca3d98f031c534603898888df",  # até 19/10/2026
+    "b41c85bc88370e2c6e9d6c8998e6fb836d3183f474e16136e42ef6dd01d081c5",  # 20/10/2026
+})
+_QUEM_E = re.compile(r"^## Quem (?:é o Erton|usa o [^\n]+)\n(.*?)(?=\n\n|\Z)", re.S | re.M)
 
 
 def _impressao(texto: str) -> str:
@@ -312,13 +318,13 @@ def _atualizar_claude_md(modelo: Path, instalado: Path) -> None:
         shutil.copy2(modelo, instalado)
         return
     texto = instalado.read_text(encoding="utf-8-sig", errors="replace").replace("\r\n", "\n")
-    if _impressao(texto) == CLAUDE_MD_ANTIGO:
+    if _impressao(texto) in CLAUDE_MD_ANTIGOS:
         shutil.copy2(modelo, instalado)
         return
     antigo = _QUEM_E.search(texto)
     novo = _QUEM_E.search(modelo.read_text(encoding="utf-8-sig").replace("\r\n", "\n"))
-    if antigo and novo and _impressao(antigo.group(1)) == QUEM_E_ANTIGO:
-        instalado.write_text(texto[:antigo.start(1)] + novo.group(1) + texto[antigo.end(1):], encoding="utf-8")
+    if antigo and novo and _impressao(antigo.group(1)) in QUEM_E_ANTIGOS:
+        instalado.write_text(texto[:antigo.start()] + novo.group(0) + texto[antigo.end():], encoding="utf-8")
 
 
 def _copiar_agency(origem: Path, destino: Path) -> None:
@@ -530,7 +536,7 @@ def explicar(texto: str, subtipo: str = "") -> str:
         return "a tarefa ficou grande demais para uma vez só; peça em partes menores"
     if "not logged in" in baixo or "/login" in baixo or "login expired" in baixo or "invalid api key" in baixo:
         return ("o Claude não está conectado à sua conta. Dê dois cliques em 'Instalar Claude' na pasta do "
-                "Jarvis para entrar de novo")
+                f"{marca.NOME_CURTO} para entrar de novo")
     if "subscription access" in baixo or "oauth_org_not_allowed" in baixo:
         return "a sua organização desligou o uso da assinatura no Claude Code"
     if "limit" in baixo and ("reset" in baixo or "hit your" in baixo):
@@ -600,7 +606,7 @@ def _job_que_morre_com_o_jarvis(processo):
             return job
         k32.CloseHandle(job)
     except Exception as erro:
-        print(f"[Claude] Não consegui prender o programa ao Jarvis: {erro}")
+        print(f"[Claude] Não consegui prender o programa ao {marca.NOME_CURTO}: {erro}")
     return None
 
 
@@ -654,7 +660,7 @@ def rodar(pedido: str, permitir, pasta: Path, sessao: str | None = None, tempo: 
     exe = achar_claude()
     if not exe:
         return Resposta(False, erro="o Claude Code não está instalado. Dê dois cliques em 'Instalar Claude' "
-                                    "na pasta do Jarvis")
+                                    f"na pasta do {marca.NOME_CURTO}")
     try:
         codigo, saida, problemas = _executar(comando(exe, permitir, pasta, sessao, turnos, pastas_extras),
                                              pedido.encode("utf-8"), tempo, pasta, ambiente())
@@ -999,7 +1005,7 @@ def _travar_codigo() -> int | None:
         if isinstance(erro, BlockingIOError) or erro.errno in (errno.EACCES, errno.EAGAIN):
             os.close(descritor)
             return None  # outro Jarvis está com ela
-        print(f"[Claude] A trava entre dois Jarvis abertos não funciona nesta pasta: {erro}")
+        print(f"[Claude] A trava entre dois {marca.NOME_CURTO} abertos não funciona nesta pasta: {erro}")
     return descritor
 
 
@@ -1077,7 +1083,7 @@ def _desfazer_interrompida() -> str:
         aviso = ("Uma mudança do Claude no meu código ficou pela metade e eu não consegui desfazer, porque o "
                  f"backup dela sumiu ou estragou ({backup.name}). Não mexi em nada; os arquivos que ele mudou "
                  f"são {', '.join(mudados[:3]) or 'nenhum'}.")
-        registrar(pedido, plano, mudados, f"NÃO DESFEITO: o Jarvis fechou no meio e o backup estragou ({erro})",
+        registrar(pedido, plano, mudados, f"NÃO DESFEITO: o {marca.NOME_CURTO} fechou no meio e o backup estragou ({erro})",
                   backup)
     except OSError as erro:  # a anotação fica: tento de novo na próxima abertura
         return (f"Uma mudança do Claude no meu código ficou pela metade e eu não consegui desfazer ({erro}). "
@@ -1085,7 +1091,7 @@ def _desfazer_interrompida() -> str:
     else:
         aviso = _aviso_de_desfeita(pasta, antes, mudados, feito, backup)
         if mudados:
-            registrar(pedido, plano, mudados, "DESFEITO: o Jarvis fechou no meio da mudança", backup)
+            registrar(pedido, plano, mudados, f"DESFEITO: o {marca.NOME_CURTO} fechou no meio da mudança", backup)
     dados["aviso"] = aviso
     try:
         _anotar(dados)
@@ -1097,12 +1103,12 @@ def _desfazer_interrompida() -> str:
 def _aviso_de_desfeita(pasta: Path, antes: dict[str, str], mudados: list[str], feito: Restauro,
                        backup: Path) -> str:
     if not mudados:
-        return ("Uma mudança do Claude no meu código foi interrompida porque o Jarvis fechou ou foi religado no "
-                "meio, mas ele ainda não tinha mudado nenhum arquivo.")
+        return (f"Uma mudança do Claude no meu código foi interrompida porque o {marca.NOME_CURTO} fechou ou foi "
+                "religado no meio, mas ele ainda não tinha mudado nenhum arquivo.")
     agora = fotografar(pasta)
     sobrou = [n for n in mudados if n not in feito.deixados and agora.get(n) != antes.get(n)]
-    aviso = ("Uma mudança do Claude no meu código ficou pela metade porque o Jarvis fechou ou foi religado no "
-             "meio, e eu desfiz: o código voltou a ser como era antes dela.")
+    aviso = (f"Uma mudança do Claude no meu código ficou pela metade porque o {marca.NOME_CURTO} fechou ou foi "
+             "religado no meio, e eu desfiz: o código voltou a ser como era antes dela.")
     if feito.deixados:
         aviso += f" Não mexi em {', '.join(feito.deixados[:3])}, que mudou depois."
     if sobrou:
@@ -1134,7 +1140,7 @@ def aplicar_plano(plano: str, sessao: str | None, pedido: str) -> Resultado:
     try:
         trava = _travar_codigo()  # e nenhum outro Jarvis aberto mexe no código até o fim
         if trava is None:
-            return Resultado(False, "Outro Jarvis aberto neste PC está mudando o código agora; espere ele terminar.")
+            return Resultado(False, f"Outro {marca.NOME_CURTO} aberto neste PC está mudando o código agora; espere ele terminar.")
         try:
             return _aplicar_plano(plano, sessao, pedido)
         finally:
@@ -1163,7 +1169,7 @@ def _aplicar_plano(plano: str, sessao: str | None, pedido: str) -> Resultado:
 def _aplicar_e_conferir(pasta: Path, antes: dict[str, str], backup: Path, falhas_antes, plano: str,
                         sessao: str | None, pedido: str) -> Resultado:
     permitir = [*LEITURA, *_ler(pasta), f"Edit({regra_de_pasta(pasta)}/**)"]
-    texto = _regras() + REGRAS_APLICAR.format(plano=plano.strip())
+    texto = _regras() + marca.aplicar(REGRAS_APLICAR).format(plano=plano.strip())
     resposta = rodar(texto, permitir, pasta, sessao=sessao, turnos=MAX_TURNOS + 20)
     if not resposta.ok and sessao and "session" in resposta.erro.lower():
         resposta = rodar(texto, permitir, pasta, turnos=MAX_TURNOS + 20)  # a conversa do plano sumiu
@@ -1185,7 +1191,7 @@ def _aplicar_e_conferir(pasta: Path, antes: dict[str, str], backup: Path, falhas
         if feito.copia:
             # o que alguém salvou na pasta do Jarvis enquanto o Claude trabalhava também voltou: fica guardado
             fala += (f" A versão que estava no lugar ficou guardada em Backups, no arquivo {feito.copia.name}, "
-                     "caso você tenha mexido em algum arquivo do Jarvis enquanto o Claude trabalhava.")
+                     f"caso você tenha mexido em algum arquivo do {marca.NOME_CURTO} enquanto o Claude trabalhava.")
         registro = registrar(pedido, plano, mudados, f"DESFEITO: {motivo}", backup)
         guardado = f". O que estava no lugar ficou guardado em {feito.copia}" if feito.copia else ""
         return Resultado(False, fala, f"Registro: {registro}{guardado}")
@@ -1217,7 +1223,7 @@ def _aplicar_e_conferir(pasta: Path, antes: dict[str, str], backup: Path, falhas
     registro = registrar(pedido, plano, mudados, f"APLICADO ({situacao})", backup)
     # o X da janela só esconde o Jarvis perto do relógio: reabrindo assim, o antigo continuaria ligado
     fala = (f"Pronto: o Claude mudou {len(mudados)} arquivo(s) e {situacao}. As mudanças valem quando você "
-            f"fechar o Jarvis de verdade, no ícone perto do relógio, em Quit JARVIS, e abrir de novo. "
+            f"fechar o {marca.NOME_CURTO} de verdade, no ícone perto do relógio, em Sair do {marca.NOME}, e abrir de novo. "
             f"{resposta.fala}").strip()
     return Resultado(True, fala, f"Arquivos: {', '.join(mudados)}. Backup: {backup}. Registro: {registro}")
 

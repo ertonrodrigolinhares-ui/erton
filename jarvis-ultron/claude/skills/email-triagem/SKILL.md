@@ -4,7 +4,7 @@ description: "Triagem de e-mails: separa a caixa em urgente, clientes e o resto,
 ---
 # Email triagem
 
-> Agente do Jarvis Ultron rodando no Claude Code (veio do Hermes). Aqui o Claude **não tem** conectores
+> Agente do Luiz Conrado rodando no Claude Code (veio do Hermes). Aqui o Claude **não tem** conectores
 > (Gmail, Agenda, Metricool, Meta), navegador nem comandos: ele pesquisa na internet, lê os arquivos de
 > `Documentos\Jarvis Ultron` e escreve só em `Documentos\Jarvis Ultron\Claude`. Onde este agente falar
 > em publicar, agendar, enviar, usar conectores ou o Hermes, prepare só o rascunho ou o relatório (em
@@ -13,7 +13,7 @@ description: "Triagem de e-mails: separa a caixa em urgente, clientes e o resto,
 Triagem de e-mails: separa a caixa em urgente, clientes e o resto, e sugere respostas prontas (sem enviar).
 
 ## Requisitos
-- Gmail conectado ao Hermes: rode o 'Ligar Gmail' na pasta do Jarvis (usa uma senha de app do Google).
+- Gmail conectado ao Hermes: rode o 'Ligar Gmail' na pasta do Luiz (usa uma senha de app do Google).
 
 ## Procedimento
 1. Leia os e-mails não lidos e separe em: urgente, de cliente, financeiro, e outros.

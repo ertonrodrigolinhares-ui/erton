@@ -32,6 +32,8 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
+from core import marca
+
 USA_IA_NUVEM = True  # a descrição vai para o Veo (Google): desligada no modo privado
 
 AVISO_MODO_PRIVADO = ("No modo privado não faço vídeos, porque a descrição iria para a IA de vídeo do Google, "
@@ -277,33 +279,33 @@ def _retomar(jarvis, pedidos: list[dict], cliente=None, dormir=time.sleep, agora
     for pedido in pedidos:
         nome = str(pedido.get("nome") or "")
         if not nome:  # fechou enquanto pedia: não dá para saber se o Google recebeu
-            _para_pendentes("", "o Jarvis fechou enquanto pedia")
+            _para_pendentes("", f"o {marca.NOME_CURTO} fechou enquanto pedia")
             _desanotar(pedido["id"])
-            _avisar(jarvis, "Quando o Jarvis fechou, um vídeo pago estava sendo pedido ao Google e pode ter sido "
+            _avisar(jarvis, f"Quando o {marca.NOME_CURTO} fechou, um vídeo pago estava sendo pedido ao Google e pode ter sido "
                             "cobrado. Antes de pedir outro, confira na conta do Google.")
             continue
         if privado:  # buscar seria falar com o Google: fica anotado para o modo normal
             para_depois += 1
             continue
-        _log(jarvis, "SYS: 🎬 Buscando o vídeo pago que ficou pela metade quando o Jarvis fechou ou religou...")
+        _log(jarvis, f"SYS: 🎬 Buscando o vídeo pago que ficou pela metade quando o {marca.NOME_CURTO} fechou ou religou...")
         try:
             from google.genai import types
 
             arquivo = _terminar(cliente or _cliente(), types.GenerateVideosOperation(name=nome), dormir, agora)
         except Exception as erro:
-            aviso = ("O vídeo pago que ficou pela metade quando o Jarvis fechou ou religou não chegou: "
+            aviso = (f"O vídeo pago que ficou pela metade quando o {marca.NOME_CURTO} fechou ou religou não chegou: "
                      f"{_explicar(erro)}.")
             if not isinstance(erro, VideoJaPedido):  # o VideoJaPedido já anotou e já fala da cobrança
                 _para_pendentes(nome, type(erro).__name__)
                 aviso += " Ele pode ter sido cobrado; anotei o número do pedido em pendentes.txt, na pasta de vídeos."
         else:
             _abrir(arquivo)
-            aviso = ("O vídeo pago que ficou pela metade quando o Jarvis fechou ou religou ficou pronto e já abri "
+            aviso = (f"O vídeo pago que ficou pela metade quando o {marca.NOME_CURTO} fechou ou religou ficou pronto e já abri "
                      f"para você. Está salvo em {arquivo.parent}.")
         _desanotar(pedido["id"])
         _avisar(jarvis, aviso)
     if para_depois:
-        _avisar(jarvis, "Um vídeo pago ficou pela metade quando o Jarvis religou. No modo privado não falo com o "
+        _avisar(jarvis, f"Um vídeo pago ficou pela metade quando o {marca.NOME_CURTO} religou. No modo privado não falo com o "
                         "Google; busco o vídeo quando você voltar ao modo normal.")
 
 

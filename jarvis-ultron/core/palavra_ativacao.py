@@ -24,6 +24,8 @@ from typing import Callable
 
 import numpy as np
 
+from core import marca
+
 TAXA = 16000
 QUADRO = 1280  # 80 ms, o tamanho que o detector espera
 PRE_GRAVACAO = 1.5  # segundos guardados antes da ativação (para não cortar o começo do pedido)
@@ -144,7 +146,7 @@ class PortaoDeVoz:
         except Exception as erro:
             print(f"[Ativação] Detector indisponível ({erro}); ouvindo sempre.")
             if avisar:
-                avisar("SYS: Palavra de ativação indisponível; o Jarvis vai ouvir sempre.")
+                avisar(f"SYS: Palavra de ativação indisponível; o {marca.NOME_CURTO} vai ouvir sempre.")
             return cls(None, ativo=False, avisar=avisar)
         chamada = _ligado("JARVIS_PALAVRA_ATIVACAO")
         portao = cls(detector, ativo=chamada, limiar=_numero("JARVIS_SENSIBILIDADE", 0.5),

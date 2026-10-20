@@ -26,13 +26,13 @@ try {
 } catch {
     Write-Host ""
     Write-Host "Nao consegui mudar o arquivo .env (ele pode estar somente leitura ou aberto em outro" -ForegroundColor Red
-    Write-Host "programa). O Jarvis continua no Gemma 4. Feche o Jarvis e rode o 'Voltar para o Gemini' de novo." -ForegroundColor Red
+    Write-Host "programa). O Luiz Conrado continua no Gemma 4. Feche o Luiz Conrado e rode o 'Voltar para o Gemini' de novo." -ForegroundColor Red
     Write-Host ("Detalhe: " + $_.Exception.Message)
     Read-Host "Aperte Enter para fechar"
     exit 1
 }
-Write-Host "O Jarvis voltou a usar o Gemini como cerebro." -ForegroundColor Green
-Write-Host "Se o Jarvis estiver aberto (ou no icone perto do relogio), feche de verdade: botao direito"
-Write-Host "no icone > Quit JARVIS. Depois abra o 'Iniciar Jarvis Ultron'."
+Write-Host "O Luiz Conrado voltou a usar o Gemini como cerebro." -ForegroundColor Green
+Write-Host "Se o Luiz Conrado estiver aberto (ou no icone perto do relogio), feche de verdade: botao direito"
+Write-Host "no icone > Sair do Luiz Conrado. Depois abra o 'Iniciar Jarvis Ultron'."
 Write-Host "Para usar o Gemma 4 de novo, rode o 'Instalar Gemma 4' (ele pula o que ja esta pronto)."
 Read-Host "Aperte Enter para fechar"

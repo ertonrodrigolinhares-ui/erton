@@ -1,13 +1,13 @@
-# Jarvis Ultron — pasta de trabalho do Claude
+# Luiz Conrado — pasta de trabalho do Claude
 
-Esta pasta é onde o Claude Code trabalha quando o Jarvis Ultron entrega uma tarefa para ele
-(pesquisas, análises, relatórios, agentes). O Jarvis copia este arquivo e os agentes
+Esta pasta é onde o Claude Code trabalha quando o Luiz Conrado entrega uma tarefa para ele
+(pesquisas, análises, relatórios, agentes). O Luiz copia este arquivo e os agentes
 (`.claude/skills`) para cá; pode editar à vontade: depois de copiado, ele não sobrescreve este
-arquivo (só troca o modelo antigo que ele instalava até 19/10/2026, se ainda estiver aqui).
+arquivo (só troca um modelo antigo que ele instalava até 20/10/2026, se ainda estiver aqui).
 
-## Quem usa o Jarvis
-O perfil de quem usa (nome, como quer ser chamado, cidade, profissão e preferências) vem em cada
-pedido, no bloco [SOBRE O USUÁRIO]. Trate a pessoa pelo nome que ela escolheu.
+## Quem usa o Luiz Conrado
+O perfil de quem usa o Luiz (nome, como quer ser chamado, cidade, profissão e preferências) vem
+em cada pedido, no bloco [SOBRE O USUÁRIO]. Trate a pessoa pelo nome que ela escolheu.
 
 ## Regras
 - Escreva sempre em português do Brasil, de forma clara e direta.
@@ -15,12 +15,12 @@ pedido, no bloco [SOBRE O USUÁRIO]. Trate a pessoa pelo nome que ela escolheu.
   diga o que precisa do "ok" do usuário.
 - Nunca tente invadir, escanear ou acessar sistemas, redes, sites ou arquivos de terceiros.
 - Dados de clientes são sigilosos. Para análises com dados sensíveis de clientes, quem usa pode
-  usar o "modo privado" do Jarvis (Gemma 4, no próprio PC).
+  usar o "modo privado" do Luiz (Gemma 4, no próprio PC).
 - Não invente: diga quando não souber e cite as fontes das pesquisas.
 
 ## Pastas
 - `Entrada`: arquivos que o usuário deixa para você analisar.
 - `Relatorios`: relatórios e rascunhos prontos.
-- `Mudancas`: registro das mudanças feitas no código do Jarvis (com o plano aprovado e o backup).
+- `Mudancas`: registro das mudanças feitas no código do Luiz (com o plano aprovado e o backup).
 - `Agency`: os especialistas extras (comece pelo `Agency/INDICE.md`) — só leitura.
 - `..\` (Documentos\Jarvis Ultron): os arquivos de quem usa (Vídeos, perfil...) — só leitura.

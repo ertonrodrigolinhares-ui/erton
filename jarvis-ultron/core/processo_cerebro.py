@@ -9,6 +9,8 @@ from __future__ import annotations
 import os
 import sys
 
+from core import marca
+
 
 def desfazer_mudanca_interrompida() -> None:
     """Uma mudança do Claude no código ficou pela metade (o cérebro antigo foi religado ou caiu no meio)?
@@ -29,7 +31,7 @@ def principal() -> int:
     porta = os.environ.get("JARVIS_PONTE_PORTA", "").strip()
     chave = os.environ.get("JARVIS_PONTE_CHAVE", "").strip()
     if not porta or not chave:
-        print("[Cérebro] Abra o Jarvis pelo 'Iniciar Jarvis Ultron' (este programa é aberto pela tela).")
+        print(f"[Cérebro] Abra o {marca.NOME_CURTO} pelo 'Iniciar Jarvis Ultron' (este programa é aberto pela tela).")
         return 2
     from multiprocessing.connection import Client
 

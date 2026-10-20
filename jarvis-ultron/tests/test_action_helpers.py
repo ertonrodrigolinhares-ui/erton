@@ -550,7 +550,9 @@ class ActionHelperTests(unittest.TestCase):
             target.write_bytes(b"data")
             sidecar = jarvis_file_stamp.write_sidecar_metadata(target, "QA artifact")
             text = sidecar.read_text(encoding="utf-8")
-            self.assertIn("JARVIS FILE PROVENANCE", text)
+            from core import marca
+
+            self.assertIn(f"{marca.NOME.upper()} FILE PROVENANCE", text)
             self.assertNotIn("GEMINI_API_KEY", text)
 
 

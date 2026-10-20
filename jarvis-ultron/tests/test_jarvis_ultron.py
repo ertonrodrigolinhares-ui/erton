@@ -641,7 +641,8 @@ class PonteHermesTests(unittest.TestCase):
             with patch.object(requests, "post", side_effect=requests.exceptions.ConnectionError()):
                 self.assertIn("desligado", hermes_ponte.perguntar("oi"))
             with patch.object(requests, "post", return_value=RespostaHttp(401)):
-                self.assertIn("não reconheceu o Jarvis", hermes_ponte.perguntar("oi"))
+                from core import marca
+                self.assertIn(f"não reconheceu o {marca.NOME_CURTO}", hermes_ponte.perguntar("oi"))
         with patch.dict("os.environ", {"HERMES_API_KEY": ""}):
             self.assertIn("Instalar Hermes", hermes_ponte.perguntar("oi"))
 
@@ -969,6 +970,18 @@ class IdiomaTests(unittest.TestCase):
         self.assertFalse(jarvis._is_explicit_self_quit_transcript("Jarvis, desligar palmas"))
         self.assertIn("Até a próxima", main.SELF_QUIT_GOODBYE)
 
+    def test_desligar_pelo_nome_do_produto(self):
+        # a palavra de ativação continua "Hey Jarvis": "Jarvis" e o nome de core/marca.py valem os dois
+        import main
+        from core import marca
+        jarvis = object.__new__(main.JarvisLive)
+        for fala in (f"desliga o {marca.NOME_CURTO}", f"{marca.NOME}, saia do ar", "desliga o Jarvis",
+                     f"shut down {marca.NOME_CURTO}", f"{marca.NOME}, go offline", f"goodbye {marca.NOME_CURTO}"):
+            self.assertTrue(jarvis._is_explicit_self_quit_transcript(fala), fala)
+        self.assertFalse(jarvis._is_explicit_self_quit_transcript(f"{marca.NOME_CURTO}, desligar palmas"))
+        self.assertIn(f"O {marca.NOME_CURTO} está saindo do ar", main.SELF_QUIT_GOODBYE)
+        self.assertNotIn("senhor", main.SELF_QUIT_GOODBYE)  # o produto não sabe o gênero de quem usa
+
 
 class BotoesDeModoTests(unittest.TestCase):
     def test_botao_troca_o_modo_na_hora_sem_ir_para_a_ia(self):
@@ -1149,7 +1162,8 @@ class EnvArquivoTests(unittest.TestCase):
         self.assertLess(texto.index("WriteAllText"), catch)
         self.assertIn("exit 1", texto[catch:fim_catch])
         self.assertIn("Read-Host", texto[catch:fim_catch])
-        self.assertGreater(texto.index("O Jarvis voltou a usar o Gemini"), fim_catch)  # sucesso só depois
+        from core import marca
+        self.assertGreater(texto.index(f"O {marca.NOME} voltou a usar o Gemini"), fim_catch)  # sucesso só depois
         bat = (raiz / "Voltar para o Gemini.bat").read_bytes().decode("ascii")
         self.assertIn("if errorlevel 1 pause\r\n", bat)
 
@@ -2698,6 +2712,14 @@ class ModoUltronPorVozTests(unittest.TestCase):
         jarvis._on_text_command("modo Jarvis")
         jarvis._on_text_command("Jarvis, sair do modo Ultron.")
         self.assertEqual(jarvis.pedidos, [False, True, True])
+
+    def test_modo_com_o_nome_do_produto_tambem_fecha(self):
+        from core import marca
+        jarvis = self._jarvis()
+        jarvis._on_text_command(f"modo {marca.NOME_CURTO}")
+        jarvis._on_text_command(f"{marca.NOME_CURTO}, modo Ultron")  # tem o nome, mas é para ABRIR
+        jarvis._on_text_command("modo Jarvis")  # continua fechando
+        self.assertEqual(jarvis.pedidos, [True, False, True])
 
     def test_desativar_ou_encerrar_o_modo_ultron_fecha(self):
         jarvis = self._jarvis()

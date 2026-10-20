@@ -11,6 +11,7 @@ from pathlib import Path
 
 from actions.jarvis_file_stamp import mark_created_file
 from actions.safe_text_entry import safe_type_text
+from core import marca
 
 try:
     import pyautogui
@@ -221,7 +222,7 @@ def _screenshot(save_path: str | None = None) -> str:
     path = _safe_screenshot_path(save_path)
     img  = pyautogui.screenshot()
     img.save(str(path))
-    mark_created_file(path, "Screenshot captured by JARVIS computer_control.")
+    mark_created_file(path, f"Screenshot captured by {marca.NOME} computer_control.")
     return f"Screenshot saved: {path}"
 
 

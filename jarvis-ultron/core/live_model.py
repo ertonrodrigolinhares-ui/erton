@@ -6,6 +6,8 @@ import json
 import os
 from pathlib import Path
 
+from core import marca
+
 
 DEFAULT_LIVE_MODEL = "models/gemini-2.5-flash-native-audio-preview-12-2025"
 LIVE_ACTION = "bidiGenerateContent"

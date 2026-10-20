@@ -1,4 +1,4 @@
-# O Jarvis como produto: a ideia, a partir do que já existe
+# O Luiz Conrado como produto: a ideia, a partir do que já existe
 
 Escrito em 20/10/2026 a partir do código que está no repositório, não de uma ideia nova. Tudo o que
 está em "já existe" funciona hoje; o resto é o que falta para vender. Os pontos marcados com
@@ -14,7 +14,7 @@ age sem o "ok" da pessoa**, com um modo privado em que nada sai do computador.
 
 Profissionais liberais e donos de pequenos negócios que vivem no PC, querem um "assistente de verdade"
 em português e se preocupam com privacidade. Não é um produto de contabilidade nem de nenhum setor:
-o perfil (profissão, preferências e objetivos) é o que adapta o Jarvis a cada cliente.
+o perfil (profissão, preferências e objetivos) é o que adapta o Luiz a cada cliente.
 
 ## O que já existe (e vende)
 
@@ -26,7 +26,7 @@ o perfil (profissão, preferências e objetivos) é o que adapta o Jarvis a cada
 | **Modo privado** | Gemma 4 no PC (Ollama) + Whisper local: conversa e executa tarefas sem internet para a IA; nada sai do computador. Troca por voz. |
 | **Reserva** | Se o Gemini cair, continua pelo Groq (ou outra empresa) com voz da Microsoft. |
 | **Claude chefe** | Pesquisas, análises de arquivos, relatórios, 282 especialistas (finanças, vendas, marketing, gestão, jurídico...), e mudanças no próprio código com plano, "ok", backup e desfazer. Usa a assinatura do próprio cliente. |
-| **Hermes** | Agentes com modelos grátis (Nous): posts para redes sociais via Metricool (só publica com "ok"), leitura de painéis no navegador, Telegram (fala com o Jarvis do celular). |
+| **Hermes** | Agentes com modelos grátis (Nous): posts para redes sociais via Metricool (só publica com "ok"), leitura de painéis no navegador, Telegram (fala com o Luiz do celular). |
 | **Automações** | Lembretes falados, rotinas salvas por voz, vídeos (Google Veo, com preço dito antes), imagens, backup da memória em HD externo, proteção do PC, análise de segurança e reputação de sites, vigia do Wi-Fi, autoconserto e autodiagnóstico. Uma automação nova = um arquivo na pasta. |
 | **Agentes prontos** | 22 agentes em português (briefing do dia, triagem de e-mails, resumo de reunião, proposta comercial, controle de gastos, viagens, investimentos, agenda...). Veja a seção "Agentes" abaixo. |
 | **Segurança (diferencial)** | O "ok" é conferido no código, numa fala nova depois da pergunta: nada é publicado, enviado, comprado, digitado, apagado nem desligado sem ele. As ferramentas herdadas que agiam sozinhas foram desligadas. O mapa das travas está em `core/SEGURANCA.md`, com testes. |
@@ -38,7 +38,8 @@ o perfil (profissão, preferências e objetivos) é o que adapta o Jarvis a cada
 - Os 282 especialistas entraram sem pesar (índices lidos só quando precisa).
 - A empresa do dono saiu de tudo; o perfil do cliente substituiu o nome fixo no Gemini, no Gemma, no
   Groq, no Claude, no Hermes e nas telas.
-- O nome do produto ficou num lugar só (`core/marca.py`), com o guia `docs/RENOMEAR.md`.
+- O nome do produto ficou num lugar só (`core/marca.py`), com o guia `docs/RENOMEAR.md`, e em 20/10/2026 o
+  assistente passou a se chamar **Luiz Conrado** (telas, falas, cérebros, Claude, Hermes e manuais).
 - Código morto e peças sem uso saíram (etapa 5 da reorganização).
 
 ## Agentes: o que é do produto e o que é seu **(decisão sua)**
@@ -53,16 +54,17 @@ Dos 22 agentes do Claude (e os 6 do Hermes), três grupos:
   conteudo-atleta, rotina-atleta-8h e geekie-pendencias (e as rotinas automáticas das 8h e do Geekie
   que o instalador do Hermes cria). **Feito:** estão em `pacotes/erton`, ligados só no seu PC pela linha
   `JARVIS_PACOTE=erton` no `.env`, fora do que o cliente recebe.
-- **De contabilidade, fora do produto** (regra do projeto: o Jarvis não é de contabilidade):
+- **De contabilidade, fora do produto** (regra do projeto: o Luiz não é de contabilidade):
   clientes-grupos, holding-sucessao, prazos-fiscais, legislacao, noticias-setor. **Feito:** também
   estão em `pacotes/erton`.
 
 ## O que falta para vender (na ordem)
 
 1. **Separar o pacote do dono e tirar a contabilidade**: feito (`pacotes/erton`, `JARVIS_PACOTE`).
-2. **Nome e marca** **(decisão sua)**: "Jarvis" e "Ultron" são da Marvel; um produto pago com esses nomes
-   é risco de marca. Trocar é um passo só no código (`core/marca.py`) mais o que `docs/RENOMEAR.md`
-   lista (a palavra "Hey Jarvis" pede um modelo novo de ativação). Ícone e nome da pasta vêm junto.
+2. **Nome e marca**: feito em 20/10/2026: o assistente se chama **Luiz Conrado** (`core/marca.py`; o que
+   ficou à mão está em `docs/RENOMEAR.md`). Falta **(decisão sua)**: a palavra de ativação ("Hey Jarvis"
+   continua, porque outro nome pede um modelo novo), o ícone e os nomes da pasta e dos .bat (`Iniciar
+   Jarvis Ultron`, `Documentos\Jarvis Ultron`), que precisam de migração dos dados do cliente.
 3. **Contas e chaves do cliente**: cada cliente usa a própria chave do Gemini (grátis), do Groq
    (grátis) e a própria assinatura do Claude. As telas já pedem isso. Conferir as regras de uso
    comercial do Google e da Anthropic antes de vender.
@@ -107,7 +109,7 @@ código ficar fechado e o suporte for seu.
 | Fase | O quê | Depende de |
 |---|---|---|
 | 0 (feita) | Tirar a contabilidade; criar o pacote do dono; manual sem exemplos pessoais | Feito em 20/10/2026 |
-| 1 | Nome novo, ícone, repositório privado | Sua decisão de nome e de código fechado |
+| 1 | Nome novo (feito em 20/10/2026: Luiz Conrado); ícone; repositório privado | Sua decisão de ícone e de código fechado |
 | 2 | Memória em Documentos; instalador único; atualização sem perder dados | Trabalho |
 | 3 | Tela toda em português; aposentar a tela antiga (etapas 6 a 8 e 19 da reorganização) | Trabalho + alguns dias de uso por etapa |
 | 4 | Termos de uso; piloto com 3 a 5 clientes | Clientes de confiança |
@@ -115,6 +117,7 @@ código ficar fechado e o suporte for seu.
 
 ## Decisões que só você pode tomar
 
-1. Nome novo do produto (e se "Hey Jarvis" continua como palavra de ativação por enquanto).
+1. Palavra de ativação: "Hey Jarvis" continua por enquanto (o nome novo, Luiz Conrado, já está no
+   produto); trocar pede um modelo novo. E o ícone.
 2. Código fechado (repositório privado) ou venda de serviço com código aberto?
 3. Público-alvo e preço.

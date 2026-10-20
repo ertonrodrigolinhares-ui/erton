@@ -4,7 +4,7 @@ description: "Investimentos: acompanha cotações e notícias dos ativos escolhi
 ---
 # Investimentos
 
-> Agente do Jarvis Ultron rodando no Claude Code (veio do Hermes). Aqui o Claude **não tem** conectores
+> Agente do Luiz Conrado rodando no Claude Code (veio do Hermes). Aqui o Claude **não tem** conectores
 > (Gmail, Agenda, Metricool, Meta), navegador nem comandos: ele pesquisa na internet, lê os arquivos de
 > `Documentos\Jarvis Ultron` e escreve só em `Documentos\Jarvis Ultron\Claude`. Onde este agente falar
 > em publicar, agendar, enviar, usar conectores ou o Hermes, prepare só o rascunho ou o relatório (em

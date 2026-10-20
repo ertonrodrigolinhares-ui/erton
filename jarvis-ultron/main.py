@@ -124,19 +124,24 @@ QUIET_MODE_RESULT = ("Done. The user already heard a chime and sees the mode on 
 # JARVIS_CENA=0) o sinal é a linha "🔒 Modo privado ligado" que a ponte escreve no registro ao trocar.
 ESPERE_O_MODO_PRIVADO = "espere o aviso \"🔒 Modo privado ligado\" (na tela azul, o selo 🔒 MODO PRIVADO)"
 SELF_QUIT_GOODBYE = (
-    "Certamente, senhor. Foi um privilégio. O Jarvis está saindo do ar agora. "
+    f"Certamente. Foi um privilégio. O {_marca.NOME_CURTO} está saindo do ar agora. "
     "Até a próxima."
 )
 
+# Jarvis Ultron: como as pessoas chamam o assistente nas falas: "jarvis" (a palavra de ativação continua
+# "Hey Jarvis") e o nome de core/marca.py, o mais longo primeiro
+_NOMES_DO_ASSISTENTE_LISTA = list(_marca.nomes_falados())
+_NOMES_DO_ASSISTENTE = "(?:" + "|".join(re.escape(nome) for nome in _NOMES_DO_ASSISTENTE_LISTA) + ")"
+
 _SELF_QUIT_PATTERNS = tuple(re.compile(pattern, re.IGNORECASE) for pattern in (
-    r"\b(?:quit|close|exit)\s+(?:jarvis|yourself)\b",
-    r"\b(?:shut|turn)\s+(?:jarvis|yourself)\s+(?:down|off)\b",
-    r"\b(?:shut\s+down|turn\s+off|power\s+down)\s+(?:jarvis|yourself)\b",
-    r"\bjarvis\b.{0,36}\b(?:quit|close|exit|shut\s+down|turn\s+off|go\s+offline)\b",
-    r"\b(?:go|take\s+yourself)\s+offline(?:\s+jarvis)?\b",
+    r"\b(?:quit|close|exit)\s+(?:" + _NOMES_DO_ASSISTENTE + r"|yourself)\b",
+    r"\b(?:shut|turn)\s+(?:" + _NOMES_DO_ASSISTENTE + r"|yourself)\s+(?:down|off)\b",
+    r"\b(?:shut\s+down|turn\s+off|power\s+down)\s+(?:" + _NOMES_DO_ASSISTENTE + r"|yourself)\b",
+    r"\b" + _NOMES_DO_ASSISTENTE + r"\b.{0,36}\b(?:quit|close|exit|shut\s+down|turn\s+off|go\s+offline)\b",
+    r"\b(?:go|take\s+yourself)\s+offline(?:\s+" + _NOMES_DO_ASSISTENTE + r")?\b",
     # Jarvis Ultron: em português ("desliga o Jarvis", "Jarvis, saia do ar")
-    r"\b(?:desligue|desliga|desligar|feche|fecha|fechar|encerre|encerra|encerrar)\s+(?:o\s+)?jarvis\b",
-    r"\bjarvis\b.{0,36}\b(?:desligue-se|se\s+desligue|saia\s+do\s+ar|sair\s+do\s+ar)\b",
+    r"\b(?:desligue|desliga|desligar|feche|fecha|fechar|encerre|encerra|encerrar)\s+(?:o\s+)?" + _NOMES_DO_ASSISTENTE + r"\b",
+    r"\b" + _NOMES_DO_ASSISTENTE + r"\b.{0,36}\b(?:desligue-se|se\s+desligue|saia\s+do\s+ar|sair\s+do\s+ar)\b",
 ))
 
 
@@ -205,7 +210,7 @@ def _como_chamar() -> str:
 
 def _load_system_prompt() -> str:
     try:
-        prompt = PROMPT_PATH.read_text(encoding="utf-8").strip()
+        prompt = _marca.aplicar(PROMPT_PATH.read_text(encoding="utf-8")).strip()
         return prompt + "\n\n" + _como_chamar()
     except Exception:
         return (
@@ -258,7 +263,7 @@ TOOL_DECLARATIONS = [
     {
         "name": "listening_mode",
         "description": (
-            "Switches how JARVIS listens. 'maos_livres' (hands-free): answers everything the user says, "
+            f"Switches how {_marca.NOME} listens. 'maos_livres' (hands-free): answers everything the user says, "
             "no wake word needed. 'chamada' (call mode): answers only after the user says 'Hey Jarvis'. "
             "Use when the user says 'modo mãos livres' or 'modo chamada'."
         ),
@@ -287,7 +292,7 @@ TOOL_DECLARATIONS = [
     {
         "name": "self_diagnosis",
         "description": (
-            "Runs JARVIS's self-diagnosis: checks internet, the Gemini key and models, the Groq backup, "
+            f"Runs {_marca.NOME}'s self-diagnosis: checks internet, the Gemini key and models, the Groq backup, "
             "Hermes (agents), microphone, speakers, computer memory/disk, the automation browser and the "
             "wake word. Use when the user asks what is wrong, to check/diagnose the system, or why something "
             "is not working. Afterwards, tell the user in Portuguese only the problems found and how to fix them."
@@ -297,7 +302,7 @@ TOOL_DECLARATIONS = [
     {
         "name": "hermes_agent",
         "description": (
-            "Sends a task to Hermes, JARVIS's autonomous orchestrator with sub-agents. Use for: social media "
+            f"Sends a task to Hermes, {_marca.NOME}'s autonomous orchestrator with sub-agents. Use for: social media "
             "posts of the user's social media (daily post proposals, Metricool, best time to post, "
             "performance), Meta/Facebook/Instagram ads reports, opening and reading web panels/dashboards "
             "by itself. Examples: 'what are today's posts?', 'how are my ads doing?', 'publish the approved "
@@ -334,8 +339,8 @@ TOOL_DECLARATIONS = [
     {
         "name": "suspend_listening",
         "description": (
-            "Suspends JARVIS for a number of minutes: the microphone is muted and JARVIS stops listening, "
-            "then it unmutes automatically and announces it is back. Use when the user asks JARVIS to be "
+            f"Suspends {_marca.NOME} for a number of minutes: the microphone is muted and {_marca.NOME} stops listening, "
+            f"then it unmutes automatically and announces it is back. Use when the user asks {_marca.NOME} to be "
             "suspended, pause, stay quiet, sleep or stop listening for some time (default 10 minutes)."
         ),
         "parameters": {
@@ -588,7 +593,7 @@ TOOL_DECLARATIONS = [
     },
     {
         "name": "graphics_quality",
-        "description": "Changes JARVIS rendering quality between low, medium, and high.",
+        "description": f"Changes {_marca.NOME} rendering quality between low, medium, and high.",
         "parameters": {
             "type": "OBJECT",
             "properties": {
@@ -604,7 +609,7 @@ TOOL_DECLARATIONS = [
     {
         "name": "jarvis_ui_control",
         "description": (
-            "Changes JARVIS's own interface. Use when the user asks to open or close the Command Center, "
+            f"Changes {_marca.NOME}'s own interface. Use when the user asks to open or close the Command Center, "
             "change the theme or graphics quality, open settings, enter compact mode, toggle fullscreen, or show shortcuts."
         ),
         "parameters": {
@@ -724,7 +729,7 @@ TOOL_DECLARATIONS = [
                 "appearance": {
                     "type": "STRING",
                     "enum": ["auto", "light", "dark"],
-                    "description": "Overall slide appearance. Honor light or dark when requested; auto uses the restrained dark JARVIS style."
+                    "description": f"Overall slide appearance. Honor light or dark when requested; auto uses the restrained dark {_marca.NOME} style."
                 },
                 "transition": {
                     "type": "STRING",
@@ -1207,7 +1212,7 @@ class JarvisLive:
         ):
             self._queue_self_quit_after_farewell()
             outgoing_text = (
-                "[VERIFIED LOCAL SELF-SHUTDOWN] The user explicitly asked JARVIS to quit. "
+                f"[VERIFIED LOCAL SELF-SHUTDOWN] The user explicitly asked {_marca.NOME} to quit. "
                 f'Say exactly: "{SELF_QUIT_GOODBYE}" Do not call a tool and say nothing else.'
             )
         await self.session.send_client_content(
@@ -1294,8 +1299,9 @@ class JarvisLive:
         if re.search(r"\b(?:stop talking|be quiet|cancel|never mind)\b", normalized):
             return False
         if normalized in {
-            "quit", "exit", "shutdown", "shut down", "turn off", "power down",
-            "go offline", "goodbye jarvis", "goodbye jarvis please",
+            "quit", "exit", "shutdown", "shut down", "turn off", "power down", "go offline",
+            *(f"goodbye {nome}" for nome in _NOMES_DO_ASSISTENTE_LISTA),
+            *(f"goodbye {nome} please" for nome in _NOMES_DO_ASSISTENTE_LISTA),
         }:
             return True
         return any(pattern.search(normalized) for pattern in _SELF_QUIT_PATTERNS)
@@ -1305,7 +1311,7 @@ class JarvisLive:
         self._pending_self_quit = True
         self._pending_self_quit_farewell_received = False
         try:
-            self.ui.write_log("SYS: Shutdown queued; waiting for JARVIS's farewell.")
+            self.ui.write_log(f"SYS: Shutdown queued; waiting for {_marca.NOME}'s farewell.")
         except Exception:
             pass
         # A voice model can occasionally omit audio/turn_complete. Do not
@@ -1401,7 +1407,7 @@ class JarvisLive:
                 transcript = str(getattr(self, "_last_input_transcript", "") or "")
 
         if not self._is_explicit_self_quit_transcript(transcript):
-            return "Ignored an unverified shutdown request. JARVIS remains online."
+            return f"Ignored an unverified shutdown request. {_marca.NOME} remains online."
 
         self._queue_self_quit_after_farewell()
         return f'Shutdown queued. Say exactly: "{SELF_QUIT_GOODBYE}"'
@@ -1547,7 +1553,7 @@ class JarvisLive:
             return "na_tela"
         session, loop = getattr(self, "session", None), getattr(self, "_loop", None)
         if session is not None and loop is not None and not getattr(self, "_modo_reserva", False):
-            aviso = (f"[Aviso do Jarvis] {texto}\n"
+            aviso = (f"[Aviso do {_marca.NOME_CURTO}] {texto}\n"
                      "Diga isso ao usuário agora, em português do Brasil, em uma ou duas frases curtas. "
                      "Não chame ferramentas.")
             asyncio.run_coroutine_threadsafe(
@@ -1624,7 +1630,7 @@ class JarvisLive:
                 if bandeja is not None and bandeja.isVisible():
                     from PyQt6.QtWidgets import QSystemTrayIcon
 
-                    bandeja.showMessage(f"Jarvis · {titulo}", texto, QSystemTrayIcon.MessageIcon.Information, 10000)
+                    bandeja.showMessage(f"{_marca.NOME_CURTO} · {titulo}", texto, QSystemTrayIcon.MessageIcon.Information, 10000)
                 mostrar_aviso = getattr(janela, "_show_toast", None)
                 if callable(mostrar_aviso):
                     mostrar_aviso(f"{titulo}: {texto}", "warning")
@@ -1863,10 +1869,14 @@ class JarvisLive:
         texto = " ".join(re.sub(r"[^\w\s]", " ", texto).split())  # tira vírgula, ponto, "!" da transcrição
         if not texto or len(texto.split()) > 6:  # só frases curtas (um pedido, não uma conversa)
             return False
-        if not ("modo ultron" in texto or "modo jarvis" in texto or texto == "ultron"):
+        # "modo <nome>" fecha o painel ("modo jarvis", "modo luiz"...): os nomes de core/marca.py, sem acento
+        # como o texto comparado
+        modo_nome = any("modo " + "".join(c for c in unicodedata.normalize("NFKD", nome) if not unicodedata.combining(c))
+                        in texto for nome in _marca.nomes_falados())
+        if not ("modo ultron" in texto or modo_nome or texto == "ultron"):
             return False
         # "Jarvis, modo Ultron" tem "jarvis" no começo: quem decide fechar é "modo jarvis", não o nome
-        fechar = "modo jarvis" in texto or bool(re.search(
+        fechar = modo_nome or bool(re.search(
             r"\b(sai|sair|saia|fecha|fechar|feche|desliga|desligar|desligue|desativa|desativar|desative"
             r"|encerra|encerrar|encerre|tira|tirar|tire)( do| o)? modo ultron\b", texto))
         # o painel Ultron registra _abrir_ultron; com a tela em outro programa, vai pela ponte
@@ -1900,10 +1910,10 @@ class JarvisLive:
         if destino == "gemma" and not whisper_instalado():
             # sem ouvir no PC, a voz não pode ir para a nuvem: não liga
             self._recusar_troca(destino, "O modo privado não foi ligado: falta a transcrição local da sua voz. "
-                                         "Dê dois cliques em Instalar voz local, na pasta do Jarvis.")
+                                         f"Dê dois cliques em Instalar voz local, na pasta do {_marca.NOME_CURTO}.")
             return
         if destino == "gemma" and not modelo_instalado():
-            self._recusar_troca(destino, "Para o modo privado, primeiro rode o Instalar Gemma 4 na pasta do Jarvis.")
+            self._recusar_troca(destino, f"Para o modo privado, primeiro rode o Instalar Gemma 4 na pasta do {_marca.NOME_CURTO}.")
             return
         if destino == "gemma":
             self.ui.write_log("SYS: 🔒 Entrando no modo privado: o cérebro passa a ser o Gemma 4, no seu PC...")
@@ -1958,13 +1968,13 @@ class JarvisLive:
         um programa só): aqui não dá para religar o cérebro. Diz em voz alta que NÃO trocou."""
         como = " (tire JARVIS_UM_PROCESSO do .env)" if os.environ.get("JARVIS_UM_PROCESSO", "").strip() else ""
         if destino != "gemma":
-            self.ui.write_log("SYS: Modo normal NÃO ligado: com o Jarvis em um programa só, a troca pela voz não "
-                              f"funciona{como}. Use o 'Voltar para o Gemini' e abra o Jarvis de novo.")
+            self.ui.write_log(f"SYS: Modo normal NÃO ligado: com o {_marca.NOME_CURTO} em um programa só, a troca pela voz não "
+                              f"funciona{como}. Use o 'Voltar para o Gemini' e abra o {_marca.NOME_CURTO} de novo.")
             self._falar_aviso("Não consegui voltar ao modo normal por aqui. Use o Voltar para o Gemini e abra "
-                              "o Jarvis de novo.")
+                              f"o {_marca.NOME_CURTO} de novo.")
             return
-        self.ui.write_log("SYS: 🔒 Modo privado NÃO ligado: com o Jarvis em um programa só, a troca pela voz não "
-                          f"funciona{como}. Feche o Jarvis, rode o 'Instalar Gemma 4' e abra de novo.")
+        self.ui.write_log(f"SYS: 🔒 Modo privado NÃO ligado: com o {_marca.NOME_CURTO} em um programa só, a troca pela voz não "
+                          f"funciona{como}. Feche o {_marca.NOME_CURTO}, rode o 'Instalar Gemma 4' e abra de novo.")
         self._falar_aviso("Atenção: o modo privado NÃO foi ligado; continuo usando a nuvem. Desliguei o microfone "
                           "por segurança: não fale dados de clientes agora.")
         mutar = getattr(self.ui, "set_muted_threadsafe", None)
@@ -2046,11 +2056,11 @@ class JarvisLive:
             pronto = self._reserva.aquecer(ferramentas)
             if pronto:
                 self.ui.write_log("SYS: Gemma 4 pronto. Converso e executo as tarefas.")
-                self._falar_reserva("Jarvis online. Estou rodando no Gemma 4, no seu computador.")
+                self._falar_reserva(f"{_marca.NOME_CURTO} online. Estou rodando no Gemma 4, no seu computador.")
             else:
                 self.ui.write_log("SYS: O Gemma 4 não respondeu. Confira se o Ollama está instalado "
                                   "(rode o 'Instalar Gemma 4').")
-                self._falar_reserva("Não consegui ligar o Gemma. Rode o Instalar Gemma 4 na pasta do Jarvis.")
+                self._falar_reserva(f"Não consegui ligar o Gemma. Rode o Instalar Gemma 4 na pasta do {_marca.NOME_CURTO}.")
             checar = getattr(self._reserva, "checar_ouvido", None)
             if callable(checar) and not checar():  # sem o Whisper local: avisa já na abertura
                 self._avisar_sem_ouvido()
@@ -2236,7 +2246,7 @@ class JarvisLive:
         loop = asyncio.get_running_loop()
         self._suspensao = loop.call_later(
             minutos * 60, lambda: asyncio.ensure_future(self._voltar_da_suspensao()))
-        self.ui.write_log(f"SYS: Jarvis suspenso por {minutos} minuto(s).")
+        self.ui.write_log(f"SYS: {_marca.NOME_CURTO} suspenso por {minutos} minuto(s).")
         return (f"Microphone muted for {minutos} minute(s). Tell the user, in one short sentence in "
                 f"Portuguese, that you are suspended and will be back in {minutos} minute(s).")
 
@@ -2282,7 +2292,7 @@ class JarvisLive:
             return types.FunctionResponse(
                 id=fc.id,
                 name=name,
-                response={"result": "Startup sequence active. Try this action again when JARVIS is ready."},
+                response={"result": f"Startup sequence active. Try this action again when {_marca.NOME} is ready."},
             )
 
         from core.qa_mode import guard_tool_call, qa_block_message
@@ -2384,7 +2394,7 @@ class JarvisLive:
 
             elif name in FERRAMENTAS_DESLIGADAS:
                 # desligada de propósito (Etapa 3): responde e não chama nada
-                self.ui.write_log(f"SYS: ⛔ {name} está desligada no Jarvis.")
+                self.ui.write_log(f"SYS: ⛔ {name} está desligada no {_marca.NOME_CURTO}.")
                 result = resposta_de_desligada(name)
 
             elif name == "email_control":
@@ -2448,7 +2458,7 @@ class JarvisLive:
                 if quality not in {"low", "medium", "high"}:
                     raise ValueError("Graphics quality must be low, medium, or high.")
                 self.ui.set_graphics_quality(quality)
-                result = f"JARVIS graphics quality changed to {quality}."
+                result = f"{_marca.NOME} graphics quality changed to {quality}."
 
             elif name == "jarvis_ui_control":
                 action = str(args.get("action") or "").strip().lower()
@@ -2456,18 +2466,18 @@ class JarvisLive:
                     theme = str(args.get("theme") or "").strip().lower()
                     allowed = {"arc_reactor", "stealth_red", "vibranium_purple", "nanotech_gold", "platinum"}
                     if theme not in allowed:
-                        raise ValueError(f"Unknown JARVIS theme: {theme or 'missing'}")
+                        raise ValueError(f"Unknown {_marca.NOME} theme: {theme or 'missing'}")
                     self.ui.set_theme(theme)
-                    result = f"JARVIS theme changed to {theme.replace('_', ' ')}."
+                    result = f"{_marca.NOME} theme changed to {theme.replace('_', ' ')}."
                 elif action == "change_graphics_quality":
                     quality = str(args.get("graphics_quality") or "").strip().lower()
                     if quality not in {"low", "medium", "high"}:
                         raise ValueError(f"Unknown graphics quality: {quality or 'missing'}")
                     self.ui.set_graphics_quality(quality)
-                    result = f"JARVIS graphics quality changed to {quality}."
+                    result = f"{_marca.NOME} graphics quality changed to {quality}."
                 else:
                     self.ui.handle_ui_command(action)
-                    result = f"JARVIS interface action completed: {action.replace('_', ' ')}."
+                    result = f"{_marca.NOME} interface action completed: {action.replace('_', ' ')}."
 
             elif name == "deep_research":
                 r = request_deep_research(parameters=args, player=self.ui, speak=self.speak)
@@ -2834,7 +2844,7 @@ class JarvisLive:
                 # Modo privado sem o Gemma: NUNCA cai para o Gemini (a tela mostra MODO PRIVADO).
                 # Fica parado até ele pedir o modo normal (digitado) ou fechar o Jarvis.
                 aviso = ("Modo privado: não consegui ligar o Gemma 4, e não vou usar a nuvem. Rode o Instalar "
-                         "Gemma 4 na pasta do Jarvis, ou digite 'modo normal' para voltar ao Gemini.")
+                         f"Gemma 4 na pasta do {_marca.NOME_CURTO}, ou digite 'modo normal' para voltar ao Gemini.")
                 self.ui.write_log(f"ERR: 🔒 {aviso}")
                 from actions.tts_engine import falar_com_voz_do_windows
 
@@ -2898,7 +2908,7 @@ class JarvisLive:
                     if self._modo_reserva:
                         self._desativar_modo_reserva()
                     self.ui.set_state("LISTENING")
-                    self.ui.write_log("SYS: JARVIS online.")
+                    self.ui.write_log(f"SYS: {_marca.NOME} online.")
                     if not self.cloud_safe:
                         try:
                             jarvis_status.write_status({
@@ -2996,7 +3006,7 @@ _AVISOS_EM_PORTUGUES = {
     "Private mode is on, so nothing is sent to Claude": ("No modo privado nada vai para o Claude. Diga "
                                                          "'modo normal' para usar os agentes."),
     "Claude Code is not installed": ("O Claude ainda não está instalado. Dê dois cliques em 'Instalar Claude' "
-                                     "na pasta do Jarvis."),
+                                     f"na pasta do {_marca.NOME_CURTO}."),
 }
 
 

@@ -64,8 +64,8 @@ Titulo "1/4  Criar o seu robo no Telegram"
 Write-Host "Vai abrir o @BotFather (o criador oficial de robos do Telegram)."
 Write-Host "  1. Clique em INICIAR (ou mande /start)."
 Write-Host "  2. Mande:  /newbot"
-Write-Host "  3. Nome do robo: por exemplo  Jarvis Hermes"
-Write-Host "  4. Usuario do robo: precisa terminar em 'bot', por exemplo  jarvis_erton_bot"
+Write-Host "  3. Nome do robo: por exemplo  Luiz Conrado Hermes"
+Write-Host "  4. Usuario do robo: precisa terminar em 'bot', por exemplo  luiz_conrado_bot"
 Write-Host "  5. Ele responde com um CODIGO (token), parecido com  123456789:ABCdef..."
 Write-Host "NUNCA mande esse codigo para ninguem." -ForegroundColor Yellow
 Start-Process "https://t.me/BotFather"
@@ -99,7 +99,7 @@ while ($usuario -notmatch '^\d{5,15}$') {
 }
 
 # ---------------------------------------------------------------- 3. Gravar no perfil jarvis
-Titulo "3/4  Ligando o Telegram ao Hermes do Jarvis"
+Titulo "3/4  Ligando o Telegram ao Hermes do Luiz"
 $envPerfil = Join-Path $perfil ".env"
 $chaves = Ler-Env $envPerfil
 $chaves["TELEGRAM_BOT_TOKEN"] = $token
@@ -120,7 +120,7 @@ if ($LASTEXITCODE -ne 0) { & $hermes gateway start }
 Start-Sleep -Seconds 15
 
 try {
-    $texto = "Jarvis Ultron: Telegram conectado ao Hermes. Mande 'oi' aqui para testar."
+    $texto = "Luiz Conrado: Telegram conectado ao Hermes. Mande 'oi' aqui para testar."
     Invoke-RestMethod -TimeoutSec 15 -Method Post -Uri "https://api.telegram.org/bot$token/sendMessage" `
         -Body @{ chat_id = $usuario; text = $texto } | Out-Null
     Write-Host "Mandei uma mensagem de teste para voce no Telegram." -ForegroundColor Green
@@ -141,5 +141,5 @@ Write-Host ""
 Write-Host "PRONTO!" -ForegroundColor Green
 Write-Host "No Telegram, abra o robo @$nomeRobo, clique em INICIAR e mande: oi"
 Write-Host "Depois peca tarefas, por exemplo: 'quais sao os melhores horarios para postar esta semana?'"
-Write-Host "Publicar, agendar ou mexer em anuncios continua precisando do seu 'ok' dado ao Jarvis."
+Write-Host "Publicar, agendar ou mexer em anuncios continua precisando do seu 'ok' dado ao Luiz."
 Sair 0

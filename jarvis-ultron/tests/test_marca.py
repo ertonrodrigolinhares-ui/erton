@@ -1,4 +1,4 @@
-"""O nome do produto vem de core/marca.py: trocar NOME e NOME_CURTO lá renomeia o Jarvis nos prompts
+"""O nome do produto vem de core/marca.py: trocar NOME e NOME_CURTO lá renomeia o assistente nos prompts
 dos cérebros, no Claude chefe, no Hermes e nas telas. O docs/RENOMEAR.md diz o que ainda é trocado à mão."""
 
 import os
@@ -31,9 +31,9 @@ class MarcaTests(unittest.TestCase):
             troca.stop()
 
     def test_nome_de_hoje(self):
-        self.assertEqual((marca.NOME, marca.NOME_CURTO), ("Jarvis Ultron", "Jarvis"))
+        self.assertEqual((marca.NOME, marca.NOME_CURTO), ("Luiz Conrado", "Luiz"))
         self.assertEqual(marca.TITULO_DA_JANELA, marca.NOME)
-        self.assertEqual(marca.aplicar("o __MARCA__ (__MARCA_CURTA__)"), "o Jarvis Ultron (Jarvis)")
+        self.assertEqual(marca.aplicar("o __MARCA__ (__MARCA_CURTA__)"), "o Luiz Conrado (Luiz)")
 
     def test_a_tela_e_a_trava_da_janela_usam_o_mesmo_titulo(self):
         from actions import computer_settings as cs
@@ -50,7 +50,8 @@ class MarcaTests(unittest.TestCase):
 
         soul = (RAIZ / "hermes" / "SOUL.md").read_text(encoding="utf-8")
         for texto in (INSTRUCOES, INSTRUCOES_GEMMA, chefe.REGRAS, chefe.REGRAS_TAREFA, chefe.REGRAS_PLANO, soul):
-            self.assertNotIn("Jarvis Ultron", texto)
+            for nome in ("Jarvis Ultron", marca.NOME):  # nem o nome velho nem o de hoje escritos à mão
+                self.assertNotIn(nome, texto)
             self.assertIn("__MARCA", texto)
 
     def test_trocar_o_nome_renomeia_cerebros_claude_e_hermes(self):
@@ -74,7 +75,7 @@ class MarcaTests(unittest.TestCase):
             self.assertIn("Você é o Atlas Assistente, o agente principal de quem usa o Atlas.", soul)
         for texto in (chefe._regras(), CerebroGemma(cliente=object()).mensagens[0]["content"], soul):
             self.assertNotIn("__MARCA", texto)
-        self.assertIn("Jarvis Ultron", chefe._regras())  # de volta ao nome de hoje
+        self.assertIn(marca.NOME, chefe._regras())  # de volta ao nome de hoje
 
     def test_guia_de_renomear_existe_e_cita_o_que_fica_a_mao(self):
         guia = (RAIZ / "docs" / "RENOMEAR.md").read_text(encoding="utf-8")

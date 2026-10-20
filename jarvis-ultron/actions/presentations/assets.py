@@ -8,6 +8,8 @@ import time
 from pathlib import Path
 from typing import Any, Callable
 
+from core import marca
+
 from .models import PresentationRequest, SourceBundle
 
 
@@ -114,7 +116,7 @@ def generate_planned_assets(
     if _image_quota_cooldown_active():
         _resolve_unbuilt_visuals(plan, prompts, [])
         warnings.append(
-            "Gemini image generation is in a short quota cooldown. JARVIS skipped new image "
+            f"Gemini image generation is in a short quota cooldown. {marca.NOME} skipped new image "
             "requests and used a clean shape-based layout instead."
         )
         return lookup, warnings
@@ -158,7 +160,7 @@ def generate_planned_assets(
                 if _is_quota_error(exc):
                     _mark_image_quota_cooldown()
                     warnings.append(
-                        "Gemini image quota was reached. JARVIS stopped additional image requests "
+                        f"Gemini image quota was reached. {marca.NOME} stopped additional image requests "
                         "and finished the deck with the visuals already available."
                     )
                     break

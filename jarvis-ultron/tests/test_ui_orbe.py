@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import QApplication, QLabel, QWidget
 
 import ui
 import ui_orbe
+from core import marca
 
 
 class _CofreVazio:
@@ -124,7 +125,7 @@ class CenaTests(unittest.TestCase):
             win._orbe.ver_texto("You: que horas são?")
             win._orbe.ver_texto("Jarvis: São dez horas.")
             win._orbe.ver_texto("SYS: conectado")
-            self.assertEqual(falas, [("VOCÊ", "que horas são?"), ("JARVIS", "São dez horas.")])
+            self.assertEqual(falas, [("VOCÊ", "que horas são?"), (marca.NOME_CURTO.upper(), "São dez horas.")])
         finally:
             win.close()
             win.deleteLater()
@@ -155,7 +156,7 @@ class CenaTests(unittest.TestCase):
                 jarvis_ui.notificar("Pergunta", pergunta)
             for _ in range(5):
                 self.app.processEvents()
-            win._tray.showMessage.assert_called_once_with("Jarvis · Pergunta", pergunta, ANY, 10000)
+            win._tray.showMessage.assert_called_once_with(f"{marca.NOME_CURTO} · Pergunta", pergunta, ANY, 10000)
             avisos = [t for t in central.findChildren(ui.ToastNotification) if t.isVisible()
                       and any(pergunta in rotulo.text() for rotulo in t.findChildren(QLabel))]
             self.assertEqual(len(avisos), 1)
@@ -221,7 +222,7 @@ class UltronNaCenaTests(unittest.TestCase):
     def test_modo_ultron_deixa_textos_campo_e_botoes_laranja(self):
         cena = self.cena
         cena.montar_botoes_ultron(ITENS_ULTRON, lambda n, a: None)
-        cena.canal.adicionar("JARVIS", "Às ordens.")
+        cena.canal.adicionar(marca.NOME_CURTO.upper(), "Às ordens.")
         cena.st["Câmera local"].definir("EM USO", ui_orbe.CIANO)
         ui_orbe.definir_ultron(self.win, True)
         laranja_texto = ui_orbe.cor(ui_orbe.TEXTO2).name()

@@ -31,11 +31,13 @@ import uuid
 from datetime import date, datetime
 from pathlib import Path
 
+from core import marca as _marca  # "marca" aqui é a marca do HD
+
 FERRAMENTA = {
     "name": "external_memory_drive",
     "description": (
-        "JARVIS's memory backup on the user's external hard drive (HD externo). setup: use drive letter "
-        "(e.g. 'E') as memory drive. save_now: copy everything JARVIS learned to the drive now. status: say "
+        f"{_marca.NOME}'s memory backup on the user's external hard drive (HD externo). setup: use drive letter "
+        f"(e.g. 'E') as memory drive. save_now: copy everything {_marca.NOME} learned to the drive now. status: say "
         "where/when it was last saved. restore: bring the memory back from the drive — ONLY after the user "
         "explicitly confirms; pass confirm=true then. Answer in Portuguese."
     ),
@@ -151,8 +153,8 @@ def preparar_hd(pasta: Path, config_caminho: Path | None = None) -> Path:
     if not arquivo_marca.exists():
         arquivo_marca.write_text(marca, encoding="utf-8")
         leia = pasta / "LEIA-ME.txt"
-        leia.write_text("Memória do Jarvis Ultron.\n'atual' = cópia mais recente; 'historico' = uma cópia por "
-                        "dia.\nNão apague o arquivo .jarvis-memoria (é como o Jarvis reconhece este HD).\n",
+        leia.write_text(f"Memória do {_marca.NOME}.\n'atual' = cópia mais recente; 'historico' = uma cópia por "
+                        f"dia.\nNão apague o arquivo .jarvis-memoria (é como o {_marca.NOME_CURTO} reconhece este HD).\n",
                         encoding="utf-8")
     config["marca"] = arquivo_marca.read_text(encoding="utf-8").strip()
     gravar_config(config, config_caminho)
@@ -260,7 +262,7 @@ def executar(args: dict, jarvis) -> str:
             return f"Não achei o disco {letra}:. Tell the user in Portuguese to plug in the HD and check the letter."
         hd = preparar_hd(raiz / PASTA_NO_HD)
         copiados, total = salvar(hd)
-        return (f"HD {letra}: pronto como memória do Jarvis. Copiei {total} arquivos. A partir de agora salvo sozinho "
+        return (f"HD {letra}: pronto como memória do {_marca.NOME_CURTO}. Copiei {total} arquivos. A partir de agora salvo sozinho "
                 "a cada 30 minutos quando ele estiver ligado. Tell the user in Portuguese.")
     hd = achar_hd()
     config = ler_config()
@@ -280,7 +282,7 @@ def executar(args: dict, jarvis) -> str:
                     "as a backup). Then call again with confirm=true.")
         trazidos = restaurar(hd)
         return (f"Recuperei {trazidos} arquivos da memória do HD. Tell the user in Portuguese to close and reopen "
-                "JARVIS so it loads the restored memory.")
+                f"{_marca.NOME} so it loads the restored memory.")
     ligado = f"ligado ({hd.anchor or hd})" if hd else "desconectado"
     return (f"HD da memória: {ligado}. Última cópia: {_quando(config.get('ultima_copia'))}, "
             f"{config.get('arquivos', 0)} arquivos. Tell the user in Portuguese.")

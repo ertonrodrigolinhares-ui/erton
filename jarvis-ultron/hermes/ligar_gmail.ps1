@@ -99,7 +99,7 @@ Start-Sleep -Seconds 15
 Write-Host ""
 Write-Host "PRONTO!" -ForegroundColor Green
 Write-Host "Ligue o agente 'email-triagem' no 'Ativar Agentes' (se ainda nao ligou)."
-Write-Host "Depois peca ao Jarvis: 'Hey Jarvis, pede ao Hermes para separar meus e-mails'."
+Write-Host "Depois peca ao Luiz: 'Hey Jarvis, pede ao Hermes para separar meus e-mails'."
 Write-Host ""
 Write-Host "Seguranca: para cancelar esse acesso, apague a senha de app em" -ForegroundColor DarkGray
 Write-Host "https://myaccount.google.com/apppasswords (nao mexe na sua conta)." -ForegroundColor DarkGray

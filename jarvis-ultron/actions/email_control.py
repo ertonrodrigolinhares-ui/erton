@@ -23,6 +23,7 @@ from email.utils import getaddresses
 from pathlib import Path
 from urllib.parse import quote, urlencode
 
+from core import marca
 
 _SYSTEM = platform.system()
 _FIELD_SEPARATOR = chr(31)
@@ -170,7 +171,7 @@ def _load_gmail_credentials():
     if not payload:
         raise GmailConnectionError(
             "Gmail is not connected. Download a Desktop app OAuth credentials JSON file, "
-            "then tell JARVIS: connect Gmail using this file."
+            f"then tell {marca.NOME}: connect Gmail using this file."
         )
     try:
         credentials = Credentials.from_authorized_user_info(json.loads(payload), list(GMAIL_SCOPES))
@@ -229,7 +230,7 @@ def _gmail_connect(credentials_path: str = "") -> str:
         return (
             "Gmail needs a Google Desktop OAuth credentials JSON file. In Google Cloud: enable the Gmail API, "
             "configure the OAuth consent screen, create an OAuth Client ID with application type Desktop app, "
-            "download the JSON, then drag it into JARVIS and say: connect Gmail using this file."
+            f"download the JSON, then drag it into {marca.NOME} and say: connect Gmail using this file."
         )
     try:
         flow = InstalledAppFlow.from_client_secrets_file(str(path), list(GMAIL_SCOPES))
@@ -240,7 +241,7 @@ def _gmail_connect(credentials_path: str = "") -> str:
             timeout_seconds=240,
             access_type="offline",
             prompt="consent",
-            success_message="Gmail is connected to JARVIS. You can close this browser tab.",
+            success_message=f"Gmail is connected to {marca.NOME}. You can close this browser tab.",
         )
         service = build("gmail", "v1", credentials=credentials, cache_discovery=False)
         profile = service.users().getProfile(userId="me").execute()
@@ -551,7 +552,7 @@ async def _open_gmail_compose_fields(session, player=None):
         if not await _assist_gmail_sign_in(page, player=player):
             return page, None, (
                 "Gmail is waiting for Google sign-in. Complete the password or 2FA step in the open "
-                "JARVIS Chrome window, then ask me to prepare the email again. JARVIS never stores your password."
+                f"{marca.NOME} Chrome window, then ask me to prepare the email again. {marca.NOME} never stores your password."
             )
         try:
             await page.goto(compose_url, wait_until="domcontentloaded", timeout=45_000)
@@ -601,7 +602,7 @@ async def _open_gmail_compose_fields(session, player=None):
             pass
         if "sign in" in page_text.lower():
             return page, None, "Gmail requires a browser sign-in. Sign in, then ask me to prepare the email again."
-        return page, None, "Gmail opened, but JARVIS could not find a new compose window. Open Gmail once, finish any sign-in prompts, and try again."
+        return page, None, f"Gmail opened, but {marca.NOME} could not find a new compose window. Open Gmail once, finish any sign-in prompts, and try again."
 
     to_field = await _first_visible(page, (
         'input[aria-label^="To recipients" i]',
@@ -611,7 +612,7 @@ async def _open_gmail_compose_fields(session, player=None):
         'input[role="combobox"][aria-autocomplete="list"]',
     ), timeout_seconds=8.0)
     if to_field is None:
-        return page, None, "Gmail opened a compose window, but JARVIS could not locate the recipient field."
+        return page, None, f"Gmail opened a compose window, but {marca.NOME} could not locate the recipient field."
     return page, {"to": to_field, "subject": subject, "body": body}, ""
 
 
@@ -710,7 +711,7 @@ async def _gmail_web_prepare_once(session, draft: dict[str, str], player=None) -
             continue
         locator = await _first_visible(page, selectors, timeout_seconds=4.0)
         if locator is None:
-            return f"Gmail opened the draft, but JARVIS could not locate the {field_name} field. Nothing was sent."
+            return f"Gmail opened the draft, but {marca.NOME} could not locate the {field_name} field. Nothing was sent."
         _compose_progress(player, field_name, draft[key])
         for recipient in [item.strip() for item in draft[key].split(",") if item.strip()]:
             try:
@@ -767,7 +768,7 @@ async def _gmail_web_prepare_async(session, draft: dict[str, str], player=None) 
             if attempt == 0:
                 await asyncio.sleep(0.4)
     return (
-        "Gmail interrupted the compose operation twice, so JARVIS discarded the incomplete draft. "
+        f"Gmail interrupted the compose operation twice, so {marca.NOME} discarded the incomplete draft. "
         f"Nothing was sent. Details: {last_error}"
     )
 
@@ -790,7 +791,7 @@ async def _gmail_web_send_async(session, draft: dict[str, str]) -> str:
     page = await session._get_page()
     await page.bring_to_front()
     if "mail.google.com" not in str(page.url or "").lower():
-        return "The Gmail draft is no longer the active JARVIS browser tab. Nothing was sent."
+        return f"The Gmail draft is no longer the active {marca.NOME} browser tab. Nothing was sent."
 
     subject = await _first_visible(page, (
         'input[name="subjectbox"]', 'input[aria-label="Subject"]', 'input[placeholder="Subject"]'
@@ -820,7 +821,7 @@ async def _gmail_web_send_async(session, draft: dict[str, str]) -> str:
         'button[aria-label^="Send" i]',
     ), timeout_seconds=5.0)
     if send_button is None:
-        return "JARVIS could not find Gmail's Send button. Nothing was sent."
+        return f"{marca.NOME} could not find Gmail's Send button. Nothing was sent."
     await send_button.click()
     try:
         await page.get_by_text(re.compile(r"message sent", re.I)).last.wait_for(state="visible", timeout=8_000)
@@ -893,7 +894,7 @@ def _mail_error(result: subprocess.CompletedProcess, operation: str) -> str:
     if "not authorized" in detail.lower() or "not permitted" in detail.lower():
         return (
             f"Email {operation} needs macOS Automation permission. "
-            "Allow JARVIS or Terminal to control Mail in System Settings > Privacy & Security > Automation."
+            f"Allow {marca.NOME} or Terminal to control Mail in System Settings > Privacy & Security > Automation."
         )
     return f"Email {operation} failed: {detail}"
 
@@ -1118,7 +1119,7 @@ def _prepare_email(params: dict, player=None) -> str:
     copies = (f"\nCc: {cc}" if cc else "") + (f"\nBcc: {bcc}" if bcc else "")
     return (
         "EMAIL_APPROVAL_REQUIRED|A pending email is ready. Nothing has been sent.\n"
-        + ("JARVIS opened Gmail and visibly typed this draft. It remains open for your review.\n" if provider == "gmail" else "")
+        + (f"{marca.NOME} opened Gmail and visibly typed this draft. It remains open for your review.\n" if provider == "gmail" else "")
         + f"Provider: {'Gmail' if provider == 'gmail' else 'Apple Mail' if provider == 'apple_mail' else 'Default mail app'}\n"
         f"To: {to}{copies}\nSubject: {subject}\n\n{preview}\n\n"
         "Ask the user to approve, revise, or cancel this exact email."
@@ -1226,8 +1227,8 @@ def email_control(parameters: dict | None = None, response=None, player=None, se
     if action == "disconnect":
         _clear_gmail_credentials()
         return (
-            "The local Gmail connection was removed from JARVIS. To revoke Google-side access too, "
-            "remove JARVIS from your Google Account connections."
+            f"The local Gmail connection was removed from {marca.NOME}. To revoke Google-side access too, "
+            f"remove {marca.NOME} from your Google Account connections."
         )
     if action == "inbox":
         limit = _bounded_limit(params.get("limit", 10))

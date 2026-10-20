@@ -48,7 +48,7 @@
   },
   {
     "name": "listening_mode",
-    "description": "Switches how JARVIS listens. 'maos_livres' (hands-free): answers everything the user says, no wake word needed. 'chamada' (call mode): answers only after the user says 'Hey Jarvis'. Use when the user says 'modo mãos livres' or 'modo chamada'.",
+    "description": "Switches how Luiz Conrado listens. 'maos_livres' (hands-free): answers everything the user says, no wake word needed. 'chamada' (call mode): answers only after the user says 'Hey Jarvis'. Use when the user says 'modo mãos livres' or 'modo chamada'.",
     "parameters": {
       "type": "OBJECT",
       "properties": {
@@ -81,7 +81,7 @@
   },
   {
     "name": "self_diagnosis",
-    "description": "Runs JARVIS's self-diagnosis: checks internet, the Gemini key and models, the Groq backup, Hermes (agents), microphone, speakers, computer memory/disk, the automation browser and the wake word. Use when the user asks what is wrong, to check/diagnose the system, or why something is not working. Afterwards, tell the user in Portuguese only the problems found and how to fix them.",
+    "description": "Runs Luiz Conrado's self-diagnosis: checks internet, the Gemini key and models, the Groq backup, Hermes (agents), microphone, speakers, computer memory/disk, the automation browser and the wake word. Use when the user asks what is wrong, to check/diagnose the system, or why something is not working. Afterwards, tell the user in Portuguese only the problems found and how to fix them.",
     "parameters": {
       "type": "OBJECT",
       "properties": {}
@@ -89,7 +89,7 @@
   },
   {
     "name": "hermes_agent",
-    "description": "Sends a task to Hermes, JARVIS's autonomous orchestrator with sub-agents. Use for: social media posts of the user's social media (daily post proposals, Metricool, best time to post, performance), Meta/Facebook/Instagram ads reports, opening and reading web panels/dashboards by itself. Examples: 'what are today's posts?', 'how are my ads doing?', 'publish the approved posts'. For research, analysis, reports and other long multi-step tasks prefer claude_task (when available). Never use it to publish without approval.",
+    "description": "Sends a task to Hermes, Luiz Conrado's autonomous orchestrator with sub-agents. Use for: social media posts of the user's social media (daily post proposals, Metricool, best time to post, performance), Meta/Facebook/Instagram ads reports, opening and reading web panels/dashboards by itself. Examples: 'what are today's posts?', 'how are my ads doing?', 'publish the approved posts'. For research, analysis, reports and other long multi-step tasks prefer claude_task (when available). Never use it to publish without approval.",
     "parameters": {
       "type": "OBJECT",
       "properties": {
@@ -134,7 +134,7 @@
   },
   {
     "name": "suspend_listening",
-    "description": "Suspends JARVIS for a number of minutes: the microphone is muted and JARVIS stops listening, then it unmutes automatically and announces it is back. Use when the user asks JARVIS to be suspended, pause, stay quiet, sleep or stop listening for some time (default 10 minutes).",
+    "description": "Suspends Luiz Conrado for a number of minutes: the microphone is muted and Luiz Conrado stops listening, then it unmutes automatically and announces it is back. Use when the user asks Luiz Conrado to be suspended, pause, stay quiet, sleep or stop listening for some time (default 10 minutes).",
     "parameters": {
       "type": "OBJECT",
       "properties": {
@@ -578,7 +578,7 @@
   },
   {
     "name": "graphics_quality",
-    "description": "Changes JARVIS rendering quality between low, medium, and high.",
+    "description": "Changes Luiz Conrado rendering quality between low, medium, and high.",
     "parameters": {
       "type": "OBJECT",
       "properties": {
@@ -599,7 +599,7 @@
   },
   {
     "name": "jarvis_ui_control",
-    "description": "Changes JARVIS's own interface. Use when the user asks to open or close the Command Center, change the theme or graphics quality, open settings, enter compact mode, toggle fullscreen, or show shortcuts.",
+    "description": "Changes Luiz Conrado's own interface. Use when the user asks to open or close the Command Center, change the theme or graphics quality, open settings, enter compact mode, toggle fullscreen, or show shortcuts.",
     "parameters": {
       "type": "OBJECT",
       "properties": {
@@ -750,7 +750,7 @@
             "light",
             "dark"
           ],
-          "description": "Overall slide appearance. Honor light or dark when requested; auto uses the restrained dark JARVIS style."
+          "description": "Overall slide appearance. Honor light or dark when requested; auto uses the restrained dark Luiz Conrado style."
         },
         "transition": {
           "type": "STRING",

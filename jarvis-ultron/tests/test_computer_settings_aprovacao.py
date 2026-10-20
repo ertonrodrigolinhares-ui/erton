@@ -31,7 +31,7 @@ sys.path.insert(0, str(RAIZ))
 sys.path.insert(0, str(RAIZ / "tests"))
 
 import actions.computer_settings as cs  # noqa: E402
-from core import aprovacao  # noqa: E402
+from core import aprovacao, marca  # noqa: E402
 from test_contratos import UIFalsa  # noqa: E402
 
 REINICIAR = {"action": "restart", "description": "restart my computer"}
@@ -225,6 +225,9 @@ class DesligarEReiniciarTests(BaseTests):
         self.assertIn("target was not explicit", self.chamar({"action": "restart", "confirmed": "yes"}, jarvis))
         self.assertIn("self-shutdown is disabled",
                       self.chamar({"action": "shutdown", "description": "shut down jarvis", "confirmed": "yes"}, jarvis))
+        self.assertIn("self-shutdown is disabled",  # pelo nome de hoje (core/marca.py) também
+                      self.chamar({"action": "shutdown", "description": f"desliga o {marca.NOME_CURTO}", "confirmed": "yes"},
+                                  jarvis))
         self.assertEqual(cs._pendente, {})
         self.assertEqual(self.desligou(), [])
 
@@ -606,7 +609,7 @@ class TecladoTests(BaseTests):
         for valor in ("21", "1000", 10 ** 9):
             with self.subTest(valor=valor):
                 resposta = self.chamar({"action": "reload_n", "value": valor}, jarvis)
-                self.assertTrue(resposta.startswith("Not done: Jarvis reloads at most 20 times"), resposta)
+                self.assertTrue(resposta.startswith(f"Not done: {marca.NOME} reloads at most 20 times"), resposta)
                 self.assertNotIn("Ask the user now", resposta)
                 self.assertEqual(cs._pendente, {})
         self.assertIn("apertar F5 (recarregar a página) 20 vezes", self.chamar({"action": "reload_n", "value": "20"}, jarvis))
@@ -707,7 +710,7 @@ class JanelaDoJarvisTests(BaseTests):
                     jarvis.falar("ok, pode fazer")
                     segunda = self.chamar(dict(args, confirmed="yes"), jarvis)
                 for resposta in (primeira, segunda):
-                    self.assertIn("Not done: the window in front is Jarvis itself", resposta)
+                    self.assertIn(f"Not done: the window in front is {marca.NOME} itself", resposta)
                     self.assertNotIn("Ask the user now", resposta)
                     self.assertNotIn("Approved", resposta)
                 self.assertEqual(cs._pendente, {})
@@ -722,9 +725,9 @@ class JanelaDoJarvisTests(BaseTests):
         self.teclado.press.side_effect = lambda tecla, **_: jarvis.falar("".join(digitado)) if tecla == "enter" else None
         args = {"action": "type_text", "value": "sim", "press_enter": "true"}
         with patch.object(cs, "_janela_da_frente", return_value=JANELA_DO_JARVIS):
-            self.assertIn("Jarvis itself", self.chamar(args, jarvis))
+            self.assertIn(f"{marca.NOME} itself", self.chamar(args, jarvis))
             jarvis.falar("ok, pode fazer")
-            self.assertIn("Jarvis itself", self.chamar(args, jarvis))
+            self.assertIn(f"{marca.NOME} itself", self.chamar(args, jarvis))
             self.assertIn("Not done yet", self.chamar(REINICIAR, jarvis))
             self.assertIn("has not answered", self.chamar(REINICIAR, jarvis))
         self.assertEqual(digitado, [])
@@ -747,7 +750,7 @@ class JanelaDoJarvisTests(BaseTests):
             de_volta = self.chamar(args, jarvis)
         self.assertIn('na janela "Sem título - Bloco de Notas"', respostas[0])
         for resposta in respostas[1:]:
-            self.assertIn("Not done: the window in front is Jarvis itself", resposta)
+            self.assertIn(f"Not done: the window in front is {marca.NOME} itself", resposta)
         self.assertIn("Not done yet", de_volta)
         self.assertFalse(any(f'na janela "{cs.TITULO_DO_JARVIS}' in texto for texto in respostas + jarvis.logs))
         self.assertEqual(self.teclado.method_calls, [])
@@ -769,15 +772,13 @@ class JanelaDoJarvisTests(BaseTests):
                     jarvis = JarvisFalso("aperta enter")
                     with patch.object(cs, "_janela_da_frente", return_value=(9, "Painel Ultron")):
                         resposta = self.chamar({"action": "enter"}, jarvis)
-                    self.assertEqual("Jarvis itself" in resposta, do_jarvis, resposta)
+                    self.assertEqual(f"{marca.NOME} itself" in resposta, do_jarvis, resposta)
                     self.assertEqual("Ask the user now" in resposta, not do_jarvis, resposta)
         self.ctypes.user32.GetWindowThreadProcessId.assert_called_with(9, ANY)
         self.assertEqual(self.teclado.method_calls, [])
 
     def test_titulo_e_o_da_janela_da_tela(self):
         # a tela e a trava leem o mesmo título de core/marca.py (senão a trava não reconheceria a janela)
-        from core import marca
-
         ui = (RAIZ / "ui.py").read_text(encoding="utf-8")
         self.assertIn("self.setWindowTitle(marca.TITULO_DA_JANELA)", ui)
         self.assertEqual(cs.TITULO_DO_JARVIS, marca.TITULO_DA_JANELA)

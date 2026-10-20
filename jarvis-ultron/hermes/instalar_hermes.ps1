@@ -105,7 +105,7 @@ Titulo "2/7  Perfil 'jarvis'"
 $raizHermes = if ($env:HERMES_HOME) { $env:HERMES_HOME } else { Join-Path $env:LOCALAPPDATA "hermes" }
 $perfil = Join-Path $raizHermes "profiles\jarvis"
 if (-not (Test-Path $perfil)) {
-    & $hermes profile create jarvis --description "Jarvis Ultron: orquestrador de tarefas (redes sociais, anuncios, navegador)."
+    & $hermes profile create jarvis --description "Luiz Conrado: orquestrador de tarefas (redes sociais, anuncios, navegador)."
 }
 if (-not (Test-Path $perfil)) { New-Item -ItemType Directory -Force $perfil | Out-Null }
 $pastaJarvis = Join-Path $perfil "jarvis"
@@ -117,7 +117,7 @@ Write-Host "Perfil: $perfil" -ForegroundColor Green
 Titulo "3/7  Habilidades, sub-agentes e trava de aprovacao"
 # O perfil de quem usa entra no lugar de __PERFIL__ quando o Jarvis abre (core/automacoes.py)
 $soul = [System.IO.File]::ReadAllText((Join-Path $kit "SOUL.md"))
-Gravar (Join-Path $perfil "SOUL.md") ($soul.Replace("__PERFIL__", "").Replace("__MARCA__", "Jarvis Ultron").Replace("__MARCA_CURTA__", "Jarvis"))
+Gravar (Join-Path $perfil "SOUL.md") ($soul.Replace("__PERFIL__", "").Replace("__MARCA__", "Luiz Conrado").Replace("__MARCA_CURTA__", "Luiz"))
 $destinoSkills = Join-Path $perfil "skills\jarvis"
 New-Item -ItemType Directory -Force $destinoSkills | Out-Null
 Copy-Item (Join-Path $kit "skills\jarvis\*") $destinoSkills -Recurse -Force
@@ -157,7 +157,7 @@ if ($temNous) {
 }
 if (-not $chaves.Contains("ELEVENLABS_API_KEY")) {
     Write-Host ""
-    Write-Host "Chave da ElevenLabs (voz do Jarvis). Opcional: aperte Enter para pular."
+    Write-Host "Chave da ElevenLabs (voz do Luiz). Opcional: aperte Enter para pular."
     Write-Host "  No site: clique no seu nome > API Keys > Create API Key."
     Start-Process "https://elevenlabs.io/app/settings/api-keys"
     $chaves["ELEVENLABS_API_KEY"] = (Read-Host "Cole a chave da ElevenLabs (ou Enter para pular)").Trim()
@@ -204,7 +204,7 @@ if ($chaves["ELEVENLABS_API_KEY"]) {
     $ultronEnv["JARVIS_VOZ_ELEVENLABS"] = $chaves["JARVIS_VOZ_ELEVENLABS"]
 }
 Gravar-Env $envUltron $ultronEnv
-Write-Host "Configuracao aplicada e Jarvis Ultron ligado ao Hermes." -ForegroundColor Green
+Write-Host "Configuracao aplicada e Luiz Conrado ligado ao Hermes." -ForegroundColor Green
 
 # ---------------------------------------------------------------- 6. Conectores (login uma vez)
 Titulo "6/7  Conectar o Metricool (uma vez so)"
@@ -240,8 +240,8 @@ if ($LASTEXITCODE -ne 0) {
     & $hermes gateway start
 }
 Write-Host ""
-Write-Host "Pronto! O Hermes do Jarvis liga sozinho com o Windows e roda a rotina todo dia as 8h." -ForegroundColor Green
-Write-Host "Se o Jarvis estiver aberto (ou no icone perto do relogio), feche de verdade: botao direito"
-Write-Host "no icone > Quit JARVIS. Depois abra o 'Iniciar Jarvis Ultron' e diga:"
+Write-Host "Pronto! O Hermes do Luiz liga sozinho com o Windows e roda a rotina todo dia as 8h." -ForegroundColor Green
+Write-Host "Se o Luiz estiver aberto (ou no icone perto do relogio), feche de verdade: botao direito"
+Write-Host "no icone > Sair do Luiz Conrado. Depois abra o 'Iniciar Jarvis Ultron' e diga:"
 Write-Host "'Hey Jarvis, quais sao os posts de hoje?'"
 Read-Host "Aperte Enter para fechar"

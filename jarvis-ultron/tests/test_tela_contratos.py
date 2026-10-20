@@ -25,6 +25,7 @@ from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import QApplication, QLineEdit
 
 import ui
+from core import marca
 from core import perfil
 from core.api_key_validator import ApiKeyValidationResult
 from memory import memory_manager
@@ -128,7 +129,7 @@ class TelaContratosTests(unittest.TestCase):
         self.assertIs(self.janela._log, self.janela._chat_bubble)
         self.fachada.write_log("Jarvis: Tudo pronto.")
         self.app.processEvents()
-        self.assertEqual(self.janela._focus_dialogue._speaker_lbl.text(), "JARVIS")
+        self.assertEqual(self.janela._focus_dialogue._speaker_lbl.text(), marca.NOME_CURTO.upper())
         self.assertEqual(self.janela._focus_dialogue._message_lbl.text(), "Tudo pronto.")
 
     def test_cena_cobre_a_janela_e_f2_alterna(self):

@@ -27,6 +27,8 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from core import marca
+
 VIAS = ("studio", "vertex")
 
 # Modelos de conversa ao vivo do Vertex AI, do mais novo para o mais antigo (o testador confere
@@ -315,7 +317,7 @@ def principal() -> int:
             atualizar_env(env, "GEMINI_LIVE_MODEL", modelo_vivo)
     except OSError as erro:
         print(f"\nNÃO consegui gravar no arquivo .env ({type(erro).__name__}). Ele pode estar somente leitura")
-        print("ou aberto em outro programa. Feche o Jarvis e o Bloco de Notas e rode este teste de novo.")
+        print(f"ou aberto em outro programa. Feche o {marca.NOME_CURTO} e o Bloco de Notas e rode este teste de novo.")
         return 1
     print("\nGravei no .env:", ", ".join(
         (["a chave nova"] if nova else []) + [f"o caminho ({vencedor.via})"]
@@ -323,7 +325,7 @@ def principal() -> int:
     if modelo_vivo:
         print("\nPronto! Abra o 'Iniciar Jarvis Ultron': a conversa natural deve funcionar.")
         return 0
-    print("\nO texto funciona, mas a voz ao vivo não abriu. O Jarvis vai usar a reserva para falar.")
+    print(f"\nO texto funciona, mas a voz ao vivo não abriu. O {marca.NOME_CURTO} vai usar a reserva para falar.")
     for passo in _proximos_passos(resultados):
         print(" -", passo)
     return 2

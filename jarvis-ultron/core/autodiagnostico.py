@@ -20,6 +20,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
+from core import marca
+
 
 @dataclass
 class Item:
@@ -55,7 +57,7 @@ def verificar_gemini() -> Item:
     chave = modelos._chave()
     if not chave:
         return Item("Chave do Gemini", "defeito", "nenhuma chave configurada",
-                    "Abra o Jarvis e cole a chave na tela, ou coloque GEMINI_API_KEY no arquivo .env.")
+                    f"Abra o {marca.NOME_CURTO} e cole a chave na tela, ou coloque GEMINI_API_KEY no arquivo .env.")
     from core.gemini_acesso import via
 
     if via() == "vertex":
@@ -76,10 +78,10 @@ def verificar_gemini() -> Item:
                         "que aceita as chaves 'AQ.'. Enquanto isso, a reserva (Groq) funciona.")
         if "401" in texto or "API_KEY_INVALID" in texto or "not valid" in texto.lower():
             return Item("Chave do Gemini", "defeito", "chave recusada (inválida, apagada ou antiga)",
-                        "Crie uma chave nova em aistudio.google.com/apikey e cole na tela do Jarvis.")
+                        f"Crie uma chave nova em aistudio.google.com/apikey e cole na tela do {marca.NOME_CURTO}.")
         if "429" in texto or "quota" in texto.lower():
             return Item("Chave do Gemini", "atencao", "limite grátis do dia atingido",
-                        "Espere algumas horas; enquanto isso o Jarvis usa a reserva Groq.")
+                        f"Espere algumas horas; enquanto isso o {marca.NOME_CURTO} usa a reserva Groq.")
         return Item("Chave do Gemini", "atencao", f"não consegui falar com o Google ({texto[:80]})",
                     "Confira a internet e tente de novo em alguns minutos.")
     vivos = [m for m in modelos_da_chave
@@ -116,7 +118,7 @@ def verificar_modelos() -> Item:
     detalhe = f"voz: {voz} | texto: {texto}"
     if modelos._versao(voz) and modelos._versao(voz) < modelos.VERSAO_MINIMA:
         return Item("Modelos do Gemini", "atencao", detalhe + " (a voz ainda é 2.5, que o Google está aposentando)",
-                    "Normal se o Google ainda não liberou voz 3.x para a sua chave; o Jarvis troca sozinho quando liberar.")
+                    f"Normal se o Google ainda não liberou voz 3.x para a sua chave; o {marca.NOME_CURTO} troca sozinho quando liberar.")
     return Item("Modelos do Gemini", "ok", detalhe)
 
 
@@ -144,8 +146,8 @@ def verificar_hermes() -> Item:
     from core import hermes_ponte
 
     if not hermes_ponte.configurado():
-        return Item("Hermes (agentes)", "atencao", "não instalado ou não ligado ao Jarvis",
-                    "Dê dois cliques em 'Instalar Hermes' na pasta do Jarvis.")
+        return Item("Hermes (agentes)", "atencao", f"não instalado ou não ligado ao {marca.NOME_CURTO}",
+                    f"Dê dois cliques em 'Instalar Hermes' na pasta do {marca.NOME_CURTO}.")
     import requests
 
     chave = os.environ.get("HERMES_API_KEY", "").strip()
@@ -161,8 +163,8 @@ def verificar_hermes() -> Item:
             return Item("Hermes (agentes)", "ok", "ligado e respondendo")
     if desligado:
         return Item("Hermes (agentes)", "defeito", "o Hermes está desligado",
-                    "Dê dois cliques em 'Ligar Hermes' na pasta do Jarvis.")
-    return Item("Hermes (agentes)", "defeito", "o Hermes não reconheceu o Jarvis (chave ou endereço)",
+                    f"Dê dois cliques em 'Ligar Hermes' na pasta do {marca.NOME_CURTO}.")
+    return Item("Hermes (agentes)", "defeito", f"o Hermes não reconheceu o {marca.NOME_CURTO} (chave ou endereço)",
                 "Rode o 'Instalar Hermes' de novo e depois o 'Ligar Hermes'.")
 
 
@@ -206,7 +208,7 @@ def verificar_navegador() -> Item:
         import playwright  # noqa: F401
     except ImportError:
         return Item("Navegador automático", "defeito", "componente do navegador não instalado",
-                    "Apague a pasta .venv do Jarvis e abra o 'Iniciar Jarvis Ultron' de novo para reinstalar.")
+                    f"Apague a pasta .venv do {marca.NOME_CURTO} e abra o 'Iniciar Jarvis Ultron' de novo para reinstalar.")
     pastas = []
     if os.environ.get("PLAYWRIGHT_BROWSERS_PATH"):
         pastas.append(Path(os.environ["PLAYWRIGHT_BROWSERS_PATH"]))
@@ -216,7 +218,7 @@ def verificar_navegador() -> Item:
     if any(p.exists() and any(p.glob("chromium*")) for p in pastas):
         return Item("Navegador automático", "ok", "instalado")
     return Item("Navegador automático", "atencao", "o Chromium das automações não foi encontrado",
-                "Os sites ainda abrem no navegador normal; para o Jarvis clicar sozinho, reinstale os componentes.")
+                f"Os sites ainda abrem no navegador normal; para o {marca.NOME_CURTO} clicar sozinho, reinstale os componentes.")
 
 
 def verificar_escuta(portao) -> Item:
@@ -272,7 +274,7 @@ _ICONE = {"ok": "OK", "atencao": "ATENÇÃO", "defeito": "DEFEITO"}
 
 
 def relatorio(itens: list[Item]) -> str:
-    linhas = [f"Autodiagnóstico do Jarvis Ultron — {datetime.now():%d/%m/%Y %H:%M}", ""]
+    linhas = [f"Autodiagnóstico do {marca.NOME} — {datetime.now():%d/%m/%Y %H:%M}", ""]
     for item in itens:
         linhas.append(f"[{_ICONE[item.estado]}] {item.nome}: {item.detalhe}")
         if item.dica:

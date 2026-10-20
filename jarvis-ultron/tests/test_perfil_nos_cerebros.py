@@ -143,7 +143,7 @@ class ClaudeChefeTests(Base):
         from core import claude_chefe as chefe
 
         texto = (RAIZ / "claude" / "CLAUDE.md").read_text(encoding="utf-8")
-        self.assertIn("## Quem usa o Jarvis\n", texto)
+        self.assertIn(f"## Quem usa o {marca.NOME}\n", texto)
         self.assertIsNotNone(chefe._QUEM_E.search(texto))
         for nome in ("Erton", "Ironman", "Emanuele", "Yvnna", "clientes.txt"):
             self.assertNotIn(nome, texto)

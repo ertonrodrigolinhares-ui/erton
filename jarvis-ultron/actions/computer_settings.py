@@ -714,7 +714,7 @@ def _power_target_text(params: dict, description: str, value) -> str:
 
 def _is_jarvis_self_shutdown_request(params: dict, action: str, description: str, value) -> bool:
     text = f"{action} {_power_target_text(params, description, value)}"
-    if "jarvis" not in text:
+    if not any(nome in text for nome in marca.nomes_falados()):  # "jarvis" e os nomes de core/marca.py
         return False
     return any(word in text for word in ("shutdown", "shut down", "restart", "reboot", "close", "quit", "exit", "stop"))
 
@@ -840,14 +840,16 @@ def _pedir_ok(jarvis, chave: tuple, o_que: str, janela, fazer) -> str:
     computador"). janela: (número, título) da janela da frente quando a ação vai para ela, que entra na
     chave (pelo _a_mesma) e, a que apareceu na pergunta, é conferida de novo antes de agir; None quando a
     janela não importa (desligar, reiniciar, suspender). Na janela do próprio Jarvis, recusa sem perguntar."""
+    from core import marca as _marca  # aqui embaixo, "marca" é a marca da fala
+
     if jarvis is None:  # sem a conversa não há como conferir o "ok" dele
-        return ("Not done: this needs the user's ok, which Jarvis checks in the conversation, and this call "
+        return (f"Not done: this needs the user's ok, which {_marca.NOME} checks in the conversation, and this call "
                 "did not come from the conversation.")
     if janela is not None and _janela_do_jarvis(janela):
         # o texto e o Enter iriam para o campo do Jarvis e virariam uma fala nova do Erton, que responderia a
         # outra pergunta (reiniciar, um vídeo pago, uma publicação); as teclas apertariam os botões dele
-        return ("Not done: the window in front is Jarvis itself, and text or keys sent there would count as "
-                "the user speaking (or press Jarvis's own buttons). Jarvis never types or presses keys in its "
+        return (f"Not done: the window in front is {_marca.NOME} itself, and text or keys sent there would count as "
+                f"the user speaking (or press {_marca.NOME}'s own buttons). {_marca.NOME} never types or presses keys in its "
                 "own window. Tell the user, in one short Portuguese sentence, to bring the right program to "
                 "the front and ask again.")
     from core import aprovacao
@@ -884,7 +886,7 @@ def _pedir_ok(jarvis, chave: tuple, o_que: str, janela, fazer) -> str:
         pergunta += ' Para confirmar, diga "ok, pode fazer".'
         _log(jarvis, f"SYS: ✋ Antes de agir, pergunto: {pergunta}")
         _mostrar_pergunta(jarvis, pergunta)
-        return ("Not done yet: Jarvis needs the user's ok first. Ask the user now, in Portuguese, exactly this "
+        return (f"Not done yet: {_marca.NOME} needs the user's ok first. Ask the user now, in Portuguese, exactly this "
                 f"question: {pergunta} Then stop and wait for the answer. Only if the user's next answer is a "
                 "clear ok in their own words (for example 'ok, pode fazer'), call computer_settings again with "
                 "exactly the same parameters. If the user says no or anything else, do not call it again; just "
@@ -896,7 +898,7 @@ def _pedir_ok(jarvis, chave: tuple, o_que: str, janela, fazer) -> str:
                 "only if the user asks for it again.")
     threading.Thread(target=_depois_do_ok, args=(jarvis, fala_do_ok, o_que, janela, fazer),
                      daemon=True, name="ComputadorOk").start()
-    return ("Approved by the user. Jarvis checks the user's whole answer once more and then does it. Tell the "
+    return (f"Approved by the user. {_marca.NOME} checks the user's whole answer once more and then does it. Tell the "
             "user, in one short Portuguese sentence, that you are doing it. Do not call computer_settings "
             "again for this.")
 
@@ -944,7 +946,7 @@ Return ONLY a valid JSON object:
 
 Rules:
 - Pick the single best matching action from the available list.
-- If the user says to shut down, restart, reboot, close, quit, exit, or stop JARVIS, do not choose shutdown or restart.
+- If the user says to shut down, restart, reboot, close, quit, exit, or stop {marca.NOME}, do not choose shutdown or restart.
 - Choose shutdown/restart only when the user clearly asks to power off or restart the computer/system/Mac/PC.
 - For volume_set: value is an integer 0-100.
 - For type_text: value is the exact text to type.
@@ -990,7 +992,7 @@ def computer_settings(
         return "No action could be determined."
 
     if _is_jarvis_self_shutdown_request(params, action, description, value):
-        return "JARVIS self-shutdown is disabled. No computer shutdown was performed."
+        return f"{marca.NOME} self-shutdown is disabled. No computer shutdown was performed."
 
     print(f"[Settings] Action: {action}  Value: {value}  OS: {_OS}")
     if player:
@@ -1021,7 +1023,7 @@ def computer_settings(
             # quebra de linha e tab viram Enter e Tab de verdade (e, colados num console, cada linha roda), e os
             # invisíveis (como o U+202E, que inverte o texto na tela) fazem a pergunta mostrar outra coisa
             return ("Not done: the text has line breaks, tabs or invisible characters, which would press keys "
-                    "or make the question show something different from what is typed. Jarvis types only one "
+                    f"or make the question show something different from what is typed. {marca.NOME} types only one "
                     "line of visible text per ok (Enter only with press_enter, which the question shows). Tell "
                     "the user, in one short Portuguese sentence.")
         enter_after = str(params.get("press_enter", "false")).lower() in ("true", "1", "yes")
@@ -1048,7 +1050,7 @@ def computer_settings(
         except (TypeError, ValueError) as e:
             return f"Reload failed: {e}"
         if vezes > RECARREGAR_NO_MAXIMO:
-            return (f"Not done: Jarvis reloads at most {RECARREGAR_NO_MAXIMO} times per ok, and {vezes} were "
+            return (f"Not done: {marca.NOME} reloads at most {RECARREGAR_NO_MAXIMO} times per ok, and {vezes} were "
                     "asked. Tell the user, in one short Portuguese sentence, and ask for a smaller number.")
         janela = _janela_da_frente()
         o_que = f"apertar F5 (recarregar a página) {vezes} {'vez' if vezes == 1 else 'vezes'}"

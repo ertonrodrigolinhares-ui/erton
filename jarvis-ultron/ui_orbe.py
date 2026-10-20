@@ -890,7 +890,7 @@ class Cena(QWidget):
             self._ultimo = time.time()
             self.fala.emit("VOCÊ", texto.split(":", 1)[1].strip())
         elif texto.startswith(("Jarvis:", "JARVIS:")):
-            self.fala.emit("JARVIS", texto.split(":", 1)[1].strip())
+            self.fala.emit(marca.NOME_CURTO.upper(), texto.split(":", 1)[1].strip())
 
     def _amostra_voz(self):
         self.linha_voz.valores.append(getattr(self.hud, "_nivel_suave", 0.0) if self.hud.speaking else 0.0)

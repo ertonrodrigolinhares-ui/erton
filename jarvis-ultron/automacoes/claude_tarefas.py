@@ -19,6 +19,8 @@ import threading
 import time
 from pathlib import Path
 
+from core import marca
+
 USA_IA_NUVEM = True  # o Claude roda na nuvem: desligado no modo privado
 
 _AGENTES = sorted(p.parent.name for p in (Path(__file__).resolve().parents[1] / "claude" / "skills").glob("*/SKILL.md"))
@@ -31,10 +33,10 @@ FERRAMENTA = {
         "today's news/headlines, weather, time, a quick web search, opening sites or apps, reminders. Use it for: "
         "deep research with sources, "
         "analysis of documents in the Claude 'Entrada' folder, reports, proposals, multi-step thinking, one of "
-        "the Jarvis agents (agent=name; available: " + (", ".join(_AGENTES) or "none") + "; Claude also has "
+        f"the {marca.NOME} agents (agent=name; available: " + (", ".join(_AGENTES) or "none") + "; Claude also has "
         "hundreds of English-named specialist agents, so if the user names another agent or specialist, "
         "e.g. 'Tax Strategist', pass that name as agent), "
-        "or changing the Jarvis's own code (kind='codigo'). It runs in the background; tell the user, in one short "
+        f"or changing {marca.NOME}'s own code (kind='codigo'). It runs in the background; tell the user, in one short "
         "Portuguese sentence, that Claude is working and you will warn when it is ready. Claude cannot publish, "
         "send or buy anything. For kind='codigo': the first call makes only a PLAN; when the plan is told to the "
         "user, call again with confirm=true ONLY after the user clearly approves in their own words."
@@ -43,8 +45,8 @@ FERRAMENTA = {
         "type": "OBJECT",
         "properties": {
             "request": {"type": "STRING", "description": "The complete task, in Portuguese, with all details the user gave"},
-            "kind": {"type": "STRING", "description": "tarefa (default) | codigo (change the Jarvis's own code)"},
-            "agent": {"type": "STRING", "description": "Optional agent to follow: a Jarvis agent name or a specialist name the user said"},
+            "kind": {"type": "STRING", "description": f"tarefa (default) | codigo (change {marca.NOME}'s own code)"},
+            "agent": {"type": "STRING", "description": f"Optional agent to follow: a {marca.NOME} agent name or a specialist name the user said"},
             "continue_last": {"type": "BOOLEAN", "description": "true to continue the previous Claude task (follow-up)"},
             "confirm": {"type": "BOOLEAN", "description": "kind=codigo only: true ONLY after the user approved the plan"},
         },
@@ -130,7 +132,7 @@ def _tarefa(args: dict, jarvis, chefe) -> str:
 
 def _codigo(args: dict, jarvis, chefe) -> str:
     if getattr(sys, "frozen", False):
-        return "This packaged Jarvis cannot change its own code. Tell the user in Portuguese."
+        return f"This packaged {marca.NOME} cannot change its own code. Tell the user in Portuguese."
     pedido = str(args.get("request", "")).strip()
 
     from core import aprovacao
@@ -201,8 +203,8 @@ def _codigo(args: dict, jarvis, chefe) -> str:
         with _trava:
             _estado["plano"] = pendente  # devolve o plano: o ok continua valendo para depois
         return "Claude is still working on the previous task. Tell the user to wait for it to finish."
-    _log(jarvis, "SYS: 🤖 Backup feito; Claude aplicando o plano aprovado (o Jarvis testa e desfaz se quebrar)...")
-    return ("Approved. Claude is applying the plan in the background; the Jarvis makes a backup, runs the tests and "
+    _log(jarvis, f"SYS: 🤖 Backup feito; Claude aplicando o plano aprovado (o {marca.NOME_CURTO} testa e desfaz se quebrar)...")
+    return (f"Approved. Claude is applying the plan in the background; {marca.NOME} makes a backup, runs the tests and "
             "undoes everything if something breaks. Tell the user in one short Portuguese sentence.")
 
 
@@ -224,7 +226,7 @@ def executar(args: dict, jarvis) -> str:
                 "that in modo privado the Gemma answers alone, and that saying 'modo normal' turns Claude back on.")
     if not chefe.achar_claude():
         return ("Claude Code is not installed on this PC. Tell the user in Portuguese to double-click "
-                "'Instalar Claude' in the Jarvis folder (it signs in with their Claude account).")
+                f"'Instalar Claude' in the {marca.NOME} folder (it signs in with their Claude account).")
     if str(args.get("kind", "") or "").strip().lower() in ("codigo", "código", "code"):
         return _codigo(args, jarvis, chefe)
     return _tarefa(args, jarvis, chefe)

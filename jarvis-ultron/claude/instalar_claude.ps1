@@ -153,7 +153,7 @@ if (Logado $exe) {
 if ([Environment]::GetEnvironmentVariable("ANTHROPIC_API_KEY", "User") -or
     [Environment]::GetEnvironmentVariable("ANTHROPIC_API_KEY", "Machine")) {
     Write-Host ""
-    Write-Host "Aviso: existe uma ANTHROPIC_API_KEY nas variaveis do Windows. O Jarvis tira essa chave" -ForegroundColor Yellow
+    Write-Host "Aviso: existe uma ANTHROPIC_API_KEY nas variaveis do Windows. O Luiz Conrado tira essa chave" -ForegroundColor Yellow
     Write-Host "quando chama o Claude (para usar a sua assinatura), mas o Claude aberto por voce no" -ForegroundColor Yellow
     Write-Host "terminal vai cobrar pela API. Se voce nao usa, apague essa variavel." -ForegroundColor Yellow
 }
@@ -181,9 +181,9 @@ if ($r -and -not $r.is_error) {
 Definir-Env "JARVIS_CLAUDE_EXE" $exe
 
 Write-Host ""
-Write-Host "Pronto! Se o Jarvis estiver aberto (ou no icone perto do relogio), feche de verdade: botao" -ForegroundColor Cyan
-Write-Host "direito no icone > Quit JARVIS. Depois abra o 'Iniciar Jarvis Ultron' e diga, por exemplo:" -ForegroundColor Cyan
-Write-Host "  'Jarvis, pede para o Claude pesquisar as novidades da reforma tributaria para holdings.'"
-Write-Host "  'Jarvis, usa o agente proposta-comercial para o grupo tal.'"
+Write-Host "Pronto! Se o Luiz Conrado estiver aberto (ou no icone perto do relogio), feche de verdade: botao" -ForegroundColor Cyan
+Write-Host "direito no icone > Sair do Luiz Conrado. Depois abra o 'Iniciar Jarvis Ultron' e diga, por exemplo:" -ForegroundColor Cyan
+Write-Host "  'Luiz, pede para o Claude pesquisar as novidades do meu setor.'"
+Write-Host "  'Luiz, usa o agente proposta-comercial para o grupo tal.'"
 Write-Host "Os relatorios ficam em: $pasta\Relatorios"
 Read-Host "Aperte Enter para fechar"

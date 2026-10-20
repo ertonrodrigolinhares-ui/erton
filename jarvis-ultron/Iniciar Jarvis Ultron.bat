@@ -1,5 +1,5 @@
 @echo off
-title Jarvis Ultron
+title Luiz Conrado
 cd /d "%~dp0"
 
 rem ---- Procura o Python 3.11 ou mais novo (de preferencia 3.12) ----
@@ -12,7 +12,7 @@ if not defined PY goto instalar_python
 
 rem ---- Primeira vez: cria o ambiente ----
 if not exist ".venv\Scripts\python.exe" (
-    echo Primeira vez: preparando o Jarvis Ultron. Isso pode levar varios minutos...
+    echo Primeira vez: preparando o Luiz Conrado. Isso pode levar varios minutos...
     %PY% -m venv .venv || goto erro
 )
 
@@ -71,7 +71,7 @@ echo ============================================================
 echo  OPCIONAL: chave do Groq, a IA reserva gratis.
 echo  Se o Gemini cair ou atingir o limite, o Groq responde no lugar.
 echo  1. Vai abrir o site do Groq. Entre com a sua conta do Google.
-echo  2. Clique em "Create API Key", de o nome Jarvis e copie a chave.
+echo  2. Clique em "Create API Key", de o nome Luiz Conrado e copie a chave.
 echo  3. Cole aqui com o botao direito e aperte Enter.
 echo  Para pular, apenas aperte Enter.
 echo ============================================================
@@ -92,12 +92,12 @@ set /p "CIDADE=Sua cidade para o clima (Enter = deixar para depois): "
 
 :iniciar
 echo.
-echo Iniciando o Jarvis Ultron... Deixe esta janela aberta enquanto usa.
+echo Iniciando o Luiz Conrado... Deixe esta janela aberta enquanto usa.
 set JARVIS_CLI=1
 ".venv\Scripts\python.exe" main.py
 if errorlevel 1 (
     echo.
-    echo O Jarvis Ultron parou com um erro. Tire um print desta tela e envie para o suporte.
+    echo O Luiz Conrado parou com um erro. Tire um print desta tela e envie para o suporte.
     pause
 )
 exit /b

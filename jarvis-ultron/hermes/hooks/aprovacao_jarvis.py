@@ -37,7 +37,7 @@ PALAVRAS_LEITURA = (
 
 MENSAGEM = {
     "redes": ("Publicação bloqueada: falta o 'ok' do usuário. Salve o post como proposta e peça "
-              "aprovação. Ele aprova dizendo ao Jarvis, por exemplo: 'ok, pode publicar'."),
+              "aprovação. Ele aprova dizendo ao assistente de voz, por exemplo: 'ok, pode publicar'."),
     "anuncios": ("Alteração de anúncio bloqueada: falta o 'ok' do usuário. Descreva a mudança (e o "
                  "custo, se houver) e peça aprovação antes de mexer em qualquer campanha."),
 }

@@ -1,5 +1,5 @@
 @echo off
-title Desinstalar Hermes (Jarvis Ultron)
+title Desinstalar Hermes (Luiz Conrado)
 echo.
 echo Isto remove o Hermes e TODAS as configuracoes dele:
 echo login do Nous, conexao do Metricool, perfil jarvis e rotina das 8h.
@@ -14,5 +14,5 @@ if not exist "%H%" (echo O Hermes nao foi encontrado neste computador. Nada para
 "%H%" gateway uninstall
 "%H%" uninstall --full --yes
 echo.
-echo Pronto. Agora, na pasta nova do Jarvis, rode o "Instalar Hermes".
+echo Pronto. Agora, na pasta nova do Luiz Conrado, rode o "Instalar Hermes".
 pause

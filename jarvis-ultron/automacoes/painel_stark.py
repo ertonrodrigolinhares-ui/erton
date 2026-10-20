@@ -23,6 +23,8 @@ import time
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+from core import marca
+
 ATUALIZAR_MS = 5000
 HERMES_A_CADA = 60  # segundos
 ALERTA_POR = 90  # segundos que o painel fica âmbar depois de um lembrete
@@ -94,7 +96,7 @@ def texto_geekie(hoje: date | None = None) -> str:
 
 def texto_voz(jarvis) -> tuple[str, bool]:
     if getattr(jarvis, "parado", False) is True:  # o cérebro caiu e a tela desistiu de religar
-        return "Cérebro parado — feche e abra o Jarvis", False
+        return f"Cérebro parado — feche e abra o {marca.NOME_CURTO}", False
     if getattr(jarvis, "_cerebro_nome", "") == "gemma":
         return "Cérebro: Gemma 4 (no PC)", True
     if getattr(jarvis, "_modo_reserva", False):

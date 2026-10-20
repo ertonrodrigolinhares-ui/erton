@@ -1,9 +1,9 @@
 @echo off
-title Instalar voz local - Whisper (Jarvis Ultron)
+title Instalar voz local - Whisper (Luiz Conrado)
 cd /d "%~dp0"
 rem Transcricao da sua voz no proprio PC (modo privado / Gemma 4). Nada vai para a internet.
 if not exist ".venv\Scripts\python.exe" (
-    echo Abra o "Iniciar Jarvis Ultron" uma vez antes ^(ele prepara o Jarvis^), feche e rode este de novo.
+    echo Abra o "Iniciar Jarvis Ultron" uma vez antes ^(ele prepara o Luiz Conrado^), feche e rode este de novo.
     pause
     exit /b 1
 )
@@ -13,8 +13,8 @@ echo.
 echo Baixando o modelo de voz em portugues (uns 500 MB, so na primeira vez)...
 ".venv\Scripts\python.exe" -c "from faster_whisper import WhisperModel; WhisperModel('small', device='cpu', compute_type='int8'); print('ok')" || goto erro
 echo.
-echo Pronto! A sua voz agora e transcrita no PC. Feche o Jarvis de verdade
-echo (botao direito no icone perto do relogio, Quit JARVIS) e abra de novo.
+echo Pronto! A sua voz agora e transcrita no PC. Feche o Luiz Conrado de verdade
+echo (botao direito no icone perto do relogio, Sair do Luiz Conrado) e abra de novo.
 pause
 exit /b 0
 :erro

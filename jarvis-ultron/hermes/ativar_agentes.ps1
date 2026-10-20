@@ -43,7 +43,7 @@ function Gravar-Ligados($nomes) {
 $agentes = @($pastasSkills | Where-Object { Test-Path $_ } | ForEach-Object { Get-ChildItem $_ -Directory } | Sort-Object Name)
 $ligados = @(Ler-Ligados)
 Write-Host ""
-Write-Host "Agentes do Jarvis (os LIGADOS viram botoes no painel Ultron e rodam no Claude):" -ForegroundColor Cyan
+Write-Host "Agentes do Luiz (os LIGADOS viram botoes no painel Ultron e rodam no Claude):" -ForegroundColor Cyan
 for ($i = 0; $i -lt $agentes.Count; $i++) {
     $nome = $agentes[$i].Name
     $estado = if ($ligados -contains $nome) { "[LIGADO]   " } else { "[desligado]" }
@@ -73,6 +73,6 @@ foreach ($parte in ($resposta -split "[ ,;]+" | Where-Object { $_ })) {
 }
 Gravar-Ligados $ligados
 Write-Host ""
-Write-Host "Pronto. Abra o painel Ultron (diga 'Jarvis, modo Ultron'): os agentes ligados aparecem como botoes."
+Write-Host "Pronto. Abra o painel Ultron (diga 'Luiz, modo Ultron'): os agentes ligados aparecem como botoes."
 Write-Host "Eles rodam no Claude: rode o 'Instalar Claude' antes, se ainda nao rodou."
 Read-Host "Aperte Enter para fechar"

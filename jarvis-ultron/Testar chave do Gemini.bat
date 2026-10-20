@@ -1,8 +1,8 @@
 @echo off
-title Testar chave do Gemini (Jarvis Ultron)
+title Testar chave do Gemini (Luiz Conrado)
 cd /d "%~dp0"
 if not exist ".venv\Scripts\python.exe" (
-    echo Abra o "Iniciar Jarvis Ultron" uma vez antes ^(ele prepara o Jarvis^) e depois rode este teste.
+    echo Abra o "Iniciar Jarvis Ultron" uma vez antes ^(ele prepara o Luiz Conrado^) e depois rode este teste.
     pause
     exit /b 1
 )
