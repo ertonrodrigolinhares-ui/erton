@@ -8,7 +8,7 @@ description: "Relatório mensal das redes: crescimento de seguidores, alcance e 
 > (Gmail, Agenda, Metricool, Meta), navegador nem comandos: ele pesquisa na internet, lê os arquivos de
 > `Documentos\Jarvis Ultron` e escreve só em `Documentos\Jarvis Ultron\Claude`. Onde este agente falar
 > em publicar, agendar, enviar, usar conectores ou o Hermes, prepare só o rascunho ou o relatório (em
-> `Relatorios`) e diga ao Erton o que falta para ele aprovar. Nada é publicado, enviado ou comprado.
+> `Relatorios`) e diga ao usuário o que falta para ele aprovar. Nada é publicado, enviado ou comprado.
 
 Relatório mensal das redes: crescimento de seguidores, alcance e melhores posts do mês.
 

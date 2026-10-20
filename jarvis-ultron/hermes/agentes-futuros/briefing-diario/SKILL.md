@@ -17,7 +17,7 @@ Briefing do dia: agenda, e-mails importantes e notícias do setor logo cedo.
 ## Procedimento
 1. Agenda de hoje (e o primeiro compromisso de amanhã).
 2. E-mails importantes não lidos (remetente, assunto, uma linha de resumo).
-3. 3 notícias relevantes de economia, tributação e esporte.
+3. 3 notícias relevantes para a área de quem usa (veja o perfil; se não souber, economia e tecnologia).
 4. Responda em até 6 frases, pronto para ser falado.
 
 ## Regras

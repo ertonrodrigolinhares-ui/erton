@@ -8,7 +8,7 @@ description: "Briefing do dia: agenda, e-mails importantes e notícias do setor 
 > (Gmail, Agenda, Metricool, Meta), navegador nem comandos: ele pesquisa na internet, lê os arquivos de
 > `Documentos\Jarvis Ultron` e escreve só em `Documentos\Jarvis Ultron\Claude`. Onde este agente falar
 > em publicar, agendar, enviar, usar conectores ou o Hermes, prepare só o rascunho ou o relatório (em
-> `Relatorios`) e diga ao Erton o que falta para ele aprovar. Nada é publicado, enviado ou comprado.
+> `Relatorios`) e diga ao usuário o que falta para ele aprovar. Nada é publicado, enviado ou comprado.
 
 Briefing do dia: agenda, e-mails importantes e notícias do setor logo cedo.
 
@@ -18,7 +18,7 @@ Briefing do dia: agenda, e-mails importantes e notícias do setor logo cedo.
 ## Procedimento
 1. Agenda de hoje (e o primeiro compromisso de amanhã).
 2. E-mails importantes não lidos (remetente, assunto, uma linha de resumo).
-3. 3 notícias relevantes de economia, tributação e esporte.
+3. 3 notícias relevantes para a área de quem usa (veja o perfil; se não souber, economia e tecnologia).
 4. Responda em até 6 frases, pronto para ser falado.
 
 ## Regras

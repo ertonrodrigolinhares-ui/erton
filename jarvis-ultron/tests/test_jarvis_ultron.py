@@ -687,7 +687,8 @@ class KitHermesTests(unittest.TestCase):
         self.assertTrue(gancho["fail_closed"])
         self.assertRegex("mcp__metricool__create_post", gancho["matcher"])
         habilidades = list((KIT / "skills" / "jarvis").glob("*/SKILL.md")) + \
-            list((KIT / "agentes-futuros").glob("*/SKILL.md"))
+            list((KIT / "agentes-futuros").glob("*/SKILL.md")) + \
+            [s for s in (KIT.parent / "pacotes").rglob("SKILL.md") if "hermes" in s.parts]  # o pacote do dono
         self.assertGreaterEqual(len(habilidades), 17)
         for skill in habilidades:
             frente = yaml.safe_load(skill.read_text(encoding="utf-8").split("---")[1])
@@ -1366,7 +1367,7 @@ class GeekieTests(unittest.TestCase):
             self.assertEqual(jarvis._verificar_lembretes_geekie(), [])  # já lembrou hoje
 
     def test_skill_e_somente_leitura(self):
-        texto = (KIT / "skills" / "jarvis" / "geekie-pendencias" / "SKILL.md").read_text(encoding="utf-8")
+        texto = (KIT.parent / "pacotes" / "erton" / "hermes" / "skills" / "jarvis" / "geekie-pendencias" / "SKILL.md").read_text(encoding="utf-8")
         self.assertIn("SOMENTE LEITURA", texto)
         self.assertIn("Nunca digite senhas", texto)
         self.assertIn("__PASTA_JARVIS__/geekie/pendencias.json", texto)

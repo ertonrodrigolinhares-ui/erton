@@ -1,6 +1,7 @@
 """Agentes do Jarvis Ultron: quais estão LIGADOS (eles viram botões no painel Ultron).
 
-Os agentes ficam em claude/skills/<nome>/SKILL.md e rodam no Claude (claude_task com agent=<nome>).
+Os agentes ficam em claude/skills/<nome>/SKILL.md (e, com JARVIS_PACOTE no .env, também em
+pacotes/<nome>/claude/skills: core/pacote.py) e rodam no Claude (claude_task com agent=<nome>).
 A lista dos ligados fica em Documentos/Jarvis Ultron/agentes_ligados.txt, um nome por linha. Quem
 liga e desliga: o "Ativar Agentes" (na pasta do Jarvis) ou estas funções.
 """
@@ -9,6 +10,8 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+
+from core import pacote
 
 EMOJIS = {
     "agenda-inteligente": "📅", "agente-provas": "🏁", "briefing-diario": "☀️", "clientes-grupos": "👥",
@@ -50,7 +53,8 @@ def _descricao(skill: Path) -> str:
 def todos() -> list[dict]:
     """Todos os agentes que existem: [{nome, titulo, curto, emoji, descricao}]."""
     saida = []
-    for skill in sorted(pasta_agentes().glob("*/SKILL.md")):
+    skills = [s for pasta in pacote.pastas_de_skills(pasta_agentes().parents[1]) for s in pasta.glob("*/SKILL.md")]
+    for skill in sorted(skills, key=lambda s: s.parent.name):
         nome = skill.parent.name
         descricao = _descricao(skill)
         titulo = descricao.split(":", 1)[0].strip() if ":" in descricao[:60] else nome.replace("-", " ").capitalize()

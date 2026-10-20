@@ -1,6 +1,6 @@
 ---
 name: agenda-inteligente
-description: "Agenda inteligente: organiza o Google Agenda, avisa conflitos e lembra aniversários e compromissos da família."
+description: "Agenda inteligente: organiza o Google Agenda, avisa conflitos e lembra aniversários e compromissos de quem usa."
 version: 1.0.0
 metadata:
   hermes:
@@ -9,7 +9,7 @@ metadata:
 ---
 # Agenda inteligente
 
-Agenda inteligente: organiza o Google Agenda, avisa conflitos e lembra aniversários e compromissos da família.
+Agenda inteligente: organiza o Google Agenda, avisa conflitos e lembra aniversários e compromissos de quem usa.
 
 ## Requisitos
 - Conectar o Google Agenda (MCP do Google Calendar).
@@ -17,8 +17,8 @@ Agenda inteligente: organiza o Google Agenda, avisa conflitos e lembra aniversá
 ## Procedimento
 1. Leia os compromissos de hoje e dos próximos 7 dias.
 2. Avise conflitos de horário e compromissos sem tempo de deslocamento.
-3. Lembre aniversários e datas da família (Emanuele, Yvnna, Luiz Enrique) com 3 dias de antecedência.
-4. Para criar ou mudar um compromisso, descreva a mudança e peça o ok do Erton antes.
+3. Lembre aniversários e datas importantes (pergunte quais, se não souber) com 3 dias de antecedência.
+4. Para criar ou mudar um compromisso, descreva a mudança e peça o ok do usuário antes.
 
 ## Regras
-- Nunca aceite, recuse ou cancele convites sem o ok do Erton.
+- Nunca aceite, recuse ou cancele convites sem o ok do usuário.

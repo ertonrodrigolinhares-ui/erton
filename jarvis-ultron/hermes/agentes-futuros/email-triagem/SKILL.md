@@ -17,7 +17,7 @@ Triagem de e-mails: separa a caixa em urgente, clientes e o resto, e sugere resp
 ## Procedimento
 1. Leia os e-mails não lidos e separe em: urgente, de cliente, financeiro, e outros.
 2. Para cada um importante, sugira uma resposta curta em português, como rascunho.
-3. Aponte o que precisa da decisão do Erton.
+3. Aponte o que precisa da decisão do usuário.
 4. Nunca marque como lido nem mexa na caixa sem pedir.
 
 ## Regras

@@ -69,7 +69,7 @@ Cópia do projeto **JARVIS-OS V.2** (licença MIT, veja `LICENSE`), com ajustes 
    botão **☺ SOBRE VOCÊ** (canto de baixo, à direita da tela azul) ou **PERFIL** na tela antiga (F2).
    Depois é só **falar**.
 5. **Deixe a janela preta aberta** enquanto usa. Ela mostra o que o Jarvis está fazendo.
-6. Para os agentes (posts, Metricool, rotina das 8h): dê dois cliques em **`Instalar Hermes`**.
+6. Para os agentes do Hermes (posts, Metricool, painéis): dê dois cliques em **`Instalar Hermes`**.
 
 ### Reinstalar do zero
 1. Se já tinha o Hermes: dê dois cliques em **`Desinstalar Hermes`** e digite **SIM**
@@ -176,7 +176,7 @@ O Gemini continua sendo a **voz** do Jarvis. Quando o pedido é grande, o Jarvis
 **Claude Code** rodando no seu PC, com a sua assinatura do Claude (Pro ou Max), sem chave de API.
 
 1. Dê dois cliques em **"Instalar Claude"**. Ele instala o Claude Code (instalador oficial, sem
-   administrador), prepara a pasta `Documentos\Jarvis Ultron\Claude` com os 22 agentes e abre o
+   administrador), prepara a pasta `Documentos\Jarvis Ultron\Claude` com os 11 agentes do produto e abre o
    Claude para você **entrar com a sua conta** (no fim, digite `/exit`).
 2. Abra o Jarvis (se ele estava aberto, feche de verdade, em **Quit JARVIS**, e abra de novo) e peça,
    por exemplo:
@@ -190,7 +190,7 @@ o resumo e abre o relatório completo (fica em `Claude\Relatorios`).
 
 **Especialistas extras (282 agentes da coleção [agency-agents](https://github.com/msitarzewski/agency-agents),
 licença MIT):** ficam em `claude\agency` e o Jarvis copia para `Claude\Agency`. O Gemini continua vendo
-só os 22 agentes acima (assim ele não fica lento nem confuso); quem conhece os 282 é o Claude, que
+só os agentes do Jarvis (assim ele não fica lento nem confuso); quem conhece os 282 é o Claude, que
 consulta os índices (`INDICE.md` com as áreas e um `INDICE.md` por área) quando o pedido precisa de um
 especialista. O Claude só lê essa pasta: não consegue mudar os agentes, e se algo mudar a cópia volta
 ao original na próxima tarefa. Também dá para pedir um pelo nome em inglês, por exemplo:
@@ -345,6 +345,15 @@ Toda automação nova vem em **um arquivo**: salve na pasta **`automacoes`** (de
 Jarvis), feche o Jarvis de verdade (**Quit JARVIS**, no ícone perto do relógio) e abra de novo.
 Não precisa atualizar o resto do projeto. Veja
 `automacoes/LEIA-ME.md`. Para desligar, apague o arquivo da pasta.
+
+## Pacote do dono (`JARVIS_PACOTE`)
+
+Agentes e rotinas que são de uma pessoa só (o perfil de atleta, a família, a escola dos filhos, a
+contabilidade de quem criou o Jarvis) não fazem parte do produto: ficam em `pacotes\<nome>` e só
+entram no seu Jarvis se o `.env` tiver `JARVIS_PACOTE=<nome>` (por exemplo `JARVIS_PACOTE=erton`).
+Com a linha, eles aparecem no `Ativar Agentes`, no painel Ultron, no Claude e no `Instalar Hermes`
+(que também cria as rotinas deles, como a dos posts das 8h). Sem a linha, é como se não existissem:
+é o Jarvis que o cliente recebe.
 
 ## Escola: Geekie One (pendências, tutor e lembretes)
 
@@ -502,7 +511,7 @@ o Jarvis não mexe nessas configurações do PC.
   (hoje, só visuais) ficam anotados, com o motivo, em `tests/dados/falhas_conhecidas.txt`. O
   `python dev/conferir_testes.py` roda todos os testes e avisa só das falhas novas.
 
-## Hermes: agentes, rotina das 8h e redes sociais
+## Hermes: agentes e redes sociais
 
 O Hermes Agent (Nous Research, código aberto) é o "orquestrador" do Jarvis. Ele divide tarefas
 entre sub-agentes, usa os **modelos grátis do Nous Portal** como cérebro e se conecta ao **Metricool** (posts em todas as
@@ -515,7 +524,7 @@ redes). Os **anúncios do Meta** ficam pelo app do Claude (veja "Limitações co
    - usa o login do **Nous Portal** feito na instalação (se não tiver, abre o navegador para entrar)
      e pede a chave da **ElevenLabs** (opcional);
    - abre o navegador para você autorizar o **Metricool**;
-   - cria a **rotina diária das 8h** e faz o Hermes ligar sozinho com o Windows.
+   - cria as rotinas do seu pacote (se houver) e faz o Hermes ligar sozinho com o Windows.
 2. Se o Jarvis estiver aberto, feche de verdade (botão direito no ícone perto do relógio →
    **Quit JARVIS**) e abra o **"Iniciar Jarvis Ultron"**.
 
@@ -527,7 +536,7 @@ Pode rodar o **`Instalar Hermes`** de novo sempre que receber uma atualização:
 o que já existe e só pergunta do Metricool se você quiser reconectar.
 
 ### Como usar
-- **"Hey Jarvis, quais são os posts de hoje?"**: ele lê as propostas que a rotina das 8h preparou.
+- **"Hey Jarvis, quais são os posts de hoje?"**: ele lê as propostas que a rotina de posts (do seu pacote) preparou.
 - **"Ok, pode publicar os posts 1 e 3"**: ele repete o que vai publicar e pergunta; com o seu "ok" (dito
   depois de ouvir) ele registra a aprovação e manda publicar pelo Metricool.
 - **"Entre no painel do Metricool e veja os seguidores desta semana"**: o Hermes usa o navegador sozinho.
@@ -535,7 +544,7 @@ o que já existe e só pergunta do Metricool se você quiser reconectar.
   traz a resposta quando ficar pronta (com o modo chamada esperando, ela aparece só na tela).
 
 ### Segurança
-- A rotina das 8h **só prepara** os posts. **Nada é publicado sem o seu "ok".**
+- As rotinas de posts **só preparam** os posts. **Nada é publicado sem o seu "ok".**
 - A trava é garantida por um programa (`hermes/hooks/aprovacao_jarvis.py`), não só por instrução:
   publicar, agendar, editar, apagar ou mexer em anúncios é bloqueado. Com o seu "ok", a trava abre só
   enquanto o Hermes faz o que você aprovou (no máximo 10 minutos) e fecha assim que ele termina. Se
@@ -546,7 +555,7 @@ o que já existe e só pergunta do Metricool se você quiser reconectar.
   de gastar ou mudar algo, o Jarvis confere de novo a sua fala inteira (às vezes a transcrição chega
   aos pedaços). Vale também para vídeos e para o Claude.
 - No navegador, o Hermes não digita senhas, não paga nada e não envia mensagens sem o seu ok.
-- Os posts ficam no perfil de atleta; nada da empresa ou de clientes.
+- Os posts seguem a skill de conteúdo que estiver ligada; nada de clientes nem de dados sigilosos.
 
 ### Custos
 - **Hermes**: grátis. **Metricool**: o conector funciona inclusive no plano grátis.

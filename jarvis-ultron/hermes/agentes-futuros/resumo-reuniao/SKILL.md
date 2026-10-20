@@ -17,9 +17,9 @@ Resumo de reunião: transforma suas anotações ou a transcrição em uma ata or
 ## Procedimento
 1. Leia as anotações/transcrição.
 2. Monte a ata: assunto, decisões, e uma lista de tarefas com responsável e prazo.
-3. Destaque o que depende do Erton.
+3. Destaque o que depende do usuário.
 4. Salve a ata em Documentos\Jarvis Ultron\Reunioes.
 
 ## Regras
 - Não invente o que não estiver nas anotações.
-- Não envie a ata a ninguém sem o ok do Erton.
+- Não envie a ata a ninguém sem o ok do usuário.

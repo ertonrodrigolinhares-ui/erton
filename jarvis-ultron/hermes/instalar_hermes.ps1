@@ -121,6 +121,15 @@ Gravar (Join-Path $perfil "SOUL.md") ($soul.Replace("__PERFIL__", "").Replace("_
 $destinoSkills = Join-Path $perfil "skills\jarvis"
 New-Item -ItemType Directory -Force $destinoSkills | Out-Null
 Copy-Item (Join-Path $kit "skills\jarvis\*") $destinoSkills -Recurse -Force
+# Pacote do dono (JARVIS_PACOTE no .env do Jarvis): as habilidades dele entram junto; o cliente nao as tem
+$pacote = ""
+$envDoJarvis = Ler-Env (Join-Path $ultron ".env")
+if ($envDoJarvis.Contains("JARVIS_PACOTE")) { $pacote = ([string]$envDoJarvis["JARVIS_PACOTE"]).Trim().ToLower() }
+$skillsDoPacote = if ($pacote) { Join-Path $ultron "pacotes\$pacote\hermes\skills\jarvis" } else { "" }
+if ($skillsDoPacote -and (Test-Path $skillsDoPacote)) {
+    Copy-Item (Join-Path $skillsDoPacote "*") $destinoSkills -Recurse -Force
+    Write-Host "Pacote '$pacote': habilidades do dono instaladas junto." -ForegroundColor Green
+}
 Get-ChildItem $destinoSkills -Recurse -Filter "SKILL.md" | ForEach-Object {
     $texto = [System.IO.File]::ReadAllText($_.FullName)
     Gravar $_.FullName ($texto.Replace("__PASTA_JARVIS__", $pastaJarvisBarra))
@@ -129,7 +138,7 @@ $pastaGancho = Join-Path $perfil "hooks-jarvis"
 New-Item -ItemType Directory -Force $pastaGancho | Out-Null
 Copy-Item (Join-Path $kit "hooks\aprovacao_jarvis.py") $pastaGancho -Force
 $gancho = (Join-Path $pastaGancho "aprovacao_jarvis.py") -replace '\\', '/'
-Write-Host "6 habilidades instaladas e trava de aprovacao ligada." -ForegroundColor Green
+Write-Host "Habilidades instaladas e trava de aprovacao ligada." -ForegroundColor Green
 
 # ---------------------------------------------------------------- 4. Chaves
 Titulo "4/7  Cerebro gratis (Nous) e chave da ElevenLabs"
@@ -215,12 +224,12 @@ if ($conectar) {
 }
 
 # ---------------------------------------------------------------- 7. Rotina das 8h e inicio automatico
-Titulo "7/7  Rotinas (8h e Geekie 7h/18h) e inicio automatico"
+Titulo "7/7  Rotinas do pacote do dono (se houver) e inicio automatico"
 $rotinas = (& $hermes -p jarvis cron list 2>&1 | Out-String)
-if ($rotinas -notmatch "Rotina do atleta 8h") {
+if ((Test-Path (Join-Path $destinoSkills "rotina-atleta-8h")) -and ($rotinas -notmatch "Rotina do atleta 8h")) {
     & $hermes -p jarvis cron create "0 8 * * *" "Execute a rotina diaria do perfil de atleta." --skill rotina-atleta-8h --name "Rotina do atleta 8h" --deliver local
 }
-if ($rotinas -notmatch "Geekie pendencias") {
+if ((Test-Path (Join-Path $destinoSkills "geekie-pendencias")) -and ($rotinas -notmatch "Geekie pendencias")) {
     & $hermes -p jarvis cron create "0 7,18 * * *" "Leia as atividades pendentes do Geekie One (somente leitura)." --skill geekie-pendencias --name "Geekie pendencias" --deliver local
 }
 # Um servico so (do perfil principal) atende o perfil jarvis e a rotina das 8h.

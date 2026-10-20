@@ -281,7 +281,7 @@ def preparar_pasta() -> Path:
     except OSError as erro:  # um CLAUDE.md preso (OneDrive, antivírus) não impede os agentes
         print(f"[Claude] Não consegui atualizar o CLAUDE.md: {erro}")
     try:
-        for skill in sorted((origem / "skills").glob("*/SKILL.md")):
+        for skill in sorted(s for pasta_skills in _pastas_de_skills() for s in pasta_skills.glob("*/SKILL.md")):
             destino = pasta / ".claude" / "skills" / skill.parent.name / "SKILL.md"
             if not destino.exists() or destino.stat().st_mtime < skill.stat().st_mtime:
                 destino.parent.mkdir(parents=True, exist_ok=True)
@@ -391,9 +391,15 @@ def _dentro(caminho, pasta) -> bool:
     return real == base or base in real.parents
 
 
+def _pastas_de_skills() -> list[Path]:
+    """claude/skills e, com JARVIS_PACOTE no .env, a pasta do pacote do dono (core/pacote.py)."""
+    from core import pacote
+
+    return pacote.pastas_de_skills(pasta_jarvis())
+
+
 def agentes() -> list[str]:
-    raiz = pasta_jarvis() / "claude" / "skills"
-    return sorted(p.parent.name for p in raiz.glob("*/SKILL.md"))
+    return sorted({p.parent.name for pasta in _pastas_de_skills() for p in pasta.glob("*/SKILL.md")})
 
 
 def agente_do_jarvis(nome: str | None) -> str | None:

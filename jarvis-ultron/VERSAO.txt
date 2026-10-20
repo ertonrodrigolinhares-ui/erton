@@ -10,6 +10,10 @@ Novidades desta versão:
   você pelo nome escolhido (nunca mais "Sir"). O "Bom dia" e o clima usam o perfil; sem cidade, o
   clima não é consultado (o serviço localizaria você pelo IP) e a tela pede a cidade. Se você usa o
   Hermes, rode o "Instalar Hermes" de novo para ele receber a personalidade nova.
+- Pacote do dono: os agentes e rotinas que são de uma pessoa só (atleta, família, escola dos filhos e
+  contabilidade) saíram do produto e foram para pacotes\erton. O Jarvis que o cliente recebe fica com os
+  11 agentes genéricos, sem nome de ninguém. Para continuar com os seus, ponha JARVIS_PACOTE=erton no
+  seu .env (uma vez) e rode o "Instalar Hermes" de novo: tudo volta como era.
 
 Versão anterior (2026-10-19.2):
 

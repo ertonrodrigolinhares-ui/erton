@@ -7,6 +7,20 @@ $kit = Split-Path -Parent $MyInvocation.MyCommand.Path        # ...\jarvis-ultro
 $ultron = Split-Path -Parent $kit
 $skills = Join-Path $ultron "claude\skills"
 $guardados = Join-Path $kit "agentes-futuros"
+# Pacote do dono (JARVIS_PACOTE no .env): os agentes dele entram na lista junto com os do produto
+$pacote = ""
+$envUltron = Join-Path $ultron ".env"
+if (Test-Path $envUltron) {
+    foreach ($linha in [System.IO.File]::ReadAllLines($envUltron)) {
+        if ($linha -match '^\s*JARVIS_PACOTE\s*=\s*"?([A-Za-z0-9-]+)"?') { $pacote = $matches[1].ToLower() }
+    }
+}
+$pastasSkills = @($skills)
+$pastasGuardados = @($guardados)
+if ($pacote -and (Test-Path (Join-Path $ultron "pacotes\$pacote"))) {
+    $pastasSkills += Join-Path $ultron "pacotes\$pacote\claude\skills"
+    $pastasGuardados += Join-Path $ultron "pacotes\$pacote\hermes\agentes-futuros"
+}
 $dados = Join-Path $env:USERPROFILE "Documents\Jarvis Ultron"
 $lista = Join-Path $dados "agentes_ligados.txt"
 $utf8 = New-Object System.Text.UTF8Encoding $false
@@ -26,7 +40,7 @@ function Gravar-Ligados($nomes) {
     [System.IO.File]::WriteAllText($lista, $texto, $utf8)
 }
 
-$agentes = @(Get-ChildItem $skills -Directory | Sort-Object Name)
+$agentes = @($pastasSkills | Where-Object { Test-Path $_ } | ForEach-Object { Get-ChildItem $_ -Directory } | Sort-Object Name)
 $ligados = @(Ler-Ligados)
 Write-Host ""
 Write-Host "Agentes do Jarvis (os LIGADOS viram botoes no painel Ultron e rodam no Claude):" -ForegroundColor Cyan
@@ -51,8 +65,9 @@ foreach ($parte in ($resposta -split "[ ,;]+" | Where-Object { $_ })) {
         Write-Host "Desligado: $nome" -ForegroundColor Yellow
     } else {
         $ligados = @($ligados) + $nome
-        $origemHermes = Join-Path $guardados $nome
-        if ($comHermes -and (Test-Path $origemHermes)) { Copy-Item $origemHermes $noHermes -Recurse -Force }
+        $origemHermes = $null
+        foreach ($g in $pastasGuardados) { $cand = Join-Path $g $nome; if (Test-Path $cand) { $origemHermes = $cand } }
+        if ($comHermes -and $origemHermes) { Copy-Item $origemHermes $noHermes -Recurse -Force }
         Write-Host "Ligado: $nome" -ForegroundColor Green
     }
 }
