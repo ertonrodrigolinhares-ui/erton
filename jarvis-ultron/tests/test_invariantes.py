@@ -42,7 +42,7 @@ sys.path.insert(0, str(RAIZ / "tests"))
 from core.aprovacao import nova_fala  # noqa: E402
 from test_contratos import FOTO_POLITICAS, UIFalsa, acoes_do_main, em_fila, ler_foto  # noqa: E402
 
-# As ferramentas que só agem no PC (cópia da LOCAL_MACHINE_ONLY_ACTIONS de hoje, que a Etapa 5 apaga do
+# As ferramentas que só agem no PC (cópia da LOCAL_MACHINE_ONLY_ACTIONS, que a Etapa 5 apagou do
 # main.py): o modo servidor nunca pode oferecê-las.
 AGEM_NO_PC = frozenset({"computer_control", "open_app", "file_controller", "media_control",
                         "desktop_control", "computer_settings"})

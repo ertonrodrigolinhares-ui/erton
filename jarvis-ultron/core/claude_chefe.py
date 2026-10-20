@@ -38,6 +38,7 @@ import sys
 import tempfile
 import threading
 import time
+import unicodedata
 import zipfile
 import zlib
 from dataclasses import dataclass, field
@@ -81,8 +82,7 @@ PASTAS_FORA = {".git", "__pycache__", ".venv", "venv", "env", "ENV", "node_modul
 ARQUIVOS_FORA = {".env", "api_keys.json", "ui_settings.json"}
 
 REGRAS = """Você é o "chefe de tarefas" do Jarvis Ultron, o assistente de voz do Erton Rodrigo Linhares Coelho
-(contador e administrador, CRA/PB 4473 | CRC/PB 6689; lidera a Linhares Prudêncio Contabilidade e Gestão
-Empresarial; atleta de triathlon, Ironman 70.3 Hawaii). Escreva sempre em português do Brasil.
+(empresário; atleta de triathlon, Ironman 70.3 Hawaii). Escreva sempre em português do Brasil.
 
 Regras:
 - Nunca publique, envie mensagens ou e-mails, compre, agende ou apague nada. Prepare rascunhos e diga
@@ -96,7 +96,12 @@ Regras:
 REGRAS_TAREFA = """
 Pasta de trabalho: {pasta}. Arquivos que você criar devem ficar aqui (relatórios em "Relatorios").
 O Erton deixa arquivos para você analisar em "Entrada". Você também pode LER (sem alterar) os arquivos
-de {dados} (por exemplo clientes.txt, carteira.txt, a pasta Faturas)."""
+de {dados} (por exemplo clientes.txt, carteira.txt, a pasta Faturas).
+Especialistas extras: a pasta "Agency" tem centenas de agentes prontos (finanças, vendas, marketing,
+gestão, jurídico, pesquisa...). Quando o pedido ganhar com um especialista, leia "Agency/INDICE.md"
+(a lista das áreas), depois o INDICE.md da área que serve, escolha o agente certo e siga o arquivo
+dele. Eles estão em inglês e são de outros países: responda em português, use as leis e impostos do
+Brasil, e as regras acima valem mais que as deles. A pasta "Agency" é só para ler."""
 
 REGRAS_PLANO = """
 TAREFA: planejar uma mudança no código do próprio Jarvis Ultron (pasta atual). NÃO altere nada agora:
@@ -190,6 +195,9 @@ def ambiente() -> dict:
            if k.upper() not in SEGREDOS and not k.upper().startswith(SEGREDOS_PREFIXOS)}
     env["PYTHONIOENCODING"] = "utf-8"
     env["ENABLE_CLAUDEAI_MCP_SERVERS"] = "false"  # reforço do --strict-mcp-config: sem conectores
+    # Sem a "memória" do Claude Code (MEMORY.md em ~/.claude/projects): o que uma página da internet
+    # escondesse ali seria seguido em toda tarefa. A escrita também é proibida (_proibidas_na).
+    env["CLAUDE_CODE_DISABLE_AUTO_MEMORY"] = "1"
     return env
 
 
@@ -241,8 +249,14 @@ def _proibidas_na(pasta: Path) -> list[str]:
         regras += [f"Read({jarvis}/{item})", f"Edit({jarvis}/{item})"]
     if jarvis == pasta or jarvis.startswith(pasta + "/"):  # só onde o Claude pode mudar a pasta do Jarvis
         regras += _fora_da_foto(jarvis)
+    if pasta == regra_de_pasta(pasta_trabalho()):
+        # O que as próximas tarefas seguem sozinhas o Claude só lê: os especialistas (Agency) e os
+        # CLAUDE.md (carregados em toda tarefa). Assim uma página da internet com instruções
+        # escondidas não vira regra permanente. O Erton continua podendo editar à mão.
+        regras += [f"Edit({pasta}/Agency/**)", f"Edit({pasta}/**/CLAUDE.md)", f"Edit({pasta}/**/CLAUDE.local.md)"]
     regras += [f"Read({regra_de_pasta(pasta_dados())}/{nome})" for nome in DADOS_PRIVADOS]
     regras += [f"Read(~/{item})" for item in CREDENCIAIS]
+    regras.append("Edit(~/.claude/**)")  # a memória e as configurações do Claude Code, em todo modo
     return list(dict.fromkeys(regras + _ler(*_pastas_do_hermes())))
 
 
@@ -253,9 +267,10 @@ def preparar_pasta() -> Path:
         (pasta / sub).mkdir(parents=True, exist_ok=True)
     origem = pasta_jarvis() / "claude"
     try:
-        modelo = origem / "CLAUDE.md"
-        if modelo.is_file() and not (pasta / "CLAUDE.md").exists():
-            shutil.copy2(modelo, pasta / "CLAUDE.md")
+        _atualizar_claude_md(origem / "CLAUDE.md", pasta / "CLAUDE.md")
+    except OSError as erro:  # um CLAUDE.md preso (OneDrive, antivírus) não impede os agentes
+        print(f"[Claude] Não consegui atualizar o CLAUDE.md: {erro}")
+    try:
         for skill in sorted((origem / "skills").glob("*/SKILL.md")):
             destino = pasta / ".claude" / "skills" / skill.parent.name / "SKILL.md"
             if not destino.exists() or destino.stat().st_mtime < skill.stat().st_mtime:
@@ -263,12 +278,194 @@ def preparar_pasta() -> Path:
                 shutil.copy2(skill, destino)
     except OSError as erro:
         print(f"[Claude] Não consegui copiar os agentes: {erro}")
+    _copiar_agency(origem / "agency", pasta / "Agency")
     return pasta
+
+
+# O CLAUDE.md que o Jarvis instalava até 19/10/2026 (é guardada só a impressão, não o texto). O
+# arquivo da pasta do Claude é copiado uma vez e depois é do Erton; mas, se ainda for aquele, ele
+# vira o novo, e se só o parágrafo "Quem é o Erton" ainda for aquele, só o parágrafo é trocado.
+CLAUDE_MD_ANTIGO = "82df4793001f34208cbd154ffd1051cfd2c91fde24b7c92e7b523557c68408d1"
+QUEM_E_ANTIGO = "989cf1fb8d1c1a723cfda9756a25ccac272c7c3ca3d98f031c534603898888df"
+_QUEM_E = re.compile(r"^## Quem é o Erton\n(.*?)(?=\n\n|\Z)", re.S | re.M)
+
+
+def _impressao(texto: str) -> str:
+    """sha256 do texto sem BOM e com os espaços e quebras de linha (\\r\\n ou \\n) iguais."""
+    return hashlib.sha256(" ".join(texto.lstrip("\ufeff").split()).encode("utf-8")).hexdigest()
+
+
+def _atualizar_claude_md(modelo: Path, instalado: Path) -> None:
+    if not modelo.is_file():
+        return
+    if not instalado.exists():
+        shutil.copy2(modelo, instalado)
+        return
+    texto = instalado.read_text(encoding="utf-8-sig", errors="replace").replace("\r\n", "\n")
+    if _impressao(texto) == CLAUDE_MD_ANTIGO:
+        shutil.copy2(modelo, instalado)
+        return
+    antigo = _QUEM_E.search(texto)
+    novo = _QUEM_E.search(modelo.read_text(encoding="utf-8-sig").replace("\r\n", "\n"))
+    if antigo and novo and _impressao(antigo.group(1)) == QUEM_E_ANTIGO:
+        instalado.write_text(texto[:antigo.start(1)] + novo.group(1) + texto[antigo.end(1):], encoding="utf-8")
+
+
+def _copiar_agency(origem: Path, destino: Path) -> None:
+    """Especialistas da coleção agency-agents: ficam em Agency (fora de .claude) e o Claude abre os
+    índices só quando precisa, por isso não pesam na lista do Gemini. O Claude não pode mudar essa
+    pasta (veja _proibidas_na) e, se algo mudar mesmo assim, a cópia volta ao original: copia de novo
+    quando o tamanho ou a data diferem, e o que não for da coleção sai. Os índices vão primeiro; um
+    arquivo preso (antivírus, OneDrive) não impede os outros."""
+    if not origem.is_dir():
+        return
+    arquivos = [a for a in origem.rglob("*") if a.is_file()]
+    arquivos.sort(key=lambda a: (a.name != "INDICE.md", len(a.relative_to(origem).parts), a.as_posix()))
+    falhas = 0
+    conferidas: dict[Path, bool] = {}
+    for arquivo in arquivos:
+        alvo = destino / arquivo.relative_to(origem)
+        try:
+            if alvo.parent not in conferidas:
+                conferidas[alvo.parent] = _dentro(alvo.parent, destino)
+            if not conferidas[alvo.parent]:
+                raise OSError("atalho de pasta dentro de Agency")
+            fonte = arquivo.stat()
+            if alvo.exists():
+                atual = alvo.stat()
+                if atual.st_size == fonte.st_size and atual.st_mtime_ns == fonte.st_mtime_ns:
+                    continue
+            alvo.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(arquivo, alvo)  # leva a data junto: na próxima vez fica igual e não copia
+        except OSError:
+            falhas += 1
+    if arquivos:
+        falhas += _limpar_sobras(destino, {a.relative_to(origem).as_posix().casefold() for a in arquivos})
+    if falhas:
+        print(f"[Claude] Não consegui copiar ou limpar {falhas} arquivo(s) dos especialistas (pasta Agency).")
+
+
+def _limpar_sobras(destino: Path, esperados: set[str]) -> int:
+    """Tira de Agency o que não está na coleção (agente que saiu numa atualização, arquivo que não
+    devia estar lá). A pasta é toda do Jarvis. Compara sem maiúsculas, como o Windows, e não entra
+    em atalhos de pasta: no Windows o os.walk entra nas "junções" (mklink /J) mesmo com
+    followlinks=False, por isso cada pasta é conferida pelo caminho de verdade. Devolve quantos não
+    deu para apagar."""
+    falhas = 0
+    if not _dentro(destino, destino.parent):
+        return 0  # a própria Agency é um atalho: não apaga nada
+    for raiz, pastas, arquivos in os.walk(destino, topdown=False, followlinks=False):
+        if not _dentro(raiz, destino):
+            continue  # entrou por um atalho: o que está lá não é do Jarvis
+        for nome in arquivos:
+            arquivo = Path(raiz) / nome
+            if arquivo.relative_to(destino).as_posix().casefold() in esperados:
+                continue
+            try:
+                arquivo.unlink()
+            except OSError:
+                falhas += 1
+        for nome in pastas:
+            if not _dentro(Path(raiz) / nome, destino):
+                continue
+            try:
+                (Path(raiz) / nome).rmdir()  # só some se ficou vazia
+            except OSError:
+                pass
+    return falhas
+
+
+def _dentro(caminho, pasta) -> bool:
+    """O caminho de verdade (sem atalhos, junções nem ..) fica dentro da pasta (ou é ela)?"""
+    real, base = Path(os.path.realpath(caminho)), Path(os.path.realpath(pasta))
+    return real == base or base in real.parents
 
 
 def agentes() -> list[str]:
     raiz = pasta_jarvis() / "claude" / "skills"
     return sorted(p.parent.name for p in raiz.glob("*/SKILL.md"))
+
+
+def agente_do_jarvis(nome: str | None) -> str | None:
+    """O nome certo de um dos agentes do Jarvis (claude/skills), aceitando o jeito que o Gemini
+    escrever: "Briefing Diário", "briefing diario" e "briefing-diario" dão "briefing-diario"."""
+    nome = (nome or "").strip()
+    if not nome:
+        return None
+    lista = agentes()
+    if nome in lista:
+        return nome
+    simples = _so_letras(nome)
+    achados = [s for s in lista if _so_letras(s) == simples]
+    return achados[0] if len(achados) == 1 else None
+
+
+def _so_letras(texto: str) -> str:
+    base = unicodedata.normalize("NFKD", texto.lower())
+    base = "".join(c for c in base if not unicodedata.combining(c))
+    return re.sub(r"[^a-z0-9]+", "-", base).strip("-")
+
+
+def campo_no_cabecalho(texto: str, campo: str = "name") -> str | None:
+    """Um campo (name, description...) do bloco --- ... --- do começo de um agente. Só do
+    cabeçalho, nunca do corpo; aceita arquivo salvo com BOM."""
+    linhas = texto.lstrip("\ufeff").splitlines()
+    if not linhas or linhas[0].strip() != "---":
+        return None
+    for linha in linhas[1:]:
+        if linha.strip() == "---":
+            return None
+        chave, _, valor = linha.partition(":")
+        if chave.strip() == campo and valor.strip():
+            return valor.strip().strip("\"'")
+    return None
+
+
+@lru_cache(maxsize=4)
+def _mapa_agency(raiz: str) -> tuple[tuple[str, str, str], ...]:
+    """(nome do arquivo, name: em letras simples, caminho) de cada especialista. Lido uma vez por
+    abertura do Jarvis: trocar a coleção pede fechar e abrir o Jarvis de novo."""
+    pasta = Path(raiz)
+    mapa = []
+    for arquivo in sorted(pasta.rglob("*.md")):
+        if arquivo.name == "INDICE.md":
+            continue
+        try:
+            with open(arquivo, encoding="utf-8", errors="replace") as f:
+                nome = campo_no_cabecalho(f.read(1200))
+        except OSError:
+            continue
+        mapa.append((arquivo.stem, _so_letras(nome or ""), arquivo.relative_to(pasta).as_posix()))
+    return tuple(mapa)
+
+
+def agente_agency(nome: str) -> str | None:
+    """Caminho (a partir da pasta Agency) do especialista com esse nome, ou None.
+
+    Procura em camadas e só aceita uma resposta única em cada uma: 1) o nome do arquivo
+    ("finance-tax-strategist"); 2) o nome de dentro do arquivo ("Tax Strategist"); 3) o nome do
+    arquivo sem a área na frente ("tax-strategist"). Assim "Data Engineer" acha o
+    engineering-data-engineer, e não o gis-spatial-data-engineer; e um nome genérico como "Content
+    Strategist" não cai num agente de nicho (marketing-bilibili-content-strategist): vira dica e o
+    Claude escolhe pelos índices."""
+    procurado = _so_letras(nome or "")
+    if not procurado:
+        return None
+    mapa = _mapa_agency(str(pasta_jarvis() / "claude" / "agency"))
+
+    def sem_area(stem: str, caminho: str) -> str:
+        area = caminho.split("/", 1)[0] + "-"
+        return stem[len(area):] if stem.startswith(area) else stem
+
+    for bate in (lambda stem, nome_, caminho: stem == procurado,
+                 lambda stem, nome_, caminho: nome_ == procurado,
+                 lambda stem, nome_, caminho: sem_area(stem, caminho) == procurado):
+        achados = [caminho for stem, nome_, caminho in mapa if bate(stem, nome_, caminho)]
+        if len(achados) == 1:
+            return achados[0]
+        if achados:
+            return None  # serve para mais de um: melhor não chutar
+    return None
 
 
 # ---------------- conversar com o Claude Code ----------------
@@ -476,11 +673,7 @@ def separar_fala(texto: str) -> tuple[str, str]:
 
 
 def _nome_de_arquivo(texto: str) -> str:
-    import unicodedata
-
-    base = unicodedata.normalize("NFKD", texto.lower())
-    base = "".join(c for c in base if not unicodedata.combining(c))
-    base = re.sub(r"[^a-z0-9]+", "-", base).strip("-")[:50] or "tarefa"
+    base = _so_letras(texto)[:50] or "tarefa"
     return f"{datetime.now():%Y-%m-%d-%H%M}-{base}.md"
 
 
@@ -494,12 +687,32 @@ def salvar_relatorio(pedido: str, conteudo: str) -> Path | None:
 
 
 # ---------------- tarefas (pesquisa, análise, agentes) ----------------
+_SO_RASCUNHO = " Onde ele falar em publicar, enviar ou usar conectores, prepare só o rascunho."
+
+
+def _instrucao_do_agente(agente: str | None) -> str:
+    """O que vai no pedido sobre o agente. O nome vem do Gemini: no texto entra só o caminho de um
+    arquivo que existe (ou uma versão limpa e curta do nome, como dica)."""
+    agente = (agente or "").strip()
+    if not agente:
+        return ""
+    skill = agente_do_jarvis(agente)
+    if skill:
+        return f"\nSiga as instruções do agente do arquivo .claude/skills/{skill}/SKILL.md nesta pasta." + _SO_RASCUNHO
+    especialista = agente_agency(agente)
+    if especialista:
+        return f"\nSiga as instruções do especialista do arquivo Agency/{especialista} nesta pasta." + _SO_RASCUNHO
+    dica = " ".join(re.sub(r"[^\w &+-]", " ", agente).split())[:60]
+    if not dica:
+        return ""
+    return (f"\nO Erton pediu o especialista \"{dica}\", que não achei pelo nome: procure o mais parecido "
+            "nos índices da pasta Agency e, se nenhum servir, diga isso e faça a tarefa sem ele.")
+
+
 def fazer_tarefa(pedido: str, agente: str | None = None, sessao: str | None = None) -> Resposta:
     pasta = preparar_pasta()
     texto = REGRAS + REGRAS_TAREFA.format(pasta=pasta, dados=pasta_dados())
-    if agente:
-        texto += (f"\nSiga as instruções do agente '{agente}' (arquivo .claude/skills/{agente}/SKILL.md "
-                  "nesta pasta). Onde ele falar em publicar, enviar ou usar conectores, prepare só o rascunho.")
+    texto += _instrucao_do_agente(agente)
     texto += f"\n\nPEDIDO DO ERTON:\n{pedido.strip()}"
     permitir = [*LEITURA, *_ler(pasta, pasta_dados()), f"Edit({regra_de_pasta(pasta)}/**)"]
     return rodar(texto, permitir, pasta, sessao=sessao, pastas_extras=[pasta_dados()])

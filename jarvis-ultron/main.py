@@ -121,9 +121,6 @@ QUIET_MODE_RESULT = ("Done. The user already heard a chime and sees the mode on 
 # Jarvis Ultron: o selo 🔒 só existe na tela azul (a cena do orbe); na tela antiga (F2, JARVIS_VISUAL=classico,
 # JARVIS_CENA=0) o sinal é a linha "🔒 Modo privado ligado" que a ponte escreve no registro ao trocar.
 ESPERE_O_MODO_PRIVADO = "espere o aviso \"🔒 Modo privado ligado\" (na tela azul, o selo 🔒 MODO PRIVADO)"
-STARTUP_CLAPS_REQUIRED = 2
-STARTUP_CLAP_MAX_GAP_SECONDS = 4.0
-STARTUP_CLAP_COOLDOWN_SECONDS = 0.22
 SELF_QUIT_GOODBYE = (
     "Certamente, senhor. Foi um privilégio. O Jarvis está saindo do ar agora. "
     "Até a próxima."
@@ -141,42 +138,6 @@ _SELF_QUIT_PATTERNS = tuple(re.compile(pattern, re.IGNORECASE) for pattern in (
 ))
 
 
-def _exception_leaves(exc: BaseException):
-    nested = getattr(exc, "exceptions", None)
-    if nested:
-        for child in nested:
-            yield from _exception_leaves(child)
-    else:
-        yield exc
-
-
-def _is_normal_live_close_error(exc: BaseException) -> bool:
-    for leaf in _exception_leaves(exc):
-        name = leaf.__class__.__name__.lower()
-        message = str(leaf).lower()
-        if name == "connectionclosedok" or "1000 (ok)" in message:
-            return True
-        if isinstance(leaf, genai.errors.APIError) and "1000" in message:
-            return True
-    return False
-
-
-def _is_transient_live_connection_error(exc: BaseException) -> bool:
-    transient_markers = (
-        "connection reset", "connection aborted", "temporarily unavailable",
-        "timed out", "timeout", "network is unreachable", "broken pipe",
-    )
-    return any(
-        isinstance(leaf, (ConnectionResetError, ConnectionAbortedError, TimeoutError))
-        or any(marker in str(leaf).lower() for marker in transient_markers)
-        for leaf in _exception_leaves(exc)
-    )
-
-
-def _live_reconnect_delay(attempt: int) -> float:
-    return min(30.0, float(2 ** max(0, int(attempt) - 1)))
-
-
 def _live_response_audio_bytes(response) -> bytes | None:
     server_content = getattr(response, "server_content", None)
     model_turn = getattr(server_content, "model_turn", None)
@@ -188,158 +149,6 @@ def _live_response_audio_bytes(response) -> bytes | None:
             return bytes(data)
     return None
 
-
-def wait_for_startup_claps(
-    required: int = STARTUP_CLAPS_REQUIRED,
-    *,
-    timeout: float | None = None,
-    stream_factory=None,
-) -> bool:
-    """Hold startup until two distinct claps are heard by the default microphone."""
-    if os.environ.get("JARVIS_SKIP_CLAP_GATE", "").strip().lower() in {"1", "true", "yes", "on"}:
-        print("[JARVIS] 👏 Startup clap gate bypassed (JARVIS_SKIP_CLAP_GATE).")
-        return True
-    # Some macOS/AUHAL configurations expose a nominal input device but reject
-    # every PortAudio operation (PaErrorCode -9986). Avoid repeatedly starting
-    # a failing Core Audio stream; users with a working mic can opt in.
-    if sys.platform == "darwin" and stream_factory is None and os.environ.get("JARVIS_ENABLE_CLAP_GATE", "").strip().lower() not in {"1", "true", "yes", "on"}:
-        print("[JARVIS] ⚠️ macOS microphone gate disabled for this audio configuration.")
-        print("[JARVIS] Continuing without clap startup. Set JARVIS_ENABLE_CLAP_GATE=1 to force it.")
-        return True
-
-    required = max(1, int(required))
-    stream_factory = stream_factory or sd.InputStream
-    try:
-        import numpy as np
-    except ImportError:
-        print("[JARVIS] ❌ Startup clap gate needs numpy. Set JARVIS_SKIP_CLAP_GATE=1 to bypass.")
-        return False
-
-    clap_times: list[float] = []
-    last_clap_at = 0.0
-    # Microphone input levels vary considerably between Mac models.  The old
-    # fixed 0.12 RMS / 0.32 peak gates rejected quiet real claps, while laptop
-    # fan noise could sometimes trip them.  Track the room floor and use both
-    # transient shape (crest factor) and energy to identify a clap.
-    noise_floor = 0.008
-    finished = threading.Event()
-    started_at = time.monotonic()
-
-    def callback(indata, frames, time_info, status):
-        nonlocal last_clap_at, noise_floor, clap_times
-        if status:
-            print(f"[JARVIS] ⚠️ Clap mic: {status}")
-        samples = np.asarray(indata, dtype=np.float32).reshape(-1)
-        if samples.size == 0:
-            return
-        magnitude = np.abs(samples)
-        rms = float(np.sqrt(np.mean(samples * samples)))
-        peak = float(np.max(magnitude))
-        # Only let low-energy frames teach the noise floor; otherwise a clap
-        # would raise the threshold immediately and make the second clap hard
-        # to detect.
-        if rms < max(0.08, noise_floor * 6.0):
-            noise_floor = (noise_floor * 0.96) + (rms * 0.04)
-        threshold = max(0.100, noise_floor * 6.5)
-        peak_threshold = max(0.35, noise_floor * 15.0)
-        crest_factor = peak / max(rms, 1e-6)
-        now = time.monotonic()
-        # A valid clap must be either a sharp transient with meaningful energy
-        # or a genuinely loud impact. This rejects speech, fan noise, and most
-        # desk/keyboard taps that only have a brief peak.
-        is_transient = crest_factor >= 2.20 and rms >= threshold
-        is_loud = rms >= max(0.28, noise_floor * 15.0)
-        if (
-            peak < peak_threshold
-            or not (is_transient or is_loud)
-            or now - last_clap_at < STARTUP_CLAP_COOLDOWN_SECONDS
-        ):
-            return
-        if clap_times and now - clap_times[-1] > STARTUP_CLAP_MAX_GAP_SECONDS:
-            clap_times = []
-        clap_times.append(now)
-        last_clap_at = now
-        print(f"[JARVIS] 👏 Clap {len(clap_times)}/{required} detected")
-        if len(clap_times) >= required:
-            finished.set()
-
-    print(f"[JARVIS] 👏 Waiting for {required} claps to power up...")
-    # PortAudio on macOS commonly rejects 16 kHz even when the microphone is
-    # available (PaErrorCode -9986). Prefer the device's native rate, then
-    # retry standard rates before reporting that the microphone is unavailable.
-    sample_rates = [SEND_SAMPLE_RATE, 44100, 48000]
-    input_device = None
-    try:
-        if stream_factory is sd.InputStream:
-            try:
-                default_device = sd.default.device
-                try:
-                    input_index = int(default_device[0])
-                except (TypeError, IndexError, ValueError):
-                    input_index = -1
-                if input_index < 0:
-                    print("[JARVIS] ⚠️ macOS reports no default microphone device.")
-                    if os.environ.get("JARVIS_REQUIRE_CLAP_GATE", "").strip().lower() not in {"1", "true", "yes", "on"}:
-                        print("[JARVIS] ⚠️ Continuing without the clap gate; microphone input is unavailable.")
-                        return True
-                    raise RuntimeError("no default microphone device")
-                input_device = input_index
-                device = sd.query_devices(input_device if input_device is not None else None, "input")
-                if int(device.get("max_input_channels", 0)) < 1:
-                    raise RuntimeError("no input channels are available")
-                native_rate = int(float(device.get("default_samplerate", 0)))
-                if native_rate > 0:
-                    sample_rates.insert(0, native_rate)
-            except Exception:
-                pass
-        sample_rates = list(dict.fromkeys(sample_rates))
-        last_error = None
-        for sample_rate in sample_rates:
-            try:
-                if stream_factory is sd.InputStream:
-                    # Validate the format before constructing a live AUHAL
-                    # stream; macOS can report a device but reject it with
-                    # PaErrorCode -9986 during stream startup.
-                    sd.check_input_settings(
-                        device=input_device,
-                        samplerate=sample_rate,
-                        channels=CHANNELS,
-                        dtype="float32",
-                    )
-                with stream_factory(
-                    samplerate=sample_rate,
-                    device=input_device,
-                    channels=CHANNELS,
-                    dtype="float32",
-                    blocksize=0,
-                    latency="high",
-                    callback=callback,
-                ):
-                    while not finished.wait(0.05):
-                        if timeout is not None and time.monotonic() - started_at >= timeout:
-                            print("[JARVIS] ⏱️ Startup clap gate timed out.")
-                            return False
-                break
-            except Exception as exc:
-                last_error = exc
-                if finished.is_set():
-                    break
-        else:
-            raise last_error or RuntimeError("no compatible microphone sample rate")
-    except KeyboardInterrupt:
-        print("\n[JARVIS] Startup cancelled.")
-        return False
-    except Exception as exc:
-        print(f"[JARVIS] ❌ Startup clap microphone unavailable: {exc}")
-        if os.environ.get("JARVIS_REQUIRE_CLAP_GATE", "").strip().lower() not in {"1", "true", "yes", "on"}:
-            print("[JARVIS] ⚠️ Continuing without the clap gate; microphone input is unavailable.")
-            print("[JARVIS] Restore microphone access to use voice input.")
-            return True
-        print("[JARVIS] Clap gate required. Set JARVIS_SKIP_CLAP_GATE=1 to bypass it.")
-        return False
-
-    print("[JARVIS] ⚡ Two claps detected. Powering up...")
-    return True
 
 def _latencia_audio() -> str:
     """Jarvis Ultron: 'low' (padrão) deixa a voz sair e entrar mais rápido. Se o som ficar
@@ -1104,15 +913,6 @@ CLOUD_SAFE_ACTIONS = frozenset({
     "youtube_video",
 })
 
-LOCAL_MACHINE_ONLY_ACTIONS = frozenset({
-    "computer_control",
-    "open_app",
-    "file_controller",
-    "media_control",
-    "desktop_control",
-    "computer_settings",
-})
-
 # Jarvis Ultron: no modo privado (JARVIS_CEREBRO=gemma) nada vai para IA na nuvem. Estas ferramentas
 # mandam o pedido (ou a tela) para o Gemini, o Hermes (modelos grátis da Nous) ou outra IA na nuvem:
 # não são oferecidas ao Gemma e são recusadas em _execute_tool. As automações da pasta marcam isso
@@ -1228,18 +1028,12 @@ class JarvisLive:
         self.voice_name     = voice_name
         # optional runtime limit in seconds (set by main)
         self.runtime_limit_seconds: int | None = None
-        # optional path that must exist (e.g. a mounted encrypted volume)
-        self.required_unlock_path: str | None = None
-        self.required_unlock_secret: str | None = None
         self._textos_trava = threading.Lock()  # texto digitado antes de o Gemini conectar
         self._textos_esperando = []
         self.ui.on_text_command = self._on_text_command
-        self._voice_changed  = threading.Event()
         self._turn_done_event: asyncio.Event | None = None
         self._tts_engine = None
         self._ext_tts_provider = ""
-        self._ext_tts_voice_id = ""
-        self._ext_tts_api_key = ""
         self._current_input_transcript = ""
         self._last_input_transcript = ""
         self._last_input_transcript_at = 0.0
@@ -1251,7 +1045,6 @@ class JarvisLive:
         self._pending_self_quit_farewell_received = False
         self._self_quit_timer = None
         self._shutdown_requested = threading.Event()
-        self._tour_active = False
         # Jarvis Ultron: palavra de ativação ("Hey Jarvis") e IA reserva (Groq)
         from core.palavra_ativacao import PortaoDeVoz
         if self.external_audio or self.cloud_safe:
@@ -1576,10 +1369,6 @@ class JarvisLive:
                 out_queue.put_nowait(None)
         except Exception as exc:
             print(f"[JARVIS] ⚠️ Shutdown session close failed: {exc}")
-
-    def set_tour_active(self, active: bool) -> None:
-        """Track whether the desktop introduction temporarily owns the UI."""
-        self._tour_active = bool(active)
 
     async def _wait_before_reconnect(self, delay: float) -> None:
         deadline = time.monotonic() + max(0.0, float(delay))
@@ -2807,7 +2596,6 @@ class JarvisLive:
                             txt = _clean_transcript(sc.output_transcription.text)
                             if txt:
                                 out_buf.append(txt)
-                                self._interrupted_text = " ".join(out_buf)
                                 if not self.ui.muted:
                                     if _new_turn:
                                         self.ui.clear_subtitle()
@@ -3057,26 +2845,6 @@ class JarvisLive:
                 if elapsed >= float(self.runtime_limit_seconds):
                     self._encerrar_fim_do_teste()
 
-            # enforce presence of required unlock path (e.g. mounted encrypted volume)
-            if getattr(self, "required_unlock_path", None):
-                try:
-                    path = Path(self.required_unlock_path)
-                    if not path.exists():
-                        print(f"[JARVIS] 🔒 Required unlock path not present: {self.required_unlock_path}")
-                        print("Please mount the locked container (see scripts/create_locked_dmg.sh).")
-                        time.sleep(5)
-                        continue
-                    if self.required_unlock_secret is not None:
-                        content = path.read_text(encoding="utf-8").strip()
-                        if content != self.required_unlock_secret:
-                            print("[JARVIS] 🔒 unlock.key content does not match expected secret.")
-                            print("Please mount the locked container with the correct unlock.key file.")
-                            time.sleep(5)
-                            continue
-                except Exception as e:
-                    print(f"[JARVIS] 🔒 Locked path check error: {e}")
-                    time.sleep(1)
-                    continue
             # Jarvis Ultron: o modelo de voz que vai ser usado agora (3.x antes do 2.5; se um falhar,
             # a central passa para o próximo).
             modelo_voz = central_de_modelos.resolver(live_model_id)
@@ -3326,29 +3094,14 @@ def rodar_cerebro(ui):
         jarvis.ui.write_log(f"SYS: Trial keyword detected. Running for {jarvis.runtime_limit_seconds} seconds.")
         _vigiar_fim_do_teste(jarvis)
 
-    locked_secret = os.environ.get("JARVIS_LOCKED_KEY_SECRET")
-    if locked_secret:
-        jarvis.required_unlock_secret = locked_secret.strip()
-
-    # Locked container check: if `JARVIS_LOCKED_VOLUME` is set, require
-    # presence of `/Volumes/<name>/unlock.key` before full operation.
-    locked_vol = os.environ.get("JARVIS_LOCKED_VOLUME")
-    if locked_vol:
-        mount_path = f"/Volumes/{locked_vol}/unlock.key"
-        jarvis.required_unlock_path = mount_path
-        jarvis.ui.write_log(f"SYS: Locked volume required: {mount_path}")
     ui.on_voice_change = jarvis.update_voice
     def _on_tts_change(provider, api_key, voice_id):
         if provider == "gemini":
             jarvis._tts_engine = None
             jarvis._ext_tts_provider = ""
-            jarvis._ext_tts_voice_id = ""
-            jarvis._ext_tts_api_key = ""
             jarvis.update_voice(voice_id)
         else:
             jarvis._ext_tts_provider = provider
-            jarvis._ext_tts_voice_id = voice_id
-            jarvis._ext_tts_api_key = api_key
             try:
                 from actions.tts_engine import TTSEngine
                 jarvis._tts_engine = TTSEngine(

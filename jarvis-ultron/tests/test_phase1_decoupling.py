@@ -87,7 +87,6 @@ class PhaseOneDecouplingTests(unittest.TestCase):
         names = {item["name"] for item in jarvis.tool_declarations}
 
         self.assertEqual(names, main.CLOUD_SAFE_ACTIONS)
-        self.assertTrue(names.isdisjoint(main.LOCAL_MACHINE_ONLY_ACTIONS))
 
     def test_cloud_safe_mode_rejects_unadvertised_local_tool_calls(self):
         client = StubClient()

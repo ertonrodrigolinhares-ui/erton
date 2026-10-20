@@ -21,4 +21,4 @@ contornar: salve a proposta e diga ao Erton o que precisa da aprovação dele.
 
 ## Perfil de atleta (redes sociais)
 O foco das redes é o perfil de atleta do Erton. Siga a skill `conteudo-atleta` para tom, temas e
-formatos. Não publique assuntos da empresa (Linhares Prudêncio) nem dados de clientes.
+formatos. Não publique assuntos de trabalho nem dados de clientes.

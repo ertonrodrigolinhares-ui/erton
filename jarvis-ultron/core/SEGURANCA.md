@@ -132,10 +132,12 @@ Testes: `test_invariantes.py` (`ModoPrivadoTests`, `ListaDeNuvemTests`, `BaseEsc
 | `ui.py`, `SetupOverlay` e `KeyTutorialOverlay` | O campo da chave fica mascarado. |
 | `ui.py`, `MainWindow._on_setup_done` | Chave não verificada não vai a lugar nenhum; aceita, vai para o `.env` (e não vai se a tela abriu pela reserva); **nunca** para o `config/api_keys.json`, e uma chave antiga que estivesse lá é apagada (também em `_check_config` e `_on_voice_changed`). A chave da voz externa também vai só para o cofre. |
 | `core/claude_chefe.py` (`PROTEGIDOS`, `SEGREDOS`) | O Claude chefe não lê `.env`, `config/api_keys.json` nem `memory/`, e não recebe as variáveis com chaves. |
+| `core/claude_chefe.py` (`_proibidas_na`, `ambiente`, `_copiar_agency`, `_dentro`) | Nas tarefas, o Claude só lê a pasta `Agency` (especialistas) e os `CLAUDE.md`; em todo pedido, a memória do Claude Code fica desligada (`CLAUDE_CODE_DISABLE_AUTO_MEMORY`) e `~/.claude` não pode ser escrito. Assim, instrução escondida numa página não vira regra permanente. A cópia de `Agency` volta ao original a cada tarefa, e a limpeza não entra em atalhos de pasta. |
 
 Testes: `test_invariantes.py` (`ChaveTests`: não vai para o `api_keys.json` nem aparece no registro da
 tela), `test_gemini_acesso.py`, `test_api_key_validation.py`, `test_claude_chefe.py`
-(`RodarClaudeTests.test_tarefa_usa_a_assinatura_e_as_travas`, `TravasDeLeituraEConectoresTests`). O campo mascarado ganha teste na Etapa 2. A sentinela
+(`RodarClaudeTests.test_tarefa_usa_a_assinatura_e_as_travas`, `TravasDeLeituraEConectoresTests`,
+`EspecialistasAgencyTests`, `ClaudeMdInstaladoTests`). O campo mascarado ganha teste na Etapa 2. A sentinela
 (`tests/test_sentinela.py`) falha se algum teste mexer no `.env`, no `config/*.json`, na `memory/` ou no
 `tmp/` de verdade.
 

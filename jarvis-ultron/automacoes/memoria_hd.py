@@ -1,7 +1,7 @@
 """Memória do Jarvis no HD externo (automação: salve na pasta 'automacoes' e reabra o Jarvis).
 
 Tudo o que o Jarvis aprende é copiado para o seu HD externo:
-  - a memória dele (o que ele sabe de você, respostas guardadas, histórico de tarefas);
+  - a memória dele (o que ele sabe de você e o histórico de tarefas);
   - lembretes, rotinas, bloco de notas, relatórios e imagens (Documentos/Jarvis Ultron);
   - o que os agentes do Hermes aprenderam (memórias e habilidades);
   - as suas automações (esta pasta).

@@ -1,6 +1,6 @@
 ---
 name: proposta-comercial
-description: "Proposta comercial: monta um rascunho de proposta de serviços de contabilidade e consultoria a partir dos dados que o Erton passar."
+description: "Proposta comercial: monta um rascunho de proposta de produtos ou serviços a partir dos dados que o Erton passar."
 ---
 # Proposta comercial
 
@@ -10,14 +10,14 @@ description: "Proposta comercial: monta um rascunho de proposta de serviços de 
 > em publicar, agendar, enviar, usar conectores ou o Hermes, prepare só o rascunho ou o relatório (em
 > `Relatorios`) e diga ao Erton o que falta para ele aprovar. Nada é publicado, enviado ou comprado.
 
-Proposta comercial: monta um rascunho de proposta de serviços de contabilidade e consultoria a partir dos dados que o Erton passar.
+Proposta comercial: monta um rascunho de proposta de produtos ou serviços a partir dos dados que o Erton passar.
 
 ## Requisitos
 - Nada.
 
 ## Procedimento
-1. Pergunte o essencial: tipo de empresa, regime, porte, serviços desejados e dores do cliente.
-2. Monte um rascunho de proposta com escopo, entregáveis e diferenciais da Linhares Prudêncio (40+ especialistas, 23 estados, governança, compliance, sucessão).
+1. Pergunte o essencial: quem é o cliente, o que ele precisa, produtos ou serviços desejados, prazos e dores do cliente.
+2. Monte um rascunho de proposta com escopo, entregáveis e diferenciais (se o Erton ainda não disse quais são os diferenciais, pergunte).
 3. Deixe o valor em aberto para o Erton preencher.
 4. Salve o rascunho em Documentos\Jarvis Ultron\Propostas.
 

@@ -217,7 +217,7 @@ class RodarCerebroTests(unittest.TestCase):
             async def run(self):
                 pass
 
-        sem = ("JARVIS_TRIAL_KEYWORD", "JARVIS_LOCKED_KEY_SECRET", "JARVIS_LOCKED_VOLUME", "ELEVENLABS_API_KEY")
+        sem = ("JARVIS_TRIAL_KEYWORD", "ELEVENLABS_API_KEY")
         try:
             with patch.object(main, "JarvisLive", JarvisFalso), \
                     patch.object(main, "_load_voice_name", return_value="Charon"), patch.dict(os.environ):
@@ -261,7 +261,7 @@ class RodarCerebroTests(unittest.TestCase):
         ui = NS(wait_for_api_key=lambda: None, write_log=lambda texto: None)
         with patch.object(main, "JarvisLive", JarvisFalso), \
                 patch.object(main, "_load_voice_name", return_value="Charon"), patch.dict(os.environ):
-            for nome in ("JARVIS_LOCKED_KEY_SECRET", "JARVIS_LOCKED_VOLUME", "ELEVENLABS_API_KEY"):
+            for nome in ("ELEVENLABS_API_KEY",):
                 os.environ.pop(nome, None)
             os.environ.update({"JARVIS_TRIAL_KEYWORD": "trial", "JARVIS_RUNTIME_SECONDS": "3600",
                                "JARVIS_CEREBRO": "gemma", "JARVIS_TESTE_INICIO": repr(time.time() - 61 * 60)})
@@ -490,7 +490,7 @@ class TextoAntesDoGeminiConectarTests(unittest.TestCase):
         jarvis.ui = NS(logs=logs, write_log=logs.append, set_state=lambda estado: None)
         jarvis.session, jarvis._loop, jarvis._reserva, jarvis._modo_reserva = None, None, None, False
         jarvis.cloud_safe, jarvis.external_audio, jarvis._api_key = True, True, "chave-de-teste"
-        jarvis.runtime_limit_seconds, jarvis.required_unlock_path = None, None
+        jarvis.runtime_limit_seconds = None
         jarvis._falhas_seguidas = 0
         jarvis._shutdown_requested = threading.Event()
         return jarvis

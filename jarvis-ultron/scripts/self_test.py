@@ -64,7 +64,6 @@ def _ai_voice() -> CapabilityResult:
         "tests.test_qa_system.QAModeSafetyTests.test_live_audio_extraction_ignores_non_audio_parts_without_data_shortcut",
         "tests.test_qa_system.QAModeSafetyTests.test_live_config_uses_fast_end_of_speech_detection",
         "tests.test_qa_system.ToolContractTests.test_declared_tool_inventory_is_complete_and_unique",
-        "tests.test_startup_clap.StartupClapTests.test_two_distinct_claps_unlock_startup",
     )
     passed, output = _run_tests(*tests)
     if not passed:
@@ -266,14 +265,12 @@ def _agent() -> CapabilityResult:
 
 def _memory() -> CapabilityResult:
     return _tested(
-        "MEMORY / AWARENESS",
+        "MEMORY",
         (
             "tests.test_core_resilience.CoreResilienceTests.test_corrupt_memory_recovers_and_round_trips",
-            "tests.test_core_resilience.CoreResilienceTests.test_answer_cache_round_trip_uses_temporary_file",
-            "tests.test_core_resilience.CoreResilienceTests.test_awareness_state_is_copied_and_bounded",
             "tests.test_hosted_api.HostedApiTests.test_memory_is_scoped_by_tenant",
         ),
-        "memory recovery, answer cache, bounded awareness, and tenant isolation pass",
+        "memory contract tests pass",
     )
 
 
