@@ -121,3 +121,11 @@ código ficar fechado e o suporte for seu.
    produto); trocar pede um modelo novo. E o ícone.
 2. Código fechado (repositório privado) ou venda de serviço com código aberto?
 3. Público-alvo e preço.
+
+## Para melhorar depois (anotado pelo Erton)
+
+- **Consumo do PC** (20/10/2026): o painel "Tempo real" do Erton mostrou **CPU 100%** e **memória 94%**
+  com o assistente aberto (disco 35%). Medir quanto é do próprio assistente (tela, cérebro, Gemma,
+  Whisper, câmera, orbe) e quanto é de outros programas, e deixar mais leve. O autodiagnóstico e a
+  Etapa 6 da reorganização (`docs/PLANO-REORGANIZACAO.md`, "medir antes") são o ponto de partida.
+  Para vender, isso é importante: o cliente não pode sentir o PC travar.
