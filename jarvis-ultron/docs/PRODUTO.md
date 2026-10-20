@@ -51,16 +51,15 @@ Dos 22 agentes do Claude (e os 6 do Hermes), três grupos:
 - **Seus (atleta, família, escola), que não devem ir para o cliente:** conteudo-atleta,
   rotina-atleta-8h, treino-semana, treinador-dados, nutricao-recuperacao, agente-provas; no Hermes,
   conteudo-atleta, rotina-atleta-8h e geekie-pendencias (e as rotinas automáticas das 8h e do Geekie
-  que o instalador do Hermes cria). Proposta: um **pacote do dono**, ligado só no seu PC por uma linha
-  no `.env` (ex.: `JARVIS_PACOTE=erton`), fora do que o cliente recebe.
-- **De contabilidade, que saem do produto** (regra do projeto: o Jarvis não é de contabilidade):
-  clientes-grupos, holding-sucessao, prazos-fiscais, legislacao, noticias-setor. Podem ir para o seu
-  pacote, se você os usa.
+  que o instalador do Hermes cria). **Feito:** estão em `pacotes/erton`, ligados só no seu PC pela linha
+  `JARVIS_PACOTE=erton` no `.env`, fora do que o cliente recebe.
+- **De contabilidade, fora do produto** (regra do projeto: o Jarvis não é de contabilidade):
+  clientes-grupos, holding-sucessao, prazos-fiscais, legislacao, noticias-setor. **Feito:** também
+  estão em `pacotes/erton`.
 
 ## O que falta para vender (na ordem)
 
-1. **Separar o pacote do dono e tirar a contabilidade** (acima). Trabalho pequeno; só depende da sua
-   decisão sobre o pacote.
+1. **Separar o pacote do dono e tirar a contabilidade**: feito (`pacotes/erton`, `JARVIS_PACOTE`).
 2. **Nome e marca** **(decisão sua)**: "Jarvis" e "Ultron" são da Marvel; um produto pago com esses nomes
    é risco de marca. Trocar é um passo só no código (`core/marca.py`) mais o que `docs/RENOMEAR.md`
    lista (a palavra "Hey Jarvis" pede um modelo novo de ativação). Ícone e nome da pasta vêm junto.
@@ -104,7 +103,7 @@ código ficar fechado e o suporte for seu.
 
 | Fase | O quê | Depende de |
 |---|---|---|
-| 0 (agora) | Tirar a contabilidade; criar o pacote do dono; manual sem exemplos pessoais | Sua decisão sobre o pacote |
+| 0 (feita) | Tirar a contabilidade; criar o pacote do dono; manual sem exemplos pessoais | Feito em 20/10/2026 |
 | 1 | Nome novo, ícone, repositório privado | Sua decisão de nome e de código fechado |
 | 2 | Memória em Documentos; instalador único; atualização sem perder dados | Trabalho |
 | 3 | Tela toda em português; aposentar a tela antiga (etapas 6 a 8 e 19 da reorganização) | Trabalho + alguns dias de uso por etapa |
@@ -113,8 +112,6 @@ código ficar fechado e o suporte for seu.
 
 ## Decisões que só você pode tomar
 
-1. Pacote do dono: criar (`JARVIS_PACOTE=erton`) e deixar os de contabilidade nele? Ou apagar os de
-   contabilidade de vez?
-2. Nome novo do produto (e se "Hey Jarvis" continua como palavra de ativação por enquanto).
-3. Código fechado (repositório privado) ou venda de serviço com código aberto?
-4. Público-alvo e preço.
+1. Nome novo do produto (e se "Hey Jarvis" continua como palavra de ativação por enquanto).
+2. Código fechado (repositório privado) ou venda de serviço com código aberto?
+3. Público-alvo e preço.

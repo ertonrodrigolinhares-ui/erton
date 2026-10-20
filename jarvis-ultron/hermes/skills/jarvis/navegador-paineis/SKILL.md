@@ -14,14 +14,14 @@ Sempre que for abrir sites ou painéis para ler informações ou fazer uma taref
 
 ## Pode fazer sozinho
 - Abrir sites, navegar, ler, copiar dados, tirar prints, baixar relatórios.
-- Usar sessões em que o Erton já está logado.
+- Usar sessões em que o usuário já está logado.
 
-## Nunca faça sem o "ok" do Erton
+## Nunca faça sem o "ok" do usuário
 - Digitar ou pedir senhas, códigos de verificação (2FA) ou dados de cartão.
 - Fazer pagamentos, compras, transferências, assinaturas.
 - Enviar mensagens, e-mails, formulários ou comentários em nome dele.
 - Apagar dados, mudar configurações de conta, aceitar termos.
 
 ## Se precisar de login
-Pare e diga ao Erton: "Preciso que você entre no <site> uma vez no navegador do Jarvis." Depois
+Pare e diga ao usuário: "Preciso que você entre no <site> uma vez no navegador do Jarvis." Depois
 continue a tarefa.
