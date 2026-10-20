@@ -129,7 +129,7 @@ class UIRegressionTests(unittest.TestCase):
             self.window._quit_btn,
         )
         visible_labels = {button.text().split("·", 1)[0].strip() for button in primary_buttons}
-        self.assertEqual(visible_labels, {"MIC", "VOICE", "NAME", "THEME", "QUIT"})
+        self.assertEqual(visible_labels, {"MIC", "VOICE", "PERFIL", "THEME", "QUIT"})  # PERFIL: a tela "Sobre você"
 
     def test_dock_mute_state_reuses_command_rail_style(self):
         original = self.window._muted
