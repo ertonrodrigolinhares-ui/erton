@@ -367,8 +367,9 @@ Não precisa atualizar o resto do projeto. Veja
 
 Diga **"Jarvis, faça um autodiagnóstico"** (ou "o que está com defeito?"), ou aperte o botão **✚** na
 tela. Ele confere internet, chave do Gemini e modelos, reserva Groq, Hermes, microfone, alto-falante,
-memória/disco, navegador automático e o "Hey Jarvis", e **fala só o que está com problema e como
-resolver**. O relatório completo aparece na tela e fica salvo em **Documentos\Jarvis Ultron\diagnostico.txt**.
+memória/disco, **quanto o próprio Jarvis gasta do processador** (a tela e o cérebro, "CPU do Jarvis"),
+o processador e a bateria do computador (num PC de mesa ele diz "sem bateria", e isso é normal),
+navegador automático e o "Hey Jarvis", e **fala só o que está com problema e como resolver**. O relatório completo aparece na tela e fica salvo em **Documentos\Jarvis Ultron\diagnostico.txt**.
 Funciona até com o Gemini fora do ar (pelo botão, digitando "diagnóstico" ou falando no modo reserva).
 
 ## Se o Jarvis não conseguir abrir um site
@@ -389,6 +390,12 @@ Funciona até com o Gemini fora do ar (pelo botão, digitando "diagnóstico" ou 
 - Minimize a janela do Jarvis quando não estiver olhando para ela: ele continua ouvindo.
 - Memória alta costuma ser o navegador com muitas abas, o Hermes e o próprio Jarvis juntos.
   Feche abas que não usa e reinicie o computador de vez em quando.
+- A tela antiga (a do **F2**) e a tela Stark **ficam paradas enquanto o anel cobre a janela**: o
+  relógio e as barras delas só voltam a trabalhar quando você aperta F2. O medidor do sistema só lê o
+  PC quando alguma tela está mostrando o número.
+- Para saber quanto o Jarvis está gastando, diga **"Jarvis, faça um autodiagnóstico"**: o item
+  "CPU do Jarvis" diz quanto a tela e o cérebro usam do processador. Anote com o Jarvis parado e
+  falando; se o número subir muito de uma versão para outra, avise.
 - Para desligar a economia automática (não recomendado), coloque `JARVIS_ECONOMIA=0` no `.env`.
 
 ## Configurações (arquivo `.env` nesta pasta)

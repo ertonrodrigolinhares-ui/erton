@@ -1,4 +1,27 @@
-Jarvis Ultron - versão 2026-10-19.2
+Jarvis Ultron - versão 2026-10-30
+
+Novidades desta versão:
+- PC mais leve com o Jarvis aberto (etapa 6 da reorganização). A tela antiga (a do F2) ficava escondida
+  atrás do anel, mas continuava trabalhando: agora, enquanto o anel cobre a janela, o relógio e as
+  barras dela e o relógio da tela Stark ficam parados (com F2 voltam a andar), a esfera antiga não é
+  mais calculada quadro a quadro, e o medidor do sistema, que lia o PC a cada 1,5 s desde a abertura
+  (e abria uma janela preta no Windows para ler a temperatura), só lê quando alguma tela está olhando.
+  Saíram também umas 1.700 linhas de código que nada usava e, com o seu sim, os enfeites da tela antiga
+  que mostravam dados de mentira: frases inventadas em inglês a cada 15 s, oito "agentes" falsos, o
+  número COG sorteado, gráficos escondidos e os popups das teclas L e R.
+- Um número para conferir: "Jarvis, faça um autodiagnóstico" agora diz "CPU do Jarvis" (quanto a tela
+  e o cérebro gastam do processador), "CPU" do computador inteiro e "Bateria" (num PC de mesa diz "sem
+  bateria", sem acusar defeito). Anote o número com o Jarvis parado e falando, antes e depois de cada
+  versão: é assim que se vê se ficou mais leve.
+- Claude: no .env dá para escolher quanto ele pensa (JARVIS_CLAUDE_ESFORCO), um modelo reserva para
+  quando o principal estiver lotado (JARVIS_CLAUDE_RESERVA) e um modelo e esforço só para as mudanças
+  no código do Jarvis (JARVIS_CLAUDE_MODELO_CODIGO, JARVIS_CLAUDE_ESFORCO_CODIGO,
+  JARVIS_CLAUDE_RESERVA_CODIGO). Sem nada no .env, continua o padrão do seu plano. Veja "Claude como
+  chefe de tarefas" no LEIA-ME.
+- Reparos achados na conferência desta versão: o botão de escolher arquivo da tela antiga quebrava
+  (faltava uma importação) e a sonda da tela dos testes (scripts/qa_ui_probe.py) não abria.
+
+Versão anterior (2026-10-19.2):
 
 Novidades desta versão:
 - 282 especialistas extras para o Claude (coleção agency-agents, licença MIT): finanças, vendas,
