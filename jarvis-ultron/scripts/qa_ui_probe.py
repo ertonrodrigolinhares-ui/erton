@@ -62,19 +62,14 @@ def main() -> int:
     args.output.mkdir(parents=True, exist_ok=True)
     app = QApplication.instance() or QApplication([])
     temp_settings = args.output / "ui-settings.json"
-    temp_layout = args.output / "layout-settings.json"
     temp_api = args.output / "api-keys.json"
 
     patchers = [
         patch.object(ui, "UI_SETTINGS_FILE", temp_settings),
-        patch.object(ui, "LAYOUT_SETTINGS_FILE", temp_layout),
         patch.object(ui, "API_FILE", temp_api),
         patch.object(ui, "get_secret_store", return_value=_NoSecrets()),
         patch.object(ui.MainWindow, "_setup_system_tray", lambda self: None),
         patch.object(ui.MainWindow, "_update_metrics", lambda self: None),
-        patch.object(ui.MainWindow, "_restore_detached_panels", lambda self: None),
-        patch.object(ui.MainWindow, "_start_layout_autosave", lambda self: None),
-        patch.object(ui.MainWindow, "_start_auto_graphics_detection", lambda self: None),
     ]
     for patcher in patchers:
         patcher.start()

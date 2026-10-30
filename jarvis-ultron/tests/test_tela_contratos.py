@@ -43,7 +43,6 @@ class TelaContratosTests(unittest.TestCase):
         cls._trocas = [
             patch.dict(os.environ),  # devolve as variáveis como estavam no fim
             patch.object(ui, "UI_SETTINGS_FILE", pasta / "settings.json"),
-            patch.object(ui, "LAYOUT_SETTINGS_FILE", pasta / "layout_settings.json"),
             patch.object(ui, "API_FILE", pasta / "api_keys.json"),
             patch.object(ui, "get_secret_store", return_value=_CofreVazio()),
             patch.object(ui, "BASE_DIR", pasta),  # o .env que a tela regrava ao aceitar uma chave
