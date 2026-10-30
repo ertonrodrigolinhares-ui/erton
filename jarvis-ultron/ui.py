@@ -8520,49 +8520,6 @@ class MainWindow(QMainWindow):
         except Exception:
             self._name_btn.setText("NAME")
 
-    def _show_voice_select(self):
-        if self._voice_overlay and self._voice_overlay.isVisible():
-            self._voice_overlay.raise_()
-            return
-
-        current = self._get_selected_voice()
-
-        ov = VoiceSelectorOverlay(
-            self.centralWidget(),
-            current_provider="gemini",
-            current_voice_id=current,
-            current_api_key="",
-        )
-        cw = self.centralWidget()
-        ow, oh = 520, 540
-        ov.setGeometry(
-            (cw.width()  - ow) // 2,
-            (cw.height() - oh) // 2,
-            ow, oh,
-        )
-        ov.done.connect(self._on_tts_select_done)
-        ov._close_btn.clicked.disconnect()
-        ov._close_btn.clicked.connect(self._close_voice_overlay)
-        ov.show()
-        self._voice_overlay = ov
-
-    def _close_voice_overlay(self):
-        if self._voice_overlay:
-            self._voice_overlay.hide()
-            self._voice_overlay.deleteLater()
-            self._voice_overlay = None
-
-    def _on_voice_select_done(self, voice_value: str):
-        if hasattr(self, "_voice_overlay") and self._voice_overlay:
-            self._voice_overlay.hide()
-            self._voice_overlay.deleteLater()
-            self._voice_overlay = None
-        # Sync the hidden combo so existing voice-change logic fires
-        idx = self._voice_combo.findData(voice_value)
-        if idx >= 0:
-            self._voice_combo.setCurrentIndex(idx)
-        self._update_voice_btn()
-
     def _update_voice_btn(self):
         """Update the voice button label to show the currently selected voice."""
         if not hasattr(self, "_voice_btn"):
