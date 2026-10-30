@@ -20,6 +20,9 @@ PEDACOS = {
         "_notificar_na_tela", "_chamada_fechada", "_pode_falar_agora",
         "AVISO_ESPERA_AO_CHAMAR", "VOZ_DO_PC_ESPERA", "RESPOSTA_DIGITADA_FALA",
     }),
+    "cerebro/escuta.py": ("Escuta", {
+        "_definir_modo_escuta", "_aviso_de_escuta", "_mostrar_selo", "_mostrar_volume",
+    }),
 }
 
 

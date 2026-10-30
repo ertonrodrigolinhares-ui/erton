@@ -84,9 +84,6 @@ REGRA_IDIOMA = (
     "Só use outro idioma se o usuário pedir claramente (ex.: \"responda em inglês\").\n"
 )
 
-# Jarvis Ultron: a troca de modo já é avisada por um som e pelo selo na tela.
-QUIET_MODE_RESULT = ("Done. The user already heard a chime and sees the mode on screen: do not announce "
-                     "or explain the listening mode. Say nothing at all.")
 # Jarvis Ultron: o selo 🔒 só existe na tela azul (a cena do orbe); na tela antiga (F2, JARVIS_VISUAL=classico,
 # JARVIS_CENA=0) o sinal é a linha "🔒 Modo privado ligado" que a ponte escreve no registro ao trocar.
 ESPERE_O_MODO_PRIVADO = "espere o aviso \"🔒 Modo privado ligado\" (na tela azul, o selo 🔒 MODO PRIVADO)"
@@ -199,7 +196,10 @@ from cerebro.ferramentas.executores import (  # noqa: E402,F401
     request_presentation, screen_process, weather_action, web_search_action, youtube_video,
 )
 
-from cerebro.avisos import Avisos  # noqa: E402,F401
+# Etapa 15: a JarvisLive é montada com pedaços que moram em cerebro/*.py, com os mesmos nomes de antes
+# (tests/test_cerebro_em_pedacos.py diz o que mora em cada um). As constantes continuam aqui para quem usa main.X.
+from cerebro.avisos import Avisos  # noqa: E402
+from cerebro.escuta import Escuta, QUIET_MODE_RESULT  # noqa: E402,F401
 
 
 def muda_algo(nome: str) -> bool:
@@ -225,7 +225,7 @@ def get_tool_declarations() -> list[dict]:
 
 
 
-class JarvisLive(Avisos):
+class JarvisLive(Avisos, Escuta):
 
     def __init__(
         self,
@@ -853,38 +853,6 @@ class JarvisLive(Avisos):
             return ""
         return os.environ.get("JARVIS_IDIOMA", "pt-BR").strip()
 
-    def _definir_modo_escuta(self, modo: str) -> str:
-        """Jarvis Ultron: 'maos_livres' (ouve tudo) ou 'chamada' (só depois de "Hey Jarvis")."""
-        portao = getattr(self, "_portao", None)
-        if modo not in ("maos_livres", "chamada") or portao is None:
-            return "Invalid mode. Use 'maos_livres' or 'chamada'."
-        if portao.modo == modo:
-            self._aviso_de_escuta(portao.estado)  # confirma com o som e o selo
-            return QUIET_MODE_RESULT
-        if not portao.definir_modo(modo):
-            return ("Call mode is unavailable because the activation detector did not load. "
-                    "Tell the user, in Portuguese, that you will keep listening to everything.")
-        if modo == "maos_livres":
-            self.ui.write_log("SYS: Modo mãos livres: estou ouvindo tudo.")
-        else:
-            self.ui.write_log(f"SYS: Modo chamada: {portao.como_chamar} para falar comigo.")
-        return QUIET_MODE_RESULT
-
-    def _aviso_de_escuta(self, estado: str) -> None:
-        """Jarvis Ultron: som curto + selo na tela quando ele começa/para de ouvir ou o modo muda."""
-        from core.palavra_ativacao import tocar_aviso
-
-        print(f"[Ativação] {estado}")
-        tocar_aviso(estado)
-        self._mostrar_selo(estado)
-        if estado in ("ouvindo", "maos_livres"):
-            self._falar_avisos_guardados()
-
-    def _mostrar_selo(self, estado: str) -> None:
-        mostrar = getattr(self.ui, "set_listening_status", None)
-        if callable(mostrar):
-            mostrar(estado)
-
     def _pedido_de_cerebro(self, fala: str) -> bool:
         """Jarvis Ultron: "modo privado" -> Gemma 4 no PC; "modo normal" -> Gemini. True se era isso."""
         from core.cerebro_gemma import pedido_de_privacidade
@@ -1026,13 +994,6 @@ class JarvisLive(Avisos):
         modo = modo_pedido(fala)
         if modo and portao is not None and portao.modo != modo:
             self._definir_modo_escuta(modo)
-
-    def _mostrar_volume(self, pcm: bytes) -> None:
-        """Jarvis Ultron: manda o volume da voz para a esfera pulsar enquanto ele fala."""
-        definir = getattr(self.ui, "set_voice_level", None)
-        if callable(definir):
-            from core.efeito_ultron import nivel_da_voz
-            definir(nivel_da_voz(pcm))
 
     def _falar_com_voz_externa(self, texto: str) -> None:
         """Jarvis Ultron: com ElevenLabs/OpenAI/Edge escolhida, fala a resposta por ela."""
