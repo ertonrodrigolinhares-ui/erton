@@ -432,7 +432,70 @@ async def _ex_generate_image(jarvis, args):
     return await asyncio.to_thread(gerar_imagem, args.get("prompt", ""))
 
 
+async def _ex_screen_process(jarvis, args):
+    threading.Thread(
+        target=screen_process,
+        kwargs={"parameters": args, "response": None,
+                "player": jarvis.ui, "session_memory": None,
+                "speak": jarvis._speak_vision_result},
+        daemon=True
+    ).start()
+    return "Vision module activated. Stay completely silent — vision module will speak directly."
+
+
+async def _ex_file_processor(jarvis, args):
+    if not args.get("file_path") and jarvis.ui.current_file:
+        args["file_path"] = jarvis.ui.current_file
+    r = await asyncio.to_thread(
+        lambda: file_processor(parameters=args, player=jarvis.ui, speak=jarvis.speak)
+    )
+    return r or "Done."
+
+
+async def _ex_deep_research(jarvis, args):
+    r = request_deep_research(parameters=args, player=jarvis.ui, speak=jarvis.speak)
+    return r or "Deep research preference requested."
+
+
+async def _ex_create_presentation(jarvis, args):
+    current_file = getattr(jarvis.ui, "current_file", None)
+    supported_sources = {
+        ".txt", ".md", ".rst", ".csv", ".json", ".jsonl", ".docx", ".pptx",
+        ".pdf", ".xlsx", ".xls", ".png", ".jpg", ".jpeg", ".webp",
+        ".wav", ".mp3", ".m4a", ".mp4", ".mov", ".avi", ".webm",
+    }
+    if (
+        not args.get("source_file")
+        and not args.get("source_files")
+        and current_file
+        and Path(str(current_file)).suffix.lower() in supported_sources
+    ):
+        args["source_files"] = [current_file]
+    r = request_presentation(parameters=args, player=jarvis.ui, speak=jarvis.speak)
+    return r or "Presentation preference requested."
+
+
+async def _ex_task_status(jarvis, args):
+    from agent.task_queue import get_queue
+
+    queue = get_queue()
+    action = str(args.get("action") or "get").lower()
+    task_id = str(args.get("task_id") or "").strip()
+    if action == "all" or not task_id:
+        return json.dumps(queue.get_all_statuses(), ensure_ascii=False)
+    if action == "cancel":
+        return f"Task {task_id} cancelled." if queue.cancel(task_id) else f"Task {task_id} could not be cancelled."
+    status = queue.get_status(task_id)
+    return json.dumps(status, ensure_ascii=False) if status else f"Task {task_id} was not found."
+
+
 EXECUTORES = {
+    # grupo 5: visão, arquivos e tarefas
+    "screen_process": _ex_screen_process,
+    "file_processor": _ex_file_processor,
+    "deep_research": _ex_deep_research,
+    "create_presentation": _ex_create_presentation,
+    "task_status": _ex_task_status,
     # grupo 4: o Jarvis por dentro
     "listening_mode": _ex_listening_mode,
     "hermes_agent": _ex_hermes_agent,
@@ -1766,62 +1829,9 @@ class JarvisLive:
                 self.ui.write_log(f"SYS: ⛔ {name} está desligada no Jarvis.")
                 result = resposta_de_desligada(name)
 
-            elif name == "screen_process":
-                threading.Thread(
-                    target=screen_process,
-                    kwargs={"parameters": args, "response": None,
-                            "player": self.ui, "session_memory": None,
-                            "speak": self._speak_vision_result},
-                    daemon=True
-                ).start()
-                result = "Vision module activated. Stay completely silent — vision module will speak directly."
-
-            elif name == "file_processor":
-                if not args.get("file_path") and self.ui.current_file:
-                    args["file_path"] = self.ui.current_file
-                r = await asyncio.to_thread(
-                    lambda: file_processor(parameters=args, player=self.ui, speak=self.speak)
-                )
-                result = r or "Done."
-
             elif name == "flight_finder":
                 r = await asyncio.to_thread(lambda: flight_finder(parameters=args, player=self.ui))
                 result = r or "Done."
-
-            elif name == "deep_research":
-                r = request_deep_research(parameters=args, player=self.ui, speak=self.speak)
-                result = r or "Deep research preference requested."
-
-            elif name == "create_presentation":
-                current_file = getattr(self.ui, "current_file", None)
-                supported_sources = {
-                    ".txt", ".md", ".rst", ".csv", ".json", ".jsonl", ".docx", ".pptx",
-                    ".pdf", ".xlsx", ".xls", ".png", ".jpg", ".jpeg", ".webp",
-                    ".wav", ".mp3", ".m4a", ".mp4", ".mov", ".avi", ".webm",
-                }
-                if (
-                    not args.get("source_file")
-                    and not args.get("source_files")
-                    and current_file
-                    and Path(str(current_file)).suffix.lower() in supported_sources
-                ):
-                    args["source_files"] = [current_file]
-                r = request_presentation(parameters=args, player=self.ui, speak=self.speak)
-                result = r or "Presentation preference requested."
-
-            elif name == "task_status":
-                from agent.task_queue import get_queue
-
-                queue = get_queue()
-                action = str(args.get("action") or "get").lower()
-                task_id = str(args.get("task_id") or "").strip()
-                if action == "all" or not task_id:
-                    result = json.dumps(queue.get_all_statuses(), ensure_ascii=False)
-                elif action == "cancel":
-                    result = f"Task {task_id} cancelled." if queue.cancel(task_id) else f"Task {task_id} could not be cancelled."
-                else:
-                    status = queue.get_status(task_id)
-                    result = json.dumps(status, ensure_ascii=False) if status else f"Task {task_id} was not found."
 
             elif name in carregar_automacoes().ferramentas:
                 automacao = carregar_automacoes().ferramentas[name]
