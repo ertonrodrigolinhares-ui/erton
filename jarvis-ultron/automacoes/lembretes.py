@@ -195,6 +195,19 @@ def listar(agora: datetime | None = None, caminho: Path | None = None) -> str:
     return "Lembretes: " + "; ".join(partes) + ". Tell the user in Portuguese, briefly."
 
 
+def sugestao(dados: dict, texto: str) -> dict | None:
+    """Etapa 10: o lembrete com o texto mais parecido (difflib), para o "você quis dizer…?" do cancelamento.
+    Lembretes do modo privado nunca são sugeridos fora dele."""
+    import difflib
+
+    texto = str(texto or "").lower().strip()
+    visiveis = {l["texto"].lower(): l for l in dados["lembretes"] if not _escondido(l)}
+    if not texto or not visiveis:
+        return None
+    parecidos = difflib.get_close_matches(texto, list(visiveis), n=1, cutoff=0.6)
+    return visiveis[parecidos[0]] if parecidos else None
+
+
 def cancelar(args: dict, caminho: Path | None = None) -> str:
     numero = args.get("number")
     texto = str(args.get("text", "") or "").lower().strip()
@@ -207,6 +220,10 @@ def cancelar(args: dict, caminho: Path | None = None) -> str:
                 alvo = l
                 break
         if alvo is None:
+            parecido = sugestao(dados, texto)
+            if parecido is not None:
+                return (f"Não achei esse lembrete. Você quis dizer o lembrete {parecido['numero']}: "
+                        f"{parecido['texto']}? Pergunte ao usuário antes de cancelar.")
             return "Não achei esse lembrete. " + listar(caminho=caminho)
         dados["lembretes"].remove(alvo)
         gravar(dados, caminho)

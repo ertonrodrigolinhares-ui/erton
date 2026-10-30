@@ -120,6 +120,27 @@ def nomes(caminho: Path | None = None) -> list[str]:
     return sorted(ler(caminho)["rotinas"])
 
 
+def sugestao(dados: dict, nome: str) -> str | None:
+    """Etapa 10: o microfone entende errado ("rotina trein0"): a rotina mais parecida, pelo difflib, ou
+    None. Rotinas do modo privado nunca são sugeridas fora dele."""
+    import difflib
+
+    procurado = chave(nome)
+    visiveis = {chave(n): n for n, r in dados["rotinas"].items() if not _escondida(r)}
+    if not procurado or not visiveis:
+        return None
+    parecidas = difflib.get_close_matches(procurado, list(visiveis), n=1, cutoff=0.6)
+    return visiveis[parecidas[0]] if parecidas else None
+
+
+def _nao_achei(dados: dict, nome: str, caminho: Path | None) -> str:
+    parecida = sugestao(dados, nome)
+    if parecida:
+        return (f"Não achei essa rotina. Você quis dizer a rotina '{parecida}'? Pergunte ao usuário antes de "
+                "rodar ou apagar.")
+    return "Não achei essa rotina. " + listar(caminho)
+
+
 def _achar(dados: dict, nome: str) -> str | None:
     procurado = chave(nome)
     if not procurado:
@@ -179,7 +200,7 @@ def apagar(args: dict, caminho: Path | None = None) -> str:
         dados = ler(caminho)
         nome = _achar(dados, args.get("name", ""))
         if nome is None:
-            return "Não achei essa rotina. " + listar(caminho)
+            return _nao_achei(dados, args.get("name", ""), caminho)
         if _escondida(dados["rotinas"][nome]):
             return SO_NO_MODO_PRIVADO
         del dados["rotinas"][nome]
@@ -201,7 +222,7 @@ def rodar(args: dict, jarvis, caminho: Path | None = None) -> str:
     dados = ler(caminho)
     nome = _achar(dados, args.get("name", ""))
     if nome is None:
-        return "Não achei essa rotina. " + listar(caminho)
+        return _nao_achei(dados, args.get("name", ""), caminho)
     rotina = dados["rotinas"][nome]
     if _escondida(rotina):  # os passos foram ditos no modo privado: não vão para a nuvem
         return SO_NO_MODO_PRIVADO
