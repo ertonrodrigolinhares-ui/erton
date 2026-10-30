@@ -16,7 +16,11 @@ Para cada passo, o que fazer e o que tem de acontecer.
 1. **Abrir:** dois cliques em **"Iniciar Jarvis Ultron"**.
    - Abre a tela azul com o anel, sem erro na janela preta (ela mostra `[Ponte] Cérebro conectado`).
 2. **Conversa:** diga **"Hey Jarvis, como está o tempo?"**.
-   - Ele acorda com o "Hey Jarvis" e responde sobre o tempo.
+   - Ele acorda com o "Hey Jarvis" e responde falando o clima da sua cidade, em português, com a
+     temperatura de verdade (sem abrir o navegador).
+   - Diga **"Jarvis, quais são as notícias?"**: ele lê as manchetes e pergunta se abre alguma. Responda
+     **"não"**: nada abre.
+   - Diga **"Jarvis, mostra no mapa a praia de Tambaú"**: o Google Maps abre no lugar certo.
 3. **Modo privado** (só se o Gemma 4 estiver instalado; se não, pule para o passo 5): diga
    **"Jarvis, modo privado"**.
    - Aparece o selo **🔒 MODO PRIVADO** no alto da tela, e ele diz que está rodando no Gemma 4.

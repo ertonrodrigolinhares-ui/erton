@@ -407,5 +407,23 @@ class NadaSomeAtrasDoAnelTests(unittest.TestCase):
         self.assertFalse({"change_theme", "open_command_center"} & set(declaracao["parameters"]["properties"]["action"]["enum"]))
 
 
+class FontesDoDiaTests(unittest.TestCase):
+    def test_textos_da_etapa_9_batem_com_o_codigo(self):
+        from core.automacoes import carregar_ferramentas
+
+        nomes = set(carregar_ferramentas().ferramentas)
+        self.assertLessEqual({"news_headlines", "show_map"}, nomes)
+        texto = _uma_linha(LEIA_ME)
+        for trecho in ("**Clima falado**", "**Notícias**", "**Mapa**", 'depois do seu "sim"', "Boa tarde"):
+            self.assertIn(trecho, texto)
+        novidades = _uma_linha(VERSAO[:VERSAO.index("Versão anterior (2026-10-19.2)")])
+        for trecho in ("como está o tempo?", "quais são as notícias?", "mostra no mapa"):
+            self.assertIn(trecho, novidades)
+        roteiro = _uma_linha((RAIZ / "dev" / "ROTEIRO_DE_5_MINUTOS.md").read_text(encoding="utf-8"))
+        passo = roteiro[roteiro.index("**Conversa:**"):roteiro.index("**Modo privado**")]
+        for trecho in ("quais são as notícias?", 'Responda **"não"**: nada abre', "mostra no mapa"):
+            self.assertIn(trecho, passo)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -31,6 +31,8 @@ Arquivos terminados em `.exemplo` são só modelos e não são carregados.
 | `autoconserto.py` | Diagnostica e conserta sozinho o que é seguro | "Jarvis, conserte seus problemas" |
 | `lembretes.py` | Lembretes falados (no modo chamada, esperam o "Hey Jarvis") | "Jarvis, me lembra às 15h de ligar para o contador" · "quais são meus lembretes?" · "cancela o lembrete 2" |
 | `rotinas.py` | Rotinas salvas: seus agentes para tarefas repetidas | "Jarvis, rotina bom dia" · "salve a rotina treino: ..." · "quais rotinas eu tenho?" |
+| `noticias.py` | Manchetes do Google Notícias lidas em voz alta (sem chave, sem IA); só abre a matéria depois do seu "sim" | "Jarvis, quais são as notícias?" · "abre a segunda" |
+| `mapa.py` | Abre o Google Maps no lugar pedido (sem IA) | "Jarvis, mostra no mapa a praia de Tambaú" |
 | `memoria_hd.py` | Salva tudo o que o Jarvis aprende no seu HD externo (a cada 30 min, com histórico de 30 dias; nunca copia chaves) | "Jarvis, use o HD E como memória" · "salve sua memória no HD agora" |
 | `reputacao_site.py` | Diz se um site é confiável ou golpe (idade do domínio, disfarces, cadeado) — só dados públicos | "Jarvis, esse site é golpe? loja-oferta.xyz" |
 | `vigia_wifi.py` | Mostra os aparelhos da SUA rede, avisa aparelho novo e checa sua senha de Wi-Fi — só leitura | "Jarvis, quem está no meu Wi-Fi?" |

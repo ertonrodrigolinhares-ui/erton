@@ -14,6 +14,14 @@ Cópia do projeto **JARVIS-OS V.2** (licença MIT, veja `LICENSE`), com ajustes 
   ele **passa sozinho para o próximo**. Isso corrige o problema do "gemini-2.5-flash não pega".
 - **Suspender por um tempo**: "Jarvis, fique suspenso por 10 minutos". Ele para de ouvir e volta
   sozinho, avisando. Para voltar antes, clique no botão de microfone.
+- **Clima falado**: "Jarvis, como está o tempo?" responde falando, em português, com dados de verdade
+  (temperatura, sensação, umidade, mínima e máxima, chance de chuva) da cidade do `.env`
+  (`JARVIS_CIDADE`) ou da que você disser. Sem IA: funciona na reserva e no modo privado. Só abre o
+  navegador se você pedir.
+- **Notícias**: "Jarvis, quais são as notícias?" lê de 3 a 5 manchetes (Google Notícias, sem chave).
+  Ele só abre a matéria no navegador depois do seu "sim"; um "não" não abre nada.
+- **Mapa**: "Jarvis, mostra no mapa a praia de Tambaú" abre o Google Maps no lugar pedido.
+- O cartão do "bom dia" diz "Bom dia", "Boa tarde" ou "Boa noite" conforme a hora.
 - **Gerar imagens (Nano Banana)**: "Jarvis, crie uma imagem de um leão de armadura".
   A imagem abre na hora e fica salva em **Documentos\Jarvis Ultron\Imagens**.
   Atenção: o Google pode não liberar cota grátis de imagens para a sua chave; nesse caso o Jarvis avisa.

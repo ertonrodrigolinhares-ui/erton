@@ -1,7 +1,12 @@
 Jarvis Ultron - versão 2026-10-30
 
-Novidades desta versão (Etapas 6, 7 e 8 da reorganização: tela mais leve, nada some atrás do anel, tudo
-em português):
+Novidades desta versão (Etapas 6 a 9 da reorganização: tela mais leve, nada some atrás do anel, tudo em
+português, clima falado, notícias e mapa):
+- "Jarvis, como está o tempo?" passa a responder falando, em português, com dados de verdade da cidade do
+  .env (antes só abria uma busca do Google em inglês). Vale também na reserva e no modo privado, porque
+  não usa IA. Só abre o navegador se você pedir.
+- Novidades sem IA na nuvem: "quais são as notícias?" (lê as manchetes e só abre a matéria depois do seu
+  "sim") e "mostra no mapa <lugar>" (abre o Google Maps). O cartão do bom dia cumprimenta conforme a hora.
 - Tudo o que você vê em português: a tela da chave do Gemini ("CONFIGURAÇÃO INICIAL"), a escolha da voz
   e do nome na primeira abertura, os Ajustes, a lista de Atalhos (que agora mostra o F2 e o Ctrl+Shift+C),
   a janela da visão, a área de soltar arquivo, o andamento das tarefas e os avisos. O botão do ícone perto
