@@ -328,7 +328,70 @@ async def _ex_youtube_video(jarvis, args):
     return r or "Done."
 
 
+async def _ex_open_app(jarvis, args):
+    r = await asyncio.to_thread(lambda: open_app(parameters=args, response=None, player=jarvis.ui))
+    return r or f"Opened {args.get('app_name')}."
+
+
+async def _ex_computer_settings(jarvis, args):
+    # desligar, reiniciar, digitar e apertar teclas só com o "ok" do Erton, conferido na ação
+    # (core/aprovacao.py)
+    r = await asyncio.to_thread(lambda: computer_settings(parameters=args, response=None, player=jarvis.ui,
+                                                          jarvis=jarvis))
+    return r or "Done."
+
+
+async def _ex_desktop_control(jarvis, args):
+    r = await asyncio.to_thread(lambda: desktop_control(parameters=args, player=jarvis.ui))
+    return r or "Done."
+
+
+async def _ex_file_controller(jarvis, args):
+    if (
+        args.get("action", "").lower() == "open"
+        and not args.get("path")
+        and not args.get("name")
+    ):
+        current_file = getattr(jarvis.ui, "current_file", None)
+        if current_file:
+            args["path"] = current_file
+    r = await asyncio.to_thread(lambda: file_controller(parameters=args, player=jarvis.ui))
+    return r or "Done."
+
+
+async def _ex_graphics_quality(jarvis, args):
+    quality = str(args.get("quality") or "").strip().lower()
+    if quality not in {"low", "medium", "high"}:
+        raise ValueError("Graphics quality must be low, medium, or high.")
+    jarvis.ui.set_graphics_quality(quality)
+    return f"JARVIS graphics quality changed to {quality}."
+
+
+async def _ex_jarvis_ui_control(jarvis, args):
+    action = str(args.get("action") or "").strip().lower()
+    if action in ("change_theme", "open_command_center", "close_command_center"):
+        # Jarvis Ultron (Etapa 7): na tela azul não há tema nem Command Center; antes o Jarvis
+        # dizia que tinha feito e nada mudava na tela
+        return ("This action no longer exists: the blue screen has a fixed color and no "
+                "Command Center (nothing changed). Tell the user that in Portuguese.")
+    if action == "change_graphics_quality":
+        quality = str(args.get("graphics_quality") or "").strip().lower()
+        if quality not in {"low", "medium", "high"}:
+            raise ValueError(f"Unknown graphics quality: {quality or 'missing'}")
+        jarvis.ui.set_graphics_quality(quality)
+        return f"JARVIS graphics quality changed to {quality}."
+    jarvis.ui.handle_ui_command(action)
+    return f"JARVIS interface action completed: {action.replace('_', ' ')}."
+
+
 EXECUTORES = {
+    # grupo 2: o sistema e a própria tela
+    "open_app": _ex_open_app,
+    "computer_settings": _ex_computer_settings,
+    "desktop_control": _ex_desktop_control,
+    "file_controller": _ex_file_controller,
+    "graphics_quality": _ex_graphics_quality,
+    "jarvis_ui_control": _ex_jarvis_ui_control,
     # grupo 1: internet e mídia
     "weather_report": _ex_weather_report,
     "web_search": _ex_web_search,
@@ -1639,10 +1702,6 @@ class JarvisLive:
             if executor is not None:
                 result = await executor(self, args)
 
-            elif name == "open_app":
-                r = await asyncio.to_thread(lambda: open_app(parameters=args, response=None, player=self.ui))
-                result = r or f"Opened {args.get('app_name')}."
-
             elif name == "listening_mode":
                 result = self._definir_modo_escuta(args.get("mode", ""))
 
@@ -1669,18 +1728,6 @@ class JarvisLive:
             elif name == "generate_image":
                 from core.modelos import gerar_imagem
                 result = await asyncio.to_thread(gerar_imagem, args.get("prompt", ""))
-
-            elif name == "file_controller":
-                if (
-                    args.get("action", "").lower() == "open"
-                    and not args.get("path")
-                    and not args.get("name")
-                ):
-                    current_file = getattr(self.ui, "current_file", None)
-                    if current_file:
-                        args["path"] = current_file
-                r = await asyncio.to_thread(lambda: file_controller(parameters=args, player=self.ui))
-                result = r or "Done."
 
             elif name in FERRAMENTAS_DESLIGADAS:
                 # desligada de propósito (Etapa 3): responde e não chama nada
@@ -1709,17 +1756,6 @@ class JarvisLive:
                 ).start()
                 result = "Vision module activated. Stay completely silent — vision module will speak directly."
 
-            elif name == "computer_settings":
-                # desligar, reiniciar, digitar e apertar teclas só com o "ok" do Erton, conferido na ação
-                # (core/aprovacao.py)
-                r = await asyncio.to_thread(lambda: computer_settings(parameters=args, response=None, player=self.ui,
-                                                                      jarvis=self))
-                result = r or "Done."
-
-            elif name == "desktop_control":
-                r = await asyncio.to_thread(lambda: desktop_control(parameters=args, player=self.ui))
-                result = r or "Done."
-
             elif name == "file_processor":
                 if not args.get("file_path") and self.ui.current_file:
                     args["file_path"] = self.ui.current_file
@@ -1731,30 +1767,6 @@ class JarvisLive:
             elif name == "flight_finder":
                 r = await asyncio.to_thread(lambda: flight_finder(parameters=args, player=self.ui))
                 result = r or "Done."
-
-            elif name == "graphics_quality":
-                quality = str(args.get("quality") or "").strip().lower()
-                if quality not in {"low", "medium", "high"}:
-                    raise ValueError("Graphics quality must be low, medium, or high.")
-                self.ui.set_graphics_quality(quality)
-                result = f"JARVIS graphics quality changed to {quality}."
-
-            elif name == "jarvis_ui_control":
-                action = str(args.get("action") or "").strip().lower()
-                if action in ("change_theme", "open_command_center", "close_command_center"):
-                    # Jarvis Ultron (Etapa 7): na tela azul não há tema nem Command Center; antes o Jarvis
-                    # dizia que tinha feito e nada mudava na tela
-                    result = ("This action no longer exists: the blue screen has a fixed color and no "
-                              "Command Center (nothing changed). Tell the user that in Portuguese.")
-                elif action == "change_graphics_quality":
-                    quality = str(args.get("graphics_quality") or "").strip().lower()
-                    if quality not in {"low", "medium", "high"}:
-                        raise ValueError(f"Unknown graphics quality: {quality or 'missing'}")
-                    self.ui.set_graphics_quality(quality)
-                    result = f"JARVIS graphics quality changed to {quality}."
-                else:
-                    self.ui.handle_ui_command(action)
-                    result = f"JARVIS interface action completed: {action.replace('_', ' ')}."
 
             elif name == "deep_research":
                 r = request_deep_research(parameters=args, player=self.ui, speak=self.speak)
