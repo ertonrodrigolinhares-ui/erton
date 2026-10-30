@@ -72,9 +72,6 @@ def main() -> int:
         patch.object(ui, "get_secret_store", return_value=_NoSecrets()),
         patch.object(ui.MainWindow, "_setup_system_tray", lambda self: None),
         patch.object(ui.MainWindow, "_update_metrics", lambda self: None),
-        patch.object(ui.MainWindow, "_restore_detached_panels", lambda self: None),
-        patch.object(ui.MainWindow, "_start_layout_autosave", lambda self: None),
-        patch.object(ui.MainWindow, "_start_auto_graphics_detection", lambda self: None),
     ]
     for patcher in patchers:
         patcher.start()

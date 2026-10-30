@@ -39,9 +39,6 @@ class UIRegressionTests(unittest.TestCase):
             patch.object(ui, "BASE_DIR", temp_path),  # Jarvis Ultron: o .env que a tela regrava
             patch.object(ui.MainWindow, "_setup_system_tray", lambda self: None),
             patch.object(ui.MainWindow, "_update_metrics", lambda self: None),
-            patch.object(ui.MainWindow, "_restore_detached_panels", lambda self: None),
-            patch.object(ui.MainWindow, "_start_layout_autosave", lambda self: None),
-            patch.object(ui.MainWindow, "_start_auto_graphics_detection", lambda self: None),
         ]
         for patcher in cls.patchers:
             patcher.start()

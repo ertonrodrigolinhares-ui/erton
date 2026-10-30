@@ -6235,15 +6235,6 @@ class MainWindow(QMainWindow):
     _presentation_progress_hide_sig = pyqtSignal()
     _ui_command_sig = pyqtSignal(str)
 
-    def _restore_detached_panels(self) -> None:
-        """Compatibility hook for persisted panel layouts."""
-
-    def _start_layout_autosave(self) -> None:
-        """Compatibility hook for layout persistence."""
-
-    def _start_auto_graphics_detection(self) -> None:
-        """Compatibility hook for deferred capability detection."""
-
     def __init__(self, face_path: str):
         super().__init__()
         _load_bundled_fonts()
