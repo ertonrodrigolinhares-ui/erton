@@ -10,3 +10,5 @@ Vale para qualquer conversa com o Claude neste repositório.
   impostos ou escritório contábil; dados de clientes do escritório.
 - Se faltar contexto sobre para quem é o Jarvis, pergunte ao Erton em vez de supor que é contabilidade.
 - Responda ao Erton sempre em português do Brasil, de forma simples (ele não é programador).
+- Só fale do Jarvis, ou use o Jarvis como exemplo, quando o Erton disser "vamos trabalhar no projeto
+  Jarvis". Fora disso, atenda o pedido sem puxar o Jarvis para a conversa.
