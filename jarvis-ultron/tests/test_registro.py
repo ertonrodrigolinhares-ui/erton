@@ -87,5 +87,49 @@ class FichasTests(unittest.TestCase):
                 self.assertIn(f.resposta_padrao, inspect.getsource(f.executar))
 
 
+class FilaSeguraTests(unittest.TestCase):
+    """Etapa 14 (c): o que muda algo roda em fila; só o que só lê roda em paralelo."""
+
+    def _maximo_ao_mesmo_tempo(self, nomes) -> int:
+        import asyncio
+        from types import SimpleNamespace as NS
+
+        jarvis = object.__new__(main.JarvisLive)
+        abertas, maximo = [0], [0]
+
+        async def executar(chamada):
+            abertas[0] += 1
+            maximo[0] = max(maximo[0], abertas[0])
+            await asyncio.sleep(0)
+            abertas[0] -= 1
+            return chamada.name
+
+        jarvis._execute_tool = executar
+        asyncio.run(jarvis._execute_tool_batch([NS(name=n) for n in nomes]))
+        return maximo[0]
+
+    def test_publicar_e_gerar_video_pago_nunca_disputam_o_mesmo_ok(self):
+        self.assertEqual(self._maximo_ao_mesmo_tempo(["approve_publication", "generate_video"]), 1)
+        self.assertEqual(self._maximo_ao_mesmo_tempo(["open_app", "listening_mode"]), 1)
+        self.assertEqual(self._maximo_ao_mesmo_tempo(["ferramenta_desconhecida", "web_search"]), 1)
+
+    def test_lote_so_de_leitura_roda_junto(self):
+        self.assertGreater(self._maximo_ao_mesmo_tempo(["web_search", "weather_report", "task_status", "self_diagnosis"]), 1)
+
+    def test_automacao_pode_declarar_que_so_le(self):
+        from types import SimpleNamespace as NS
+        from unittest.mock import patch
+
+        from cerebro.ferramentas import registro
+
+        carga = NS(ferramentas={"so_le": NS(muda_algo=False), "normal": NS(muda_algo=True)})
+        with patch.object(main, "carregar_automacoes", return_value=carga), \
+                patch.object(registro, "carregar_automacoes", return_value=carga):
+            self.assertFalse(main.muda_algo("so_le"))
+            self.assertTrue(main.muda_algo("normal"))
+        self.assertTrue(main.muda_algo("computer_settings"))
+        self.assertFalse(main.muda_algo("weather_report"))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -200,6 +200,22 @@ from cerebro.ferramentas.executores import (  # noqa: E402,F401
 )
 
 
+def muda_algo(nome: str) -> bool:
+    """Esta ferramenta muda alguma coisa (roda em fila num lote)? Etapa 14 (c): o padrão seguro é SIM. Só as
+    fichas marcadas muda_algo=False (só leitura) e as automações com MUDA_ALGO = False rodam em paralelo.
+    Nome desconhecido também vai para a fila."""
+    if nome in MUDAM_ALGO:
+        return True
+    from cerebro.ferramentas.fichas import POR_NOME
+
+    if nome in POR_NOME:
+        return False  # ficha marcada como só leitura
+    automacao = carregar_automacoes().ferramentas.get(nome)
+    if automacao is not None:
+        return bool(getattr(automacao, "muda_algo", True))
+    return True
+
+
 def get_tool_declarations(*, cloud_safe: bool = False) -> list[dict]:
     """Return the Gemini tools available for the requested runtime."""
     if not cloud_safe:
@@ -1538,9 +1554,8 @@ class JarvisLive:
 
     async def _execute_tool_batch(self, calls):
         """Run read-only calls concurrently while preserving mutation order."""
-        mutating = MUDAM_ALGO  # cerebro/ferramentas/politica.py (Etapa 12)
         call_list = list(calls or [])
-        if any(getattr(call, "name", "") in mutating for call in call_list):
+        if any(muda_algo(getattr(call, "name", "")) for call in call_list):
             return [await self._execute_tool(call) for call in call_list]
         return list(await asyncio.gather(*(self._execute_tool(call) for call in call_list)))
 

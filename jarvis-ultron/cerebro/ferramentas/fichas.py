@@ -6,7 +6,10 @@ cada uma é UMA ficha, e as listas são CALCULADAS daqui, com os mesmos nomes de
 
 - FERRAMENTAS_NUVEM_IA: as fichas com usa_ia_nuvem=True (uma regra por argumento, como o resumo do
   youtube_video, fica em REGRAS_DE_NUVEM e vale só para aquele argumento);
-- MUDAM_ALGO: as fichas com muda_algo=True (rodam em fila num lote do Gemini);
+- MUDAM_ALGO: as fichas com muda_algo=True (rodam em fila num lote do Gemini). Desde a Etapa 14 (c) é o
+  padrão: só o que SÓ LÊ (web_search, weather_report, task_status, self_diagnosis, school_tasks) marca
+  False. Antes, publicar, gerar vídeo pago, abrir programa e trocar o modo de escuta podiam rodar ao mesmo
+  tempo e disputar o mesmo "ok";
 - CLOUD_SAFE_ACTIONS: nuvem_ok=True (as que o servidor web, hoje guardado, oferecia);
 - RESERVA_FERRAMENTAS_ESSENCIAIS: essencial_na_reserva=True (vão para o Groq);
 - FERRAMENTAS_DESLIGADAS: as fichas desligadas (Etapa 3), com o motivo;
@@ -34,7 +37,8 @@ class Ficha:
     executar: Callable | None = None   # None: desligada (Etapa 3) ou tratada no próprio _execute_tool (save_memory)
     resposta_padrao: str = "Done."     # o que volta ao modelo quando a ação não devolve nada ("" = ela sempre responde)
     usa_ia_nuvem: bool = False         # manda o pedido para uma IA na nuvem: não roda no modo privado
-    muda_algo: bool = False            # num lote do Gemini, roda em fila (uma depois da outra)
+    muda_algo: bool = True             # num lote do Gemini, roda em fila (uma depois da outra). É o padrão
+                                       # seguro (Etapa 14 c): só o que SÓ LÊ marca False e roda em paralelo
     precisa_ok: bool = False           # a ação confere o "ok" do Erton no código (core/aprovacao.py)
     nuvem_ok: bool = False             # o servidor web (guardado) podia oferecê-la
     essencial_na_reserva: bool = False  # vai para o Groq no modo reserva
@@ -54,55 +58,54 @@ REGRAS_DE_NUVEM: dict[str, Callable[[dict], bool]] = {
 
 FICHAS: tuple[Ficha, ...] = (
     # internet e mídia
-    Ficha("weather_report", ex._ex_weather_report, "Weather delivered.", essencial_na_reserva=True),
-    Ficha("web_search", ex._ex_web_search, usa_ia_nuvem=True, nuvem_ok=True, essencial_na_reserva=True),
+    Ficha("weather_report", ex._ex_weather_report, "Weather delivered.", muda_algo=False, essencial_na_reserva=True),
+    Ficha("web_search", ex._ex_web_search, usa_ia_nuvem=True, muda_algo=False, nuvem_ok=True, essencial_na_reserva=True),
     Ficha("browser_control", ex._ex_browser_control, essencial_na_reserva=True),
     Ficha("media_control", ex._ex_media_control, essencial_na_reserva=True),
     Ficha("youtube_video", ex._ex_youtube_video, nuvem_ok=True, essencial_na_reserva=True),
     # o sistema e a própria tela
     Ficha("open_app", ex._ex_open_app, "Opened {app_name}.", essencial_na_reserva=True),
-    Ficha("computer_settings", ex._ex_computer_settings, usa_ia_nuvem=True, muda_algo=True, precisa_ok=True),
-    Ficha("desktop_control", ex._ex_desktop_control, usa_ia_nuvem=True, muda_algo=True),
-    Ficha("file_controller", ex._ex_file_controller, muda_algo=True),
-    Ficha("graphics_quality", ex._ex_graphics_quality, "JARVIS graphics quality changed to {quality}.", muda_algo=True),
-    Ficha("jarvis_ui_control", ex._ex_jarvis_ui_control, "JARVIS interface action completed: {action}.", muda_algo=True),
+    Ficha("computer_settings", ex._ex_computer_settings, usa_ia_nuvem=True, precisa_ok=True),
+    Ficha("desktop_control", ex._ex_desktop_control, usa_ia_nuvem=True),
+    Ficha("file_controller", ex._ex_file_controller),
+    Ficha("graphics_quality", ex._ex_graphics_quality, "JARVIS graphics quality changed to {quality}."),
+    Ficha("jarvis_ui_control", ex._ex_jarvis_ui_control, "JARVIS interface action completed: {action}."),
     # e-mail e lembrete
-    Ficha("email_control", ex._ex_email_control, "Email action completed.", muda_algo=True, nuvem_ok=True,
-          essencial_na_reserva=True),
-    Ficha("reminder", ex._ex_reminder, "Reminder set.", muda_algo=True, essencial_na_reserva=True),
+    Ficha("email_control", ex._ex_email_control, "Email action completed.", nuvem_ok=True, essencial_na_reserva=True),
+    Ficha("reminder", ex._ex_reminder, "Reminder set.", essencial_na_reserva=True),
     # o Jarvis por dentro
     Ficha("listening_mode", ex._ex_listening_mode, "", essencial_na_reserva=True),
     Ficha("hermes_agent", ex._ex_hermes_agent, "", usa_ia_nuvem=True, essencial_na_reserva=True),
-    Ficha("school_tasks", ex._ex_school_tasks, "", essencial_na_reserva=True),
-    Ficha("self_diagnosis", ex._ex_self_diagnosis, "", essencial_na_reserva=True),
+    Ficha("school_tasks", ex._ex_school_tasks, "", muda_algo=False, essencial_na_reserva=True),
+    Ficha("self_diagnosis", ex._ex_self_diagnosis, "", muda_algo=False, essencial_na_reserva=True),
     Ficha("approve_publication", ex._ex_approve_publication, "", usa_ia_nuvem=True, precisa_ok=True),
     Ficha("suspend_listening", ex._ex_suspend_listening, ""),
     Ficha("generate_image", ex._ex_generate_image, "", usa_ia_nuvem=True, essencial_na_reserva=True),
     # visão, arquivos e tarefas
     Ficha("screen_process", ex._ex_screen_process,
           "Vision module activated. Stay completely silent — vision module will speak directly.", usa_ia_nuvem=True),
-    Ficha("file_processor", ex._ex_file_processor, usa_ia_nuvem=True, muda_algo=True),
+    Ficha("file_processor", ex._ex_file_processor, usa_ia_nuvem=True),
     Ficha("deep_research", ex._ex_deep_research, "Deep research preference requested.", usa_ia_nuvem=True, nuvem_ok=True),
     Ficha("create_presentation", ex._ex_create_presentation, "Presentation preference requested.", usa_ia_nuvem=True,
-          muda_algo=True, nuvem_ok=True),
-    Ficha("task_status", ex._ex_task_status, ""),
+          nuvem_ok=True),
+    Ficha("task_status", ex._ex_task_status, "", muda_algo=False),
     # memória: tratada no próprio _execute_tool (não grava no modo privado), por isso sem executar aqui
-    Ficha("save_memory", None, "ok", muda_algo=True, essencial_na_reserva=True),
+    Ficha("save_memory", None, "ok", essencial_na_reserva=True),
     # herdada que ainda existe (a Etapa 18 decide, com o Erton)
     Ficha("flight_finder", ex._ex_flight_finder, usa_ia_nuvem=True, nuvem_ok=True),
     # desligadas de propósito (Etapa 3, decisão do Erton): sem declaração, sem executor; chamadas mesmo assim,
     # o _execute_tool responde o motivo e não chama nada
-    Ficha("send_message", muda_algo=True,
+    Ficha("send_message",
           desligada="sending messages on WhatsApp, Telegram, Discord, Instagram or iMessage"),
-    Ficha("prepare_message_reply", muda_algo=True, desligada="drafting and sending message replies"),
+    Ficha("prepare_message_reply", desligada="drafting and sending message replies"),
     Ficha("check_messages", desligada="reading messages and contacts"),
     Ficha("agent_task", usa_ia_nuvem=True, desligada="multi-step tasks that write and run AI-generated code"),
-    Ficha("code_helper", usa_ia_nuvem=True, muda_algo=True, desligada="writing, running and building code"),
-    Ficha("dev_agent", usa_ia_nuvem=True, muda_algo=True,
+    Ficha("code_helper", usa_ia_nuvem=True, desligada="writing, running and building code"),
+    Ficha("dev_agent", usa_ia_nuvem=True,
           desligada="building projects, installing packages and running code"),
-    Ficha("computer_control", usa_ia_nuvem=True, muda_algo=True,
+    Ficha("computer_control", usa_ia_nuvem=True,
           desligada="clicking, typing and moving the mouse anywhere on the screen"),
-    Ficha("game_updater", muda_algo=True,
+    Ficha("game_updater",
           desligada="installing and updating Steam and Epic games, which could shut down the computer"),
 )
 

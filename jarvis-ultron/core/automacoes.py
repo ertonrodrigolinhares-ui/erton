@@ -12,6 +12,9 @@ Coloque o arquivo na pasta `automacoes` do Jarvis e abra o Jarvis de novo. Dois 
    `NA_TELA = True` no arquivo (assim o `iniciar` roda no programa da tela).
    Se a ferramenta manda o pedido para uma IA na nuvem (Gemini, Claude, Hermes...), ponha
    `USA_IA_NUVEM = True`: no modo privado ela não é oferecida ao Gemma nem roda.
+   Toda automação é tratada como algo que MUDA alguma coisa: num lote do Gemini, roda em fila, uma
+   depois da outra. Se a sua só lê (não abre nada, não grava, não envia), ponha `MUDA_ALGO = False`
+   para ela poder rodar junto com as outras.
 
 2. `nome.md`: um agente/habilidade para o Hermes (mesmo formato de SKILL.md, com
    `name:` no cabeçalho). O Jarvis copia para o perfil jarvis do Hermes ao abrir. Se o cabeçalho
@@ -41,6 +44,7 @@ class Automacao:
     executar: Callable
     arquivo: Path
     usa_ia_nuvem: bool = False  # USA_IA_NUVEM = True no arquivo: fica desligada no modo privado
+    muda_algo: bool = True  # MUDA_ALGO = False no arquivo: só lê, pode rodar junto com outras num lote
 
 
 @dataclass
@@ -95,7 +99,8 @@ def carregar_ferramentas(pasta: Path | None = None, reservados: set[str] | None 
                 raise ValueError("falta a descrição (description)")
             declaracao.setdefault("parameters", {"type": "OBJECT", "properties": {}})
             carga.ferramentas[nome] = Automacao(nome, declaracao, executar, arquivo,
-                                                bool(getattr(modulo, "USA_IA_NUVEM", False)))
+                                                bool(getattr(modulo, "USA_IA_NUVEM", False)),
+                                                bool(getattr(modulo, "MUDA_ALGO", True)))
             if iniciar is not None:
                 carga.inicios.append((arquivo.name, iniciar))
         except Exception as erro:
