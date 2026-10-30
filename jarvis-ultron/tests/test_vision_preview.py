@@ -30,11 +30,11 @@ class VisionPreviewTests(unittest.TestCase):
                 self.assertIs(preview.parentWidget(), host)
                 self.assertFalse(preview.isWindow())
                 self.assertEqual(preview._source, "camera")
-                self.assertEqual(preview._source_label.text(), "CAMERA FEED")
+                self.assertEqual(preview._source_label.text(), "IMAGEM: CÂMERA")
                 self.assertTrue(preview._frame_timer.isActive())
 
                 preview.finish(2500)
-                self.assertEqual(preview._status.text(), "ANALYSIS COMPLETE")
+                self.assertEqual(preview._status.text(), "ANÁLISE CONCLUÍDA")
                 self.assertTrue(preview._hide_timer.isActive())
 
                 preview.stop()

@@ -540,7 +540,7 @@ class ChatBubbleWidget(QWidget):
         ib_lay.setSpacing(6)
 
         self._input = QLineEdit()
-        self._input.setPlaceholderText("Type a message to JARVIS…")
+        self._input.setPlaceholderText("Escreva para o Jarvis…")
         self._input.setFont(QFont(UI_FONT, 10))
         self._input.setFixedHeight(32)
         self._input.setStyleSheet(f"""
@@ -825,7 +825,7 @@ class FocusDialogueWidget(QWidget):
 
         header = QHBoxLayout()
         header.setSpacing(8)
-        self._channel_lbl = QLabel("DIALOGUE LINK")
+        self._channel_lbl = QLabel("CONVERSA")
         self._channel_lbl.setFont(QFont(DISPLAY_FONT, 8, QFont.Weight.DemiBold))
         header.addWidget(self._channel_lbl)
         header.addStretch()
@@ -842,7 +842,7 @@ class FocusDialogueWidget(QWidget):
         self._speaker_lbl.setFixedWidth(62)
         self._speaker_lbl.setFont(QFont(DISPLAY_FONT, 8, QFont.Weight.DemiBold))
         message_row.addWidget(self._speaker_lbl, alignment=Qt.AlignmentFlag.AlignTop)
-        self._message_lbl = QLabel("Standing by.")
+        self._message_lbl = QLabel("Pronto.")
         self._message_lbl.setFont(QFont(UI_FONT, 10, QFont.Weight.Medium))
         self._message_lbl.setWordWrap(True)
         self._message_lbl.setMaximumHeight(34)
@@ -852,12 +852,12 @@ class FocusDialogueWidget(QWidget):
         input_row = QHBoxLayout()
         input_row.setSpacing(7)
         self._input = QLineEdit()
-        self._input.setPlaceholderText("Give JARVIS a command")
+        self._input.setPlaceholderText("Diga ao Jarvis o que fazer")
         self._input.setFont(QFont(UI_FONT, 9))
         self._input.setFixedHeight(30)
         self._input.returnPressed.connect(self._submit)
         input_row.addWidget(self._input, stretch=1)
-        self._send_btn = QPushButton("SEND")
+        self._send_btn = QPushButton("ENVIAR")
         self._send_btn.setFont(QFont(UI_FONT, 8, QFont.Weight.DemiBold))
         self._send_btn.setFixedSize(64, 30)
         self._send_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -3408,15 +3408,15 @@ class FileDropZone(QWidget):
 
     def _browse(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "Select a file for JARVIS", str(Path.home()),
-            "All Files (*.*);;"
-            "Images (*.jpg *.jpeg *.png *.gif *.webp *.bmp *.svg);;"
+            self, "Escolha um arquivo para o Jarvis", str(Path.home()),
+            "Todos os arquivos (*.*);;"
+            "Imagens (*.jpg *.jpeg *.png *.gif *.webp *.bmp *.svg);;"
             "Documents (*.pdf *.docx *.txt *.md *.pptx);;"
             "Data (*.csv *.xlsx *.json *.xml);;"
             "Code (*.py *.js *.ts *.html *.css *.java *.cpp *.go);;"
             "Audio (*.mp3 *.wav *.ogg *.m4a *.aac *.flac);;"
             "Video (*.mp4 *.avi *.mov *.mkv *.wmv *.webm);;"
-            "Archives (*.zip *.rar *.tar *.gz *.7z)",
+            "Compactados (*.zip *.rar *.tar *.gz *.7z)",
         )
         if path:
             self._set_file(path)
@@ -3469,11 +3469,11 @@ class _DropCanvas(QWidget):
         p.setFont(QFont("Courier New", 8))
         p.setPen(QPen(qcol(C.PRI_DIM if not hover else C.TEXT), 1))
         p.drawText(QRectF(0, cy + 8, W, 16), Qt.AlignmentFlag.AlignCenter,
-                   "Drop file here  or  Click to Browse")
+                   "Solte um arquivo aqui  ou  clique para escolher")
         p.setFont(QFont("Courier New", 7))
         p.setPen(QPen(qcol(C.BORDER_B), 1))
         p.drawText(QRectF(0, cy + 24, W, 14), Qt.AlignmentFlag.AlignCenter,
-                   "Images · Video · Audio · PDF · Docs · Code · Data")
+                   "Imagens · Vídeo · Áudio · PDF · Documentos · Código · Dados")
 
     def _paint_drag_over(self, p, W, H):
         cx, cy = W / 2, H / 2
@@ -3482,7 +3482,7 @@ class _DropCanvas(QWidget):
         p.drawText(QRectF(0, cy - 24, W, 32), Qt.AlignmentFlag.AlignCenter, "⬇")
         p.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
         p.setPen(QPen(qcol(C.PRI), 1))
-        p.drawText(QRectF(0, cy + 12, W, 16), Qt.AlignmentFlag.AlignCenter, "Release to load")
+        p.drawText(QRectF(0, cy + 12, W, 16), Qt.AlignmentFlag.AlignCenter, "Solte para carregar")
 
     def _paint_file(self, p, W, H):
         path = Path(self._z._current_file)
@@ -3939,7 +3939,7 @@ class ShortcutsOverlay(_OverlayBase):
             w.setStyleSheet(f"color: {color}; background: transparent;")
             return w
 
-        layout.addWidget(_lbl("◈  KEYBOARD SHORTCUTS", 13, True))
+        layout.addWidget(_lbl("◈  ATALHOS DO TECLADO", 13, True))
         layout.addSpacing(4)
 
         sep = QFrame()
@@ -3949,14 +3949,16 @@ class ShortcutsOverlay(_OverlayBase):
         layout.addSpacing(6)
 
         shortcuts = [
-            ("F4",       "Toggle Microphone Mute"),
-            ("F6",       "Minimize / Restore Window"),
-            ("F11",      "Toggle Fullscreen"),
-            ("Ctrl+/",   "Show This Help Panel"),
-            ("Ctrl+M",   "Toggle Compact Mode"),
-            ("Ctrl+Shift+T", "Cycle Color Theme"),
-            ("Enter",    "Send Command (in input)"),
-            ("Esc",      "Close Overlay / Dismiss"),
+            ("F2",       "Tela antiga / tela azul"),
+            ("F4",       "Ligar ou desligar o microfone"),
+            ("F6",       "Minimizar / restaurar a janela"),
+            ("F11",      "Tela cheia"),
+            ("Ctrl+/",   "Esta lista de atalhos"),
+            ("Ctrl+M",   "Modo compacto"),
+            ("Ctrl+Shift+C", "Command Center (tela antiga)"),
+            ("Ctrl+Shift+T", "Trocar o tema de cores (tela antiga)"),
+            ("Enter",    "Enviar o que digitou"),
+            ("Esc",      "Fechar a janelinha"),
         ]
 
         for key, desc in shortcuts:
@@ -3982,7 +3984,7 @@ class ShortcutsOverlay(_OverlayBase):
             layout.addLayout(row)
 
         layout.addSpacing(8)
-        layout.addWidget(_lbl("Press Esc or Ctrl+/ to close", 7, color=C.TEXT_DIM))
+        layout.addWidget(_lbl("Esc ou Ctrl+/ fecha", 7, color=C.TEXT_DIM))
 
         self._setup_overlay_base(close_callback=self.hide)
 
@@ -4000,9 +4002,9 @@ class GraphicsQualityCard(QPushButton):
     """Compact, theme-aware graphics option used by Settings."""
 
     _COPY = {
-        "low": ("LOW", "20 FPS", "· reduced detail"),
-        "medium": ("MEDIUM", "30 FPS", "· balanced"),
-        "high": ("HIGH", "60 FPS", "· full detail"),
+        "low": ("BAIXA", "20 FPS", "· menos detalhe"),
+        "medium": ("MÉDIA", "30 FPS", "· equilibrada"),
+        "high": ("ALTA", "60 FPS", "· detalhe total"),
     }
 
     def __init__(self, quality: str, parent=None):
@@ -4010,7 +4012,7 @@ class GraphicsQualityCard(QPushButton):
         self.quality = quality
         title, fps, detail = self._COPY[quality]
         self.setText("")
-        self.setAccessibleName(f"{title.title()} graphics quality")
+        self.setAccessibleName(f"Qualidade gráfica {title.lower()}")
         self.setToolTip(f"{fps} {detail}")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setMinimumHeight(78)
@@ -4154,11 +4156,11 @@ class SettingsOverlay(_OverlayBase):
         id_lay.setContentsMargins(4, 8, 4, 4)
         id_lay.setSpacing(8)
 
-        id_lay.addWidget(_lbl("◈  YOUR NAME", 9, bold=True, color_role="PRI",
+        id_lay.addWidget(_lbl("◈  SEU NOME", 9, bold=True, color_role="PRI",
                               align=Qt.AlignmentFlag.AlignLeft))
         self._s_name_input = QLineEdit()
         self._s_name_input.setText(current_name)
-        self._s_name_input.setPlaceholderText("e.g. Tony, Mirsab, Alex...")
+        self._s_name_input.setPlaceholderText("ex.: Ana, Carlos...")
         self._s_name_input.setFont(QFont(UI_FONT, 10))
         self._s_name_input.setFixedHeight(32)
         self._s_name_input.setStyleSheet(f"""
@@ -4174,7 +4176,7 @@ class SettingsOverlay(_OverlayBase):
         """)
         id_lay.addWidget(self._s_name_input)
 
-        save_name = QPushButton("▸  UPDATE IDENTITY")
+        save_name = QPushButton("▸  SALVAR O NOME")
         save_name.setFixedHeight(36)
         save_name.setFont(QFont(UI_FONT, 9, QFont.Weight.Medium))
         save_name.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -4204,7 +4206,7 @@ class SettingsOverlay(_OverlayBase):
         th_lay.setContentsMargins(4, 8, 4, 4)
         th_lay.setSpacing(6)
 
-        th_lay.addWidget(_lbl("COLOR THEME", 8, color_role="TEXT_DIM",
+        th_lay.addWidget(_lbl("TEMA DE CORES", 8, color_role="TEXT_DIM",
                               align=Qt.AlignmentFlag.AlignLeft))
 
         self._theme_btns: dict[str, QPushButton] = {}
@@ -4229,11 +4231,11 @@ class SettingsOverlay(_OverlayBase):
         gfx_lay.setContentsMargins(4, 8, 4, 4)
         gfx_lay.setSpacing(10)
         gfx_lay.addWidget(_lbl(
-            "GRAPHICS QUALITY", 8, bold=True, color_role="WHITE_DIM",
+            "QUALIDADE GRÁFICA", 8, bold=True, color_role="WHITE_DIM",
             align=Qt.AlignmentFlag.AlignLeft,
         ))
         gfx_lay.addWidget(_lbl(
-            "Choose a performance profile. Changes apply instantly.",
+            "Escolha entre leveza e detalhe. Vale na hora.",
             8, color_role="WHITE_DIM", align=Qt.AlignmentFlag.AlignLeft,
         ))
 
@@ -4290,7 +4292,7 @@ class SettingsOverlay(_OverlayBase):
         value = _normalize_graphics_quality(quality)
         self._current_graphics = value
         self._highlight_graphics(value)
-        self._graphics_note.setText(f"{value.upper()} quality active.")
+        self._graphics_note.setText(f"Qualidade {QUALIDADE_EM_PORTUGUES[value]} em uso.")
         self.graphics_changed.emit(value)
 
     def _highlight_graphics(self, quality: str):
@@ -4590,7 +4592,7 @@ class KeyTutorialOverlay(_OverlayBase):
             return w
 
         # Header
-        title = info.get("title", f"{provider.upper()} API Key Setup")
+        title = info.get("title", f"Chave da voz {provider.upper()}")
         layout.addWidget(_lbl(f"◈  {title}", 11, True, C.ACC,
                               Qt.AlignmentFlag.AlignCenter))
         layout.addSpacing(2)
@@ -4616,10 +4618,10 @@ class KeyTutorialOverlay(_OverlayBase):
         sep2 = QFrame(); sep2.setFrameShape(QFrame.Shape.HLine)
         sep2.setStyleSheet(f"color: {C.BORDER};"); layout.addWidget(sep2)
 
-        layout.addWidget(_lbl("API KEY", 8, bold=True, color=C.ACC))
+        layout.addWidget(_lbl("CHAVE", 8, bold=True, color=C.ACC))
 
         self._key_input = QLineEdit()
-        self._key_input.setPlaceholderText("Paste your API key here…")
+        self._key_input.setPlaceholderText("Cole a chave aqui…")
         self._key_input.setEchoMode(QLineEdit.EchoMode.Password)
         self._key_input.setFont(QFont("Courier New", 9))
         self._key_input.setFixedHeight(32)
@@ -4637,7 +4639,7 @@ class KeyTutorialOverlay(_OverlayBase):
 
         btn_row = QHBoxLayout(); btn_row.setSpacing(8)
 
-        back_btn = QPushButton("← BACK")
+        back_btn = QPushButton("← VOLTAR")
         back_btn.setFixedHeight(30)
         back_btn.setFont(QFont("Courier New", 8))
         back_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -4651,7 +4653,7 @@ class KeyTutorialOverlay(_OverlayBase):
         back_btn.clicked.connect(self.cancelled.emit)
         btn_row.addWidget(back_btn)
 
-        save_btn = QPushButton("▸  SAVE KEY & ACTIVATE")
+        save_btn = QPushButton("▸  SALVAR A CHAVE E ATIVAR")
         save_btn.setFixedHeight(30)
         save_btn.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
         save_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -4724,8 +4726,8 @@ class VoiceSelectorOverlay(_OverlayBase):
             w.setStyleSheet(f"color: {color}; background: transparent;")
             return w
 
-        main_lay.addWidget(_lbl("◈  SELECT VOICE", 13, True))
-        main_lay.addWidget(_lbl("Default: Orus  ·  Gemini", 8, color=C.PRI_DIM))
+        main_lay.addWidget(_lbl("◈  ESCOLHER A VOZ", 13, True))
+        main_lay.addWidget(_lbl("Padrão: Orus  ·  Gemini", 8, color=C.PRI_DIM))
         main_lay.addSpacing(2)
 
         sep = QFrame(); sep.setFrameShape(QFrame.Shape.HLine)
@@ -4741,7 +4743,7 @@ class VoiceSelectorOverlay(_OverlayBase):
             "gemini":     C.ENERGY,
         }
         SECTION_KEY_HINT = {
-            "gemini":     "no key required",
+            "gemini":     "sem chave",
         }
 
         for provider, voices in PROVIDER_VOICES.items():
@@ -4798,7 +4800,7 @@ class VoiceSelectorOverlay(_OverlayBase):
         
         # Confirm button
         main_lay.addSpacing(16)
-        confirm_btn = QPushButton("▸  ACTIVATE VOICE")
+        confirm_btn = QPushButton("▸  ATIVAR A VOZ")
         confirm_btn.setFixedHeight(36)
         confirm_btn.setFont(QFont("Courier New", 9, QFont.Weight.Bold))
         confirm_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -5249,7 +5251,7 @@ class VisionPreviewWindow(QWidget):
         super().__init__(parent)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setObjectName("visionPreview")
-        self.setAccessibleName("JARVIS live vision preview")
+        self.setAccessibleName("Visão do Jarvis ao vivo")
         self.setFixedSize(360, 248)
         self._source = "screen"
         self._drag_origin_global = None
@@ -5274,9 +5276,9 @@ class VisionPreviewWindow(QWidget):
 
         self._live_dot = QLabel("●", self._header)
         self._live_dot.setFont(QFont(TECH_FONT, 8, QFont.Weight.Medium))
-        self._title = QLabel("VISION LINK", self._header)
+        self._title = QLabel("VISÃO", self._header)
         self._title.setFont(QFont(UI_FONT, 9, QFont.Weight.DemiBold))
-        self._source_label = QLabel("SCREEN FEED", self._header)
+        self._source_label = QLabel("IMAGEM: TELA", self._header)
         self._source_label.setFont(QFont(TECH_FONT, 7, QFont.Weight.Medium))
         header_layout.addWidget(self._live_dot)
         header_layout.addWidget(self._title)
@@ -5284,22 +5286,22 @@ class VisionPreviewWindow(QWidget):
         header_layout.addWidget(self._source_label)
 
         self._close_button = QPushButton("×", self._header)
-        self._close_button.setAccessibleName("Close vision preview")
-        self._close_button.setToolTip("Close live preview")
+        self._close_button.setAccessibleName("Fechar a visão")
+        self._close_button.setToolTip("Fechar a visão")
         self._close_button.setFixedSize(24, 24)
         self._close_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self._close_button.clicked.connect(self.stop)
         header_layout.addWidget(self._close_button)
         root.addWidget(self._header)
 
-        self._frame = QLabel("INITIALIZING VISION LINK", self)
+        self._frame = QLabel("LIGANDO A VISÃO", self)
         self._frame.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._frame.setFont(QFont(TECH_FONT, 8, QFont.Weight.Medium))
         self._frame.setMinimumHeight(174)
-        self._frame.setAccessibleName("Live vision image")
+        self._frame.setAccessibleName("Imagem da visão")
         root.addWidget(self._frame, stretch=1)
 
-        self._status = QLabel("LIVE // ANALYZING", self)
+        self._status = QLabel("AO VIVO // ANALISANDO", self)
         self._status.setFixedHeight(32)
         self._status.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._status.setFont(QFont(TECH_FONT, 7, QFont.Weight.Medium))
@@ -5394,9 +5396,9 @@ class VisionPreviewWindow(QWidget):
         self._hide_timer.stop()
         self._release_source()
         self._source = "camera" if str(source).lower().strip() == "camera" else "screen"
-        self._source_label.setText(f"{self._source.upper()} FEED")
-        self._status.setText("LIVE // ANALYZING")
-        self._frame.setText("INITIALIZING VISION LINK")
+        self._source_label.setText(f"IMAGEM: {'CÂMERA' if self._source == 'camera' else 'TELA'}")
+        self._status.setText("AO VIVO // ANALISANDO")
+        self._frame.setText("LIGANDO A VISÃO")
         self._frame.setPixmap(QPixmap())
 
         try:
@@ -5426,7 +5428,7 @@ class VisionPreviewWindow(QWidget):
             self.raise_()
 
     def finish(self, delay_ms: int = 1800):
-        self._status.setText("ANALYSIS COMPLETE")
+        self._status.setText("ANÁLISE CONCLUÍDA")
         self._hide_timer.start(max(0, int(delay_ms)))
 
     def stop(self):
@@ -5454,7 +5456,7 @@ class VisionPreviewWindow(QWidget):
             if not self._camera.isOpened():
                 self._camera.release()
                 self._camera = None
-                raise RuntimeError("CAMERA FEED UNAVAILABLE")
+                raise RuntimeError("CÂMERA INDISPONÍVEL")
         else:
             import mss
             self._screen_capture = mss.mss()
@@ -5469,7 +5471,7 @@ class VisionPreviewWindow(QWidget):
                     return
                 ok, frame = self._camera.read()
                 if not ok or frame is None:
-                    raise RuntimeError("CAMERA SIGNAL LOST")
+                    raise RuntimeError("SINAL DA CÂMERA PERDIDO")
                 rgb = self._cv2.cvtColor(frame, self._cv2.COLOR_BGR2RGB)
             else:
                 if self._screen_capture is None or self._screen_monitor is None:
@@ -5492,8 +5494,8 @@ class VisionPreviewWindow(QWidget):
     def _show_error(self, message: str):
         self._frame_timer.stop()
         self._frame.setPixmap(QPixmap())
-        self._frame.setText("VISION LINK UNAVAILABLE")
-        self._status.setText(str(message or "FEED ERROR").upper()[:52])
+        self._frame.setText("VISÃO INDISPONÍVEL")
+        self._status.setText(str(message or "ERRO NA IMAGEM").upper()[:52])
 
     def _release_source(self):
         if self._camera is not None:
@@ -6905,7 +6907,7 @@ class MainWindow(QMainWindow):
         self._drop_zone = FileDropZone()
         self._drop_zone.file_selected.connect(self._on_file_selected)
         al.addWidget(self._drop_zone)
-        self._file_hint = QLabel("No file loaded — drop or click above")
+        self._file_hint = QLabel("Nenhum arquivo — solte um aqui ou clique acima")
         self._file_hint.setFont(QFont("Courier New", 7))
         self._file_hint.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent;")
         self._file_hint.setWordWrap(True)
@@ -7100,7 +7102,7 @@ class MainWindow(QMainWindow):
         cat  = _file_category(p)
         icon, _ = _FILE_ICONS.get(cat, _FILE_ICONS["unknown"])
         size = _fmt_size(p.stat().st_size)
-        self._file_hint.setText(f"{icon}  {p.name}  ·  {size}  ·  Tell JARVIS what to do with it")
+        self._file_hint.setText(f"{icon}  {p.name}  ·  {size}  ·  Diga ao Jarvis o que fazer com ele")
         self._log.append_log(f"FILE: {p.name} ({size}) loaded")
         if self.on_text_command:
             msg = (
