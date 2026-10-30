@@ -96,7 +96,6 @@ class Sistema:
         except ImportError:  # pragma: no cover
             psutil = None
         self.ps = psutil
-        self._rede_antes = None
         self.dados: dict = {}
 
     def atualizar(self) -> dict:
@@ -104,10 +103,10 @@ class Sistema:
         if ps is None:
             return self.dados
         d = {}
-        d["cpu"] = ps.cpu_percent(interval=None)
-        memoria = ps.virtual_memory()
-        d["ram"] = memoria.percent
-        d["swap"] = ps.swap_memory().percent
+        from core import metricas
+
+        r = metricas.retrato()  # a mesma leitura da Cena e da tela antiga (etapa 6)
+        d["cpu"], d["ram"], d["swap"] = r["cpu"], r["mem"], r["swap"]
         raiz = os.environ.get("SystemDrive", "C:") + "\\" if os.name == "nt" else "/"
         try:
             disco = ps.disk_usage(raiz)
@@ -116,15 +115,7 @@ class Sistema:
         except OSError:
             d["disco_total"] = d["disco_livre"] = d["disco_pct"] = 0
         agora = time.time()
-        rede = ps.net_io_counters()
-        if self._rede_antes:
-            t0, env0, rec0 = self._rede_antes
-            passou = max(0.5, agora - t0)
-            d["envio"] = (rede.bytes_sent - env0) / passou
-            d["recebido"] = (rede.bytes_recv - rec0) / passou
-        else:
-            d["envio"] = d["recebido"] = 0.0
-        self._rede_antes = (agora, rede.bytes_sent, rede.bytes_recv)
+        d["envio"], d["recebido"] = r["envio"], r["recebido"]
         bateria = ps.sensors_battery() if hasattr(ps, "sensors_battery") else None
         d["energia"] = bateria.percent if bateria else 100.0
         d["na_tomada"] = bool(bateria.power_plugged) if bateria else True
@@ -573,10 +564,14 @@ class TelaStark(QWidget):
         self._internet.timeout.connect(self._buscar_da_internet)
         self._internet.start(30 * 60 * 1000)
 
-    def _girar_botoes(self):
+    def _coberta_pela_cena(self) -> bool:
+        """True enquanto a tela do orbe (o anel) cobre este painel: não adianta animar nem ler."""
         cena = getattr(getattr(self.window(), "_orbe", None), "cena", None)
-        if cena is not None and cena.ativa and cena.isVisible():
-            return  # a tela do orbe cobre este painel: não adianta animar
+        return cena is not None and bool(getattr(cena, "ativa", False)) and not cena.isHidden()
+
+    def _girar_botoes(self):
+        if self._coberta_pela_cena():
+            return
         if self.isVisible() and not self.window().isMinimized():
             for b in self.botoes:
                 b.girar(6)
@@ -669,8 +664,8 @@ class TelaStark(QWidget):
         self.enviar_comando(comando)
 
     def _a_cada_segundo(self) -> None:
-        # Minimizado ou escondido: não desenha nem lê o sistema (economia de processador).
-        if not self.isVisible() or self.window().isMinimized():
+        # Minimizado, escondido ou coberto pelo anel: não desenha nem lê o sistema (economia).
+        if not self.isVisible() or self.window().isMinimized() or self._coberta_pela_cena():
             return
         self.relogio.update()
         d = self.sistema.atualizar()

@@ -910,8 +910,11 @@ class Cena(QWidget):
                               f"VOZ {'MUDA' if self.hud.muted else 'ATIVA'}   ·   {agora:%H:%M}")
         try:
             import psutil
-            self.a_cpu.valor = psutil.cpu_percent(interval=None)
-            self.a_mem.valor = psutil.virtual_memory().percent
+            from core import metricas
+
+            r = metricas.retrato()  # a mesma leitura da tela antiga e da Stark (etapa 6)
+            self.a_cpu.valor = r["cpu"]
+            self.a_mem.valor = r["mem"]
             self.a_disco.valor = psutil.disk_usage(str(Path.home().anchor or "/")).percent
         except Exception:
             pass

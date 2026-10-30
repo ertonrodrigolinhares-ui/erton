@@ -1393,222 +1393,13 @@ class CompactModeWidget(QWidget):
         self.expand_requested.emit()
 
 
-class _SysMetrics:
-    def __init__(self):
-        self.cpu  = 0.0
-        self.mem  = 0.0
-        self.net  = 0.0   
-        self.gpu  = -1.0  
-        self.tmp  = -1.0  
-        self._lock = threading.Lock()
-        self._last_net = psutil.net_io_counters()
-        self._last_net_t = time.time()
-        self._running = True
-        # GPU/temperatura abrem programas externos (pesado): só de vez em quando, e param de tentar
-        # se não houver ferramenta disponível (evita processador gasto à toa).
-        self._extra_tick = 0
-        self._gpu_off = False
-        self._temp_off = False
-        t = threading.Thread(target=self._loop, daemon=True)
-        t.start()
-
-    def _loop(self):
-        while self._running:
-            try:
-                self._update()
-            except Exception:
-                pass
-            time.sleep(1.5)
-
-    def _update(self):
-        cpu = psutil.cpu_percent(interval=None)
-        mem = psutil.virtual_memory().percent
-
-        nc  = psutil.net_io_counters()
-        now = time.time()
-        dt  = now - self._last_net_t
-        if dt > 0:
-            sent = (nc.bytes_sent - self._last_net.bytes_sent) / dt
-            recv = (nc.bytes_recv - self._last_net.bytes_recv) / dt
-            net  = (sent + recv) / (1024 * 1024)
-        else:
-            net = 0.0
-        self._last_net   = nc
-        self._last_net_t = now
-
-        with self._lock:
-            self.cpu = cpu
-            self.mem = mem
-            self.net = net
-
-        # GPU e temperatura mudam devagar: só a cada ~12 s, e nunca se já sabemos que não dá.
-        self._extra_tick += 1
-        if self._extra_tick % 8 == 1:
-            if not self._gpu_off:
-                gpu = self._get_gpu()
-                if gpu < 0:
-                    self._gpu_off = True  # nenhuma ferramenta de GPU: não tenta mais
-                with self._lock:
-                    self.gpu = gpu
-            if not self._temp_off:
-                tmp = self._get_temp()
-                if tmp < 0:
-                    self._temp_off = True
-                with self._lock:
-                    self.tmp = tmp
-
-    def _get_gpu(self) -> float:
-        # NVIDIA
-        try:
-            r = subprocess.run(
-                ["nvidia-smi", "--query-gpu=utilization.gpu",
-                 "--format=csv,noheader,nounits"],
-                capture_output=True, text=True, timeout=2
-            )
-            if r.returncode == 0:
-                vals = [float(v.strip()) for v in r.stdout.strip().split("\n") if v.strip()]
-                if vals:
-                    return sum(vals) / len(vals)
-        except Exception:
-            pass
-
-        # AMD (Linux)
-        if _OS == "Linux":
-            try:
-                r = subprocess.run(
-                    ["rocm-smi", "--showuse", "--csv"],
-                    capture_output=True, text=True, timeout=2
-                )
-                if r.returncode == 0:
-                    for line in r.stdout.strip().split("\n"):
-                        parts = line.split(",")
-                        if len(parts) >= 2:
-                            try:
-                                return float(parts[1].strip().replace("%", ""))
-                            except ValueError:
-                                pass
-            except Exception:
-                pass
-
-            # Intel GPU (Linux) — uma amostra rápida (sem prender 500 ms toda vez)
-            try:
-                r = subprocess.run(
-                    ["intel_gpu_top", "-J", "-s", "100", "-n", "1"],
-                    capture_output=True, text=True, timeout=1
-                )
-                if r.returncode == 0 and "Render/3D" in r.stdout:
-                    import re
-                    m = re.search(r'"busy":\s*([\d.]+)', r.stdout)
-                    if m:
-                        return float(m.group(1))
-            except Exception:
-                pass
-
-        # macOS — powermetrics (GPU Engine)
-        if _OS == "Darwin":
-            try:
-                r = subprocess.run(
-                    ["sudo", "-n", "powermetrics", "-n", "1", "-i", "500",
-                     "--samplers", "gpu_power"],
-                    capture_output=True, text=True, timeout=2
-                )
-                if r.returncode == 0 and "GPU" in r.stdout:
-                    import re
-                    m = re.search(r'GPU\s+Active:\s+([\d.]+)%', r.stdout)
-                    if m:
-                        return float(m.group(1))
-            except Exception:
-                pass
-            # Fallback: get GPU chip name from system_profiler
-            try:
-                r = subprocess.run(
-                    ["system_profiler", "SPDisplaysDataType"],
-                    capture_output=True, text=True, timeout=5
-                )
-                if r.returncode == 0:
-                    import re
-                    m = re.search(r'Chipset Model:\s*(.+)', r.stdout)
-                    if m:
-                        self._gpu_name = m.group(1).strip()
-            except Exception:
-                pass
-
-        return -1.0
-
-    def _get_temp(self) -> float:
-        try:
-            temps = psutil.sensors_temperatures()
-            candidates = ["coretemp", "k10temp", "cpu_thermal", "acpitz",
-                          "cpu-thermal", "zenpower", "it8688"]
-            for name in candidates:
-                if name in temps:
-                    entries = temps[name]
-                    if entries:
-                        return entries[0].current
-            for entries in temps.values():
-                if entries:
-                    return entries[0].current
-        except Exception:
-            pass
-        if _OS == "Darwin":
-            try:
-                r = subprocess.run(
-                    ["osx-cpu-temp"], capture_output=True, text=True, timeout=2
-                )
-                if r.returncode == 0:
-                    import re
-                    m = re.search(r"([\d.]+)", r.stdout)
-                    if m:
-                        return float(m.group(1))
-            except Exception:
-                pass
-            # Fallback: ioreg thermal sensors (Apple Silicon)
-            try:
-                r = subprocess.run(
-                    ["ioreg", "-l"], capture_output=True, text=True, timeout=3
-                )
-                if r.returncode == 0:
-                    import re
-                    all_temps = re.findall(r'"temperature"\s*=\s*(\d+)', r.stdout)
-                    valid = [float(t) / 1000.0 for t in all_temps
-                             if 10 < float(t) < 150000]
-                    if valid:
-                        return min(valid)
-            except Exception:
-                pass
-
-        if _OS == "Windows":
-            try:
-                r = subprocess.run(
-                    ["powershell", "-Command",
-                     "(Get-WmiObject MSAcpi_ThermalZoneTemperature -Namespace root/wmi).CurrentTemperature"],
-                    capture_output=True, text=True, timeout=3
-                )
-                if r.returncode == 0 and r.stdout.strip():
-                    raw = float(r.stdout.strip().split("\n")[0])
-                    return (raw / 10.0) - 273.15
-            except Exception:
-                pass
-
-        return -1.0
-
-    def snapshot(self) -> dict:
-        with self._lock:
-            return {
-                "cpu": self.cpu,
-                "mem": self.mem,
-                "net": self.net,
-                "gpu": self.gpu,
-                "tmp": self.tmp,
-            }
-
-
-_metrics = _SysMetrics()
-
-
 def _get_metrics() -> dict:
-    """Single seam for live metrics, allowing unavailable values to stay honest."""
-    return _metrics.snapshot()
+    """Single seam for live metrics, allowing unavailable values to stay honest.
+    Jarvis Ultron (etapa 6): a leitura vem do core/metricas.py, a mesma da Cena e da Stark; nada
+    nasce ao importar este arquivo (antes, um fio lia o sistema a cada 1,5 s desde o import)."""
+    from core import metricas
+
+    return metricas.retrato()
 
 # Configuration classes for customizable UI elements
 class HudConfig:
@@ -1857,57 +1648,60 @@ class HudCanvas(QWidget):
         self._scale     += (self._tgt_scale  - self._scale)     * sp
         self._brightness += (self._tgt_bright - self._brightness) * sp
 
-        # Wave fade
-        if self.speaking:
-            wt = 0.0
-        elif is_active:
-            wt = 0.15
-        else:
-            wt = 1.0
-        self._wave_opacity += (wt - self._wave_opacity) * 0.06
+        # Jarvis Ultron (etapa 6): com o anel (_orbe), a esfera antiga não é desenhada; então também não
+        # é calculada. O _nivel_suave, o estado e o ritmo do anel (acima) continuam.
+        if getattr(self, "_orbe", None) is None:
+            # Wave fade
+            if self.speaking:
+                wt = 0.0
+            elif is_active:
+                wt = 0.15
+            else:
+                wt = 1.0
+            self._wave_opacity += (wt - self._wave_opacity) * 0.06
 
-        # Rotation
-        rot_speed = 0.008 if is_active else (0.002 if self.muted else 0.004)
-        self._rotation_y += rot_speed
-        self._rotation_x  = 0.25 + 0.05 * math.sin(self._tick * 0.003)
-        self._lattice_angle += rot_speed * 0.3
+            # Rotation
+            rot_speed = 0.008 if is_active else (0.002 if self.muted else 0.004)
+            self._rotation_y += rot_speed
+            self._rotation_x  = 0.25 + 0.05 * math.sin(self._tick * 0.003)
+            self._lattice_angle += rot_speed * 0.3
 
-        # Orbital rings
-        for i, (_, _, _, _, spd, _) in enumerate(self._orbital_rings):
-            mult = 2.5 if is_active else 1.0
-            self._ring_angles[i] = (self._ring_angles[i] + spd * mult) % 360
+            # Orbital rings
+            for i, (_, _, _, _, spd, _) in enumerate(self._orbital_rings):
+                mult = 2.5 if is_active else 1.0
+                self._ring_angles[i] = (self._ring_angles[i] + spd * mult) % 360
 
-        # Energy pulses
-        self._next_pulse_tick -= 1
-        pulse_interval = 15 if is_active else 60
-        if self._next_pulse_tick <= 0 and len(self._pulses) < 10:
-            if self._connections:
-                conn = random.choice(self._connections)
-                spd = random.uniform(0.008, 0.018)
-                cidx = random.choice([0, 1, 2])
-                self._pulses.append([conn[0], conn[1], 0.0, spd, cidx])
-            self._next_pulse_tick = random.randint(pulse_interval // 2, pulse_interval)
+            # Energy pulses
+            self._next_pulse_tick -= 1
+            pulse_interval = 15 if is_active else 60
+            if self._next_pulse_tick <= 0 and len(self._pulses) < 10:
+                if self._connections:
+                    conn = random.choice(self._connections)
+                    spd = random.uniform(0.008, 0.018)
+                    cidx = random.choice([0, 1, 2])
+                    self._pulses.append([conn[0], conn[1], 0.0, spd, cidx])
+                self._next_pulse_tick = random.randint(pulse_interval // 2, pulse_interval)
 
-        alive = []
-        for pulse in self._pulses:
-            pulse[2] += pulse[3]
-            if pulse[2] < 1.0:
-                alive.append(pulse)
-        self._pulses = alive
+            alive = []
+            for pulse in self._pulses:
+                pulse[2] += pulse[3]
+                if pulse[2] < 1.0:
+                    alive.append(pulse)
+            self._pulses = alive
 
-        # Node animation
-        for nd in self._nodes[::self._render_stride]:
-            nd[5] += 0.04
-            drift = random.gauss(0, 0.0008) * (3.0 if is_active else 1.0)
-            nd[0] = max(0.05, min(1.0, nd[0] + drift))
-            tb = random.uniform(0.5, 1.0) if is_active else (
-                random.uniform(0.05, 0.2) if self.muted else random.uniform(0.25, 0.65))
-            nd[4] += (tb - nd[4]) * 0.06
+            # Node animation
+            for nd in self._nodes[::self._render_stride]:
+                nd[5] += 0.04
+                drift = random.gauss(0, 0.0008) * (3.0 if is_active else 1.0)
+                nd[0] = max(0.05, min(1.0, nd[0] + drift))
+                tb = random.uniform(0.5, 1.0) if is_active else (
+                    random.uniform(0.05, 0.2) if self.muted else random.uniform(0.25, 0.65))
+                nd[4] += (tb - nd[4]) * 0.06
 
-        self._blink_tick += 1
-        if self._blink_tick >= 32:
-            self._blink = not self._blink
-            self._blink_tick = 0
+            self._blink_tick += 1
+            if self._blink_tick >= 32:
+                self._blink = not self._blink
+                self._blink_tick = 0
         # Jarvis Ultron (economia): parado ou pensando/executando tarefa, redesenha 1 a cada
         # 3 quadros (sobra processador para a tarefa); falando, todos. Minimizado, não redesenha.
         if _economia_ligada():
@@ -6089,6 +5883,8 @@ class MainWindow(QMainWindow):
             )
 
     def _update_metrics(self):
+        if self._tela_antiga_coberta():
+            return  # as barras ficam atrás do anel: não lê o sistema à toa
         snap = _get_metrics()
 
         # CPU
@@ -6452,7 +6248,15 @@ class MainWindow(QMainWindow):
         self._style_header()
         return w
 
+    def _tela_antiga_coberta(self) -> bool:
+        """True enquanto a Cena (o anel) cobre a janela: o que a tela antiga desenha, ninguém vê.
+        Os relógios continuam marcando, mas não trabalham (etapa 6 da reorganização)."""
+        cena = getattr(getattr(self, "_orbe", None), "cena", None)
+        return cena is not None and bool(getattr(cena, "ativa", False)) and not cena.isHidden()
+
     def _tick_clock(self):
+        if self._tela_antiga_coberta():
+            return
         _colon = ":" if int(time.time()) % 2 == 0 else " "
         self._clock_lbl.setText(time.strftime("%H") + _colon + time.strftime("%M") + _colon + time.strftime("%S"))
         self._date_lbl.setText(time.strftime("%a %d %b %Y").upper())

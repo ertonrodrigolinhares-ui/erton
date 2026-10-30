@@ -4,6 +4,7 @@
 """
 
 import os
+import subprocess
 import sys
 import threading
 import time
@@ -189,3 +190,139 @@ class AutodiagnosticoTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ---------------------------------------------------------------- (d) parar o que trabalha escondido
+class _CofreVazio:
+    def get(self, _chave):
+        return None
+
+
+class _JanelaDeTeste:
+    """Uma MainWindow sem a chave de verdade (como no tests/test_ui_orbe.py)."""
+
+    def __enter__(self):
+        import tempfile
+
+        import ui
+
+        self._pasta = tempfile.TemporaryDirectory()
+        self._trocas = [
+            patch.dict(os.environ),
+            patch.object(ui, "API_FILE", Path(self._pasta.name) / "api_keys.json"),
+            patch.object(ui, "BASE_DIR", Path(self._pasta.name)),
+            patch.object(ui, "get_secret_store", return_value=_CofreVazio()),
+        ]
+        for t in self._trocas:
+            t.start()
+        os.environ.pop("GEMINI_API_KEY", None)
+        for nome in ("JARVIS_VISUAL", "JARVIS_CENA", "JARVIS_TELA"):
+            os.environ.pop(nome, None)
+        from PyQt6.QtWidgets import QApplication
+
+        self.app = QApplication.instance() or QApplication([])
+        self.win = ui.MainWindow("face.png")
+        for nome in ("_overlay", "_name_overlay"):
+            w = getattr(self.win, nome, None)
+            if w is not None:
+                w.hide()
+        return self.win
+
+    def __exit__(self, *_):
+        self.win.close()
+        self.win.deleteLater()
+        self.app.processEvents()
+        for t in reversed(self._trocas):
+            t.stop()
+        self._pasta.cleanup()
+
+
+class NadaTrabalhaEscondidoTests(unittest.TestCase):
+    def test_importar_o_ui_nao_cria_nenhum_fio(self):
+        # antes, o ui.py abria ao importar um fio que lia o sistema a cada 1,5 s (o _SysMetrics)
+        codigo = ("import os, threading; os.environ['QT_QPA_PLATFORM'] = 'offscreen'\n"
+                  "antes = threading.active_count(); import ui; print(threading.active_count() - antes)")
+        r = subprocess.run([sys.executable, "-c", codigo], cwd=str(RAIZ), capture_output=True, text=True, timeout=120)
+        self.assertEqual(r.returncode, 0, r.stderr[-800:])
+        self.assertEqual(r.stdout.strip(), "0", r.stderr[-800:])
+
+    def test_a_tela_antiga_le_do_medidor_unico(self):
+        import ui
+
+        with patch.object(metricas, "retrato", return_value=dict(metricas.VAZIO, cpu=33.0)):
+            self.assertEqual(ui._get_metrics()["cpu"], 33.0)
+
+    def test_com_a_cena_na_frente_o_relogio_e_as_barras_da_tela_antiga_ficam_parados(self):
+        import ui
+
+        with _JanelaDeTeste() as win:
+            cena = win._orbe.cena
+            self.assertTrue(cena.ativa)
+            win._clock_lbl.setText("parado")
+            win._tick_clock()
+            self.assertEqual(win._clock_lbl.text(), "parado")
+            with patch.object(ui, "_get_metrics", return_value=dict(metricas.VAZIO)) as leitura:
+                win._update_metrics()
+            leitura.assert_not_called()
+
+            cena.alternar()  # F2: a tela antiga volta a aparecer e volta a trabalhar
+            win._tick_clock()
+            self.assertNotEqual(win._clock_lbl.text(), "parado")
+            with patch.object(ui, "_get_metrics", return_value=dict(metricas.VAZIO)) as leitura:
+                win._update_metrics()
+            leitura.assert_called_once()
+
+    def test_a_stark_nao_le_o_sistema_enquanto_o_anel_cobre(self):
+        import tempfile
+
+        from PyQt6.QtWidgets import QApplication, QWidget
+
+        import ui_stark
+
+        self.app = QApplication.instance() or QApplication([])  # a referência segura o app vivo
+        with patch.object(ui_stark.TelaStark, "_buscar_da_internet", lambda self: None):
+            tela = ui_stark.TelaStark(QWidget(), lambda c: None, pasta_dados=Path(tempfile.mkdtemp()))
+        tela.show()
+        cena = NS(ativa=True, isHidden=lambda: False)
+        tela.window()._orbe = NS(cena=cena)
+        with patch.object(tela.sistema, "atualizar", return_value={}) as leitura:
+            tela._a_cada_segundo()
+            tela._girar_botoes()
+            leitura.assert_not_called()
+            cena.ativa = False  # F2
+            tela._a_cada_segundo()
+            leitura.assert_called_once()
+        tela.close()
+        tela.deleteLater()
+
+    def test_a_stark_le_cpu_memoria_e_rede_do_medidor_unico(self):
+        import ui_stark
+
+        retrato = dict(metricas.VAZIO, cpu=21.0, mem=55.0, swap=2.0, envio=10.0, recebido=20.0)
+        with patch.object(metricas, "retrato", return_value=retrato):
+            d = ui_stark.Sistema().atualizar()
+        self.assertEqual((d["cpu"], d["ram"], d["swap"], d["envio"], d["recebido"]), (21.0, 55.0, 2.0, 10.0, 20.0))
+        self.assertIn("ligado", d)
+
+    def test_o_anel_continua_pulsando_com_a_voz_mas_a_esfera_antiga_para(self):
+        from PyQt6.QtWidgets import QApplication, QWidget
+
+        import ui
+        import ui_orbe
+
+        self.app = QApplication.instance() or QApplication([])  # a referência segura o app vivo
+        janela = QWidget()
+        hud = ui.HudCanvas("face.png", parent=janela)
+        hud._orbe = ui_orbe.Orbe()
+        giro, pulsos = hud._rotation_y, len(hud._pulses)
+        hud.nivel_voz, hud.nivel_voz_em = 0.9, time.time()
+        for _ in range(5):
+            hud._step()
+        self.assertGreater(hud._nivel_suave, 0.3)        # o anel segue o volume da voz
+        self.assertEqual(hud._rotation_y, giro)           # a esfera antiga não gira mais
+        self.assertEqual(len(hud._pulses), pulsos)
+        self.assertEqual(hud._blink_tick, 0)
+
+        hud._orbe = None  # esfera clássica (JARVIS_VISUAL=classico): continua animando
+        hud._step()
+        self.assertNotEqual(hud._rotation_y, giro)

@@ -171,8 +171,15 @@ class UIRegressionTests(unittest.TestCase):
         self.window._gpu_info_cached = True
         self.window._gpu_chip = "GPU unavailable"
         self.window._gpu_vram_str = "N/A"
-        with patch.object(ui, "_get_metrics", return_value=dict(_SEM_SENSORES)):
-            self.original_update_metrics(self.window)
+        cena = getattr(getattr(self.window, "_orbe", None), "cena", None)
+        if cena is not None and cena.ativa:
+            cena.alternar()  # etapa 6: atrás do anel as barras não são atualizadas; aqui a tela antiga está na frente
+        try:
+            with patch.object(ui, "_get_metrics", return_value=dict(_SEM_SENSORES)):
+                self.original_update_metrics(self.window)
+        finally:
+            if cena is not None and not cena.ativa:
+                cena.alternar()
         self.assertEqual(self.window._gpu_pct_lbl.text(), "N/A")
         self.assertEqual(self.window._bar_tmp._text, "N/A")  # a sparkline escondida saiu na etapa 6
         self.assertEqual(self.window._gpu_load_bar.value(), 0)
