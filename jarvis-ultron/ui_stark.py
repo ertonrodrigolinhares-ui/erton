@@ -104,9 +104,11 @@ class Sistema:
         if ps is None:
             return self.dados
         d = {}
-        d["cpu"] = ps.cpu_percent(interval=None)
-        memoria = ps.virtual_memory()
-        d["ram"] = memoria.percent
+        from core import metricas
+
+        retrato = metricas.ler()  # CPU e memória da mesma fonte da Cena e do autodiagnóstico
+        d["cpu"] = retrato["cpu"]
+        d["ram"] = retrato["mem"]
         d["swap"] = ps.swap_memory().percent
         raiz = os.environ.get("SystemDrive", "C:") + "\\" if os.name == "nt" else "/"
         try:
@@ -573,13 +575,19 @@ class TelaStark(QWidget):
         self._internet.timeout.connect(self._buscar_da_internet)
         self._internet.start(30 * 60 * 1000)
 
-    def _girar_botoes(self):
+    def _coberta(self) -> bool:
+        """True quando ninguém vê este painel: a Cena (tela azul) está na frente, a janela está escondida
+        ou minimizada. Os relógios daqui conferem isto antes de ler o sistema ou desenhar."""
         cena = getattr(getattr(self.window(), "_orbe", None), "cena", None)
-        if cena is not None and cena.ativa and cena.isVisible():
+        if cena is not None and cena.ativa and not cena.isHidden():
+            return True
+        return not self.isVisible() or self.window().isMinimized()
+
+    def _girar_botoes(self):
+        if self._coberta():
             return  # a tela do orbe cobre este painel: não adianta animar
-        if self.isVisible() and not self.window().isMinimized():
-            for b in self.botoes:
-                b.girar(6)
+        for b in self.botoes:
+            b.girar(6)
 
     # ---- colunas
     def _montar_esquerda(self) -> QWidget:
@@ -669,8 +677,8 @@ class TelaStark(QWidget):
         self.enviar_comando(comando)
 
     def _a_cada_segundo(self) -> None:
-        # Minimizado ou escondido: não desenha nem lê o sistema (economia de processador).
-        if not self.isVisible() or self.window().isMinimized():
+        # Atrás da Cena, minimizado ou escondido: não desenha nem lê o sistema (economia de processador).
+        if self._coberta():
             return
         self.relogio.update()
         d = self.sistema.atualizar()

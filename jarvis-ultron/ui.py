@@ -6,7 +6,6 @@ import os
 import platform
 import random
 import re
-import subprocess
 import sys
 import threading
 import time
@@ -265,6 +264,17 @@ def _janela_escondida(widget) -> bool:
         return True
     janela = widget.window()
     return bool(janela and janela.isMinimized())
+
+
+def _tela_antiga_parada(widget) -> bool:
+    """True quando não adianta a tela antiga se atualizar: a janela está escondida (bandeja) ou minimizada,
+    ou a Cena (tela azul, ui_orbe.py) está na frente cobrindo tudo. Os relógios da tela antiga (hora,
+    medidores, grade de agentes) conferem isto antes de trabalhar."""
+    if _janela_escondida(widget):
+        return True
+    janela = widget.window()
+    cena = getattr(getattr(janela, "_orbe", None), "cena", None)
+    return cena is not None and bool(getattr(cena, "ativa", False)) and not cena.isHidden()
 
 
 def _css(widget, estilo: str) -> None:
@@ -1854,222 +1864,13 @@ class PresenceSystem(QObject):
             self._presence_tmr.start()
         else:
             self._presence_tmr.stop()
-class _SysMetrics:
-    def __init__(self):
-        self.cpu  = 0.0
-        self.mem  = 0.0
-        self.net  = 0.0   
-        self.gpu  = -1.0  
-        self.tmp  = -1.0  
-        self._lock = threading.Lock()
-        self._last_net = psutil.net_io_counters()
-        self._last_net_t = time.time()
-        self._running = True
-        # GPU/temperatura abrem programas externos (pesado): só de vez em quando, e param de tentar
-        # se não houver ferramenta disponível (evita processador gasto à toa).
-        self._extra_tick = 0
-        self._gpu_off = False
-        self._temp_off = False
-        t = threading.Thread(target=self._loop, daemon=True)
-        t.start()
-
-    def _loop(self):
-        while self._running:
-            try:
-                self._update()
-            except Exception:
-                pass
-            time.sleep(1.5)
-
-    def _update(self):
-        cpu = psutil.cpu_percent(interval=None)
-        mem = psutil.virtual_memory().percent
-
-        nc  = psutil.net_io_counters()
-        now = time.time()
-        dt  = now - self._last_net_t
-        if dt > 0:
-            sent = (nc.bytes_sent - self._last_net.bytes_sent) / dt
-            recv = (nc.bytes_recv - self._last_net.bytes_recv) / dt
-            net  = (sent + recv) / (1024 * 1024)
-        else:
-            net = 0.0
-        self._last_net   = nc
-        self._last_net_t = now
-
-        with self._lock:
-            self.cpu = cpu
-            self.mem = mem
-            self.net = net
-
-        # GPU e temperatura mudam devagar: só a cada ~12 s, e nunca se já sabemos que não dá.
-        self._extra_tick += 1
-        if self._extra_tick % 8 == 1:
-            if not self._gpu_off:
-                gpu = self._get_gpu()
-                if gpu < 0:
-                    self._gpu_off = True  # nenhuma ferramenta de GPU: não tenta mais
-                with self._lock:
-                    self.gpu = gpu
-            if not self._temp_off:
-                tmp = self._get_temp()
-                if tmp < 0:
-                    self._temp_off = True
-                with self._lock:
-                    self.tmp = tmp
-
-    def _get_gpu(self) -> float:
-        # NVIDIA
-        try:
-            r = subprocess.run(
-                ["nvidia-smi", "--query-gpu=utilization.gpu",
-                 "--format=csv,noheader,nounits"],
-                capture_output=True, text=True, timeout=2
-            )
-            if r.returncode == 0:
-                vals = [float(v.strip()) for v in r.stdout.strip().split("\n") if v.strip()]
-                if vals:
-                    return sum(vals) / len(vals)
-        except Exception:
-            pass
-
-        # AMD (Linux)
-        if _OS == "Linux":
-            try:
-                r = subprocess.run(
-                    ["rocm-smi", "--showuse", "--csv"],
-                    capture_output=True, text=True, timeout=2
-                )
-                if r.returncode == 0:
-                    for line in r.stdout.strip().split("\n"):
-                        parts = line.split(",")
-                        if len(parts) >= 2:
-                            try:
-                                return float(parts[1].strip().replace("%", ""))
-                            except ValueError:
-                                pass
-            except Exception:
-                pass
-
-            # Intel GPU (Linux) — uma amostra rápida (sem prender 500 ms toda vez)
-            try:
-                r = subprocess.run(
-                    ["intel_gpu_top", "-J", "-s", "100", "-n", "1"],
-                    capture_output=True, text=True, timeout=1
-                )
-                if r.returncode == 0 and "Render/3D" in r.stdout:
-                    import re
-                    m = re.search(r'"busy":\s*([\d.]+)', r.stdout)
-                    if m:
-                        return float(m.group(1))
-            except Exception:
-                pass
-
-        # macOS — powermetrics (GPU Engine)
-        if _OS == "Darwin":
-            try:
-                r = subprocess.run(
-                    ["sudo", "-n", "powermetrics", "-n", "1", "-i", "500",
-                     "--samplers", "gpu_power"],
-                    capture_output=True, text=True, timeout=2
-                )
-                if r.returncode == 0 and "GPU" in r.stdout:
-                    import re
-                    m = re.search(r'GPU\s+Active:\s+([\d.]+)%', r.stdout)
-                    if m:
-                        return float(m.group(1))
-            except Exception:
-                pass
-            # Fallback: get GPU chip name from system_profiler
-            try:
-                r = subprocess.run(
-                    ["system_profiler", "SPDisplaysDataType"],
-                    capture_output=True, text=True, timeout=5
-                )
-                if r.returncode == 0:
-                    import re
-                    m = re.search(r'Chipset Model:\s*(.+)', r.stdout)
-                    if m:
-                        self._gpu_name = m.group(1).strip()
-            except Exception:
-                pass
-
-        return -1.0
-
-    def _get_temp(self) -> float:
-        try:
-            temps = psutil.sensors_temperatures()
-            candidates = ["coretemp", "k10temp", "cpu_thermal", "acpitz",
-                          "cpu-thermal", "zenpower", "it8688"]
-            for name in candidates:
-                if name in temps:
-                    entries = temps[name]
-                    if entries:
-                        return entries[0].current
-            for entries in temps.values():
-                if entries:
-                    return entries[0].current
-        except Exception:
-            pass
-        if _OS == "Darwin":
-            try:
-                r = subprocess.run(
-                    ["osx-cpu-temp"], capture_output=True, text=True, timeout=2
-                )
-                if r.returncode == 0:
-                    import re
-                    m = re.search(r"([\d.]+)", r.stdout)
-                    if m:
-                        return float(m.group(1))
-            except Exception:
-                pass
-            # Fallback: ioreg thermal sensors (Apple Silicon)
-            try:
-                r = subprocess.run(
-                    ["ioreg", "-l"], capture_output=True, text=True, timeout=3
-                )
-                if r.returncode == 0:
-                    import re
-                    all_temps = re.findall(r'"temperature"\s*=\s*(\d+)', r.stdout)
-                    valid = [float(t) / 1000.0 for t in all_temps
-                             if 10 < float(t) < 150000]
-                    if valid:
-                        return min(valid)
-            except Exception:
-                pass
-
-        if _OS == "Windows":
-            try:
-                r = subprocess.run(
-                    ["powershell", "-Command",
-                     "(Get-WmiObject MSAcpi_ThermalZoneTemperature -Namespace root/wmi).CurrentTemperature"],
-                    capture_output=True, text=True, timeout=3
-                )
-                if r.returncode == 0 and r.stdout.strip():
-                    raw = float(r.stdout.strip().split("\n")[0])
-                    return (raw / 10.0) - 273.15
-            except Exception:
-                pass
-
-        return -1.0
-
-    def snapshot(self) -> dict:
-        with self._lock:
-            return {
-                "cpu": self.cpu,
-                "mem": self.mem,
-                "net": self.net,
-                "gpu": self.gpu,
-                "tmp": self.tmp,
-            }
-
-
-_metrics = _SysMetrics()
-
-
 def _get_metrics() -> dict:
-    """Single seam for live metrics, allowing unavailable values to stay honest."""
-    return _metrics.snapshot()
+    """Retrato do computador para os medidores da tela antiga (cpu, mem, net, gpu, tmp). Vem do
+    core/metricas.py, a mesma fonte da Cena e da tela Stark: antes, um fio nascia só de importar este
+    arquivo e lia o sistema a cada 1,5 s para painéis que ninguém via."""
+    from core import metricas
+
+    return metricas.ler()
 
 # Configuration classes for customizable UI elements
 class HudConfig:
@@ -2293,6 +2094,15 @@ class HudCanvas(QWidget):
         voz_ativa = now - self.nivel_voz_em < 0.35
         alvo = self.nivel_voz if voz_ativa else 0.0
         self._nivel_suave += (alvo - self._nivel_suave) * (0.55 if alvo > self._nivel_suave else 0.18)
+        if getattr(self, "_orbe", None) is None:
+            # Sem o anel (JARVIS_VISUAL=classico), é a esfera antiga que aparece: ela anima aqui
+            self._animar_esfera_antiga(now, is_active, voz_ativa)
+        # Com o anel (ui_orbe.py), a esfera antiga nunca é desenhada (o paintEvent entrega ao anel), então
+        # também não é animada: nós, pulsos, ondas e anéis dela eram recalculados 30 a 60 vezes por
+        # segundo à toa. O anel só lê daqui o _nivel_suave, o estado, o mudo e o ritmo abaixo.
+        self._ritmo_de_redesenho(voz_ativa)
+
+    def _animar_esfera_antiga(self, now: float, is_active: bool, voz_ativa: bool) -> None:
         if voz_ativa and not self.muted:
             self._tgt_scale = 1.0 + 0.20 * self._nivel_suave
             self._tgt_bright = 0.55 + 0.45 * self._nivel_suave
@@ -2369,6 +2179,8 @@ class HudCanvas(QWidget):
         if self._blink_tick >= 32:
             self._blink = not self._blink
             self._blink_tick = 0
+
+    def _ritmo_de_redesenho(self, voz_ativa: bool) -> None:
         # Jarvis Ultron (economia): parado ou pensando/executando tarefa, redesenha 1 a cada
         # 3 quadros (sobra processador para a tarefa); falando, todos. Minimizado, não redesenha.
         if _economia_ligada():
@@ -3581,6 +3393,8 @@ class AgentGridWidget(QWidget):
 
 
     def _animate(self):
+        if _tela_antiga_parada(self):
+            return  # a grade fica atrás da Cena (ou a janela está escondida): não anima
         self._tick += 1
 
         # Rotate active agent every 10 s (125 * 80 ms = 10 000 ms)
@@ -7030,6 +6844,8 @@ class MainWindow(QMainWindow):
             )
 
     def _update_metrics(self):
+        if _tela_antiga_parada(self):
+            return  # os medidores ficam atrás da Cena: não lê o sistema nem redesenha
         snap = _get_metrics()
 
         # CPU
@@ -7436,6 +7252,8 @@ class MainWindow(QMainWindow):
         return w
 
     def _tick_clock(self):
+        if _tela_antiga_parada(self):
+            return  # ninguém vê o cabeçalho da tela antiga (Cena na frente, bandeja ou minimizado)
         _colon = ":" if int(time.time()) % 2 == 0 else " "
         self._clock_lbl.setText(time.strftime("%H") + _colon + time.strftime("%M") + _colon + time.strftime("%S"))
         self._date_lbl.setText(time.strftime("%a %d %b %Y").upper())

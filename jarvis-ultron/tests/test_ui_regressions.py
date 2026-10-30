@@ -171,8 +171,12 @@ class UIRegressionTests(unittest.TestCase):
         self.window._gpu_info_cached = True
         self.window._gpu_chip = "GPU unavailable"
         self.window._gpu_vram_str = "N/A"
-        with patch.object(ui, "_get_metrics", return_value=dict(_SEM_SENSORES)):
-            self.original_update_metrics(self.window)
+        self.window._orbe.cena.alternar()  # F2: a tela antiga na frente (atrás da Cena os medidores param)
+        try:
+            with patch.object(ui, "_get_metrics", return_value=dict(_SEM_SENSORES)):
+                self.original_update_metrics(self.window)
+        finally:
+            self.window._orbe.cena.alternar()
         self.assertEqual(self.window._gpu_pct_lbl.text(), "N/A")
         self.assertEqual(self.window._spark_tmp._value, "N/A")
         self.assertEqual(self.window._gpu_load_bar.value(), 0)

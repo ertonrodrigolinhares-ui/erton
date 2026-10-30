@@ -909,10 +909,10 @@ class Cena(QWidget):
         self.topo_dir.setText(f"● SISTEMA {'ONLINE' if rede == 'ONLINE' else rede}   ·   "
                               f"VOZ {'MUDA' if self.hud.muted else 'ATIVA'}   ·   {agora:%H:%M}")
         try:
-            import psutil
-            self.a_cpu.valor = psutil.cpu_percent(interval=None)
-            self.a_mem.valor = psutil.virtual_memory().percent
-            self.a_disco.valor = psutil.disk_usage(str(Path.home().anchor or "/")).percent
+            from core import metricas
+
+            retrato = metricas.ler()  # a mesma leitura da tela antiga e do autodiagnóstico
+            self.a_cpu.valor, self.a_mem.valor, self.a_disco.valor = retrato["cpu"], retrato["mem"], retrato["disco"]
         except Exception:
             pass
         for a in (self.a_cpu, self.a_mem, self.a_disco):
