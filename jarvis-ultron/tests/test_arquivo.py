@@ -1,6 +1,7 @@
 """A pasta arquivo/ guarda, por algumas semanas, peças que saíram do Jarvis na reorganização
 (docs/PLANO-REORGANIZACAO.md, Etapas 5 e 11). Nada fora dela pode usar o que está lá: se usasse, o
-Jarvis quebraria ao abrir, ou uma peça guardada voltaria a rodar sem ninguém ver."""
+Jarvis quebraria ao abrir, ou uma peça guardada voltaria a rodar sem ninguém ver.
+("web" não entra na lista: é o site em Next.js, que nenhum .py importa; "status" do api/ virou core/status.)"""
 
 import ast
 import unittest
@@ -20,6 +21,9 @@ GUARDADOS = (
     "memory.answer_cache",
     # core/graphics_capability.py (Etapa 5)
     "core.graphics_capability",
+    # servidor web: api/, web/ e alembic/ (Etapa 11)
+    "api",
+    "alembic",
 )
 
 
@@ -30,8 +34,12 @@ def _arquivos_py():
             yield caminho
 
 
-def _guardado(nome: str) -> bool:
-    return any(nome == g or nome.startswith(g + ".") for g in GUARDADOS)
+# Nomes curtos que aparecem em textos comuns ("api.cerebras.ai"): só o import conta para eles, não o texto.
+SO_NO_IMPORT = {"api", "alembic"}
+
+
+def _guardado(nome: str, em_texto: bool = False) -> bool:
+    return any(nome == g or nome.startswith(g + ".") for g in GUARDADOS if not (em_texto and g in SO_NO_IMPORT))
 
 
 class NadaUsaOArquivoTests(unittest.TestCase):
@@ -50,7 +58,7 @@ class NadaUsaOArquivoTests(unittest.TestCase):
                     nomes = [no.module] + [f"{no.module}.{a.name}" for a in no.names]
                 elif isinstance(no, ast.Constant) and isinstance(no.value, str):
                     # alvos de patch("memory.answer_cache.x"), import_module("..."), caminhos para sys.path
-                    if _guardado(no.value) or "pecas-sem-uso" in no.value:
+                    if _guardado(no.value, em_texto=True) or "pecas-sem-uso" in no.value or "servidor-web" in no.value:
                         problemas.append(f"{caminho.relative_to(RAIZ)}:{no.lineno}: {no.value[:80]!r}")
                     continue
                 else:
