@@ -943,8 +943,8 @@ class ResearchProgressWidget(QWidget):
         self,
         parent=None,
         *,
-        task_title: str = "DEEP RESEARCH",
-        accessible_name: str = "Deep Research background progress",
+        task_title: str = "PESQUISA PROFUNDA",
+        accessible_name: str = "Andamento da pesquisa profunda",
     ):
         super().__init__(parent)
         self.setFixedHeight(106)
@@ -975,12 +975,12 @@ class ResearchProgressWidget(QWidget):
         self._title.setFont(QFont(UI_FONT, 9, QFont.Weight.DemiBold))
         header.addWidget(self._title)
         header.addStretch()
-        self._status = QLabel("RUNNING IN THE BACKGROUND  ·  0%")
+        self._status = QLabel("EM SEGUNDO PLANO  ·  0%")
         self._status.setFont(QFont(TECH_FONT, 8, QFont.Weight.Medium))
         header.addWidget(self._status)
         shell_lay.addLayout(header)
 
-        self._question_lbl = QLabel("Preparing research brief")
+        self._question_lbl = QLabel("Preparando a pesquisa")
         self._question_lbl.setFont(QFont(UI_FONT, 10, QFont.Weight.Medium))
         self._question_lbl.setWordWrap(False)
         shell_lay.addWidget(self._question_lbl)
@@ -990,10 +990,10 @@ class ResearchProgressWidget(QWidget):
         self._bar.setValue(0)
         self._bar.setTextVisible(False)
         self._bar.setFixedHeight(5)
-        self._bar.setAccessibleName("Deep Research completion")
+        self._bar.setAccessibleName("Progresso da pesquisa profunda")
         shell_lay.addWidget(self._bar)
 
-        self._phase = QLabel("Queued")
+        self._phase = QLabel("Na fila")
         self._phase.setFont(QFont(UI_FONT, 8, QFont.Weight.Normal))
         shell_lay.addWidget(self._phase)
 
@@ -1007,7 +1007,7 @@ class ResearchProgressWidget(QWidget):
         self._update_sig.emit({
             "question": str(question or self._task_title.title()),
             "percent": 0,
-            "phase": "Queued",
+            "phase": "Na fila",
             "state": "running",
             "visible": bool(visible),
         })
@@ -1024,7 +1024,7 @@ class ResearchProgressWidget(QWidget):
         self._update_sig.emit({
             "question": str(question or self._question or self._task_title.title()),
             "percent": max(0, min(100, int(percent or 0))),
-            "phase": str(phase or "Researching"),
+            "phase": str(phase or "Pesquisando"),
             "state": "completed" if int(percent or 0) >= 100 else "running",
             "artifacts": list(artifacts or []),
             "warnings": list(warnings or []),
@@ -1047,7 +1047,7 @@ class ResearchProgressWidget(QWidget):
         self._state = str(update.get("state") or "running")
         self._visible_mode = bool(update.get("visible", self._visible_mode))
         percent = max(0, min(100, int(update.get("percent", 0) or 0)))
-        phase = str(update.get("phase") or "Researching")
+        phase = str(update.get("phase") or "Pesquisando")
         artifacts = update.get("artifacts") or []
         warnings = update.get("warnings") or []
 
@@ -1058,17 +1058,17 @@ class ResearchProgressWidget(QWidget):
         self._question_lbl.setToolTip(self._question)
         self._bar.setValue(percent)
         if self._state == "completed":
-            status_label = "COMPLETE"
+            status_label = "CONCLUÍDA"
             if artifacts:
-                phase = f"Report ready: {Path(str(artifacts[0])).name}"
+                phase = f"Relatório pronto: {Path(str(artifacts[0])).name}"
             if warnings:
-                phase += f"  ·  {len(warnings)} warning{'s' if len(warnings) != 1 else ''}"
+                phase += f"  ·  {len(warnings)} aviso{'s' if len(warnings) != 1 else ''}"
         elif self._state == "failed":
-            status_label = "FAILED"
+            status_label = "FALHOU"
         elif self._state == "cancelled":
-            status_label = "CANCELLED"
+            status_label = "CANCELADA"
         else:
-            status_label = "WORKING LIVE" if self._visible_mode else "RUNNING IN THE BACKGROUND"
+            status_label = "AO VIVO" if self._visible_mode else "EM SEGUNDO PLANO"
         self._status.setText(f"{status_label}  ·  {percent}%")
         self._phase.setText(phase)
         self.refresh_theme()
@@ -1259,7 +1259,7 @@ class ToolProgressWidget(QWidget):
         self._spinner.setStyleSheet(f"color: {C.PURPLE}; background: transparent; border: none;")
         lay.addWidget(self._spinner)
 
-        self._tool_lbl = QLabel("EXECUTING...")
+        self._tool_lbl = QLabel("EXECUTANDO...")
         self._tool_lbl.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
         self._tool_lbl.setStyleSheet(f"color: {C.WHITE}; background: transparent; border: none;")
         lay.addWidget(self._tool_lbl, stretch=1)
@@ -1284,7 +1284,7 @@ class ToolProgressWidget(QWidget):
         self._hide_sig.emit()
 
     def _on_show(self, name: str):
-        self._tool_lbl.setText(f"EXECUTING: {name.upper()}")
+        self._tool_lbl.setText(f"EXECUTANDO: {name.upper()}")
         self._start_time = time.time()
         self._spinner_idx = 0
         self._tmr.start(200)
@@ -2774,13 +2774,13 @@ class HudCanvas(QWidget):
         if self.muted:
             txt, col = "\u2298  MUTED",          qcol(C.MUTED_C)
         elif self.speaking:
-            txt, col = "\u25cf  SPEAKING",        qcol(C.GREEN)
+            txt, col = "\u25cf  FALANDO",        qcol(C.GREEN)
         elif self.state == "THINKING":
             sym = "\u25c8" if self._blink else "\u25c7"
-            txt, col = f"{sym}  PROCESSING QUERY", qcol(C.ACC2)
+            txt, col = f"{sym}  PROCESSANDO", qcol(C.ACC2)
         elif self.state == "PROCESSING":
             sym = "\u25b7" if self._blink else "\u25b6"
-            txt, col = f"{sym}  EXECUTING",   qcol(C.ACC)
+            txt, col = f"{sym}  EXECUTANDO",   qcol(C.ACC)
         elif self.state == "LISTENING":
             sym = "\u25cf" if self._blink else "\u25cb"
             txt, col = f"{sym}  LISTENING",   qcol(C.ENERGY)
@@ -5670,8 +5670,8 @@ class MainWindow(QMainWindow):
 
         self._presentation_progress = ResearchProgressWidget(
             parent=self._ai_core_wrap,
-            task_title="PRESENTATION",
-            accessible_name="Presentation task progress",
+            task_title="APRESENTAÇÃO",
+            accessible_name="Andamento da apresentação",
         )
         ai_core_lay.addWidget(self._presentation_progress, stretch=0)
 
@@ -7947,9 +7947,9 @@ class JarvisUI:
     def show_research_progress(self, question: str):
         """Open the compact background Deep Research status surface."""
         self._win._research_progress_sig.emit({
-            "question": str(question or "Deep research"),
+            "question": str(question or "Pesquisa profunda"),
             "percent": 0,
-            "phase": "Queued",
+            "phase": "Na fila",
             "artifacts": [],
             "warnings": [],
         })
@@ -7964,9 +7964,9 @@ class JarvisUI:
     ):
         """Thread-safe update for real research phases and artifacts."""
         self._win._research_progress_sig.emit({
-            "question": str(question or "Deep research"),
+            "question": str(question or "Pesquisa profunda"),
             "percent": max(0, min(100, int(percent or 0))),
-            "phase": str(phase or "Researching"),
+            "phase": str(phase or "Pesquisando"),
             "artifacts": list(artifacts or []),
             "warnings": list(warnings or []),
         })
@@ -7981,9 +7981,9 @@ class JarvisUI:
     def show_presentation_progress(self, title: str, visible: bool = False):
         """Show the chosen foreground or background presentation status surface."""
         self._win._presentation_progress_sig.emit({
-            "question": str(title or "Presentation"),
+            "question": str(title or "Apresentação"),
             "percent": 0,
-            "phase": "Queued",
+            "phase": "Na fila",
             "artifacts": [],
             "warnings": [],
             "visible": bool(visible),
@@ -8000,9 +8000,9 @@ class JarvisUI:
     ):
         """Thread-safe update using real presentation build phases."""
         self._win._presentation_progress_sig.emit({
-            "question": str(title or "Presentation"),
+            "question": str(title or "Apresentação"),
             "percent": max(0, min(100, int(percent or 0))),
-            "phase": str(phase or "Building presentation"),
+            "phase": str(phase or "Montando a apresentação"),
             "artifacts": list(artifacts or []),
             "warnings": list(warnings or []),
             "visible": bool(visible),
