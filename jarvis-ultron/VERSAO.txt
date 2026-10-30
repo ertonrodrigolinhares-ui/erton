@@ -14,7 +14,12 @@ Novidades desta versão (Etapa 6 da reorganização: a tela mais leve):
 - Todas as telas (azul, antiga e Stark) leem CPU e memória da mesma fonte, então mostram o mesmo
   número; e as leituras de placa de vídeo e temperatura só acontecem se o PC tem como responder, sem
   abrir janela preta.
-- Código morto da tela retirado (cerca de 620 linhas), sem mudar nada no uso.
+- Da tela antiga (a do F2) saíram, com o seu sim, os enfeites que mostravam dados inventados: as frases
+  em inglês que apareciam a cada 15 segundos ("Memory synchronization complete..."), a aba "Agents"
+  com oito agentes de mentira (os de verdade são os do Claude e do Hermes), a barra "COG" com número
+  sorteado, gráficos que nasciam escondidos e os avisos das teclas L e R. Os medidores de verdade (CPU,
+  memória, rede, placa de vídeo, temperatura) ficam.
+- Código morto da tela retirado (cerca de 1.500 linhas no total), sem mudar nada no uso.
 
 Versão anterior (2026-10-19.2):
 
