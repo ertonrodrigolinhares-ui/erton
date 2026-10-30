@@ -6279,13 +6279,6 @@ class MainWindow(QMainWindow):
         sc_esc = QShortcut(QKeySequence("Escape"), self)
         sc_esc.activated.connect(self._dismiss_overlays)
 
-
-
-        # Shortcuts to show panel content as popups
-        sc_show_left = QShortcut(QKeySequence("L"), self)
-        sc_show_left.activated.connect(self._show_left_panel_popup)
-        sc_show_right = QShortcut(QKeySequence("R"), self)
-        sc_show_right.activated.connect(self._show_right_panel_popup)
     def closeEvent(self, event):
         # Minimize to tray instead of quitting (if tray is available)
         try:
@@ -7610,74 +7603,6 @@ class MainWindow(QMainWindow):
         self._style_maker_signature()
         return strip
 
-
-    def _show_left_panel_popup(self):
-        """Show left panel content as a popup."""
-        # Gather information from left panel components
-        info_lines = ["LEFT PANEL INFORMATION"]
-
-        # Add system metrics if available
-        if hasattr(self, '_bar_cpu'):
-            cpu_val = getattr(self._bar_cpu, 'value', 0)
-            info_lines.append(f"CPU Usage: {cpu_val:.0f}%")
-        if hasattr(self, '_bar_mem'):
-            mem_val = getattr(self._bar_mem, 'value', 0)
-            info_lines.append(f"Memory Usage: {mem_val:.0f}%")
-        if hasattr(self, '_bar_net'):
-            net_val = getattr(self._bar_net, 'value', 0)
-            info_lines.append(f"Network: {net_val:.0f}%")
-        if hasattr(self, '_bar_gpu'):
-            gpu_val = getattr(self._bar_gpu, 'value', 0)
-            info_lines.append(f"GPU: {gpu_val:.0f}%")
-
-        # Add agent info if available
-        if hasattr(self, '_agent_grid'):
-            # AgentGridWidget has a fixed number of agents
-            agent_count = len(self._agent_grid._AGENTS)
-            info_lines.append(f"Active Agents: {agent_count}")
-
-        info_lines.append("")
-        info_lines.append("Press L again to refresh this information")
-
-        # Join lines and show as popup
-        message = "\n".join(info_lines)
-        self._popup_manager.show_popup(
-            message,
-            PopupType.INFORMATION
-        )
-
-    def _show_right_panel_popup(self):
-        """Show right panel content as a popup."""
-        # Gather information from right panel components
-        info_lines = ["RIGHT PANEL INFORMATION"]
-
-        # Add mission info
-        info_lines.append("Mission Control Panel")
-
-        # Add chat status
-        if hasattr(self, '_mission'):
-            if hasattr(self._mission, 'log_widget'):
-                info_lines.append("Chat Status: Active")
-            else:
-                info_lines.append("Chat Status: Inactive")
-
-            # Add current tab info
-            if hasattr(self._mission, '_stack'):
-                current_index = self._mission._stack.currentIndex()
-                tab_names = ["COMMS", "INTEL", "FILES", "ASSETS", "TOOLS", "MEMORY"]
-                if 0 <= current_index < len(tab_names):
-                    current_tab = tab_names[current_index]
-                    info_lines.append(f"Current Tab: {current_tab}")
-
-        info_lines.append("")
-        info_lines.append("Press R again to refresh this information")
-
-        # Join lines and show as popup
-        message = "\n".join(info_lines)
-        self._popup_manager.show_popup(
-            message,
-            PopupType.INFORMATION
-        )
 
     def _on_file_selected(self, path: str):
         self._current_file = path
