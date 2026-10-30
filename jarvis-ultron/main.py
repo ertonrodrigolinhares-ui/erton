@@ -73,22 +73,6 @@ REGRA_IDIOMA = (
 # Jarvis Ultron: o selo 🔒 só existe na tela azul (a cena do orbe); na tela antiga (F2, JARVIS_VISUAL=classico,
 # JARVIS_CENA=0) o sinal é a linha "🔒 Modo privado ligado" que a ponte escreve no registro ao trocar.
 ESPERE_O_MODO_PRIVADO = "espere o aviso \"🔒 Modo privado ligado\" (na tela azul, o selo 🔒 MODO PRIVADO)"
-SELF_QUIT_GOODBYE = (
-    "Certamente, senhor. Foi um privilégio. O Jarvis está saindo do ar agora. "
-    "Até a próxima."
-)
-
-_SELF_QUIT_PATTERNS = tuple(re.compile(pattern, re.IGNORECASE) for pattern in (
-    r"\b(?:quit|close|exit)\s+(?:jarvis|yourself)\b",
-    r"\b(?:shut|turn)\s+(?:jarvis|yourself)\s+(?:down|off)\b",
-    r"\b(?:shut\s+down|turn\s+off|power\s+down)\s+(?:jarvis|yourself)\b",
-    r"\bjarvis\b.{0,36}\b(?:quit|close|exit|shut\s+down|turn\s+off|go\s+offline)\b",
-    r"\b(?:go|take\s+yourself)\s+offline(?:\s+jarvis)?\b",
-    # Jarvis Ultron: em português ("desliga o Jarvis", "Jarvis, saia do ar")
-    r"\b(?:desligue|desliga|desligar|feche|fecha|fechar|encerre|encerra|encerrar)\s+(?:o\s+)?jarvis\b",
-    r"\bjarvis\b.{0,36}\b(?:desligue-se|se\s+desligue|saia\s+do\s+ar|sair\s+do\s+ar)\b",
-))
-
 
 def _live_response_audio_bytes(response) -> bytes | None:
     server_content = getattr(response, "server_content", None)
@@ -174,6 +158,7 @@ from cerebro.voz_saida import (  # noqa: E402,F401
     _load_voice_name, _normalize_voice_name,
 )
 from cerebro.ultron import Ultron  # noqa: E402
+from cerebro.desligar import Desligar, SELF_QUIT_GOODBYE, _SELF_QUIT_PATTERNS  # noqa: E402,F401
 
 
 def muda_algo(nome: str) -> bool:
@@ -199,7 +184,7 @@ def get_tool_declarations() -> list[dict]:
 
 
 
-class JarvisLive(Avisos, Escuta, Pontes, VozSaida, Ultron):
+class JarvisLive(Avisos, Escuta, Pontes, VozSaida, Ultron, Desligar):
 
     def __init__(
         self,
@@ -437,88 +422,6 @@ class JarvisLive(Avisos, Escuta, Pontes, VozSaida, Ultron):
         with self._trava_da_fala():
             if not getattr(self, "_is_speaking", False) and not getattr(self, "_voz_externa_pendente", 0):
                 self._ouviu_depois_do_turno = True
-
-    @staticmethod
-    def _is_explicit_self_quit_transcript(text: str) -> bool:
-        """Only match commands that clearly target JARVIS, never the computer."""
-        normalized = " ".join(str(text or "").lower().split())
-        if not normalized:
-            return False
-        if re.search(r"\b(?:computer|mac|pc|system|machine)\b", normalized):
-            return False
-        if re.search(r"\b(?:stop talking|be quiet|cancel|never mind)\b", normalized):
-            return False
-        if normalized in {
-            "quit", "exit", "shutdown", "shut down", "turn off", "power down",
-            "go offline", "goodbye jarvis", "goodbye jarvis please",
-        }:
-            return True
-        return any(pattern.search(normalized) for pattern in _SELF_QUIT_PATTERNS)
-
-    def _queue_self_quit_after_farewell(self) -> None:
-        """Arm shutdown without closing until the response audio is fully drained."""
-        self._pending_self_quit = True
-        self._pending_self_quit_farewell_received = False
-        try:
-            self.ui.write_log("SYS: Shutdown queued; waiting for JARVIS's farewell.")
-        except Exception:
-            pass
-        # A voice model can occasionally omit audio/turn_complete. Do not
-        # leave the user with a permanently armed shutdown in that case.
-        try:
-            if self._self_quit_timer is not None:
-                self._self_quit_timer.cancel()
-            self._self_quit_timer = threading.Timer(8.0, self._force_complete_self_quit)
-            self._self_quit_timer.daemon = True
-            self._self_quit_timer.start()
-        except Exception:
-            pass
-
-    def _force_complete_self_quit(self) -> None:
-        if not getattr(self, "_pending_self_quit", False):
-            return
-        self._pending_self_quit_farewell_received = True
-        self._complete_self_quit_after_audio()
-
-    def _mark_self_quit_farewell_received(self) -> None:
-        if getattr(self, "_pending_self_quit", False):
-            self._pending_self_quit_farewell_received = True
-
-    def _complete_self_quit_after_audio(self) -> bool:
-        """Close through the UI only after a farewell turn has actually completed."""
-        if not (
-            getattr(self, "_pending_self_quit", False)
-            and getattr(self, "_pending_self_quit_farewell_received", False)
-        ):
-            return False
-        self._pending_self_quit = False
-        self._pending_self_quit_farewell_received = False
-        if getattr(self, "_self_quit_timer", None) is not None:
-            self._self_quit_timer.cancel()
-            self._self_quit_timer = None
-        self.request_shutdown()
-        self.ui.handle_ui_command("quit_jarvis")  # ação interna da tela (o botão se chama "Sair do Jarvis")
-        return True
-
-    def request_shutdown(self) -> None:
-        """Stop live tasks and make the process exit after the UI closes."""
-        shutdown_requested = getattr(self, "_shutdown_requested", None)
-        if shutdown_requested is None:
-            self._shutdown_requested = threading.Event()
-            shutdown_requested = self._shutdown_requested
-        if shutdown_requested.is_set():
-            return
-        shutdown_requested.set()
-        try:
-            session = getattr(self, "session", None)
-            loop = getattr(self, "_loop", None)
-            if session is not None and loop is not None:
-                asyncio.run_coroutine_threadsafe(session.close(), loop)
-            out_queue = getattr(self, "out_queue", None)
-            if out_queue is not None:
-                out_queue.put_nowait(None)
-        except Exception as exc:
-            print(f"[JARVIS] ⚠️ Shutdown session close failed: {exc}")
 
     async def _wait_before_reconnect(self, delay: float) -> None:
         deadline = time.monotonic() + max(0.0, float(delay))
@@ -904,38 +807,6 @@ class JarvisLive(Avisos, Escuta, Pontes, VozSaida, Ultron):
                     self._avisar_sem_ouvido()  # modo privado sem o Whisper local: avisa uma vez
         except Exception as erro:
             print(f"[Reserva] Microfone do modo reserva parou: {erro}")
-
-    def _suspender(self, minutos) -> str:
-        """Jarvis Ultron: silencia o microfone por alguns minutos e volta sozinho."""
-        try:
-            minutos = max(1, min(int(round(float(minutos))), 240))
-        except (TypeError, ValueError):
-            minutos = 10
-        anterior = getattr(self, "_suspensao", None)
-        if anterior is not None:
-            anterior.cancel()
-        self.ui.set_muted_threadsafe(True)
-        loop = asyncio.get_running_loop()
-        self._suspensao = loop.call_later(
-            minutos * 60, lambda: asyncio.ensure_future(self._voltar_da_suspensao()))
-        self.ui.write_log(f"SYS: Jarvis suspenso por {minutos} minuto(s).")
-        return (f"Microphone muted for {minutos} minute(s). Tell the user, in one short sentence in "
-                f"Portuguese, that you are suspended and will be back in {minutos} minute(s).")
-
-    async def _voltar_da_suspensao(self):
-        self._suspensao = None
-        if not self.ui.muted:  # o usuário já religou o microfone antes do tempo
-            return
-        self.ui.set_muted_threadsafe(False)
-        self.ui.write_log("SYS: Fim da suspensão. Microfone ativo.")
-        try:
-            await self.session.send_client_content(
-                turns={"parts": [{"text": "(A suspensão terminou. Diga ao usuário, em uma frase curta "
-                                          "em português, que você está de volta.)"}]},
-                turn_complete=True,
-            )
-        except Exception as erro:
-            print(f"[JARVIS] Aviso de volta da suspensão falhou: {erro}")
 
     async def _execute_tool(self, fc) -> types.FunctionResponse:
         name = fc.name

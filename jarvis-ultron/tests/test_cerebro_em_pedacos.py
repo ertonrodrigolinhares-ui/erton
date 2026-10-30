@@ -35,6 +35,11 @@ PEDACOS = {
     "cerebro/ultron.py": ("Ultron", {
         "_pedido_de_ultron", "rodar_automacao_ultron", "_falar_resultado_ultron",
     }),
+    "cerebro/desligar.py": ("Desligar", {
+        "_is_explicit_self_quit_transcript", "_queue_self_quit_after_farewell", "_force_complete_self_quit",
+        "_mark_self_quit_farewell_received", "_complete_self_quit_after_audio", "request_shutdown",
+        "_suspender", "_voltar_da_suspensao",
+    }),
 }
 
 
