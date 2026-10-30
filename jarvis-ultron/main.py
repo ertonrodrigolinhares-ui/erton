@@ -217,28 +217,11 @@ def _clean_transcript(text: str) -> str:
 
 from cerebro.ferramentas.declaracoes import TOOL_DECLARATIONS  # Etapa 12: o texto mora lá, igual ao de antes
 
-# Tool names exposed by hosted clients. The names here are Gemini function
-# declaration names (which differ from a few implementation module names).
-CLOUD_SAFE_ACTIONS = frozenset({
-    "web_search",
-    "deep_research",
-    "create_presentation",
-    "flight_finder",
-    "email_control",
-    "youtube_video",
-})
-
-# Jarvis Ultron: no modo privado (JARVIS_CEREBRO=gemma) nada vai para IA na nuvem. Estas ferramentas
-# mandam o pedido (ou a tela) para o Gemini, o Hermes (modelos grátis da Nous) ou outra IA na nuvem:
-# não são oferecidas ao Gemma e são recusadas em _execute_tool. As automações da pasta marcam isso
-# com USA_IA_NUVEM = True (ex.: claude_task, generate_video).
-FERRAMENTAS_NUVEM_IA = frozenset({
-    "web_search", "deep_research", "agent_task", "generate_image", "hermes_agent", "approve_publication",
-    "create_presentation", "code_helper", "dev_agent", "file_processor", "screen_process", "flight_finder",
-    "computer_control", "desktop_control", "computer_settings",
-})
-
-AVISO_MODO_PRIVADO = frase("modo_privado_nuvem")  # o texto fica no core/frases.py (Etapa 8)
+# Etapa 12: as regras (o que pode ir para a nuvem, o que roda em fila) moram em cerebro/ferramentas/politica.py;
+# os nomes continuam aqui para quem usa main.FERRAMENTAS_NUVEM_IA (core/cerebro_gemma, testes).
+from cerebro.ferramentas.politica import (  # noqa: E402
+    AVISO_MODO_PRIVADO, CLOUD_SAFE_ACTIONS, FERRAMENTAS_NUVEM_IA, MUDAM_ALGO,
+)
 
 
 def bloqueio_do_modo_privado(nome: str, args: dict | None = None) -> str | None:
@@ -1803,12 +1786,7 @@ class JarvisLive:
 
     async def _execute_tool_batch(self, calls):
         """Run read-only calls concurrently while preserving mutation order."""
-        mutating = {
-            "send_message", "prepare_message_reply", "email_control", "reminder",
-            "computer_settings", "computer_control", "desktop_control", "file_controller",
-            "file_processor", "code_helper", "dev_agent", "game_updater",
-            "create_presentation", "save_memory", "jarvis_ui_control", "graphics_quality",
-        }
+        mutating = MUDAM_ALGO  # cerebro/ferramentas/politica.py (Etapa 12)
         call_list = list(calls or [])
         if any(getattr(call, "name", "") in mutating for call in call_list):
             return [await self._execute_tool(call) for call in call_list]
