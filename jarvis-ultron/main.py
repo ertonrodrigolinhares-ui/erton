@@ -21,13 +21,8 @@ from memory.memory_manager import (
 import time
 
 from core.live_model import pick_live_model
-
-
-
-def get_base_dir():
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).parent
-    return Path(__file__).resolve().parent
+# Etapa 15: a pasta do Jarvis e os caminhos fixos moram em cerebro/ambiente.py (os nomes continuam aqui)
+from cerebro.ambiente import API_CONFIG_PATH, BASE_DIR, PROMPT_PATH, get_base_dir  # noqa: F401
 
 
 def _load_dotenv():
@@ -51,7 +46,6 @@ def _load_dotenv():
     load_dotenv(stream=io.StringIO(texto))
 
 
-BASE_DIR        = get_base_dir()
 _load_dotenv()
 # Jarvis Ultron: caminho do Gemini (normal ou Vertex AI, para as chaves "AQ."); vale para tudo
 from core.gemini_acesso import aplicar_via as _aplicar_via_gemini
@@ -60,17 +54,9 @@ _aplicar_via_gemini()
 # Jarvis Ultron: escolhe sozinho os modelos do Gemini disponíveis para a chave
 from core.modelos import instalar as _instalar_central_de_modelos
 _instalar_central_de_modelos()
-API_CONFIG_PATH = BASE_DIR / "config" / "api_keys.json"
-PROMPT_PATH     = BASE_DIR / "core" / "prompt.txt"
 LIVE_MODEL = "models/gemini-2.5-flash-native-audio-preview-12-2025"
 CHANNELS            = 1
 SEND_SAMPLE_RATE    = 16000
-SUPPORTED_VOICE_NAMES = {
-    "puck", "charon", "kore", "fenrir", "aoede",
-    "leda", "orus", "schedar", "zubenelgenubi"
-}
-DEFAULT_VOICE_NAME   = "puck"
-
 RECEIVE_SAMPLE_RATE = 24000
 CHUNK_SIZE          = 1024
 LIVE_VAD_SILENCE_MS = 200
@@ -130,13 +116,6 @@ def _get_api_key() -> str:
     return api_key
 
 
-def _normalize_voice_name(voice_name: str | None) -> str:
-    if not voice_name:
-        return DEFAULT_VOICE_NAME
-    candidate = voice_name.strip().lower()
-    return candidate if candidate in SUPPORTED_VOICE_NAMES else DEFAULT_VOICE_NAME
-
-
 def _is_unsupported_voice_error(exc: Exception) -> bool:
     if not isinstance(exc, genai.errors.APIError):
         return False
@@ -145,17 +124,6 @@ def _is_unsupported_voice_error(exc: Exception) -> bool:
     if code == 1007:
         return "requested voice api_name" in msg and "not available for model" in msg
     return "requested voice api_name" in msg and "not available for model" in msg
-
-
-def _load_voice_name() -> str:
-    voice = os.environ.get("GEMINI_VOICE_NAME")
-    if voice:
-        return _normalize_voice_name(voice)
-    try:
-        with open(API_CONFIG_PATH, "r", encoding="utf-8") as f:
-            return _normalize_voice_name(json.load(f).get("voice_name"))
-    except Exception:
-        return DEFAULT_VOICE_NAME
 
 
 def _load_system_prompt() -> str:
@@ -201,6 +169,10 @@ from cerebro.ferramentas.executores import (  # noqa: E402,F401
 from cerebro.avisos import Avisos  # noqa: E402
 from cerebro.escuta import Escuta, QUIET_MODE_RESULT  # noqa: E402,F401
 from cerebro.pontes import Pontes  # noqa: E402
+from cerebro.voz_saida import (  # noqa: E402,F401
+    DEFAULT_VOICE_NAME, SUPPORTED_VOICE_NAMES, VozSaida, _AVISOS_EM_PORTUGUES, _limpar_para_falar,
+    _load_voice_name, _normalize_voice_name,
+)
 
 
 def muda_algo(nome: str) -> bool:
@@ -226,7 +198,7 @@ def get_tool_declarations() -> list[dict]:
 
 
 
-class JarvisLive(Avisos, Escuta, Pontes):
+class JarvisLive(Avisos, Escuta, Pontes, VozSaida):
 
     def __init__(
         self,
@@ -465,51 +437,6 @@ class JarvisLive(Avisos, Escuta, Pontes):
             if not getattr(self, "_is_speaking", False) and not getattr(self, "_voz_externa_pendente", 0):
                 self._ouviu_depois_do_turno = True
 
-    def set_speaking(self, value: bool):
-        with self._trava_da_fala():
-            # Jarvis Ultron: enquanto a voz do PC fala (avisos sigilosos, _falar_no_pc), o fim da fala do
-            # Gemini ou da voz reserva não reabre o microfone: senão o resto do texto sigiloso ia para a nuvem
-            value = bool(value) or getattr(self, "_falando_no_pc", 0) > 0
-            self._is_speaking = value
-        if value:
-            self.ui.set_state("SPEAKING")
-        elif not self.ui.muted:
-            self.ui.set_state("LISTENING")
-        if not value and getattr(self, "_portao", None) is not None:
-            self._portao.estender()
-
-    def speak(self, text: str) -> bool:
-        if not self._loop or not self.session:
-            return False
-        try:
-            asyncio.run_coroutine_threadsafe(
-                self.session.send_client_content(
-                    turns={"parts": [{"text": text}]},
-                    turn_complete=True
-                ),
-                self._loop
-            )
-            return True
-        except Exception:
-            return False
-
-    def _speak_vision_result(self, text: str) -> bool:
-        """Send finished vision text through JARVIS's active voice session."""
-        result = " ".join(str(text or "").split())
-        if not result:
-            return False
-        directive = (
-            "[INTERNAL VISION OUTPUT] Read the following vision result to the user "
-            "verbatim. Do not add an introduction, commentary, or a tool call. "
-            f"Vision result: {json.dumps(result, ensure_ascii=False)}"
-        )
-        return self.speak(directive)
-
-    def speak_error(self, tool_name: str, error: str):
-        short = str(error)[:120]
-        self.ui.write_log(f"ERR: {tool_name} — {short}")
-        self.speak(frase("erro_na_ferramenta_falado", ferramenta=tool_name, detalhe=short))
-
     @staticmethod
     def _is_explicit_self_quit_transcript(text: str) -> bool:
         """Only match commands that clearly target JARVIS, never the computer."""
@@ -620,34 +547,6 @@ class JarvisLive(Avisos, Escuta, Pontes):
         self._queue_self_quit_after_farewell()
         return f'Shutdown queued. Say exactly: "{SELF_QUIT_GOODBYE}"'
 
-    def update_voice(self, voice_name: str):
-        self.voice_name = _normalize_voice_name(voice_name)
-        self.ui.write_log(f"SYS: Voice change requested: {self.voice_name}")
-        try:
-            self.ui.sync_voice_display(self.voice_name)
-        except Exception:
-            pass
-        if self.session and self._loop:
-            try:
-                asyncio.run_coroutine_threadsafe(self.session.close(), self._loop)
-            except Exception as e:
-                print(f"[JARVIS] ⚠️ Could not close session after voice change: {e}")
-
-    def _get_current_voice(self) -> str:
-        if getattr(self, "voice_name", None):
-            return _normalize_voice_name(self.voice_name)
-        voice_combo = getattr(self.ui, "_voice_combo", None)
-        if voice_combo is not None:
-            idx = voice_combo.currentIndex()
-            if idx >= 0:
-                voice = voice_combo.itemData(idx)
-                if isinstance(voice, str) and voice:
-                    return _normalize_voice_name(voice)
-            voice = voice_combo.currentText().strip().lower()
-            if voice in SUPPORTED_VOICE_NAMES:
-                return voice
-        return _load_voice_name()
-
     async def _announce_startup(self):
         # Jarvis Ultron: cumprimenta uma vez só (não a cada reconexão) e nunca com a chamada fechada.
         if getattr(self, "_ja_cumprimentou", False) or self._chamada_fechada():
@@ -724,12 +623,6 @@ class JarvisLive(Avisos, Escuta, Pontes):
                 **({"language_code": self._idioma_voz()} if self._idioma_voz() else {}),
             ),
         )
-
-    def _idioma_voz(self) -> str:
-        """Jarvis Ultron: idioma da voz (JARVIS_IDIOMA, padrão pt-BR). Vazio se o modelo recusou."""
-        if getattr(self, "_idioma_recusado", False):
-            return ""
-        return os.environ.get("JARVIS_IDIOMA", "pt-BR").strip()
 
     def _pedido_de_cerebro(self, fala: str) -> bool:
         """Jarvis Ultron: "modo privado" -> Gemma 4 no PC; "modo normal" -> Gemini. True se era isso."""
@@ -872,35 +765,6 @@ class JarvisLive(Avisos, Escuta, Pontes):
         modo = modo_pedido(fala)
         if modo and portao is not None and portao.modo != modo:
             self._definir_modo_escuta(modo)
-
-    def _falar_com_voz_externa(self, texto: str) -> None:
-        """Jarvis Ultron: com ElevenLabs/OpenAI/Edge escolhida, fala a resposta por ela."""
-        motor = getattr(self, "_tts_engine", None)
-        if motor is None or self._ext_tts_provider in ("", "gemini") or not self._pode_falar_agora():
-            return
-        motor.on_speaking_start = lambda: self.set_speaking(True)
-        motor.on_speaking_stop = lambda: self.set_speaking(False)
-        motor.on_level = self._mostrar_volume
-        # Até ela terminar, o áudio do microfone não conta como ele ter voltado a falar: senão o som do
-        # ambiente enquanto ela sintetiza fazia o resto atrasado do pedido (", pode fazer", chegando
-        # durante o preço) virar uma fala nova depois da proposta (_microfone_mandou_audio).
-        with self._trava_da_fala():
-            self._voz_externa_pendente = getattr(self, "_voz_externa_pendente", 0) + 1
-
-        def falar():
-            try:
-                if not motor.speak_sync(texto):
-                    # ElevenLabs/OpenAI recusou (créditos, chave, internet): fala pela voz reserva
-                    print("[Voz] A voz escolhida falhou; usando a voz normal.")
-                    self._falar_reserva(texto)
-            except Exception as erro:
-                print(f"[Voz] A voz escolhida falhou ({erro}); usando a voz normal.")
-                self._falar_reserva(texto)
-            finally:
-                with self._trava_da_fala():
-                    self._voz_externa_pendente = max(0, getattr(self, "_voz_externa_pendente", 1) - 1)
-
-        threading.Thread(target=falar, daemon=True, name="VozExterna").start()
 
     # ---------- Jarvis Ultron: modo reserva (Groq) ----------
 
@@ -1659,41 +1523,6 @@ class JarvisLive(Avisos, Escuta, Pontes):
                         await self._wait_before_reconnect(2)
                     else:
                         await self._wait_before_reconnect(min(60, 2 ** min(self._falhas_seguidas, 6)))
-
-# Avisos que as ferramentas dão inteiros em inglês (são para a IA): o painel Ultron fala em português.
-_AVISOS_EM_PORTUGUES = {
-    "Hermes is still working": ("O Hermes ainda está trabalhando nisso; o resultado aparece na tela "
-                                "quando ficar pronto."),
-    "There is no Geekie list yet": ("Ainda não há lista do Geekie. O Hermes lê o Geekie One às 7h e às 18h; "
-                                    "entre uma vez no Geekie One pelo navegador do Hermes."),
-    # agentes do painel Ultron (rodam no Claude)
-    "Claude is working on it": "O Claude está trabalhando nisso; eu aviso quando ficar pronto.",
-    "Claude is still working on the previous task": ("O Claude ainda está terminando a tarefa anterior. "
-                                                     "Tente de novo daqui a pouco."),
-    "Private mode is on, so nothing is sent to Claude": ("No modo privado nada vai para o Claude. Diga "
-                                                         "'modo normal' para usar os agentes."),
-    "Claude Code is not installed": ("O Claude ainda não está instalado. Dê dois cliques em 'Instalar Claude' "
-                                     "na pasta do Jarvis."),
-}
-
-
-def _limpar_para_falar(texto: str) -> str:
-    """Tira as instruções em inglês que as ferramentas deixam para a IA (ex.: 'Tell the user...'),
-    para o painel Ultron falar só a parte em português quando roda a automação direto."""
-    texto = str(texto or "").strip()
-    for inicio, aviso in _AVISOS_EM_PORTUGUES.items():
-        if texto.startswith(inicio):
-            return aviso
-    marcas = ["Tell the user", "Explique ao usuário", "Explique isso", "Answer the user", "Answer in",
-              "Confirm to the user", "Confirm in", "Say this to the user", "Oriente o usuário",
-              "\nTell the user", "Then tell the user", "Summarize for the user"]
-    corte = len(texto)
-    for m in marcas:
-        i = texto.find(m)
-        if i != -1:
-            corte = min(corte, i)
-    return texto[:corte].strip() or texto
-
 
 def _pensamento_da_voz(modelo: str) -> types.ThinkingConfig:
     """Gemini 3.x não aceita desligar o raciocínio (thinking_budget=0 dá erro 1007 "invalid argument"):

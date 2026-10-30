@@ -28,6 +28,10 @@ PEDACOS = {
         "_geekie_pendencias", "_verificar_lembretes_geekie", "_iniciar_lembretes_geekie",
         "_autodiagnostico", "_preparar_automacoes",
     }),
+    "cerebro/voz_saida.py": ("VozSaida", {
+        "set_speaking", "speak", "_speak_vision_result", "speak_error", "update_voice", "_get_current_voice",
+        "_idioma_voz", "_falar_com_voz_externa",
+    }),
 }
 
 
