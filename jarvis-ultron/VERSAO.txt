@@ -1,7 +1,12 @@
 Jarvis Ultron - versão 2026-10-30
 
-Novidades desta versão (Etapas 6 a 9 da reorganização: tela mais leve, nada some atrás do anel, tudo em
-português, clima falado, notícias e mapa):
+Novidades desta versão (Etapas 6 a 10 da reorganização: tela mais leve, nada some atrás do anel, tudo em
+português, clima falado, notícias, mapa, print salvo e música do PC):
+- "Jarvis, tira um print" passa a salvar de verdade (Documentos\Jarvis Ultron\Capturas, nome com data e
+  hora) e a dizer onde ficou; antes só abria o recorte do Windows. O print fica só no PC (a memória do HD
+  não copia essa pasta). "Toca <música> do meu PC" toca o que está na sua pasta Música, sem internet. E,
+  quando o microfone entende errado o nome de uma rotina ou de um lembrete, o Jarvis pergunta "Você quis
+  dizer…?" em vez de só dizer que não achou.
 - "Jarvis, como está o tempo?" passa a responder falando, em português, com dados de verdade da cidade do
   .env (antes só abria uma busca do Google em inglês). Vale também na reserva e no modo privado, porque
   não usa IA. Só abre o navegador se você pedir.

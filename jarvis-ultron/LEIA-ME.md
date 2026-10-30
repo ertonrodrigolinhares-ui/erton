@@ -22,6 +22,14 @@ Cópia do projeto **JARVIS-OS V.2** (licença MIT, veja `LICENSE`), com ajustes 
   Ele só abre a matéria no navegador depois do seu "sim"; um "não" não abre nada.
 - **Mapa**: "Jarvis, mostra no mapa a praia de Tambaú" abre o Google Maps no lugar pedido.
 - O cartão do "bom dia" diz "Bom dia", "Boa tarde" ou "Boa noite" conforme a hora.
+- **Print salvo**: "Jarvis, tira um print" salva a tela inteira em **Documentos\Jarvis Ultron\Capturas**
+  (nome com data e hora) e diz onde ficou. O print fica só no PC: não é enviado a ninguém e a memória do
+  HD externo não copia essa pasta. "Captura de tela" (o recorte do Windows) continua existindo.
+- **Música do seu PC**: "Jarvis, toca Evidências do meu PC" procura na pasta Música (e subpastas), por
+  palavra inteira, e abre no programa de música padrão, sem internet. Achando várias, ele diz quantas
+  achou e pergunta qual. Outra pasta: `JARVIS_PASTA_MUSICA` no `.env`.
+- **"Você quis dizer…?"**: quando o microfone entende errado o nome de uma rotina ("rotina trein0") ou o
+  texto de um lembrete para cancelar, o Jarvis sugere o mais parecido e pergunta antes de fazer.
 - **Gerar imagens (Nano Banana)**: "Jarvis, crie uma imagem de um leão de armadura".
   A imagem abre na hora e fica salva em **Documentos\Jarvis Ultron\Imagens**.
   Atenção: o Google pode não liberar cota grátis de imagens para a sua chave; nesse caso o Jarvis avisa.
@@ -402,7 +410,8 @@ Abra com o Bloco de Notas para mudar:
 | `JARVIS_EFEITO_ULTRON=leve` | Voz metálica sem eco (padrão). `ultron` = com eco (mais "atrasada"), `robo` = robô, `0` = desliga |
 | `JARVIS_LATENCIA_AUDIO=low` | Som com menos atraso (padrão). Se picotar, use `high` |
 | `JARVIS_TEMA_STARK=1` | Tela Stark ligada. `0` = volta para a tela original |
-| `JARVIS_CIDADE=Campina Grande` | Cidade do painel de clima |
+| `JARVIS_CIDADE=Campina Grande` | Cidade do painel de clima e do clima falado |
+| `JARVIS_PASTA_MUSICA=` | (Opcional) pasta onde "toca X do meu PC" procura as músicas. Vazio = a pasta Música do Windows |
 | `JARVIS_VISUAL=orbe` | Tela azul com anel de energia e painéis de vidro (padrão). `classico` = volta para a esfera antiga |
 | `JARVIS_CENA=1` | A tela azul ocupa a janela toda (padrão). `0` = anel dentro da tela antiga. A tecla **F2** também alterna |
 | `JARVIS_BIOMETRIA=1` | No "bom dia", abre a câmera dentro do anel antes do resumo. `0` = pula a câmera |

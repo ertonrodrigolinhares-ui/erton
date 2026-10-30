@@ -425,5 +425,24 @@ class FontesDoDiaTests(unittest.TestCase):
             self.assertIn(trecho, passo)
 
 
+class NovidadesLocaisTests(unittest.TestCase):
+    def test_textos_da_etapa_10_batem_com_o_codigo(self):
+        import actions.computer_settings as cs
+        from core.automacoes import carregar_ferramentas
+
+        self.assertIn("save_screenshot", cs.ACTION_MAP)
+        self.assertIn("local_music", carregar_ferramentas().ferramentas)
+        texto = _uma_linha(LEIA_ME)
+        for trecho in ("**Print salvo**", "Capturas", "não copia essa pasta", "**Música do seu PC**",
+                       "`JARVIS_PASTA_MUSICA", '**"Você quis dizer…?"**'):
+            self.assertIn(trecho, texto)
+        novidades = _uma_linha(VERSAO[:VERSAO.index("Versão anterior (2026-10-19.2)")])
+        for trecho in ("tira um print", "do meu PC", "Você quis dizer"):
+            self.assertIn(trecho, novidades)
+        roteiro = _uma_linha((RAIZ / "dev" / "ROTEIRO_DE_5_MINUTOS.md").read_text(encoding="utf-8"))
+        self.assertIn('**"Jarvis, tira um print"**', roteiro)
+        self.assertIn("musica_local.py", (RAIZ / "automacoes" / "LEIA-ME.md").read_text(encoding="utf-8"))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -21,6 +21,8 @@ Para cada passo, o que fazer e o que tem de acontecer.
    - Diga **"Jarvis, quais são as notícias?"**: ele lê as manchetes e pergunta se abre alguma. Responda
      **"não"**: nada abre.
    - Diga **"Jarvis, mostra no mapa a praia de Tambaú"**: o Google Maps abre no lugar certo.
+   - Diga **"Jarvis, tira um print"**: ele diz onde salvou, e o arquivo (com data e hora no nome) está em
+     `Documentos\Jarvis Ultron\Capturas`.
 3. **Modo privado** (só se o Gemma 4 estiver instalado; se não, pule para o passo 5): diga
    **"Jarvis, modo privado"**.
    - Aparece o selo **🔒 MODO PRIVADO** no alto da tela, e ele diz que está rodando no Gemma 4.
