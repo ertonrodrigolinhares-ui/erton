@@ -233,5 +233,37 @@ class AvisosNoCanalTests(unittest.TestCase):
             self.assertTrue(any("usando a reserva Groq" in t for t in textos))
 
 
+class SinaisDoQtTests(unittest.TestCase):
+    """show_toast e toggle_compact_mode vêm do cérebro (outro fio): têm de ir por sinal, como o resto."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_show_toast_vai_por_sinal_e_aparece_por_cima_da_cena(self):
+        with _Janela() as janela:
+            janela._overlay.hide()
+            fachada = ui.JarvisUI.__new__(ui.JarvisUI)
+            fachada._win = janela
+            with patch.object(ui.ToastManager, "show_toast", wraps=ui.ToastManager.show_toast) as mostrar:
+                fachada.show_toast("Relatório salvo", "success")
+                _Janela.eventos(self)
+            self.assertEqual(mostrar.call_count, 1)
+            self.assertEqual(tuple(mostrar.call_args.args[1:]), ("Relatório salvo", "success"))
+            self.assertEqual(mostrar.call_args.kwargs.get("duration"), 4000)
+            aviso = next(w for w in janela.janelas_por_cima() if isinstance(w, ui.ToastNotification))
+            self.assertTrue(_no_meio_aparece(janela, aviso))
+
+    def test_toggle_compact_mode_vai_por_sinal(self):
+        with _Janela() as janela:
+            fachada = ui.JarvisUI.__new__(ui.JarvisUI)
+            fachada._win = janela
+            with patch.object(janela, "_toggle_compact_mode") as alternar:
+                janela._compact_sig.connect(alternar)
+                fachada.toggle_compact_mode()
+                _Janela.eventos(self)
+            alternar.assert_called_once_with()
+
+
 if __name__ == "__main__":
     unittest.main()

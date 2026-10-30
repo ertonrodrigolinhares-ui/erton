@@ -5530,6 +5530,8 @@ class MainWindow(QMainWindow):
     _presentation_progress_finish_sig = pyqtSignal(str, str)
     _presentation_progress_hide_sig = pyqtSignal()
     _ui_command_sig = pyqtSignal(str)
+    _toast_sig = pyqtSignal(str, str, int)   # Jarvis Ultron: aviso pedido de outro fio (JarvisUI.show_toast)
+    _compact_sig = pyqtSignal()              # Jarvis Ultron: modo compacto pedido de outro fio
 
     # Jarvis Ultron: as janelinhas que abrem por cima da tela (chave do Gemini, nome, voz, voz externa,
     # Ajustes, Atalhos e a janela da visão), numa lista só. A Cena (tela azul) as traz para a frente, e o
@@ -5765,6 +5767,8 @@ class MainWindow(QMainWindow):
         self._presentation_progress_finish_sig.connect(self._presentation_progress.finish)
         self._presentation_progress_hide_sig.connect(self._presentation_progress.dismiss)
         self._ui_command_sig.connect(self._handle_ui_command)
+        self._toast_sig.connect(self._show_toast)
+        self._compact_sig.connect(self._toggle_compact_mode)
 
 
         # ── Popup System Initialization ────────────────────────────────────────
@@ -8012,22 +8016,23 @@ class JarvisUI:
 
     # ── New UI enhancement methods ───────────────────────────────────────
 
-    def show_toast(self, message: str, toast_type: str = "info"):
-        """Thread-safe toast notification. Types: info, success, warning, error."""
+    def show_toast(self, message: str, toast_type: str = "info", duration: int = 4000):
+        """Aviso na janela, de qualquer fio: vai por sinal do Qt (antes mexia nos widgets direto, de fora do
+        fio da tela). Tipos: info, success, warning, error."""
         try:
-            self._win._show_toast(message, toast_type)
+            self._win._toast_sig.emit(str(message), str(toast_type), int(duration))
         except Exception:
             pass
 
     def show_tool_progress(self, tool_name: str):
-        """Show tool execution progress indicator."""
+        """Mostra o "executando..." (de qualquer fio: o widget já troca por sinal, _show_sig)."""
         try:
             self._win._tool_progress.show_tool(tool_name)
         except Exception:
             pass
 
     def hide_tool_progress(self):
-        """Hide tool execution progress indicator."""
+        """Esconde o "executando..." (de qualquer fio: _hide_sig)."""
         try:
             self._win._tool_progress.hide_tool()
         except Exception:
@@ -8046,5 +8051,5 @@ class JarvisUI:
         self._win._ui_command_sig.emit(action)
 
     def toggle_compact_mode(self):
-        """Toggle compact/mini mode."""
-        self._win._toggle_compact_mode()
+        """Liga/desliga o modo compacto, de qualquer fio (sinal do Qt; antes mexia na janela direto)."""
+        self._win._compact_sig.emit()
