@@ -201,6 +201,58 @@ def verificar_computador() -> Item:
     return Item("Computador", "ok", detalhe)
 
 
+def verificar_cpu_jarvis() -> Item:
+    """Quanto do processador o próprio Jarvis está gastando (tela e cérebro, nos dois programas).
+    É o número que o Erton anota antes e depois de cada versão (etapa 6 da reorganização)."""
+    from core import metricas
+
+    partes = metricas.cpu_do_jarvis()
+    if not partes:
+        return Item("CPU do Jarvis", "atencao", "não consegui medir os programas do Jarvis")
+    total = sum(pct for _, pct in partes)
+    detalhe = " + ".join(f"{nome} {pct:.0f}%" for nome, pct in partes)
+    if len(partes) > 1:
+        detalhe = f"{total:.0f}% ({detalhe})"
+    if total >= 50:
+        return Item("CPU do Jarvis", "defeito", detalhe + " do processador",
+                    "O Jarvis está pesado demais. Feche e abra de novo; se continuar, diga 'qualidade gráfica baixa'.")
+    if total >= 25:
+        return Item("CPU do Jarvis", "atencao", detalhe + " do processador",
+                    "Mais do que o normal parado. Dizer 'qualidade gráfica baixa' ajuda.")
+    return Item("CPU do Jarvis", "ok", detalhe + " do processador")
+
+
+def verificar_cpu() -> Item:
+    """O processador do computador inteiro (todos os programas)."""
+    import psutil
+
+    cpu = psutil.cpu_percent(interval=0.5)
+    detalhe = f"{cpu:.0f}% em uso"
+    if cpu >= 90:
+        return Item("CPU", "defeito", detalhe + " (no limite)",
+                    "Algum programa está consumindo o processador: veja no Gerenciador de Tarefas e feche-o.")
+    if cpu >= 70:
+        return Item("CPU", "atencao", detalhe, "Está alto: feche programas e abas que não está usando.")
+    return Item("CPU", "ok", detalhe)
+
+
+def verificar_bateria() -> Item:
+    """Bateria do notebook. Num PC de mesa o psutil devolve None: aqui isso é normal, não defeito."""
+    from core import metricas
+
+    b = metricas.bateria()
+    if b is None:
+        return Item("Bateria", "ok", "sem bateria (computador de mesa)")
+    detalhe = f"{b['pct']:.0f}%" + (", na tomada" if b["na_tomada"] else ", na bateria")
+    if b["minutos"] is not None and not b["na_tomada"]:
+        detalhe += f", cerca de {b['minutos']} min"
+    if not b["na_tomada"] and b["pct"] <= 15:
+        return Item("Bateria", "defeito", detalhe, "Ligue o carregador: o Jarvis pode desligar junto com o PC.")
+    if not b["na_tomada"] and b["pct"] <= 30:
+        return Item("Bateria", "atencao", detalhe, "Está acabando: ligue o carregador.")
+    return Item("Bateria", "ok", detalhe)
+
+
 def verificar_navegador() -> Item:
     try:
         import playwright  # noqa: F401
@@ -261,6 +313,9 @@ def diagnosticar(portao=None, conferir_internet: bool = True) -> list[Item]:
         itens.append(Item("Som", "atencao", f"não consegui verificar ({str(erro)[:60]})"))
     itens += [
         _seguro("Computador", verificar_computador),
+        _seguro("CPU do Jarvis", verificar_cpu_jarvis),
+        _seguro("CPU", verificar_cpu),
+        _seguro("Bateria", verificar_bateria),
         _seguro("Navegador automático", verificar_navegador),
         _seguro("Escuta", lambda: verificar_escuta(portao)),
         _seguro("Automações", verificar_automacoes),
