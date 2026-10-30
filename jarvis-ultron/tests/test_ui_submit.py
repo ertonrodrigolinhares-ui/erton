@@ -48,7 +48,7 @@ class UISubmitTests(unittest.TestCase):
             if window._log_sig.emit.called:
                 break
             time.sleep(0.005)
-        window._log_sig.emit.assert_called_once_with("ERR: Message processing failed: routing failed")
+        window._log_sig.emit.assert_called_once_with("ERR: Não consegui processar a mensagem: routing failed")
 
 
 if __name__ == "__main__":

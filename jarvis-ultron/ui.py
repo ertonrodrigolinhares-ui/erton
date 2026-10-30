@@ -47,6 +47,9 @@ UI_SETTINGS_FILE = Path.home() / ".jarvis" / "config" / "settings.json"
 # Each profile changes both cadence and rendering density.  Keeping this data
 # centralized makes the Settings UI, the renderer, and JARVIS voice commands
 # agree on what Low / Medium / High actually mean.
+# Nome das qualidades gráficas como o Erton as vê (Ajustes, avisos e o "qualidade gráfica baixa" falado)
+QUALIDADE_EM_PORTUGUES = {"low": "BAIXA", "medium": "MÉDIA", "high": "ALTA"}
+
 GRAPHICS_PROFILES = {
     "low": {
         "frame_ms": 50,       # 20 FPS target
@@ -5951,7 +5954,7 @@ class MainWindow(QMainWindow):
             if self.on_quit_requested:
                 self.on_quit_requested()
         except Exception as exc:
-            self._log.append_log(f"ERR: Shutdown cleanup — {exc}")
+            self._log.append_log(f"ERR: Ao fechar — {exc}")
         try:
             if hasattr(self, "_tray"):
                 self._tray.hide()
@@ -6082,9 +6085,9 @@ class MainWindow(QMainWindow):
             self._settings_overlay._highlight_graphics(value)
 
         if hasattr(self, "_log"):
-            self._log.append_log(f"SYS: Graphics quality set to {value.upper()}.")
+            self._log.append_log(f"SYS: Qualidade gráfica: {QUALIDADE_EM_PORTUGUES[value]}.")
         if hasattr(self, "_popup_manager"):
-            self._show_toast(f"Graphics quality: {value.upper()}", "success")
+            self._show_toast(f"Qualidade gráfica: {QUALIDADE_EM_PORTUGUES[value]}", "success")
 
     # ── Theme cycling ────────────────────────────────────────────────────
     def _cycle_theme(self):
@@ -6248,7 +6251,7 @@ class MainWindow(QMainWindow):
                 self._tool_progress.hide()
         if announce and hasattr(self, "_popup_manager"):
             self._show_toast(
-                "Command Center open" if is_open else "Focus view restored",
+                "Command Center aberto" if is_open else "Tela principal de volta",
                 "info",
             )
         if announce and is_open and not was_open:
@@ -7132,10 +7135,10 @@ class MainWindow(QMainWindow):
         self._style_mute_btn()
         if self._muted:
             self._apply_state("MUTED")
-            self._log.append_log("SYS: Microphone muted.")
+            self._log.append_log("SYS: Microfone mudo.")
         else:
             self._apply_state("LISTENING")
-            self._log.append_log("SYS: Microphone active.")
+            self._log.append_log("SYS: Microfone ligado.")
 
     def _get_selected_voice(self) -> str:
         idx = self._voice_combo.currentIndex()
@@ -7148,7 +7151,7 @@ class MainWindow(QMainWindow):
     def _on_voice_changed(self, _voice_label: str):
         """Handle voice selection change"""
         voice_name = self._get_selected_voice()
-        self._log.append_log(f"SYS: Voice changed to {voice_name}.")
+        self._log.append_log(f"SYS: Voz trocada para {voice_name}.")
         os.environ["GEMINI_VOICE_NAME"] = voice_name
         try:
             cfg = json.loads(API_FILE.read_text(encoding="utf-8")) if API_FILE.exists() else {}
@@ -7160,12 +7163,12 @@ class MainWindow(QMainWindow):
             os.makedirs(CONFIG_DIR, exist_ok=True)
             API_FILE.write_text(json.dumps(cfg, indent=4), encoding="utf-8")
         except Exception as e:
-            self._log.append_log(f"SYS: Could not save voice selection: {e}")
+            self._log.append_log(f"SYS: Não consegui guardar a voz escolhida: {e}")
         if self.on_voice_change:
             try:
                 self.on_voice_change(voice_name)
             except Exception as e:
-                self._log.append_log(f"SYS: Voice callback error: {e}")
+                self._log.append_log(f"SYS: Erro ao avisar a troca de voz: {e}")
 
     def _style_mute_btn(self):
         if self._muted:
@@ -7215,29 +7218,29 @@ class MainWindow(QMainWindow):
                 "show the command center", "open command ceneter", "open the command ceneter",
             }:
                 self._set_command_center(True)
-                self._log.append_log("JARVIS: Command Center is open.")
+                self._log.append_log("JARVIS: Command Center aberto.")
                 return
             if normalized in {
                 "close command center", "close the command center", "hide command center",
                 "hide the command center", "return to focus view",
             }:
                 self._set_command_center(False)
-                self._log.append_log("JARVIS: Returning to focus view.")
+                self._log.append_log("JARVIS: De volta à tela principal.")
                 return
             if self.on_text_command:
                 def _dispatch():
                     try:
                         self.on_text_command(txt)
                     except Exception as exc:
-                        self._log_sig.emit(f"ERR: Message processing failed: {exc}")
+                        self._log_sig.emit(f"ERR: Não consegui processar a mensagem: {exc}")
                 threading.Thread(target=_dispatch, daemon=True).start()
         except Exception as exc:
             # Exceptions escaping a PyQt signal handler can abort the process.
             # Keep JARVIS alive and surface the problem in its own log instead.
             try:
-                self._log.append_log(f"ERR: Message processing failed: {exc}")
+                self._log.append_log(f"ERR: Não consegui processar a mensagem: {exc}")
             except Exception:
-                print(f"[JARVIS] Message processing failed: {exc}")
+                print(f"[JARVIS] Não consegui processar a mensagem: {exc}")
 
     def _apply_state(self, state: str):
         self.hud.state    = state
@@ -7274,11 +7277,6 @@ class MainWindow(QMainWindow):
         if self._compact_widget:
             self._compact_widget.set_state(state)
 
-        # Show toast for state transitions
-        if state == "THINKING":
-            self._show_toast("JARVIS is thinking...", "info")
-        elif state == "PROCESSING":
-            self._show_toast("Processing request...", "info")
 
     def _parse_log_for_context(self, text: str):
         """Detect context from log messages and feed task/tool widgets."""
@@ -7334,7 +7332,7 @@ class MainWindow(QMainWindow):
                     status = "error"
                     if hasattr(self, "_tool_progress"):
                         self._tool_progress.hide_tool()
-                    self._show_toast(f"Tool error: {label}", "error")
+                    self._show_toast(frase("erro_na_ferramenta", ferramenta=label), "error")
                 else:
                     status = "active"
                 try:
@@ -7414,7 +7412,7 @@ class MainWindow(QMainWindow):
         verified_key = getattr(self._overlay, "_verified_key", "") if self._overlay else ""
         modo_reserva = bool(getattr(self._overlay, "_modo_reserva", False)) if self._overlay else False
         if not modo_reserva and (not normalized_key or normalized_key != verified_key):
-            self._log.append_log("ERR: Setup blocked because the Gemini API key was not verified.")
+            self._log.append_log("ERR: A chave do Gemini não foi conferida: a tela da chave continua aberta.")
             self._ready = False
             return
         key = normalized_key or verified_key
@@ -7432,9 +7430,9 @@ class MainWindow(QMainWindow):
             try:
                 store = get_secret_store()
                 store.set("gemini_api_key", key.strip())
-                self._log.append_log("SYS: Gemini API key saved to OS keychain.")
+                self._log.append_log("SYS: Chave do Gemini guardada no cofre do Windows.")
             except Exception as e:
-                self._log.append_log(f"SYS: Could not save key to keychain: {e}")
+                self._log.append_log(f"SYS: Não consegui guardar a chave no cofre: {e}")
 
         os.makedirs(CONFIG_DIR, exist_ok=True)
 
@@ -7452,7 +7450,7 @@ class MainWindow(QMainWindow):
             # writing it to disk — the user must re-enter it on next start.
             if isinstance(key, str) and key.strip():
                 os.environ["GEMINI_API_KEY"] = key.strip()
-                self._log.append_log("SYS: Gemini API key set for this session (not saved).")
+                self._log.append_log("SYS: Chave do Gemini vale só nesta abertura (não foi guardada).")
         except Exception:
             pass
         # Jarvis Ultron: o iniciador guarda a chave no .env e ela é lida antes de tudo. Se a chave
@@ -7479,13 +7477,7 @@ class MainWindow(QMainWindow):
             self._overlay.hide()
             self._overlay = None
         self._apply_state("LISTENING")
-        self._log.append_log("SYS: INITIATING SYSTEMS, SIR...")
-        self._log.append_log("SYS: CORE SYSTEMS ONLINE")
-        self._log.append_log("SYS: NEURAL NETWORK ACTIVE  [OK]")
-        self._log.append_log("SYS: PARALLAX UI COMPLETE   [OK]")
-        self._log.append_log("SYS: VOICE SYNTHESIS READY  [OK]")
-        self._log.append_log(f"SYS: PLATFORM {os_name.upper()} DETECTED")
-        self._log.append_log("SYS: JARVIS MARK XXXIX - ALL SYSTEMS NOMINAL")
+        self._log.append_log(f"SYS: Jarvis Ultron pronto ({os_name}).")
         # After setup: show voice popup first, then name popup
         self._show_voice_select_then_name()
 
@@ -7601,17 +7593,17 @@ class MainWindow(QMainWindow):
         try:
             from memory.memory_manager import update_memory
             update_memory({"identity": {"name": {"value": save_name}}})
-            self._log.append_log(f"SYS: Identity set — {save_name}.")
-            self._log.append_log(f"JARVIS: The workshop is now at your disposal, {save_name}.")
-            self._log.append_log("JARVIS: All systems nominal. How may I assist you today?")
+            self._log.append_log(f"SYS: Nome guardado: {save_name}.")
+            self._log.append_log(f"JARVIS: Às ordens, {save_name}.")
+            self._log.append_log("JARVIS: Tudo pronto. Em que posso ajudar?")
         except Exception as e:
-            self._log.append_log(f"SYS: Could not save name: {e}")
+            self._log.append_log(f"SYS: Não consegui guardar o nome: {e}")
         # Notify JarvisLive so it can update the running session immediately
         if self.on_name_change:
             try:
                 self.on_name_change(save_name)
             except Exception as e:
-                self._log.append_log(f"SYS: Name callback error: {e}")
+                self._log.append_log(f"SYS: Erro ao avisar o nome novo: {e}")
         # Refresh the button label to show current name
         self._update_name_btn()
 
@@ -7717,7 +7709,7 @@ class MainWindow(QMainWindow):
             try:
                 get_secret_store().set("tts_api_key", api_key)
             except Exception as e:
-                self._log.append_log(f"SYS: Could not save TTS key to keychain: {e}")
+                self._log.append_log(f"SYS: Não consegui guardar a chave da voz externa no cofre: {e}")
 
         # Persist only non-sensitive fields to JSON
         try:
@@ -7732,7 +7724,7 @@ class MainWindow(QMainWindow):
             os.makedirs(CONFIG_DIR, exist_ok=True)
             API_FILE.write_text(json.dumps(cfg, indent=4), encoding="utf-8")
         except Exception as e:
-            self._log.append_log(f"SYS: Could not save TTS config: {e}")
+            self._log.append_log(f"SYS: Não consegui guardar a configuração da voz externa: {e}")
 
         # Derive a friendly label for the log
         from actions.tts_engine import PROVIDER_VOICES
@@ -7741,7 +7733,7 @@ class MainWindow(QMainWindow):
             if vid == voice_id:
                 label = lbl
                 break
-        self._log.append_log(f"SYS: Voice → {label}  ({provider})")
+        self._log.append_log(f"SYS: Voz → {label}  ({provider})")
         self._update_tts_btn()
 
         # Keep the hidden Gemini combo in sync (used by on_voice_change callback)
@@ -7757,7 +7749,7 @@ class MainWindow(QMainWindow):
             try:
                 self.on_tts_provider_change(provider, api_key, voice_id)
             except Exception as e:
-                self._log.append_log(f"SYS: TTS callback error: {e}")
+                self._log.append_log(f"SYS: Erro ao avisar a troca da voz externa: {e}")
 
     def _update_tts_btn(self):
         """Update the TTS button label to show the active voice name."""
