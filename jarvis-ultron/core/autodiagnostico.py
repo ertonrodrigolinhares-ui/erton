@@ -201,6 +201,72 @@ def verificar_computador() -> Item:
     return Item("Computador", "ok", detalhe)
 
 
+def programas_do_jarvis() -> dict[str, int]:
+    """{papel: pid} do próprio Jarvis: "tela" e "cérebro" quando são dois programas (core/ponte.py passa
+    JARVIS_PID_TELA ao abrir o cérebro); "Jarvis" quando é um programa só."""
+    eu = os.getpid()
+    tela = os.environ.get("JARVIS_PID_TELA", "").strip()
+    if os.environ.get("JARVIS_PROCESSO", "") == "cerebro" and tela.isdigit() and int(tela) != eu:
+        return {"tela": int(tela), "cérebro": eu}
+    return {"Jarvis": eu}
+
+
+def _megabytes(valor: int) -> str:
+    return f"{valor / (1024 * 1024):.0f} MB"
+
+
+def verificar_processador() -> list[Item]:
+    """Quanto o computador inteiro e o próprio Jarvis (tela e cérebro) estão gastando de processador,
+    medidos na mesma janela de meio segundo. É o número que o Erton compara entre versões."""
+    from core import metricas
+
+    papeis = programas_do_jarvis()
+    pc, por_programa, memoria = metricas.amostra_cpu(papeis.values())
+    itens = []
+    if pc >= 95:
+        itens.append(Item("CPU", "defeito", f"{pc:.0f}% em uso no computador inteiro (travando)",
+                          "Outro programa está pesando. Veja qual no Gerenciador de Tarefas (Ctrl+Shift+Esc)."))
+    elif pc >= 80:
+        itens.append(Item("CPU", "atencao", f"{pc:.0f}% em uso no computador inteiro",
+                          "Está pesado: feche programas que não está usando."))
+    else:
+        itens.append(Item("CPU", "ok", f"{pc:.0f}% em uso no computador inteiro"))
+
+    partes = []
+    total = 0.0
+    for papel, pid in papeis.items():
+        if pid not in por_programa:
+            continue
+        total += por_programa[pid]
+        partes.append(f"{papel} {por_programa[pid]:.0f}% ({_megabytes(memoria.get(pid, 0))} de memória)")
+    if not partes:
+        itens.append(Item("CPU do Jarvis", "atencao", "não consegui medir os programas do Jarvis"))
+    elif total >= 40:
+        itens.append(Item("CPU do Jarvis", "atencao", f"{total:.0f}% do processador: " + ", ".join(partes),
+                          "Se ficar assim parado, diga 'qualidade gráfica baixa' e, na tela antiga (F2), "
+                          "volte para a tela azul."))
+    else:
+        itens.append(Item("CPU do Jarvis", "ok", f"{total:.0f}% do processador: " + ", ".join(partes)))
+    return itens
+
+
+def verificar_bateria() -> Item:
+    """Bateria do notebook. Computador de mesa não tem: o psutil devolve None e isso é normal."""
+    from core import metricas
+
+    leitura = metricas.bateria()
+    if leitura is None:
+        return Item("Bateria", "ok", "sem bateria (computador de mesa ou ligado direto na tomada)")
+    carga, na_tomada = leitura
+    detalhe = f"{carga:.0f}%" + (", na tomada" if na_tomada else ", na bateria")
+    if not na_tomada and carga <= 10:
+        return Item("Bateria", "defeito", detalhe + " (vai desligar)",
+                    "Ligue o carregador agora: o Jarvis perde o que estava fazendo se o PC desligar.")
+    if not na_tomada and carga <= 25:
+        return Item("Bateria", "atencao", detalhe, "Ligue o carregador em breve.")
+    return Item("Bateria", "ok", detalhe)
+
+
 def verificar_navegador() -> Item:
     try:
         import playwright  # noqa: F401
@@ -259,8 +325,13 @@ def diagnosticar(portao=None, conferir_internet: bool = True) -> list[Item]:
         itens += verificar_audio()
     except Exception as erro:
         itens.append(Item("Som", "atencao", f"não consegui verificar ({str(erro)[:60]})"))
+    itens.append(_seguro("Computador", verificar_computador))
+    try:
+        itens += verificar_processador()
+    except Exception as erro:
+        itens.append(Item("CPU", "atencao", f"não consegui verificar ({str(erro)[:60]})"))
     itens += [
-        _seguro("Computador", verificar_computador),
+        _seguro("Bateria", verificar_bateria),
         _seguro("Navegador automático", verificar_navegador),
         _seguro("Escuta", lambda: verificar_escuta(portao)),
         _seguro("Automações", verificar_automacoes),

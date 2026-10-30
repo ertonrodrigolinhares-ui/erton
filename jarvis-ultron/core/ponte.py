@@ -352,7 +352,9 @@ class PonteTela:
         porta = self._ouvinte.address[1]
         ambiente = dict(os.environ)
         ambiente.update({"JARVIS_PONTE_PORTA": str(porta), "JARVIS_PONTE_CHAVE": chave.hex(),
-                         "JARVIS_PROCESSO": "cerebro", "PYTHONUNBUFFERED": "1"})
+                         "JARVIS_PROCESSO": "cerebro", "PYTHONUNBUFFERED": "1",
+                         # o autodiagnóstico (no cérebro) mede também a CPU da tela
+                         "JARVIS_PID_TELA": str(os.getpid())})
         try:
             self._processo = subprocess.Popen(self._comando, cwd=str(self._pasta), env=ambiente)
         except OSError as erro:
