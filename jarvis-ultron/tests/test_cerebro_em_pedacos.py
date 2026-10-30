@@ -40,6 +40,16 @@ PEDACOS = {
         "_mark_self_quit_farewell_received", "_complete_self_quit_after_audio", "request_shutdown",
         "_suspender", "_voltar_da_suspensao",
     }),
+    "cerebro/entrada.py": ("Entrada", {
+        "_on_text_command", "_avisar_se_nao_enviou", "_nova_fala", "_trava_da_fala", "_trava_textos",
+        "_guardar_ate_conectar", "_mandar_textos_esperando", "send_text", "send_audio_chunk",
+        "_microfone_mandou_audio",
+    }),
+    "cerebro/reserva.py": ("Reserva", {
+        "_ativar_modo_reserva", "_ligar_cerebro_gemma", "_desativar_modo_reserva", "_responder_pela_reserva",
+        "_avisar_sem_ouvido", "_ferramentas_da_reserva", "_garantir_loop_reserva", "_executar_ferramenta_reserva",
+        "_falar_reserva", "_escutar_reserva", "RESERVA_FERRAMENTAS_ESSENCIAIS",
+    }),
 }
 
 

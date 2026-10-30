@@ -24,3 +24,9 @@ def carregar_automacoes(recarregar: bool = False):
         _AUTOMACOES = carregar_ferramentas(reservados={d.get("name") for d in TOOL_DECLARATIONS}
                                            | set(FERRAMENTAS_DESLIGADAS))
     return _AUTOMACOES
+
+
+def get_tool_declarations() -> list[dict]:
+    """As ferramentas que o Gemini recebe: as nativas e as automações da pasta."""
+    extras = [a.declaracao for a in carregar_automacoes().ferramentas.values()]
+    return list(TOOL_DECLARATIONS) + extras
