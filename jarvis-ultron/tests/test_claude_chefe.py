@@ -166,6 +166,50 @@ class RodarClaudeTests(Base):
         self.assertEqual(fala, "Título Primeira frase. Segunda frase.")
 
 
+class EscolhaDoModeloTests(unittest.TestCase):
+    """JARVIS_CLAUDE_MODELO / _ESFORCO / _RESERVA no .env (e as versões _CODIGO para mudar o código)."""
+
+    LIMPO = {k: "" for k in ("JARVIS_CLAUDE_MODELO", "JARVIS_CLAUDE_ESFORCO", "JARVIS_CLAUDE_RESERVA",
+                             "JARVIS_CLAUDE_MODELO_CODIGO", "JARVIS_CLAUDE_ESFORCO_CODIGO",
+                             "JARVIS_CLAUDE_RESERVA_CODIGO")}
+
+    def _cmd(self, codigo=False, **env):
+        with patch.dict(os.environ, {**self.LIMPO, **env}):
+            return chefe.comando("claude", [], Path("."), codigo=codigo)
+
+    def _valor(self, cmd, opcao):
+        return cmd[cmd.index(opcao) + 1] if opcao in cmd else None
+
+    def test_sem_nada_no_env_usa_o_padrao_do_plano(self):
+        cmd = self._cmd()
+        for opcao in ("--model", "--effort", "--fallback-model"):
+            self.assertNotIn(opcao, cmd)
+
+    def test_modelo_esforco_e_reserva_vao_para_o_claude(self):
+        cmd = self._cmd(JARVIS_CLAUDE_MODELO="sonnet", JARVIS_CLAUDE_ESFORCO="High",
+                        JARVIS_CLAUDE_RESERVA="haiku")
+        self.assertEqual(self._valor(cmd, "--model"), "sonnet")
+        self.assertEqual(self._valor(cmd, "--effort"), "high")
+        self.assertEqual(self._valor(cmd, "--fallback-model"), "haiku")
+
+    def test_esforco_errado_e_reserva_igual_ao_modelo_sao_ignorados(self):
+        cmd = self._cmd(JARVIS_CLAUDE_MODELO="opus", JARVIS_CLAUDE_ESFORCO="muito",
+                        JARVIS_CLAUDE_RESERVA="opus")
+        self.assertNotIn("--effort", cmd)
+        self.assertNotIn("--fallback-model", cmd)
+
+    def test_mudanca_no_codigo_usa_os_do_codigo_e_tarefas_nao(self):
+        env = dict(JARVIS_CLAUDE_MODELO="sonnet", JARVIS_CLAUDE_ESFORCO="medium",
+                   JARVIS_CLAUDE_MODELO_CODIGO="opus", JARVIS_CLAUDE_ESFORCO_CODIGO="xhigh")
+        tarefa, codigo = self._cmd(**env), self._cmd(codigo=True, **env)
+        self.assertEqual((self._valor(tarefa, "--model"), self._valor(tarefa, "--effort")), ("sonnet", "medium"))
+        self.assertEqual((self._valor(codigo, "--model"), self._valor(codigo, "--effort")), ("opus", "xhigh"))
+
+    def test_codigo_sem_os_proprios_usa_os_gerais(self):
+        cmd = self._cmd(codigo=True, JARVIS_CLAUDE_MODELO="sonnet", JARVIS_CLAUDE_ESFORCO="low")
+        self.assertEqual((self._valor(cmd, "--model"), self._valor(cmd, "--effort")), ("sonnet", "low"))
+
+
 class MudarCodigoTests(Base):
     def _aplicar(self, codigo=None, falhas=(set(), set()), cria=False):
         env = {}

@@ -241,6 +241,18 @@ Bom saber:
 - Os agentes que publicam ou usam o navegador sozinhos (anúncios, Geekie, painéis, publicar
   aprovados) continuam no Hermes.
 
+Escolher o modelo e quanto o Claude pensa (opcional, no `.env`; sem nada, vale o padrão do seu plano):
+```
+JARVIS_CLAUDE_MODELO="sonnet"          # tarefas do dia a dia: rápido e bom
+JARVIS_CLAUDE_ESFORCO="medium"         # low, medium, high, xhigh, max
+JARVIS_CLAUDE_RESERVA="haiku"          # se o principal estiver lotado, usa este em vez de falhar
+JARVIS_CLAUDE_MODELO_CODIGO="opus"     # só para mudar o código do Jarvis: o mais cuidadoso
+JARVIS_CLAUDE_ESFORCO_CODIGO="high"
+JARVIS_CLAUDE_RESERVA_CODIGO="sonnet"
+```
+Mais esforço e o Opus dão respostas melhores, mas demoram mais e gastam o limite do plano mais rápido.
+Se o seu Claude Code for antigo e recusar o esforço, rode o "Instalar Claude" de novo para atualizar.
+
 ## Vídeos com IA (Google Veo)
 
 "Jarvis, faz um vídeo de 8 segundos de um triatleta cruzando a linha de chegada no Havaí" (ou

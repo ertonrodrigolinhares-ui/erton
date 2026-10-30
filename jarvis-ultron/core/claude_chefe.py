@@ -469,15 +469,41 @@ def agente_agency(nome: str) -> str | None:
 
 
 # ---------------- conversar com o Claude Code ----------------
+ESFORCOS = ("low", "medium", "high", "xhigh", "max")
+
+
+def _config(nome: str) -> str:
+    return os.environ.get(nome, "").strip().strip('"').strip("'").strip()
+
+
+def escolha_do_claude(codigo: bool = False) -> tuple[str, str, str]:
+    """(modelo, esforço, reserva) do .env. Nas mudanças no código do Jarvis valem primeiro os
+    JARVIS_CLAUDE_*_CODIGO; vazio = o padrão do plano do Erton (e nada vai na linha de comando)."""
+    def ler(nome):
+        return (_config(nome + "_CODIGO") if codigo else "") or _config(nome)
+    modelo = ler("JARVIS_CLAUDE_MODELO")
+    esforco = ler("JARVIS_CLAUDE_ESFORCO").lower()
+    if esforco not in ESFORCOS:
+        esforco = ""  # valor errado no .env: melhor ignorar do que o Claude recusar a tarefa
+    reserva = ler("JARVIS_CLAUDE_RESERVA")
+    if reserva and reserva.lower() == modelo.lower():
+        reserva = ""  # o Claude recusa reserva igual ao modelo principal
+    return modelo, esforco, reserva
+
+
 def comando(exe: str, permitir, pasta: Path, sessao: str | None = None, turnos: int = MAX_TURNOS,
-            pastas_extras=()) -> list[str]:
+            pastas_extras=(), codigo: bool = False) -> list[str]:
     """O pedido vai pela entrada padrão (não pela linha de comando), porque no Windows um claude.cmd
     estragaria textos com acentos, aspas ou '&'."""
     cmd = [exe, "-p", "--output-format", "json", "--permission-mode", "dontAsk", "--max-turns", str(turnos),
            "--strict-mcp-config"]  # nenhum servidor MCP: sem os conectores da conta (Gmail, Agenda...)
-    modelo = os.environ.get("JARVIS_CLAUDE_MODELO", "").strip()
+    modelo, esforco, reserva = escolha_do_claude(codigo)
     if modelo:
         cmd += ["--model", modelo]
+    if esforco:
+        cmd += ["--effort", esforco]
+    if reserva:
+        cmd += ["--fallback-model", reserva]
     if sessao:
         cmd += ["--resume", sessao]
     extras = [str(p) for p in pastas_extras if Path(p).is_dir()]
@@ -634,13 +660,13 @@ def _executar(cmd: list[str], entrada: bytes | None, tempo: float, pasta: Path, 
 
 
 def rodar(pedido: str, permitir, pasta: Path, sessao: str | None = None, tempo: float = TEMPO_TAREFA,
-          turnos: int = MAX_TURNOS, pastas_extras=()) -> Resposta:
+          turnos: int = MAX_TURNOS, pastas_extras=(), codigo: bool = False) -> Resposta:
     exe = achar_claude()
     if not exe:
         return Resposta(False, erro="o Claude Code não está instalado. Dê dois cliques em 'Instalar Claude' "
                                     "na pasta do Jarvis")
     try:
-        codigo, saida, problemas = _executar(comando(exe, permitir, pasta, sessao, turnos, pastas_extras),
+        codigo, saida, problemas = _executar(comando(exe, permitir, pasta, sessao, turnos, pastas_extras, codigo),
                                              pedido.encode("utf-8"), tempo, pasta, ambiente())
     except subprocess.TimeoutExpired:
         return Resposta(False, erro=f"o Claude passou de {int(tempo // 60)} minutos e eu parei a tarefa")
@@ -722,7 +748,7 @@ def fazer_tarefa(pedido: str, agente: str | None = None, sessao: str | None = No
 def planejar(pedido: str) -> Resposta:
     pasta = pasta_jarvis()
     texto = REGRAS + REGRAS_PLANO + f"\n\nPEDIDO DO ERTON:\n{pedido.strip()}"
-    return rodar(texto, [*LEITURA, *_ler(pasta)], pasta)  # sem Edit: no plano ele não consegue mudar nada
+    return rodar(texto, [*LEITURA, *_ler(pasta)], pasta, codigo=True)  # sem Edit: no plano ele não consegue mudar nada
 
 
 def _arquivos_de_codigo(pasta: Path, exemplos: bool = False):
@@ -1148,9 +1174,9 @@ def _aplicar_e_conferir(pasta: Path, antes: dict[str, str], backup: Path, falhas
                         sessao: str | None, pedido: str) -> Resultado:
     permitir = [*LEITURA, *_ler(pasta), f"Edit({regra_de_pasta(pasta)}/**)"]
     texto = REGRAS + REGRAS_APLICAR.format(plano=plano.strip())
-    resposta = rodar(texto, permitir, pasta, sessao=sessao, turnos=MAX_TURNOS + 20)
+    resposta = rodar(texto, permitir, pasta, sessao=sessao, turnos=MAX_TURNOS + 20, codigo=True)
     if not resposta.ok and sessao and "session" in resposta.erro.lower():
-        resposta = rodar(texto, permitir, pasta, turnos=MAX_TURNOS + 20)  # a conversa do plano sumiu
+        resposta = rodar(texto, permitir, pasta, turnos=MAX_TURNOS + 20, codigo=True)  # a conversa do plano sumiu
     depois_claude = fotografar(pasta)
     mudados = mudancas(antes, depois_claude)
 
