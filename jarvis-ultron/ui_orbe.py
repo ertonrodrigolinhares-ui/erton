@@ -716,6 +716,7 @@ class Cena(QWidget):
         self.canal = Canal(win, self)
         self.fala.connect(self.canal.adicionar)
 
+
         self.botao = BotaoNucleo(self.hud, self)
         self.botao.clicked.connect(lambda: getattr(win, "_toggle_mute", lambda: None)())
 
@@ -736,6 +737,23 @@ class Cena(QWidget):
         self.entrada_rapida.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.entrada_rapida.returnPressed.connect(self._enviar_rapido)
         self._estilo_tela_limpa()
+
+        # Andamento: a pesquisa profunda, a apresentação e o "executando..." (ui.py) nasciam no layout da
+        # tela antiga, embaixo da cena, e o Erton não via nada do que o Jarvis estava fazendo. Aqui eles
+        # passam para um cartão de vidro por cima do anel; o F2 os devolve ao lugar antigo (alternar).
+        self.p_andamento = Vidro("Andamento", self, etiqueta="TAREFAS")
+        self._andamento = []  # (widget, layout antigo, posição antiga)
+        for nome in ("_research_progress", "_presentation_progress", "_tool_progress"):
+            w = getattr(win, nome, None)
+            if w is None:
+                continue
+            pai = w.parentWidget()
+            layout_antigo = pai.layout() if pai is not None else None
+            indice = layout_antigo.indexOf(w) if layout_antigo is not None else -1
+            self._andamento.append((w, layout_antigo, indice))
+            w.installEventFilter(self)
+        self._andamento_para_cena(True)
+        self.p_andamento.hide()
 
         self._painel = [self.b_chamada, self.b_maos, self.p_voz, self.p_sistema, self.p_status, self.p_ultron,
                         self.p_ativ, self.p_hist, self.p_rede, self.canal, self.b_paineis, self.entrada_rapida]
@@ -760,7 +778,50 @@ class Cena(QWidget):
             self.raise_()
             self._organizar()
             self._trazer_janelas()
+        elif any(obj is w for w, _, _ in self._andamento) and ev.type() in (
+                QEvent.Type.Show, QEvent.Type.Hide, QEvent.Type.ShowToParent, QEvent.Type.HideToParent):
+            QTimer.singleShot(0, self._ajustar_andamento)  # o widget acabou de aparecer ou sumir
         return False
+
+    # ----- andamento (pesquisa, apresentação, ferramenta rodando)
+    def _andamento_para_cena(self, na_cena: bool) -> None:
+        """True: os widgets de andamento vão para o cartão da cena; False: voltam ao layout antigo (F2)."""
+        for w, layout_antigo, indice in self._andamento:
+            if na_cena:
+                if layout_antigo is not None:
+                    layout_antigo.removeWidget(w)
+                w.setParent(self.p_andamento)
+                self.p_andamento.corpo.addWidget(w)
+                w._na_cena = True
+            else:
+                self.p_andamento.corpo.removeWidget(w)
+                w._na_cena = False
+                if layout_antigo is not None:
+                    layout_antigo.insertWidget(max(0, indice), w)
+                else:
+                    w.setParent(self.central)
+        if not na_cena:
+            self.p_andamento.hide()
+        self._ajustar_andamento()
+
+    def _ajustar_andamento(self) -> None:
+        """Mostra o cartão quando algum andamento está aparecendo, do tamanho do que está dentro."""
+        if not self.ativa or not self._andamento:
+            return
+        visiveis = [w for w, _, _ in self._andamento if getattr(w, "_na_cena", False) and not w.isHidden()]
+        if not visiveis:
+            self.p_andamento.hide()
+            return
+        W, H = self.width(), self.height()
+        m = 18
+        altura = 32 + 12 + sum(w.minimumHeight() for w in visiveis) + 5 * (len(visiveis) - 1)
+        largura = min(880, W - 2 * m)
+        # acima do campo de digitar (tela limpa) ou do canal, quando ele fica embaixo (janela estreita)
+        base = H - 112 if (self.limpa or W >= 980) else H - 240
+        self.p_andamento.setGeometry(int((W - largura) / 2), max(60, base - altura), int(largura), altura)
+        self.p_andamento.show()
+        self.p_andamento.raise_()
+        self._trazer_janelas()
 
     def _trazer_janelas(self):
         """As janelinhas (chave do Gemini, nome, voz, Ajustes, Atalhos, visão) e os avisos ficam por cima
@@ -823,6 +884,7 @@ class Cena(QWidget):
         for w in (self.topo_esq, self.topo_dir):  # textos dos cantos (somiam depois do F2)
             w.raise_()
         self.botao.raise_()
+        self._ajustar_andamento()
         painel = self._painel_ultron()
         if painel is not None and painel.parentWidget() is self and not painel.isHidden():
             painel.setGeometry(self.rect())  # o painel ULTRON aberto fica por cima de tudo da cena
@@ -1021,6 +1083,7 @@ class Cena(QWidget):
             if self._antigo_layout is not None:
                 self._antigo_layout.insertWidget(max(0, self._antigo_indice), self.hud, 4)
             self.hud.show()
+            self._andamento_para_cena(False)
         else:
             self.ativa = True
             self.hud._cena = True
@@ -1028,6 +1091,7 @@ class Cena(QWidget):
                 self._antigo_layout.removeWidget(self.hud)
             self.hud.setParent(self)
             self.hud.show()
+            self._andamento_para_cena(True)
             self.setGeometry(self.central.rect())
             self.show(); self.raise_()
             self._organizar()

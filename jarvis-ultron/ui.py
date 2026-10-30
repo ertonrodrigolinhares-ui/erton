@@ -1277,7 +1277,9 @@ class ToolProgressWidget(QWidget):
         self._spinner_idx = 0
         self._tmr.start(200)
         window = self.window()
-        if getattr(window, "_command_center_open", True):
+        # Jarvis Ultron: no cartão de andamento da Cena (ui_orbe.py) aparece sempre; na tela antiga, só
+        # com o Command Center aberto
+        if getattr(self, "_na_cena", False) or getattr(window, "_command_center_open", True):
             self.show()
 
     def _on_hide(self):
@@ -5706,15 +5708,17 @@ class MainWindow(QMainWindow):
             middle_section2 = ui_stark.montar_tela_stark(self, middle_section2, UI_FONT, TECH_FONT)
             self._tela_stark = middle_section2
 
-        # Jarvis Ultron: anel de energia, câmera e resumo do "bom dia" (JARVIS_VISUAL=classico desliga)
-        import ui_orbe
-        self._orbe = ui_orbe.instalar(self)
-
         # Add middle section to main layout
         root.addWidget(middle_section2, stretch=1)
         # ── Tool progress indicator (above footer) ──────────────────────────
         self._tool_progress = ToolProgressWidget()
         root.addWidget(self._tool_progress)
+
+        # Jarvis Ultron: anel de energia, câmera e resumo do "bom dia" (JARVIS_VISUAL=classico desliga).
+        # Depois do _tool_progress: a Cena leva os andamentos (pesquisa, apresentação, "executando...")
+        # para o cartão dela.
+        import ui_orbe
+        self._orbe = ui_orbe.instalar(self)
 
         self._command_bar = self._build_footer()
         root.addWidget(self._command_bar)
@@ -6226,7 +6230,7 @@ class MainWindow(QMainWindow):
             if hasattr(self, "_focus_dialogue") and was_open:
                 self._reveal_widget(self._focus_dialogue, 80, transition_id)
 
-        if hasattr(self, "_tool_progress"):
+        if hasattr(self, "_tool_progress") and not getattr(self._tool_progress, "_na_cena", False):
             if is_open and self._tool_progress._tmr.isActive():
                 self._tool_progress.show()
             elif not is_open:

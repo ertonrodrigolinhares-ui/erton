@@ -141,5 +141,71 @@ class JanelasPorCimaTests(unittest.TestCase):
             self.assertTrue(_no_meio_aparece(janela, janela._settings_overlay))
 
 
+class AndamentoNaCenaTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    def _fachada(self, janela):
+        fachada = ui.JarvisUI.__new__(ui.JarvisUI)
+        fachada._win = janela
+        return fachada
+
+    def test_pesquisa_profunda_aparece_no_cartao_da_cena(self):
+        with _Janela() as janela:
+            janela._overlay.hide()
+            cena = janela._orbe.cena
+            self.assertTrue(cena.p_andamento.isHidden())  # nada rodando: sem cartão
+            fachada = self._fachada(janela)
+            fachada.show_research_progress("Preço do ouro hoje")
+            _Janela.eventos(self)
+            pesquisa = janela._research_progress
+            self.assertTrue(pesquisa.isVisible())
+            self.assertTrue(cena.p_andamento.isAncestorOf(pesquisa))  # dentro do cartão, não atrás da cena
+            self.assertTrue(cena.p_andamento.isVisible())
+            self.assertTrue(_no_meio_aparece(janela, cena.p_andamento))
+            self.assertIn("Preço do ouro hoje", pesquisa._question_lbl.text())
+            fachada.update_research_progress("Preço do ouro hoje", 40, "Lendo fontes")
+            _Janela.eventos(self)
+            self.assertEqual(pesquisa._bar.value(), 40)
+            fachada.hide_research_progress()
+            _Janela.eventos(self)
+            self.assertTrue(pesquisa.isHidden())
+            self.assertTrue(cena.p_andamento.isHidden())  # sumiu o único andamento: o cartão some
+
+    def test_executando_aparece_na_cena_mesmo_sem_o_command_center(self):
+        with _Janela() as janela:
+            janela._overlay.hide()
+            cena = janela._orbe.cena
+            self.assertFalse(janela._command_center_open)
+            janela._tool_progress.show_tool("web_search")
+            _Janela.eventos(self)
+            self.assertTrue(janela._tool_progress.isVisible())
+            self.assertTrue(cena.p_andamento.isVisible())
+            self.assertIn("WEB_SEARCH", janela._tool_progress._tool_lbl.text())
+            janela._tool_progress.hide_tool()
+            _Janela.eventos(self)
+            self.assertTrue(cena.p_andamento.isHidden())
+
+    def test_f2_devolve_os_andamentos_a_tela_antiga_e_de_volta(self):
+        with _Janela() as janela:
+            janela._overlay.hide()
+            cena = janela._orbe.cena
+            self._fachada(janela).show_presentation_progress("Plano de voo")
+            _Janela.eventos(self)
+            self.assertTrue(cena.p_andamento.isAncestorOf(janela._presentation_progress))
+            cena.alternar()  # F2: tela antiga
+            try:
+                self.assertFalse(cena.p_andamento.isAncestorOf(janela._presentation_progress))
+                self.assertIs(janela._presentation_progress.parentWidget(), janela._ai_core_wrap)
+                self.assertIs(janela._tool_progress.parentWidget(), janela.centralWidget())
+                self.assertTrue(cena.p_andamento.isHidden())
+            finally:
+                cena.alternar()
+            _Janela.eventos(self)
+            self.assertTrue(cena.p_andamento.isAncestorOf(janela._presentation_progress))
+            self.assertTrue(cena.p_andamento.isVisible())  # a apresentação ainda está rodando
+
+
 if __name__ == "__main__":
     unittest.main()
