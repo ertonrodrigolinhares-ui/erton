@@ -450,7 +450,9 @@ class NomesTests(unittest.TestCase):
 
         import main
 
-        hoje = {nome for nome, valor in vars(main.JarvisLive).items()
+        # etapa 15: a JarvisLive é montada com pedaços (cerebro/*.py); a lista junta a classe e os pedaços
+        hoje = {nome for classe in main.JarvisLive.__mro__ if classe is not object
+                for nome, valor in vars(classe).items()
                 if inspect.isfunction(valor) or isinstance(valor, (staticmethod, classmethod, property))}
         self.assertEqual(hoje, METODOS_DA_JARVISLIVE,
                          f"sumiram {sorted(METODOS_DA_JARVISLIVE - hoje)}; apareceram {sorted(hoje - METODOS_DA_JARVISLIVE)}")
