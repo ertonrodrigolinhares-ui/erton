@@ -355,13 +355,17 @@ TOOL_DECLARATIONS = [
     },
     {
         "name": "weather_report",
-        "description": "Gives the weather report to user",
+        "description": (
+            "Gives the current weather and today's forecast, in Portuguese, from real data (no AI). "
+            "If the user does not say a city, omit it: the configured city is used. "
+            "Set open_browser=true only if the user asks to see it in the browser."
+        ),
         "parameters": {
             "type": "OBJECT",
             "properties": {
-                "city": {"type": "STRING", "description": "City name"}
-            },
-            "required": ["city"]
+                "city": {"type": "STRING", "description": "City name, only if the user said one"},
+                "open_browser": {"type": "BOOLEAN", "description": "Also open the forecast page in the browser"}
+            }
         }
     },
     {

@@ -103,9 +103,10 @@ class PureActionContractTests(unittest.TestCase):
         self.assertTrue(computer_settings._has_explicit_computer_power_target({}, "restart my computer", None))
 
     def test_weather_failure_is_returned_instead_of_raised(self):
-        with patch.object(weather_report.webbrowser, "open", return_value=False):
-            result = weather_report.weather_action({"city": "London"})
-        self.assertIn("couldn't open", result)
+        # sem internet (ou o wttr.in fora do ar), a ação responde em vez de quebrar
+        with patch.object(weather_report.fontes_do_dia, "_dados_do_clima", side_effect=OSError("sem rede")):
+            result = weather_report.weather_action({"city": "Londres"})
+        self.assertIn("Não consegui ver o clima de Londres", result)
 
     def test_file_controller_is_confined_to_configured_safe_root(self):
         with tempfile.TemporaryDirectory() as directory:
