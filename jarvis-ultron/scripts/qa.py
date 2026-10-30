@@ -110,7 +110,7 @@ def automated(_args) -> int:
         "PYTHONUNBUFFERED": "1",
     })
     report.checks.extend([
-        _run_check("source compilation", [sys.executable, "-m", "compileall", "-q", "actions", "agent", "config", "core", "memory", "main.py", "ui.py"], env),
+        _run_check("source compilation", [sys.executable, "-m", "compileall", "-q", "actions", "agent", "cerebro", "config", "core", "memory", "main.py", "ui.py"], env),
         _run_check("dependency consistency", [sys.executable, "-m", "pip", "check"], env),
         _run_check("complete unittest suite", [sys.executable, "-m", "unittest", "discover", "-s", "tests", "-v"], env),
         _run_check("offscreen UI evidence", [sys.executable, "scripts/qa_ui_probe.py", str(directory / "ui")], env),

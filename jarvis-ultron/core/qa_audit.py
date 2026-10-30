@@ -19,22 +19,13 @@ EXPECTED_TOOLS = {
 }
 
 
-def declared_tools(main_path: Path) -> list[str]:
-    tree = ast.parse(main_path.read_text(encoding="utf-8"))
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Assign):
-            continue
-        if not any(isinstance(target, ast.Name) and target.id == "TOOL_DECLARATIONS" for target in node.targets):
-            continue
-        names = []
-        for item in getattr(node.value, "elts", []):
-            if not isinstance(item, ast.Dict):
-                continue
-            for key, value in zip(item.keys, item.values):
-                if isinstance(key, ast.Constant) and key.value == "name" and isinstance(value, ast.Constant):
-                    names.append(str(value.value))
-        return names
-    return []
+def declared_tools(main_path: Path | None = None) -> list[str]:
+    """Os nomes das ferramentas declaradas, na ordem. Desde a Etapa 12 a lista mora em
+    cerebro/ferramentas/declaracoes.py e é importada (antes era lida do texto do main.py); o caminho do
+    main.py continua aceito para quem chamava assim, mas não é usado."""
+    from cerebro.ferramentas.declaracoes import TOOL_DECLARATIONS
+
+    return [str(d.get("name")) for d in TOOL_DECLARATIONS if isinstance(d, dict) and d.get("name")]
 
 
 def repository_findings(root: Path) -> list[Finding]:
