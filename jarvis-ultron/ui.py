@@ -3572,19 +3572,19 @@ class SetupOverlay(QWidget):
             w.setStyleSheet(f"color: {color}; background: transparent;")
             return w
 
-        layout.addWidget(_lbl("◈  INITIALISATION REQUIRED", 13, True))
-        layout.addWidget(_lbl("Configure J.A.R.V.I.S. before first boot.", 9, color=C.PRI_DIM))
+        layout.addWidget(_lbl("◈  CONFIGURAÇÃO INICIAL", 13, True))
+        layout.addWidget(_lbl("Configure o Jarvis Ultron antes de começar.", 9, color=C.PRI_DIM))
         layout.addSpacing(6)
 
         sep = QFrame(); sep.setFrameShape(QFrame.Shape.HLine)
         sep.setStyleSheet(f"color: {C.BORDER};"); layout.addWidget(sep)
         layout.addSpacing(4)
 
-        layout.addWidget(_lbl("GEMINI API KEY", 8, color=C.TEXT_DIM,
+        layout.addWidget(_lbl("CHAVE DO GEMINI", 8, color=C.TEXT_DIM,
                                align=Qt.AlignmentFlag.AlignLeft))
         self._key_input = QLineEdit()
         self._key_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self._key_input.setPlaceholderText("Paste Gemini API key")
+        self._key_input.setPlaceholderText("Cole aqui a chave do Gemini")
         self._key_input.setFont(QFont("Courier New", 10))
         self._key_input.setFixedHeight(32)
         self._key_input.setStyleSheet(f"""
@@ -3596,14 +3596,14 @@ class SetupOverlay(QWidget):
         """)
         layout.addWidget(self._key_input)
 
-        self._validation_lbl = QLabel("Only a verified Gemini key will be accepted.")
+        self._validation_lbl = QLabel("Só entra uma chave do Gemini que o Google aceite.")
         self._validation_lbl.setWordWrap(True)
         self._validation_lbl.setFont(QFont("Arial", 8))
         self._validation_lbl.setStyleSheet(f"color: {C.TEXT_MED}; background: transparent;")
         layout.addWidget(self._validation_lbl)
         layout.addSpacing(8)
 
-        self._remember_key = QPushButton("☆  Remember API key on this machine")
+        self._remember_key = QPushButton("☆  Lembrar a chave neste computador")
         self._remember_key.setFont(QFont("Courier New", 7))
         self._remember_key.setFixedHeight(28)
         self._remember_key.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -3626,10 +3626,10 @@ class SetupOverlay(QWidget):
         sep2.setStyleSheet(f"color: {C.BORDER};"); layout.addWidget(sep2)
         layout.addSpacing(4)
 
-        layout.addWidget(_lbl("OPERATING SYSTEM", 8, color=C.TEXT_DIM,
+        layout.addWidget(_lbl("SISTEMA OPERACIONAL", 8, color=C.TEXT_DIM,
                                align=Qt.AlignmentFlag.AlignLeft))
         det_name = {"windows": "Windows", "mac": "macOS", "linux": "Linux"}[detected]
-        layout.addWidget(_lbl(f"Auto-detected: {det_name}", 8, color=C.ACC2,
+        layout.addWidget(_lbl(f"Detectado: {det_name}", 8, color=C.ACC2,
                                align=Qt.AlignmentFlag.AlignLeft))
 
         os_row = QHBoxLayout(); os_row.setSpacing(6)
@@ -3646,7 +3646,7 @@ class SetupOverlay(QWidget):
         self._sel(detected)
         layout.addSpacing(12)
 
-        self._init_btn = QPushButton("▸  INITIALISE SYSTEMS")
+        self._init_btn = QPushButton("▸  INICIAR O JARVIS")
         self._init_btn.setFont(QFont("Courier New", 10, QFont.Weight.Bold))
         self._init_btn.setFixedHeight(36)
         self._init_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -3719,7 +3719,7 @@ class SetupOverlay(QWidget):
 
         self._remember_enabled = not cur
         if self._remember_enabled:
-            self._remember_key.setText("★  Remember API key on this machine")
+            self._remember_key.setText("★  Lembrar a chave neste computador")
             self._remember_key.setStyleSheet(f"""
                 QPushButton {{
                     background: transparent; color: {C.GREEN_D};
@@ -3729,7 +3729,7 @@ class SetupOverlay(QWidget):
                 QPushButton:hover {{ color: {C.GREEN}; border: 1px solid {C.GREEN}; }}
             """)
         else:
-            self._remember_key.setText("☆  Remember API key on this machine")
+            self._remember_key.setText("☆  Lembrar a chave neste computador")
             self._remember_key.setStyleSheet(f"""
                 QPushButton {{
                     background: transparent; color: {C.TEXT_MED};
@@ -3765,8 +3765,8 @@ class SetupOverlay(QWidget):
         self._validation_pending = True
         self._purge_saved_on_failure = purge_saved_on_failure
         self._init_btn.setEnabled(False)
-        self._init_btn.setText("VERIFYING WITH GEMINI…")
-        self._validation_lbl.setText("Contacting Gemini. The key will not be saved unless verification succeeds.")
+        self._init_btn.setText("CONFERINDO COM O GOOGLE…")
+        self._validation_lbl.setText("Falando com o Google. A chave só é guardada se for aceita.")
         self._validation_lbl.setStyleSheet(f"color: {C.ACC2}; background: transparent;")
 
         def _validate():
@@ -3787,7 +3787,7 @@ class SetupOverlay(QWidget):
     def _on_validation_finished(self, valid: bool, message: str, key: str, remember_key: bool):
         self._validation_pending = False
         self._init_btn.setEnabled(True)
-        self._init_btn.setText("▸  INITIALISE SYSTEMS")
+        self._init_btn.setText("▸  INICIAR O JARVIS")
 
         if not valid:
             if os.environ.get("GEMINI_API_KEY", "").strip() == key:
@@ -3808,7 +3808,7 @@ class SetupOverlay(QWidget):
             self._key_input.setFocus()
             return
 
-        self._validation_lbl.setText("Gemini key verified.")
+        self._validation_lbl.setText("Chave do Gemini aceita.")
         self._validation_lbl.setStyleSheet(f"color: {C.GREEN}; background: transparent;")
         self._verified_key = key
         self.done.emit(key, self._sel_os, remember_key)

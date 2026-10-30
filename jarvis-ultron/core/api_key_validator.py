@@ -94,13 +94,13 @@ def _extract_plausible_token(text: str) -> str:
 def _basic_key_check(api_key: str) -> ApiKeyValidationResult | None:
     key = normalize_gemini_api_key(api_key)
     if not key:
-        return ApiKeyValidationResult(False, "API key is empty.")
+        return ApiKeyValidationResult(False, "A chave está vazia.")
     if any(ch.isspace() for ch in key):
-        return ApiKeyValidationResult(False, "Paste the raw Gemini API key value, not surrounding text.")
+        return ApiKeyValidationResult(False, "Cole só a chave do Gemini, sem o texto em volta.")
     if key.startswith("sk-ant-"):
-        return ApiKeyValidationResult(False, "That is an Anthropic key. JARVIS requires a Gemini API key.")
+        return ApiKeyValidationResult(False, "Essa é uma chave da Anthropic. O Jarvis precisa de uma chave do Gemini.")
     if key.startswith(("sk-", "sess-", "proj-")):
-        return ApiKeyValidationResult(False, "That is not a Gemini key. Use a key created in Google AI Studio.")
+        return ApiKeyValidationResult(False, "Essa não é uma chave do Gemini. Use uma chave criada no Google AI Studio.")
     # Gemini now supports more than one API-key type. Do not require the
     # legacy Google "AIza" prefix; provider identity is established by the
     # authenticated Gemini models request below.
@@ -144,7 +144,7 @@ def _validate_with_gemini(api_key: str, timeout_seconds: float) -> ApiKeyValidat
                 False,
                 "The key is valid for Gemini, but this project has no Gemini Live model access. Enable Gemini Live/billing for the project or create an authorization key in Google AI Studio.",
             )
-        return ApiKeyValidationResult(True, "Gemini API key verified.", via="studio")
+        return ApiKeyValidationResult(True, "Chave do Gemini aceita.", via="studio")
     except Exception as e:
         text = str(e).strip() or e.__class__.__name__
         lowered = text.lower()
@@ -154,11 +154,11 @@ def _validate_with_gemini(api_key: str, timeout_seconds: float) -> ApiKeyValidat
             if vertex is not None:
                 return vertex
         if "api key not valid" in lowered or "invalid api key" in lowered:
-            return ApiKeyValidationResult(False, "API key is not valid.")
+            return ApiKeyValidationResult(False, "O Google não aceitou a chave.")
         if "api_key_invalid" in lowered or "api key invalid" in lowered:
-            return ApiKeyValidationResult(False, "API key is not valid.")
+            return ApiKeyValidationResult(False, "O Google não aceitou a chave.")
         if "unauthenticated" in lowered or "401" in lowered:
-            return ApiKeyValidationResult(False, "API key was rejected by Gemini.")
+            return ApiKeyValidationResult(False, "O Google recusou a chave.")
         if "permission" in lowered or "403" in lowered:
             return ApiKeyValidationResult(
                 False,
@@ -181,7 +181,7 @@ def _validate_with_vertex(api_key: str) -> ApiKeyValidationResult | None:
         return None
     if not resultado.ok:
         return None
-    return ApiKeyValidationResult(True, "Gemini API key verified (Vertex AI).", via="vertex")
+    return ApiKeyValidationResult(True, "Chave do Gemini aceita (Vertex AI).", via="vertex")
 
 
 def validate_gemini_api_key(api_key: str, timeout_seconds: float = 8.0) -> ApiKeyValidationResult:
