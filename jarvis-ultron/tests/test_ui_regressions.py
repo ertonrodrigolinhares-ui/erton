@@ -178,7 +178,7 @@ class UIRegressionTests(unittest.TestCase):
         finally:
             self.window._orbe.cena.alternar()
         self.assertEqual(self.window._gpu_pct_lbl.text(), "N/A")
-        self.assertEqual(self.window._spark_tmp._value, "N/A")
+        self.assertEqual(self.window._bar_tmp._text, "N/A")
         self.assertEqual(self.window._gpu_load_bar.value(), 0)
 
 

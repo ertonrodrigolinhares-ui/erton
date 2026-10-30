@@ -2978,87 +2978,6 @@ class MetricBar(QWidget):
         p.drawText(QRectF(0, 4, W - 6, 16), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, self._text)
 
 
-class SparklineBar(QWidget):
-    """Compact metric row with label, sparkline, and value."""
-
-    def __init__(self, label: str, color: str = C.TEXT_MED, parent=None):
-        super().__init__(parent)
-        self._label = label
-        self._color = color
-        self._value = "0"
-        self._unit = ""
-        self._history = [0.0] * 30
-        self.setFixedHeight(28)
-
-    def set_value(self, value: str, pct: float = 0.0, unit: str = ""):
-        """Update value and sparkline. pct is 0-1 for the bar height."""
-        self._value = value
-        self._unit = unit
-        self._history.append(max(0.0, min(1.0, pct)))
-        if len(self._history) > 30:
-            self._history = self._history[-30:]
-        self.update()
-
-    def paintEvent(self, event):
-        from PyQt6.QtGui import QPainter, QColor, QPen, QLinearGradient
-        from PyQt6.QtCore import QPointF
-        W, H = self.width(), self.height()
-        p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-        # Label (left)
-        p.setFont(QFont("Courier New", 6, QFont.Weight.Bold))
-        p.setPen(QColor(C.TEXT_DIM))
-        label_w = 44
-        p.drawText(0, 0, label_w, H, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, self._label)
-
-        # Sparkline (middle)
-        spark_x = label_w + 2
-        spark_w = W - label_w - 60
-        spark_h = H - 6
-        spark_y = 3
-
-        col = QColor(self._color)
-        col_dim = QColor(self._color)
-        col_dim.setAlpha(40)
-
-        # Fill area under curve
-        if len(self._history) > 1:
-            from PyQt6.QtGui import QPainterPath
-            path = QPainterPath()
-            step = spark_w / (len(self._history) - 1)
-            for i, v in enumerate(self._history):
-                x = spark_x + i * step
-                y = spark_y + spark_h * (1 - v)
-                if i == 0:
-                    path.moveTo(x, y)
-                else:
-                    path.lineTo(x, y)
-            # Close path for fill
-            fill = QPainterPath(path)
-            fill.lineTo(spark_x + spark_w, spark_y + spark_h)
-            fill.lineTo(spark_x, spark_y + spark_h)
-            fill.closeSubpath()
-            fill_col = QColor(self._color)
-            fill_col.setAlpha(15)
-            p.fillPath(fill, fill_col)
-            # Stroke line
-            p.setPen(QPen(col, 1.2))
-            p.drawPath(path)
-
-        # Value (right)
-        p.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
-        p.setPen(QColor(C.WHITE))
-        val_x = W - 55
-        val_w = 35
-        p.drawText(val_x, 0, val_w, H, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight, self._value)
-        # Unit
-        p.setFont(QFont("Courier New", 6))
-        p.setPen(QColor(C.TEXT_DIM))
-        p.drawText(val_x + val_w + 2, 0, 18, H, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, self._unit)
-
-        p.end()
-
 class TaskQueueWidget(QWidget):
     """Displays a live task queue parsed from JARVIS log messages."""
 
@@ -6196,15 +6115,6 @@ class MainWindow(QMainWindow):
         if self._vision_preview is not None:
             self._vision_preview.refresh_theme()
 
-        for spark, color in (
-            (getattr(self, "_spark_cpu", None), C.PRI),
-            (getattr(self, "_spark_mem", None), C.ENERGY),
-            (getattr(self, "_spark_net", None), C.ACC2),
-            (getattr(self, "_spark_tmp", None), C.ACC),
-        ):
-            if spark is not None:
-                spark._color = color
-
         for widget in self.findChildren(QWidget):
             widget.update()
 
@@ -6428,8 +6338,6 @@ class MainWindow(QMainWindow):
             except Exception:
                 cpu = 0.0
         self._bar_cpu.set_value(cpu, "{:.0f}%".format(cpu))
-        if hasattr(self, '_spark_cpu'):
-            self._spark_cpu.set_value("{:.0f}".format(cpu), cpu / 100.0, "%")
 
         # MEM
         mem = snap["mem"]
@@ -6440,8 +6348,6 @@ class MainWindow(QMainWindow):
             except Exception:
                 mem = 0.0
         self._bar_mem.set_value(mem, "{:.0f}%".format(mem))
-        if hasattr(self, '_spark_mem'):
-            self._spark_mem.set_value("{:.0f}".format(mem), mem / 100.0, "%")
 
         # NET
         net = snap["net"]
@@ -6451,8 +6357,6 @@ class MainWindow(QMainWindow):
             net_str = f"{net:.1f}MB/s"
         net_pct = min(100, net * 10)  # 10 MB/s = %100
         self._bar_net.set_value(net_pct, net_str)
-        if hasattr(self, '_spark_net'):
-            self._spark_net.set_value(net_str, net_pct / 100.0, "")
 
         # GPU — cache chip/VRAM from system_profiler, simulate load
         if not getattr(self, '_gpu_info_cached', False):
@@ -6485,13 +6389,8 @@ class MainWindow(QMainWindow):
         tmp = snap["tmp"]
         if tmp < 0:
             self._bar_tmp.set_value(0, "N/A")
-            if hasattr(self, '_spark_tmp'):
-                self._spark_tmp.set_value("N/A", 0.0, "")
         else:
-            tmp_pct = min(100, tmp)
-            self._bar_tmp.set_value(tmp_pct, "{:.0f}°C".format(tmp))
-            if hasattr(self, '_spark_tmp'):
-                self._spark_tmp.set_value("{:.0f}".format(tmp), tmp / 100.0, "°C")
+            self._bar_tmp.set_value(min(100, tmp), "{:.0f}°C".format(tmp))
 
         try:
             boot_t  = psutil.boot_time()
@@ -6836,14 +6735,6 @@ class MainWindow(QMainWindow):
         sys_hdr.setStyleSheet(f"color: {C.TEXT_MED}; background: transparent;")
         ml.addWidget(sys_hdr)
 
-        # Sparkline metrics — CPU, MEM, NET with live graphs
-        self._spark_cpu = SparklineBar("CPU", C.PRI)
-        self._spark_mem = SparklineBar("MEM", C.ENERGY)
-        self._spark_net = SparklineBar("NET", C.ACC2)
-        for spark in [self._spark_cpu, self._spark_mem, self._spark_net]:
-            ml.addWidget(spark)
-            spark.hide()
-
         ml.addSpacing(6)
 
         # ── GPU Block (expanded) ────────────────────────────────────────────
@@ -6916,13 +6807,6 @@ class MainWindow(QMainWindow):
         self._gpu_vram_lbl.setStyleSheet(f"color: {C.TEXT_MED}; background: transparent;")
         gpu_vram_row.addWidget(self._gpu_vram_lbl)
         ml.addLayout(gpu_vram_row)
-
-        ml.addSpacing(6)
-
-        # ── TMP sparkline (same style as CPU/MEM/NET) ───────────────────────
-        self._spark_tmp = SparklineBar("TMP", "#FF6B35")
-        ml.addWidget(self._spark_tmp)
-        self._spark_tmp.hide()
 
         ml.addSpacing(4)
 
