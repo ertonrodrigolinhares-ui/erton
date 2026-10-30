@@ -45,3 +45,10 @@ volta para o lugar, junto com os testes e as linhas que saíram de outros arquiv
   segurança deles já foram copiadas para o `tests/test_invariantes.py` na Etapa 1). Os caminhos "por
   usuário" do cofre e da memória que gravavam no banco do servidor saíram no commit anterior.
 
+<!-- Mac/Linux (Etapa 11) -->
+- **`mac-linux/`** (commit "Reorganização etapa 11: guarda os scripts de Mac/Linux"): os iniciadores e
+  instaladores herdados do JARVIS-OS para Mac e Linux (`scripts/start_jarvis.sh`, `.command`, o
+  `start_jarvis.bat` e `setup_jarvis.*` antigos, `install_jarvis_cli.sh`, `scripts/jarvis`,
+  `create_locked_dmg.sh`) e os `JARVIS.spec`/`JARVIS-Debug.spec` do PyInstaller. O Jarvis Ultron só roda
+  no Windows, pelo "Iniciar Jarvis Ultron.bat". O `pyproject.toml` foi reescrito curto.
+
