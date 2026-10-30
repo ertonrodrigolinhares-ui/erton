@@ -384,7 +384,24 @@ async def _ex_jarvis_ui_control(jarvis, args):
     return f"JARVIS interface action completed: {action.replace('_', ' ')}."
 
 
+async def _ex_email_control(jarvis, args):
+    if args.get("action", "").lower() == "connect" and not args.get("credentials_path"):
+        current_file = getattr(jarvis.ui, "current_file", None)
+        if current_file and Path(str(current_file)).suffix.lower() == ".json":
+            args["credentials_path"] = current_file
+    r = await asyncio.to_thread(lambda: email_control(parameters=args, response=None, player=jarvis.ui, session_memory=None))
+    return r or "Email action completed."
+
+
+async def _ex_reminder(jarvis, args):
+    r = await asyncio.to_thread(lambda: reminder(parameters=args, response=None, player=jarvis.ui))
+    return r or "Reminder set."
+
+
 EXECUTORES = {
+    # grupo 3: e-mail e lembrete
+    "email_control": _ex_email_control,
+    "reminder": _ex_reminder,
     # grupo 2: o sistema e a própria tela
     "open_app": _ex_open_app,
     "computer_settings": _ex_computer_settings,
@@ -1733,18 +1750,6 @@ class JarvisLive:
                 # desligada de propósito (Etapa 3): responde e não chama nada
                 self.ui.write_log(f"SYS: ⛔ {name} está desligada no Jarvis.")
                 result = resposta_de_desligada(name)
-
-            elif name == "email_control":
-                if args.get("action", "").lower() == "connect" and not args.get("credentials_path"):
-                    current_file = getattr(self.ui, "current_file", None)
-                    if current_file and Path(str(current_file)).suffix.lower() == ".json":
-                        args["credentials_path"] = current_file
-                r = await asyncio.to_thread(lambda: email_control(parameters=args, response=None, player=self.ui, session_memory=None))
-                result = r or "Email action completed."
-
-            elif name == "reminder":
-                r = await asyncio.to_thread(lambda: reminder(parameters=args, response=None, player=self.ui))
-                result = r or "Reminder set."
 
             elif name == "screen_process":
                 threading.Thread(
