@@ -1821,49 +1821,6 @@ class PopupManager(QObject):
         self.active_popups.clear()
 
 
-class PresenceSystem(QObject):
-    """System for proactive intelligence surfacing."""
-    
-    def __init__(self, popup_manager: PopupManager):
-        super().__init__()
-        self.popup_manager = popup_manager
-        self._presence_tmr = QTimer()
-        self._presence_tmr.timeout.connect(self._surface_presence)
-        self._presence_tmr.start(15000)  # Every 15 seconds
-        
-        self._last_surface = time.time()
-        self._surface_messages = [
-            "Memory synchronization complete.",
-            "Knowledge graph expanded.",
-            "Context retrieval complete.",
-            "Predictive model updated.",
-            "Cross-referencing memory clusters...",
-            "Building execution plan...",
-            "Monitoring active systems...",
-            "Research protocols standby.",
-            "Systems nominal.",
-            "All circuits functional.",
-        ]
-        self._message_index = 0
-    
-    def _surface_presence(self):
-        """Surface a piece of intelligence proactively."""
-        # Only surface if user hasn't interacted recently
-        # For now, we'll surface periodically
-        message = self._surface_messages[self._message_index]
-        self._message_index = (self._message_index + 1) % len(self._surface_messages)
-        
-        self.popup_manager.show_popup(
-            message,
-            PopupType.MICRO
-        )
-    
-    def set_active(self, active: bool):
-        """Enable or disable presence system."""
-        if active:
-            self._presence_tmr.start()
-        else:
-            self._presence_tmr.stop()
 def _get_metrics() -> dict:
     """Retrato do computador para os medidores da tela antiga (cpu, mem, net, gpu, tmp). Vem do
     core/metricas.py, a mesma fonte da Cena e da tela Stark: antes, um fio nascia só de importar este
@@ -6235,7 +6192,6 @@ class MainWindow(QMainWindow):
 
         # ── Popup System Initialization ────────────────────────────────────────
         self._popup_manager = PopupManager(self._ai_core_wrap)
-        self._presence_system = PresenceSystem(self._popup_manager)
         # Context mode tracking
         self._context_mode = "idle"
         self._session_start = time.time()
