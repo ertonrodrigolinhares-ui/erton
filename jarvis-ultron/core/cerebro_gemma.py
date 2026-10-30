@@ -28,6 +28,7 @@ import time
 import urllib.request
 import wave
 
+from core.frases import frase
 from core.reserva_groq import ReservaGroq
 
 URL_PADRAO = "http://localhost:11434/v1"
@@ -80,12 +81,9 @@ def pedido_de_privacidade(fala: str) -> str | None:
     return None
 
 
-AVISO_SEM_WHISPER = ("No modo privado não consigo ouvir sua voz: a transcrição local (Whisper) não está "
-                     "instalada, e a voz não vai para a internet. Dê dois cliques em 'Instalar voz local' "
-                     "na pasta do Jarvis. "
-                     "Enquanto isso, digite.")
-AVISO_WHISPER_FALHOU = ("Não consegui carregar a transcrição local da voz (Whisper). Na primeira vez ela precisa "
-                        "da internet para baixar o modelo; tento de novo em 1 minuto. Enquanto isso, digite.")
+# os textos ficam no core/frases.py (Etapa 8); os nomes antigos continuam valendo
+AVISO_SEM_WHISPER = frase("sem_whisper")
+AVISO_WHISPER_FALHOU = frase("whisper_falhou")
 
 
 def whisper_instalado() -> bool:

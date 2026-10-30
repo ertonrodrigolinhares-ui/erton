@@ -14,6 +14,7 @@ from google import genai
 from google.genai import types
 from api import status as jarvis_status
 from core.jarvis_client import JarvisClient
+from core.frases import frase
 from memory.memory_manager import (
     load_memory, update_memory, format_memory_for_prompt,
 )
@@ -918,8 +919,7 @@ FERRAMENTAS_NUVEM_IA = frozenset({
     "computer_control", "desktop_control", "computer_settings",
 })
 
-AVISO_MODO_PRIVADO = ("No modo privado isso não é usado, porque mandaria o pedido para uma IA na nuvem. "
-                      "Para usar, diga 'modo normal'.")
+AVISO_MODO_PRIVADO = frase("modo_privado_nuvem")  # o texto fica no core/frases.py (Etapa 8)
 
 
 def bloqueio_do_modo_privado(nome: str, args: dict | None = None) -> str | None:
@@ -1268,7 +1268,7 @@ class JarvisLive:
     def speak_error(self, tool_name: str, error: str):
         short = str(error)[:120]
         self.ui.write_log(f"ERR: {tool_name} — {short}")
-        self.speak(f"Sir, {tool_name} encountered an error. {short}")
+        self.speak(frase("erro_na_ferramenta_falado", ferramenta=tool_name, detalhe=short))
 
     @staticmethod
     def _is_explicit_self_quit_transcript(text: str) -> bool:
@@ -2805,8 +2805,7 @@ class JarvisLive:
             else:
                 # Modo privado sem o Gemma: NUNCA cai para o Gemini (a tela mostra MODO PRIVADO).
                 # Fica parado até ele pedir o modo normal (digitado) ou fechar o Jarvis.
-                aviso = ("Modo privado: não consegui ligar o Gemma 4, e não vou usar a nuvem. Rode o Instalar "
-                         "Gemma 4 na pasta do Jarvis, ou digite 'modo normal' para voltar ao Gemini.")
+                aviso = frase("gemma_nao_ligou")
                 self.ui.write_log(f"ERR: 🔒 {aviso}")
                 from actions.tts_engine import falar_com_voz_do_windows
 
@@ -2976,9 +2975,9 @@ def _limpar_para_falar(texto: str) -> str:
     """Tira as instruções em inglês que as ferramentas deixam para a IA (ex.: 'Tell the user...'),
     para o painel Ultron falar só a parte em português quando roda a automação direto."""
     texto = str(texto or "").strip()
-    for inicio, frase in _AVISOS_EM_PORTUGUES.items():
+    for inicio, aviso in _AVISOS_EM_PORTUGUES.items():
         if texto.startswith(inicio):
-            return frase
+            return aviso
     marcas = ["Tell the user", "Explique ao usuário", "Explique isso", "Answer the user", "Answer in",
               "Confirm to the user", "Confirm in", "Say this to the user", "Oriente o usuário",
               "\nTell the user", "Then tell the user", "Summarize for the user"]

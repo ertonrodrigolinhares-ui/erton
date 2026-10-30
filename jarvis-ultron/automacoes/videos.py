@@ -34,8 +34,9 @@ from pathlib import Path
 
 USA_IA_NUVEM = True  # a descrição vai para o Veo (Google): desligada no modo privado
 
-AVISO_MODO_PRIVADO = ("No modo privado não faço vídeos, porque a descrição iria para a IA de vídeo do Google, "
-                      "na nuvem. Para fazer, diga 'modo normal'.")
+from core.frases import frase
+
+AVISO_MODO_PRIVADO = frase("modo_privado_video")  # o texto fica no core/frases.py (Etapa 8)
 
 FERRAMENTA = {
     "name": "generate_video",

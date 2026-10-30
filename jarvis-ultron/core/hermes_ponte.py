@@ -19,6 +19,8 @@ import re
 import threading
 import time
 import unicodedata
+
+from core.frases import frase
 from datetime import datetime
 from pathlib import Path
 
@@ -53,9 +55,9 @@ PALAVRAS_NAO_EXATAS = {"n", "nem", "num", "para", "pare", "parar", "paro", "mas"
 FRASES_NAO = ("mais tarde", "outro dia", "outra hora", "logo mais")
 MAX_PALAVRAS_OK = 8
 
-DEMOROU = "O Hermes demorou demais para responder. A tarefa pode continuar rodando; pergunte de novo daqui a pouco."
-SEM_HERMES = ("O Hermes ainda não está configurado. Dê dois cliques em 'Instalar Hermes' na pasta "
-              "do Jarvis Ultron e depois abra o Jarvis de novo.")
+# os textos ficam no core/frases.py (Etapa 8); os nomes antigos continuam valendo
+DEMOROU = frase("hermes_demorou")
+SEM_HERMES = frase("sem_hermes")
 
 
 def _normalizar(texto: str) -> str:
