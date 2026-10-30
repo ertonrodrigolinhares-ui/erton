@@ -90,9 +90,17 @@ def fontes() -> list[tuple[str, Path, list[str] | None]]:
     return lista
 
 
+# Pastas que ficam só no PC: os prints (Etapa 10) podem ter senha, conversa ou banco na tela.
+PASTAS_SO_NO_PC = ("capturas",)
+
+
 def _proibido(nome: str) -> bool:
     nome = nome.lower()
     return any(fnmatch.fnmatch(nome, padrao) for padrao in NUNCA_COPIAR)
+
+
+def _pasta_so_no_pc(nome: str) -> bool:
+    return nome.lower() in PASTAS_SO_NO_PC
 
 
 # ---------------------------------------------------------------- configuração e HD
@@ -167,7 +175,7 @@ def _copiar_pasta(origem: Path, destino: Path, filtros: list[str] | None) -> tup
     if not origem.is_dir():
         return 0, 0
     for raiz, pastas, arquivos in os.walk(origem):
-        pastas[:] = [p for p in pastas if not _proibido(p) and not p.startswith(".")]
+        pastas[:] = [p for p in pastas if not _proibido(p) and not _pasta_so_no_pc(p) and not p.startswith(".")]
         for nome in arquivos:
             if _proibido(nome) or (filtros and not any(fnmatch.fnmatch(nome.lower(), f) for f in filtros)):
                 continue

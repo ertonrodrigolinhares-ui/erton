@@ -493,6 +493,8 @@ TOOL_DECLARATIONS = [
             "Controls the computer: volume, brightness, window management, keyboard shortcuts, "
             "typing text on screen, closing apps, fullscreen, dark mode, WiFi, restart, shutdown, "
             "scrolling, tab management, zoom, screenshots, lock screen, refresh/reload page. "
+            "action save_screenshot saves a PNG of the whole screen to Documents/Jarvis Ultron/Capturas "
+            "(use when the user asks to take/save a print or screenshot). "
             "Use for ANY single computer control command."
         ),
         "parameters": {

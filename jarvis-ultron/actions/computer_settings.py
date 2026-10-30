@@ -393,6 +393,26 @@ def type_text(text: str, press_enter_after: bool = False):
         time.sleep(0.1)
         pyautogui.press("enter")
 
+def pasta_capturas() -> Path:
+    return Path.home() / "Documents" / "Jarvis Ultron" / "Capturas"
+
+
+def save_screenshot(agora=None) -> Path:
+    """Jarvis Ultron (Etapa 10): salva um print da tela inteira em Documentos/Jarvis Ultron/Capturas/
+    AAAA-MM-DD_HH-MM-SS.png, com o mss (já instalado). Fica só no PC: nunca é enviado, e o memoria_hd
+    não copia essa pasta. A ação "screenshot" (recorte do Windows) continua existindo."""
+    import mss
+    from datetime import datetime
+
+    agora = agora or datetime.now()
+    pasta = pasta_capturas()
+    pasta.mkdir(parents=True, exist_ok=True)
+    caminho = pasta / f"{agora:%Y-%m-%d_%H-%M-%S}.png"
+    with mss.mss() as sct:
+        sct.shot(mon=-1, output=str(caminho))  # -1 = todos os monitores juntos
+    return caminho
+
+
 def take_screenshot():
     if _OS == "Windows":
         pyautogui.hotkey("win", "shift", "s")
@@ -611,6 +631,7 @@ ACTION_MAP: dict[str, callable] = {
     "enter":               press_enter,
     "escape":              press_escape,
     "screenshot":          take_screenshot,
+    "save_screenshot":     save_screenshot,
     "lock_screen":         lock_screen,
     "open_settings":       open_system_settings,
     "file_explorer":       open_file_explorer,
@@ -685,6 +706,7 @@ NAO_PEDEM_OK = {
     "switch_window":   "Alt+Tab: o Windows troca de janela",
     "task_manager":    "Ctrl+Shift+Esc: o Windows abre o Gerenciador de Tarefas",
     "screenshot":      "Windows+Shift+S: o Windows abre a captura de tela",
+    "save_screenshot": "salva um arquivo PNG na pasta Capturas, sem teclas (fica só no PC)",
     "lock_screen":     "Windows+L: o Windows bloqueia a tela (não desliga nem sai da conta)",
     "open_settings":   "Windows+I: o Windows abre as Configurações",
     "file_explorer":   "Windows+E: o Windows abre o Explorador de Arquivos",
@@ -1063,6 +1085,13 @@ def computer_settings(
     if action == "scroll_down":
         scroll_down(int(value or 500))
         return "Scrolled down."
+
+    if action == "save_screenshot":
+        try:
+            caminho = save_screenshot()
+        except Exception as erro:
+            return f"Não consegui salvar o print ({str(erro)[:60]})."
+        return f"Print salvo em {caminho}. Tell the user in Portuguese where it was saved."
 
     func = ACTION_MAP.get(action)
     if not func:
