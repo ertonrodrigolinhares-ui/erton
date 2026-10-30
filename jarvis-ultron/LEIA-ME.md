@@ -521,6 +521,13 @@ o Jarvis não mexe nessas configurações do PC.
   anel na placa de vídeo numa tela virtual) ficam anotados, com o motivo, em
   `tests/dados/falhas_conhecidas.txt`. O `python dev/conferir_testes.py` roda todos os testes e avisa só
   das falhas novas.
+- Por dentro, o cérebro do Jarvis é montado em pedaços, na pasta `cerebro/`, cada um com um assunto e
+  nome em português: `avisos.py` (lembretes e avisos falados), `escuta.py` (modo chamada e mãos livres),
+  `pontes.py` (Hermes, Geekie e autodiagnóstico), `voz_saida.py` (a voz dele), `ultron.py` (o painel),
+  `desligar.py` (desligar e suspender), `entrada.py` (o que você digita), `reserva.py` (Groq/Gemma quando o
+  Gemini cai) e `modo_privado.py` (a troca de cérebro); as ferramentas ficam em `cerebro/ferramentas/`. O
+  `main.py` é a porta de entrada e a conversa ao vivo com o Gemini. Quando algo falhar, o nome do arquivo
+  já diz onde olhar; `tests/test_cerebro_em_pedacos.py` guarda esse mapa.
 
 ## Gmail pelo Jarvis (ler, procurar e preparar e-mails)
 

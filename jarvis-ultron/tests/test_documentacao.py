@@ -444,5 +444,19 @@ class NovidadesLocaisTests(unittest.TestCase):
         self.assertIn("musica_local.py", (RAIZ / "automacoes" / "LEIA-ME.md").read_text(encoding="utf-8"))
 
 
+
+class CerebroEmPedacosTests(unittest.TestCase):
+    def test_arquivos_do_cerebro_citados_nos_manuais_existem(self):
+        # Etapa 15: o LEIA-ME, o VERSAO.txt e o core/SEGURANCA.md dizem "olha o cerebro/reserva.py"; cada
+        # arquivo citado tem de existir, senão o manual manda procurar num lugar que não há
+        seguranca = (RAIZ / "core" / "SEGURANCA.md").read_text(encoding="utf-8")
+        citados = set(re.findall(r"cerebro/[\w/]+\.py", LEIA_ME + VERSAO + seguranca))
+        self.assertTrue({"cerebro/reserva.py", "cerebro/modo_privado.py", "cerebro/desligar.py"} <= citados, citados)
+        for arquivo in sorted(citados):
+            self.assertTrue((RAIZ / arquivo).is_file(), f"{arquivo} é citado nos manuais mas não existe")
+        for nome in ("avisos", "escuta", "pontes", "voz_saida", "ultron", "desligar", "entrada", "reserva",
+                     "modo_privado"):
+            self.assertIn(f"`{nome}.py`", _secao("## Observações"), f"o LEIA-ME não diz o que é cerebro/{nome}.py")
+
 if __name__ == "__main__":
     unittest.main()

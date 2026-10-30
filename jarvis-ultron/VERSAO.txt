@@ -1,7 +1,16 @@
 Jarvis Ultron - versão 2026-10-30
 
-Novidades desta versão (Etapas 6 a 11 da reorganização: tela mais leve, nada some atrás do anel, tudo em
-português, clima falado, notícias, mapa, print salvo, música do PC e a pasta só com o que é seu):
+Novidades desta versão (Etapas 6 a 15 da reorganização: tela mais leve, nada some atrás do anel, tudo em
+português, clima falado, notícias, mapa, print salvo, música do PC, a pasta só com o que é seu e o cérebro
+arrumado por dentro):
+- Por dentro (Etapas 12 a 15), sem mudar o que o Jarvis faz: o main.py, que tinha 3.630 linhas, ficou com
+  cerca de 1.080. Cada ferramenta tem uma ficha única (nome, o que executa, se usa IA na nuvem, se muda
+  algo, se precisa do seu ok); as listas de segurança são calculadas dessas fichas, então uma ferramenta
+  nova nasce com a regra certa. O que muda algo roda em fila; só o que apenas lê roda em paralelo. E o
+  cérebro foi dividido em pedaços com nome em português, na pasta cerebro/ (avisos, escuta, pontes,
+  voz_saida, ultron, desligar, entrada, reserva, modo_privado): quando algo falhar, dá para dizer
+  "olha o cerebro/reserva.py". Os nomes e o comportamento são os mesmos; as travas (modo privado, ok,
+  desligar só depois da despedida) continuam onde o core/SEGURANCA.md diz.
 - A pasta do Jarvis passa a mostrar só o que é do seu Jarvis. O servidor web herdado do projeto original
   (site, banco de dados, Docker, hospedagem), os scripts de Mac/Linux e os manuais em inglês foram
   guardados em `arquivo/` e `docs/original/` (nada foi apagado; com a sua confirmação de que não usa).
