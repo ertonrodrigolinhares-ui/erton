@@ -6905,20 +6905,6 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
 
-        # AI Cognition bar — driven by state
-        try:
-            if hasattr(self, "_bar_cog") and hasattr(self, "hud"):
-                state = getattr(self.hud, "state", "LISTENING")
-                cog_pct = {
-                    "THINKING": random.uniform(70, 95),
-                    "PROCESSING": random.uniform(55, 80),
-                    "SPEAKING": random.uniform(30, 50),
-                    "LISTENING": random.uniform(5, 20),
-                }.get(state, random.uniform(2, 10))
-                self._bar_cog.set_value(cog_pct, f"{cog_pct:.0f}%")
-        except Exception:
-            pass
-
     def _style_splitter(self):
         if not hasattr(self, "_splitter"):
             return
@@ -7354,21 +7340,13 @@ class MainWindow(QMainWindow):
 
         ml.addSpacing(4)
 
-        # Cognitive load with progress bar
-        cog_hdr = QLabel("COGNITIVE LOAD")
-        cog_hdr.setFont(QFont("Courier New", 6, QFont.Weight.Bold))
-        cog_hdr.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent; letter-spacing: 2px;")
-        ml.addWidget(cog_hdr)
-        cog_hdr.hide()
-        # Keep MetricBar references for data compatibility. Cognition is the
-        # only visible bar because the other values already use spark rows.
+        # Medidores de verdade (CPU, memória, rede, placa de vídeo e temperatura, do core/metricas.py)
         self._bar_cpu = MetricBar("CPU", C.TEXT_MED)
         self._bar_mem = MetricBar("MEM", C.TEXT_MED)
         self._bar_net = MetricBar("NET", C.TEXT_MED)
         self._bar_gpu = MetricBar("GPU", C.TEXT_MED)
         self._bar_tmp = MetricBar("TMP", C.TEXT_MED)
-        self._bar_cog = MetricBar("COG", C.TEXT_MED)
-        for b in [self._bar_cpu, self._bar_mem, self._bar_net, self._bar_gpu, self._bar_tmp, self._bar_cog]:
+        for b in [self._bar_cpu, self._bar_mem, self._bar_net, self._bar_gpu, self._bar_tmp]:
             ml.addWidget(b)
 
         # Info row
