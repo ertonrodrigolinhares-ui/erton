@@ -94,43 +94,12 @@ class SecretCipher:
             raise ValueError("Stored secret could not be decrypted") from exc
 
 
-class TenantDatabaseSecretStore(SecretStore):
-    """Encrypted SecretStore view scoped to one hosted user."""
-
-    def __init__(self, user_id: str):
-        self.user_id = user_id
-
-    def set(self, key: str, value: str) -> None:
-        from api.database import SessionLocal
-        from api.secret_service import set_user_secret
-
-        with SessionLocal() as db:
-            set_user_secret(db, self.user_id, key, value)
-
-    def get(self, key: str) -> Optional[str]:
-        from api.database import SessionLocal
-        from api.secret_service import get_user_secret
-
-        with SessionLocal() as db:
-            return get_user_secret(db, self.user_id, key)
-
-    def delete(self, key: str) -> None:
-        from api.database import SessionLocal
-        from api.secret_service import delete_user_secret
-
-        with SessionLocal() as db:
-            delete_user_secret(db, self.user_id, key)
-
-
 _store: SecretStore | None = None
 
 
 def get_secret_store() -> SecretStore:
-    from core.tenant import get_current_user_id
-
-    user_id = get_current_user_id()
-    if user_id:
-        return TenantDatabaseSecretStore(user_id)
+    # Etapa 11: o cofre por usuário do servidor hospedado (TenantDatabaseSecretStore, banco Postgres) saiu
+    # com o servidor (arquivo/servidor-web/). No PC o cofre é o do Windows (keyring).
     global _store
     if _store is not None:
         return _store
