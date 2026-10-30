@@ -243,6 +243,13 @@ class C:
 _QCOL_CACHE: dict = {}
 
 
+def rgba(h: str, a: int) -> str:
+    """Cor com transparência para folha de estilo do Qt: "rgba(r, g, b, a)". Escrever "#RRGGBBAA" não
+    funciona (o Qt lê #AARRGGBB: a cor some ou vira outra), defeito anotado na Etapa 2 e consertado na 7."""
+    c = QColor(h)
+    return f"rgba({c.red()}, {c.green()}, {c.blue()}, {int(a)})"
+
+
 def qcol(h: str, a: int = 255) -> QColor:
     # Jarvis Ultron (economia): guarda as cores já convertidas; devolve uma cópia.
     chave = (h, a)
@@ -535,7 +542,7 @@ class ChatBubbleWidget(QWidget):
             QLineEdit {{
                 background: {C.DARK};
                 color: {C.WHITE};
-                border: 1px solid {C.ENERGY}55;
+                border: 1px solid {rgba(C.ENERGY, 0x55)};
                 border-radius: 4px;
                 padding: 4px 10px;
             }}
@@ -557,13 +564,13 @@ class ChatBubbleWidget(QWidget):
         send_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         send_btn.setStyleSheet(f"""
             QPushButton {{
-                background: {C.ENERGY}22;
+                background: {rgba(C.ENERGY, 0x22)};
                 color: {C.ENERGY};
-                border: 1px solid {C.ENERGY}66;
+                border: 1px solid {rgba(C.ENERGY, 0x66)};
                 border-radius: 4px;
             }}
             QPushButton:hover {{
-                background: {C.ENERGY}44;
+                background: {rgba(C.ENERGY, 0x44)};
                 border: 1px solid {C.ENERGY};
                 color: {C.WHITE};
             }}
@@ -638,7 +645,7 @@ class ChatBubbleWidget(QWidget):
         lbl = QLabel(partial + '▌')
         lbl.setFont(QFont(UI_FONT, 9))
         lbl.setWordWrap(True)
-        lbl.setStyleSheet(f'color: {C.PRI}; background: {C.PRI_GHO}; border: 1px solid {C.PRI}44; border-radius: 6px; padding: 6px 10px;')
+        lbl.setStyleSheet(f'color: {C.PRI}; background: {C.PRI_GHO}; border: 1px solid {rgba(C.PRI, 0x44)}; border-radius: 6px; padding: 6px 10px;')
         self._c_lay.addWidget(lbl)
         self._typing_bubble = lbl
         sb = self._scroll.verticalScrollBar()
@@ -1124,7 +1131,7 @@ class ToastNotification(QWidget):
         self.setStyleSheet(f"""
             ToastNotification {{
                 background: {bg};
-                border: 1px solid {fg}88;
+                border: 1px solid {rgba(fg, 0x88)};
                 border-radius: 6px;
             }}
         """)
@@ -1229,8 +1236,8 @@ class ToolProgressWidget(QWidget):
         self.setFixedHeight(28)
         self.setStyleSheet(f"""
             QWidget {{
-                background: {C.PURPLE}18;
-                border: 1px solid {C.PURPLE}44;
+                background: {rgba(C.PURPLE, 0x18)};
+                border: 1px solid {rgba(C.PURPLE, 0x44)};
                 border-radius: 4px;
             }}
         """)
@@ -1520,19 +1527,19 @@ class BasePopup(QWidget):
         
         # Styling based on popup type
         bg_colors = {
-            PopupType.MICRO: f"{C.PRI_GHO}cc",
-            PopupType.INFORMATION: f"{C.BORDER}aa",
-            PopupType.ACTION: f"{C.ACC}15",
-            PopupType.RESEARCH: f"{C.PURPLE}15",
-            PopupType.CRITICAL: f"{C.RED}20",
+            PopupType.MICRO: f"{rgba(C.PRI_GHO, 0xcc)}",
+            PopupType.INFORMATION: f"{rgba(C.BORDER, 0xaa)}",
+            PopupType.ACTION: f"{rgba(C.ACC, 0x15)}",
+            PopupType.RESEARCH: f"{rgba(C.PURPLE, 0x15)}",
+            PopupType.CRITICAL: f"{rgba(C.RED, 0x20)}",
         }
         
         border_colors = {
-            PopupType.MICRO: f"{C.PRI}44",
-            PopupType.INFORMATION: f"{C.BORDER}88",
-            PopupType.ACTION: f"{C.ACC}88",
-            PopupType.RESEARCH: f"{C.PURPLE}88",
-            PopupType.CRITICAL: f"{C.RED}cc",
+            PopupType.MICRO: f"{rgba(C.PRI, 0x44)}",
+            PopupType.INFORMATION: f"{rgba(C.BORDER, 0x88)}",
+            PopupType.ACTION: f"{rgba(C.ACC, 0x88)}",
+            PopupType.RESEARCH: f"{rgba(C.PURPLE, 0x88)}",
+            PopupType.CRITICAL: f"{rgba(C.RED, 0xcc)}",
         }
         
         text_colors = {
@@ -1543,8 +1550,8 @@ class BasePopup(QWidget):
             PopupType.CRITICAL: C.RED,
         }
         
-        bg = bg_colors.get(popup_type, f"{C.PRI_GHO}cc")
-        border = border_colors.get(popup_type, f"{C.PRI}44")
+        bg = bg_colors.get(popup_type, f"{rgba(C.PRI_GHO, 0xcc)}")
+        border = border_colors.get(popup_type, f"{rgba(C.PRI, 0x44)}")
         text_color = text_colors.get(popup_type, C.WHITE)
         
         self.setStyleSheet(f"""
@@ -4173,7 +4180,7 @@ class SettingsOverlay(_OverlayBase):
                 letter-spacing: 1px;
             }}
             QPushButton:hover {{
-                background: {C.PRI}22;
+                background: {rgba(C.PRI, 0x22)};
                 border: 1px solid {C.PRI};
                 color: {C.ENERGY};
             }}
@@ -4263,7 +4270,7 @@ class SettingsOverlay(_OverlayBase):
                 btn.setStyleSheet(f"""
                     QPushButton {{
                         background: transparent; color: {C.WHITE_DIM};
-                        border: 1px solid {C.BORDER}44; border-radius: 3px; padding: 0 8px;
+                        border: 1px solid {rgba(C.BORDER, 0x44)}; border-radius: 3px; padding: 0 8px;
                     }}
                     QPushButton:hover {{ color: {C.PRI}; background: {C.PRI_GHO};
                                          border: 1px solid {C.BORDER_B}; }}
@@ -4797,7 +4804,7 @@ class VoiceSelectorOverlay(_OverlayBase):
                 letter-spacing: 1px;
             }}
             QPushButton:hover {{
-                background: {C.PRI}22;
+                background: {rgba(C.PRI, 0x22)};
                 border: 1px solid {C.PRI};
                 color: {C.ENERGY};
             }}
@@ -4862,7 +4869,7 @@ class VoiceSelectorOverlay(_OverlayBase):
                 btn.setStyleSheet(f"""
                     QPushButton {{
                         background: {C.DARK}; color: {C.TEXT_MED};
-                        border: 1px solid {C.BORDER}55; border-radius: 4px;
+                        border: 1px solid {rgba(C.BORDER, 0x55)}; border-radius: 4px;
                         border-top: 1px solid {C.BORDER};
                     }}
                     QPushButton:hover {{ color: {C.PRI}; border: 1px solid {C.BORDER_B};

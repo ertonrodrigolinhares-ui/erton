@@ -23,13 +23,10 @@
 # recentra as janelinhas no resize usando isHidden(), não isVisible(), porque no primeiro show() o Qt manda
 # o resize antes de a janela ficar visível. O teste test_setup_overlay_is_centered_after_first_show passa.)
 
-# Defeito de verdade, só visual (anotado no reparo da Etapa 2): 23 linhas do ui.py pedem cor com
-# transparência escrevendo "{C.ENERGY}22" (#RRGGBBAA), mas o Qt lê #AARRGGBB: a cor some ou vira outra
-# (conferido: "background: #00d4ff22" não pinta nada; rgba(0, 212, 255, 34) pinta). Não é só a tela
-# antiga (F2): estão na conversa da tela antiga (ChatBubbleWidget), no "executando..." (ToolProgressWidget),
-# nos avisos (BasePopup), nos Ajustes (SettingsOverlay) e na escolha de voz (VoiceSelectorOverlay), que
-# também aparecem por cima da Cena. Consertar (trocar por rgba) junto com a Etapa 7 e tirar daqui.
-tests/test_ui_regressions.py::UIRegressionTests::test_qss_alpha_colors_are_explicit_rgba
+# (As 23 cores com a transparência no fim, "#RRGGBBAA", que o Qt lia errado, foram trocadas na Etapa 7 por
+# rgba(r, g, b, a) com o ajudante ui.rgba(); mais uma igual na borda dos avisos, que o teste não via. O
+# teste test_qss_alpha_colors_are_explicit_rgba passa. Hoje não há nenhuma falha conhecida fixa: só os
+# dois instáveis abaixo.)
 
 # Instáveis: testes do anel pela placa de vídeo numa tela virtual (xvfb-run). Eles medem o brilho do anel
 # 2,5 s depois de abrir, e às vezes o valor fica logo abaixo do limite (ex.: 118 para 120). Também falham
