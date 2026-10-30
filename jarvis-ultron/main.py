@@ -489,7 +489,14 @@ async def _ex_task_status(jarvis, args):
     return json.dumps(status, ensure_ascii=False) if status else f"Task {task_id} was not found."
 
 
+async def _ex_flight_finder(jarvis, args):
+    r = await asyncio.to_thread(lambda: flight_finder(parameters=args, player=jarvis.ui))
+    return r or "Done."
+
+
 EXECUTORES = {
+    # grupo 6: herdadas que ainda existem (a Etapa 18 decide, com o Erton)
+    "flight_finder": _ex_flight_finder,
     # grupo 5: visão, arquivos e tarefas
     "screen_process": _ex_screen_process,
     "file_processor": _ex_file_processor,
@@ -1828,10 +1835,6 @@ class JarvisLive:
                 # desligada de propósito (Etapa 3): responde e não chama nada
                 self.ui.write_log(f"SYS: ⛔ {name} está desligada no Jarvis.")
                 result = resposta_de_desligada(name)
-
-            elif name == "flight_finder":
-                r = await asyncio.to_thread(lambda: flight_finder(parameters=args, player=self.ui))
-                result = r or "Done."
 
             elif name in carregar_automacoes().ferramentas:
                 automacao = carregar_automacoes().ferramentas[name]

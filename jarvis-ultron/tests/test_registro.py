@@ -28,6 +28,9 @@ class RegistroTests(unittest.TestCase):
     def test_todo_executor_da_tabela_tem_declaracao(self):
         declaradas = {d["name"] for d in TOOL_DECLARATIONS}
         self.assertEqual(sorted(set(main.EXECUTORES) - declaradas), [])
+        # a cadeia de "elif" acabou: só o save_memory fica fora da tabela (regra própria do modo privado)
+        self.assertEqual(set(main.EXECUTORES), declaradas - {"save_memory"})
+        self.assertNotIn('elif name == "', (RAIZ / "main.py").read_text(encoding="utf-8"))
         for nome, executor in main.EXECUTORES.items():
             self.assertTrue(callable(executor), nome)
 
