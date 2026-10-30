@@ -1,6 +1,15 @@
 Jarvis Ultron - versão 2026-10-30
 
-Novidades desta versão (Etapa 6 da reorganização: a tela mais leve):
+Novidades desta versão (Etapas 6 e 7 da reorganização: a tela mais leve, e nada some atrás do anel):
+- Nada some mais atrás do anel. Quando você pede uma pesquisa profunda ou uma apresentação, ou o Jarvis
+  está rodando uma ferramenta, o andamento aparece num cartão "Andamento" acima do campo de digitar, na
+  tela azul (antes ficava escondido atrás dela). As janelinhas (chave do Gemini, nome, voz, Ajustes,
+  Atalhos, visão) e os avisos ficam por cima da tela azul mesmo depois de mudar o tamanho da janela, e a
+  tela da chave nasce no centro (antes nascia no canto). Os avisos do sistema ("usando a reserva Groq",
+  chave salva, erros) aparecem também no histórico da conversa (botão PAINÉIS). As cores com
+  transparência que sumiam (bordas dos avisos, "executando...", Ajustes) voltaram a aparecer.
+- O Jarvis para de dizer que trocou o tema ou abriu o "Command Center" na tela azul: isso não existe
+  nela (a tela azul tem cor fixa). Se você pedir, ele explica.
 - O PC fica mais leve com o Jarvis aberto. A tela antiga (a do F2) e seus painéis ficavam trabalhando
   escondidos atrás da tela azul: um medidor lia o sistema a cada 1,5 segundo (e abria programas de fora
   para ler a placa de vídeo e a temperatura), um painel animado que nunca aparecia recalculava quadros

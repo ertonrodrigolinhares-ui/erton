@@ -59,18 +59,24 @@ Para cada passo, o que fazer e o que tem de acontecer.
      e avise.
 10. **F2:** aperte **F2** (vai para a tela antiga) e **F2** de novo.
     - Volta para a tela azul com o anel, sem travar.
-11. **Quanto o Jarvis gasta:** com a tela azul na frente e o Jarvis parado há uns 2 minutos, diga
+11. **Nada some atrás do anel:** com a tela azul na frente, aperte **Ctrl+/** (abre a janela de Atalhos;
+    ou diga "Jarvis, abre os ajustes") e mude o tamanho da janela puxando a borda.
+    - A janela de Atalhos (ou a de Ajustes) continua no centro e por cima do anel. Feche-a no ✕.
+    - Diga **"Jarvis, faz uma pesquisa profunda sobre o preço do café hoje"** e responda que pode ser
+      **em segundo plano**: o cartão **Andamento** aparece acima do campo de digitar, com a porcentagem,
+      e some uns segundos depois de terminar.
+12. **Quanto o Jarvis gasta:** com a tela azul na frente e o Jarvis parado há uns 2 minutos, diga
     **"Jarvis, faça um autodiagnóstico"**.
     - Na lista que aparece na tela há a linha **CPU do Jarvis: tela X%, cérebro Y%** (com a memória de
       cada um), a **CPU** do computador inteiro e a **Bateria** (num computador de mesa, "sem bateria" é
       normal, não é defeito). **Anote os números** e compare com a versão anterior: a nova tem de
       gastar igual ou menos. Se gastar bem mais, avise, dizendo os dois números.
-12. **Especialista do Claude** (só se o Claude estiver instalado pelo "Instalar Claude"; se não, pule):
+13. **Especialista do Claude** (só se o Claude estiver instalado pelo "Instalar Claude"; se não, pule):
     diga **"Jarvis, usa o agente Tax Strategist para listar três cuidados ao abrir uma holding"**.
     - Ele diz que o Claude está trabalhando. Quando termina, fala um resumo em português e abre o
       relatório (em `Documentos\Jarvis Ultron\Claude\Relatorios`).
     - A pasta `Documentos\Jarvis Ultron\Claude\Agency` existe, com o `INDICE.md` e uma pasta por área.
-13. **Fechar:** clique no **X** da janela.
+14. **Fechar:** clique no **X** da janela.
     - A janela some, mas o ícone continua perto do relógio (o Jarvis continua ouvindo).
     - Botão direito no ícone → **Quit JARVIS** (ou **Sair do Jarvis**): o Jarvis fecha de verdade,
       e a janela preta fecha junto.

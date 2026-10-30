@@ -380,5 +380,32 @@ class TelaMaisLeveTests(unittest.TestCase):
         self.assertIn("metricas.ler()", (RAIZ / "ui_orbe.py").read_text(encoding="utf-8"))
 
 
+class NadaSomeAtrasDoAnelTests(unittest.TestCase):
+    def test_textos_da_etapa_7_batem_com_o_codigo(self):
+        import ui
+        import ui_orbe
+
+        fonte_ui = Path(ui.__file__).read_text(encoding="utf-8")
+        fonte_orbe = Path(ui_orbe.__file__).read_text(encoding="utf-8")
+        self.assertIn("JANELAS_POR_CIMA", fonte_ui)
+        self.assertIn('Vidro("Andamento"', fonte_orbe)
+        self.assertIn("def rgba(", fonte_ui)
+        novidades = _uma_linha(VERSAO[:VERSAO.index("Versão anterior (2026-10-19.2)")])
+        for trecho in ('cartão "Andamento"', "por cima da tela azul", "nasce no centro", "Command Center"):
+            self.assertIn(trecho, novidades)
+        self.assertIn("**Andamento**", _secao("## Tela limpa, como no vídeo"))
+        roteiro = _uma_linha((RAIZ / "dev" / "ROTEIRO_DE_5_MINUTOS.md").read_text(encoding="utf-8"))
+        passo = roteiro[roteiro.index("**Nada some atrás do anel:**"):roteiro.index("**Quanto o Jarvis gasta:**")]
+        for trecho in ("**Ctrl+/**", "Atalhos", "**Andamento**", "mude o tamanho da janela"):
+            self.assertIn(trecho, passo)
+        self.assertIn('QKeySequence("Ctrl+/")', Path(ui.__file__).read_text(encoding="utf-8"))
+        # a ferramenta de interface não promete mais tema nem Command Center
+        import main
+
+        declaracao = next(d for d in main.get_tool_declarations() if d["name"] == "jarvis_ui_control")
+        self.assertNotIn("Command Center", declaracao["description"])
+        self.assertFalse({"change_theme", "open_command_center"} & set(declaracao["parameters"]["properties"]["action"]["enum"]))
+
+
 if __name__ == "__main__":
     unittest.main()

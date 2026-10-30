@@ -79,7 +79,10 @@ aparecem dentro do anel. Para digitar, use o campo embaixo do anel; a resposta s
 modo chamada.
 
 - Botão **PAINÉIS** (canto de baixo, à esquerda): mostra os painéis dos lados (sistema, status,
-  botões do Ultron e o histórico da conversa). **ESCONDER PAINÉIS** volta à tela limpa.
+  botões do Ultron e o histórico da conversa, que mostra também os avisos do sistema). **ESCONDER
+  PAINÉIS** volta à tela limpa.
+- Quando o Jarvis está fazendo algo demorado (pesquisa profunda, apresentação, uma ferramenta rodando),
+  o andamento aparece num cartão **Andamento**, acima do campo de digitar, e some quando termina.
 - Para abrir sempre com os painéis: `JARVIS_TELA="paineis"` no `.env`.
 
 ## Tela e cérebro separados (o Jarvis não trava)
@@ -494,9 +497,10 @@ o Jarvis não mexe nessas configurações do PC.
 - A interface original é em **inglês**. O Jarvis fala e entende português.
 - Algumas funções exigem configuração extra (Gmail, Spotify). Veja `docs/USAGE.md`.
 - Os testes herdados do projeto original que cobravam telas do JARVIS-OS que não existem mais saíram
-  (ficam guardados na etiqueta git `antes-da-reorganizacao`). Os defeitos que já se sabe que existem
-  (hoje, só visuais) ficam anotados, com o motivo, em `tests/dados/falhas_conhecidas.txt`. O
-  `python dev/conferir_testes.py` roda todos os testes e avisa só das falhas novas.
+  (ficam guardados na etiqueta git `antes-da-reorganizacao`). Os testes que oscilam (hoje, só dois do
+  anel na placa de vídeo numa tela virtual) ficam anotados, com o motivo, em
+  `tests/dados/falhas_conhecidas.txt`. O `python dev/conferir_testes.py` roda todos os testes e avisa só
+  das falhas novas.
 
 ## Hermes: agentes, rotina das 8h e redes sociais
 
