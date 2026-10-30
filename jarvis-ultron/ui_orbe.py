@@ -591,7 +591,7 @@ class Canal(Vidro):
                 w.hide()
                 w.deleteLater()
         for quem, texto in self._falas:
-            tom = _cor_estilo(VERDE if quem == "VOCÊ" else CIANO).name()
+            tom = _cor_estilo({"VOCÊ": VERDE, "SISTEMA": TEXTO2, "ERRO": VERMELHO}.get(quem, CIANO)).name()
             curto = texto if len(texto) < 160 else texto[:157] + "..."
             l = rotulo(f'<span style="color:{tom}; font-weight:700">{quem}</span>'
                        f'<span style="color:{cor(TEXTO2).name()}"> • </span>'
@@ -715,6 +715,12 @@ class Cena(QWidget):
 
         self.canal = Canal(win, self)
         self.fala.connect(self.canal.adicionar)
+        # Os avisos (SYS:/ERR:) que a tela e o cérebro escrevem no registro antigo ("usando a reserva
+        # Groq", chave salva, erro de voz) aparecem também aqui. O registro antigo (ChatBubbleWidget) avisa
+        # cada linha pelo sinal _sig, que roda no fio da tela.
+        registro = getattr(win, "_chat_bubble", None)
+        if registro is not None and hasattr(registro, "_sig"):
+            registro._sig.connect(self._aviso_do_registro)
 
 
         self.botao = BotaoNucleo(self.hud, self)
@@ -941,6 +947,14 @@ class Cena(QWidget):
         return altura
 
     # ----- dados
+    def _aviso_do_registro(self, texto: str) -> None:
+        """Linha do registro antigo: os avisos (SYS:) e os erros (ERR:) vão para o canal; as falas
+        (You:/Jarvis:) já chegam por registrar()."""
+        if texto.startswith("SYS:"):
+            self.canal.adicionar("SISTEMA", texto[4:].strip())
+        elif texto.startswith("ERR:"):
+            self.canal.adicionar("ERRO", texto[4:].strip())
+
     def registrar(self, texto: str):
         """Recebe linhas do log (qualquer fio): conta pedidos e alimenta o canal."""
         if texto.startswith(("You:", "Você:")):

@@ -207,5 +207,31 @@ class AndamentoNaCenaTests(unittest.TestCase):
             self.assertTrue(cena.p_andamento.isVisible())  # a apresentação ainda está rodando
 
 
+class AvisosNoCanalTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_aviso_do_registro_antigo_aparece_no_canal(self):
+        with _Janela() as janela:
+            janela._overlay.hide()
+            cena = janela._orbe.cena
+            fachada = ui.JarvisUI.__new__(ui.JarvisUI)
+            fachada._win = janela
+            fachada.write_log("SYS: usando a reserva Groq")    # do cérebro
+            janela._log.append_log("SYS: Chave do Gemini atualizada no arquivo .env.")  # da própria tela
+            janela._log.append_log("ERR: Shutdown cleanup — x")
+            fachada.write_log("Jarvis: Tudo pronto.")
+            _Janela.eventos(self)
+            self.assertEqual(list(cena.canal._falas), [
+                ("SISTEMA", "usando a reserva Groq"),
+                ("SISTEMA", "Chave do Gemini atualizada no arquivo .env."),
+                ("ERRO", "Shutdown cleanup — x"),
+                ("JARVIS", "Tudo pronto."),
+            ])
+            textos = [r.text() for r in cena.canal.findChildren(type(cena.canal.lista.itemAt(0).widget()))]
+            self.assertTrue(any("usando a reserva Groq" in t for t in textos))
+
+
 if __name__ == "__main__":
     unittest.main()
