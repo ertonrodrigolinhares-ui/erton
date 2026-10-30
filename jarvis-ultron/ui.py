@@ -55,7 +55,6 @@ GRAPHICS_PROFILES = {
         "noise_count": 0,
         "scanline_step": 8,
         "antialias": False,
-        "activity_nodes": 10,
         "metrics_ms": 3500,
     },
     "medium": {
@@ -65,7 +64,6 @@ GRAPHICS_PROFILES = {
         "noise_count": 60,
         "scanline_step": 6,
         "antialias": True,
-        "activity_nodes": 16,
         "metrics_ms": 2000,
     },
     "high": {
@@ -75,7 +73,6 @@ GRAPHICS_PROFILES = {
         "noise_count": 200,
         "scanline_step": 4,
         "antialias": True,
-        "activity_nodes": 24,
         "metrics_ms": 1200,
     },
 }
@@ -2119,45 +2116,6 @@ class HudConfig:
         self.particle_density = particle_density
 
 
-class AIActivityConfig:
-    """Configuration for AIActivityCanvas visualization elements."""
-    def __init__(
-        self,
-        show_nodes: bool = True,
-        show_edges: bool = True,
-        show_data_packets: bool = True,
-        show_equalizer_bars: bool = True,
-        show_scanner: bool = True,
-        show_data_streams: bool = True,
-        node_count: int = 12,
-        edge_distance_threshold: float = 0.32,
-        bar_count: int = 32,
-        max_data_packets: int = 10,
-        max_data_streams: int = 5,
-        # New hierarchical controls
-        node_size: str = "medium",  # "small", "medium", "large"
-        edge_opacity: str = "medium",  # "low", "medium", "high"
-        data_packet_velocity: str = "medium",  # "slow", "medium", "fast"
-        spectrum_type: str = "bars",  # "bars", "waveform", "off"
-    ):
-        self.show_nodes = show_nodes
-        self.show_edges = show_edges
-        self.show_data_packets = show_data_packets
-        self.show_equalizer_bars = show_equalizer_bars
-        self.show_scanner = show_scanner
-        self.show_data_streams = show_data_streams
-        self.node_count = node_count
-        self.edge_distance_threshold = edge_distance_threshold
-        self.bar_count = bar_count
-        self.max_data_packets = max_data_packets
-        self.max_data_streams = max_data_streams
-        # New hierarchical controls
-        self.node_size = node_size
-        self.edge_opacity = edge_opacity
-        self.data_packet_velocity = data_packet_velocity
-        self.spectrum_type = spectrum_type
-
-
 class HudCanvas(QWidget):
     """
     Digital Consciousness v4 — Massive Neural Core.
@@ -3726,375 +3684,6 @@ class AgentGridWidget(QWidget):
             # line_lbl hidden — no connector
 
 
-
-
-class AIActivityCanvas(QWidget):
-    """
-    Context-aware animated visualization that sits below the HUD face.
-    Modes: idle | listening | thinking | speaking | coding | analyzing | researching
-    """
-
-    def __init__(self, parent=None, config: AIActivityConfig = None):
-        super().__init__(parent)
-        self.setMinimumHeight(120)
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent)
-
-        # Use default config if none provided
-        self.config = config or AIActivityConfig()
-
-        self.mode  = "idle"   # idle | listening | thinking | speaking | coding | analyzing | researching
-        self.state = "LISTENING"
-
-        # Animation state
-        self._tick      = 0
-        self._nodes: list[list[float]] = []   # [x, y, vx, vy, pulse, phase]
-        self._edges: list[tuple[int,int,float]] = []  # (i, j, alpha)
-        self._streams: list[list[float]] = []  # [x, y, vx, vy, life, max_life]
-        self._bars: list[float] = []           # equalizer bar heights
-        self._scan_angle = 0.0
-        self._data_packets: list[list[float]] = []  # [edge_idx, t, speed]
-
-        self._init_nodes(self.config.node_count)
-        self._init_bars(self.config.bar_count)
-
-        self._tmr = QTimer(self)
-        self._tmr.timeout.connect(self._step)
-        self.set_graphics_quality(get_graphics_quality())
-
-    def set_graphics_quality(self, quality: str):
-        value = _normalize_graphics_quality(quality)
-        profile = GRAPHICS_PROFILES[value]
-        self._graphics_quality = value
-        self._antialias = bool(profile["antialias"])
-        self._quality_node_count = int(profile["activity_nodes"])
-        self._tmr.setInterval(int(profile["frame_ms"]))
-        self._init_nodes(self._quality_node_count)
-        if not self._tmr.isActive():
-            self._tmr.start()
-        self.update()
-
-    def _init_nodes(self, n: int):
-        self._nodes = []
-        for i in range(n):
-            ang = (i / n) * 2 * math.pi + random.uniform(-0.3, 0.3)
-            r   = random.uniform(0.25, 0.45)
-            self._nodes.append([
-                0.5 + r * math.cos(ang),   # x (normalized)
-                0.5 + r * math.sin(ang),   # y (normalized)
-                random.uniform(-0.0008, 0.0008),  # vx
-                random.uniform(-0.0008, 0.0008),  # vy
-                random.uniform(0, 1),       # pulse phase
-                random.uniform(0, 2 * math.pi),   # individual phase
-            ])
-        # Build edges: connect nearby nodes using config threshold
-        self._edges = []
-        for i in range(len(self._nodes)):
-            for j in range(i + 1, len(self._nodes)):
-                ni, nj = self._nodes[i], self._nodes[j]
-                dist = math.hypot(ni[0] - nj[0], ni[1] - nj[1])
-                if dist < self.config.edge_distance_threshold:
-                    self._edges.append((i, j, random.uniform(0.3, 0.8)))
-
-    def _init_bars(self, n: int):
-        self._bars = [random.uniform(0.1, 0.4) for _ in range(n)]
-
-    def set_mode(self, mode: str):
-        if mode != self.mode:
-            self.mode = mode
-            if mode == "coding":
-                self._init_nodes(min(16, self._quality_node_count))
-            elif mode == "analyzing":
-                self._init_nodes(min(10, self._quality_node_count))
-            elif mode == "researching":
-                self._init_nodes(min(20, self._quality_node_count))
-            else:
-                self._init_nodes(self._quality_node_count)
-
-    def _step(self):
-        if _economia_ligada() and _janela_escondida(self):
-            return
-        self._tick += 1
-        W, H = max(1, self.width()), max(1, self.height())
-
-        is_active = self.state in ("THINKING", "SPEAKING", "PROCESSING")
-        speed_mul = 2.5 if is_active else 0.6
-
-        # Update nodes
-        for nd in self._nodes:
-            nd[0] += nd[2] * speed_mul
-            nd[1] += nd[3] * speed_mul
-            nd[4]  = (nd[4] + 0.018 * speed_mul) % 1.0
-            nd[5]  = (nd[5] + 0.04  * speed_mul) % (2 * math.pi)
-            # Bounce off edges
-            if nd[0] < 0.08 or nd[0] > 0.92: nd[2] *= -1
-            if nd[1] < 0.08 or nd[1] > 0.92: nd[3] *= -1
-            nd[0] = max(0.08, min(0.92, nd[0]))
-            nd[1] = max(0.08, min(0.92, nd[1]))
-
-        # Rebuild edges dynamically using config threshold
-        if self._tick % 30 == 0:
-            self._edges = []
-            for i in range(len(self._nodes)):
-                for j in range(i + 1, len(self._nodes)):
-                    ni, nj = self._nodes[i], self._nodes[j]
-                    dist = math.hypot(ni[0] - nj[0], ni[1] - nj[1])
-                    if dist < self.config.edge_distance_threshold:
-                        self._edges.append((i, j, min(1.0, self.config.edge_distance_threshold / max(dist, 0.01) - 0.5)))
-
-        # Data packets flowing along edges (respect config limit)
-        if (self.config.show_data_packets and is_active and
-            random.random() < 0.12 and self._edges and
-            len(self._data_packets) < self.config.max_data_packets):
-            ei = random.randint(0, len(self._edges) - 1)
-            # Apply data_packet_velocity setting
-            velocity_multiplier = {
-                "slow": 0.5,
-                "medium": 1.0,
-                "fast": 1.5
-            }.get(self.config.data_packet_velocity, 1.0)
-            base_speed = random.uniform(0.008, 0.02)
-            self._data_packets.append([ei, 0.0, base_speed * velocity_multiplier])
-        self._data_packets = [
-            [p[0], p[1] + p[2], p[2]] for p in self._data_packets if p[1] < 1.0
-        ]
-
-        # Equalizer bars (respect config flag)
-        if self.config.show_equalizer_bars:
-            target_h = 0.6 if self.state == "SPEAKING" else (0.35 if is_active else 0.12)
-            for i in range(len(self._bars)):
-                tgt = random.uniform(0.05, target_h) if is_active else random.uniform(0.03, 0.12)
-                self._bars[i] += (tgt - self._bars[i]) * 0.18
-
-        # Scanner (respect config flag)
-        if self.config.show_scanner:
-            scan_spd = 2.8 if is_active else 0.9
-            self._scan_angle = (self._scan_angle + scan_spd) % 360
-
-        # Data streams (respect config limit and flag)
-        if (self.config.show_data_streams and is_active and
-            random.random() < 0.08 and
-            len(self._streams) < self.config.max_data_streams):
-            self._streams.append([
-                random.uniform(0.1, 0.9) * W, 0.0,
-                random.uniform(-0.5, 0.5), random.uniform(1.5, 3.5),
-                1.0, 1.0
-            ])
-        self._streams = [
-            [s[0]+s[2], s[1]+s[3], s[2], s[3], s[4]-0.025, s[5]]
-            for s in self._streams if s[4] > 0 and 0 <= s[1] <= H
-        ]
-
-        self.update()
-
-    def paintEvent(self, _):
-        p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing, self._antialias)
-        p.fillRect(self.rect(), qcol(C.BG))
-
-        W, H = self.width(), self.height()
-        if W < 10 or H < 10:
-            return
-
-        mode = self.mode
-        is_active = self.state in ("THINKING", "SPEAKING", "PROCESSING")
-
-        # ── Precision grid background (always shown) ────────────────────────
-        p.setPen(QPen(qcol(C.PRI_GHO, 40), 1))
-        for x in range(0, W, 20):
-            p.drawLine(QPointF(x, 0), QPointF(x, H))
-        for y in range(0, H, 20):
-            p.drawLine(QPointF(0, y), QPointF(W, y))
-
-        # ── Mode label (always shown) ───────────────────────────────────────
-        mode_labels = {
-            "coding":      ("◈ DEPENDENCY GRAPH",    C.ACC2),
-            "analyzing":   ("◈ DOCUMENT MAP",         C.PRI),
-            "researching": ("◈ KNOWLEDGE NETWORK",    C.PURPLE),
-            "thinking":    ("◈ REASONING CHAIN",      C.ACC),
-            "speaking":    ("◈ AUDIO SYNTHESIS",      C.GREEN),
-            "listening":   ("◈ AUDIO CAPTURE",        C.PRI),
-            "idle":        ("◈ STANDBY",              C.TEXT_DIM),
-        }
-        lbl_txt, lbl_col = mode_labels.get(mode, ("◈ AI ACTIVITY", C.TEXT_MED))
-        p.setFont(QFont("Courier New", 7, QFont.Weight.Bold))
-        p.setPen(QPen(qcol(lbl_col), 1))
-        p.drawText(QRectF(8, 4, W - 16, 14), Qt.AlignmentFlag.AlignLeft, lbl_txt)
-
-        # ── Separator line (always shown) ───────────────────────────────────
-        p.setPen(QPen(qcol(C.BORDER), 1))
-        p.drawLine(QPointF(0, 20), QPointF(W, 20))
-
-        # ── Draw based on mode (respect config) ─────────────────────────────
-        draw_y0 = 24
-        draw_h  = H - draw_y0 - 4
-
-        if mode in ("speaking",):
-            if self.config.show_equalizer_bars:  # Spectrum uses equalizer bars
-                self._draw_spectrum(p, W, draw_y0, draw_h)
-        elif mode in ("coding", "analyzing", "researching", "thinking", "idle", "listening"):
-            if self.config.show_nodes or self.config.show_edges:  # Network needs nodes or edges
-                self._draw_network(p, W, draw_y0, draw_h, mode)
-
-        # ── Data streams overlay (respect config) ───────────────────────────
-        if self.config.show_data_streams:
-            for s in self._streams:
-                a = max(0, min(255, int(s[4] * 180)))
-                p.setPen(QPen(qcol(C.PRI, a), 1))
-                p.drawLine(QPointF(s[0], s[1]), QPointF(s[0] - s[2]*3, s[1] - s[3]*3))
-
-    def _draw_network(self, p: QPainter, W: int, y0: int, H: int, mode: str):
-        if not self._nodes:
-            return
-
-        node_col = {
-            "coding":      C.ACC2,
-            "analyzing":   C.PRI,
-            "researching": C.PURPLE,
-            "thinking":    C.ACC,
-            "listening":   C.PRI,
-        }.get(mode, C.TEXT_MED)
-
-        edge_col = {
-            "coding":      C.ACC2,
-            "analyzing":   C.PRI,
-            "researching": C.PURPLE,
-            "thinking":    C.ACC,
-        }.get(mode, C.BORDER_B)
-
-        # Draw edges (respect config)
-        if self.config.show_edges:
-            # Apply edge_opacity setting
-            opacity_multiplier = {
-                "low": 0.5,
-                "medium": 1.0,
-                "high": 1.5
-            }.get(self.config.edge_opacity, 1.0)
-            for (i, j, alpha) in self._edges:
-                ni, nj = self._nodes[i], self._nodes[j]
-                x1, y1 = ni[0] * W, y0 + ni[1] * H
-                x2, y2 = nj[0] * W, y0 + nj[1] * H
-                a = max(0, min(255, int(alpha * 80 * opacity_multiplier)))
-                p.setPen(QPen(qcol(edge_col, a), 1))
-                p.drawLine(QPointF(x1, y1), QPointF(x2, y2))
-
-        # Draw data packets on edges (respect config)
-        if self.config.show_data_packets:
-            for pkt in self._data_packets:
-                ei = int(pkt[0])
-                if ei >= len(self._edges):
-                    continue
-                i, j, _ = self._edges[ei]
-                ni, nj = self._nodes[i], self._nodes[j]
-                t = pkt[1]
-                px = (ni[0] + (nj[0] - ni[0]) * t) * W
-                py = y0 + (ni[1] + (nj[1] - ni[1]) * t) * H
-                p.setPen(Qt.PenStyle.NoPen)
-                p.setBrush(QBrush(qcol(node_col, 220)))
-                p.drawEllipse(QPointF(px, py), 3, 3)
-
-        # Draw nodes with enhanced glow (respect config)
-        if self.config.show_nodes:
-            for nd in self._nodes:
-                nx, ny = nd[0] * W, y0 + nd[1] * H
-                pulse  = 0.5 + 0.5 * math.sin(nd[5])
-                # Apply node_size setting
-                size_multiplier = {
-                    "small": 0.7,
-                    "medium": 1.0,
-                    "large": 1.5
-                }.get(self.config.node_size, 1.0)
-                r_base = (4.0 + pulse * 2.5) * size_multiplier
-                # Multi-layer glow
-                for gi in range(4):
-                    gr = r_base + gi * 2.5
-                    ga = max(0, int(60 * pulse * (1 - gi / 4)))
-                    p.setPen(Qt.PenStyle.NoPen)
-                    p.setBrush(QBrush(qcol(node_col, ga)))
-                    p.drawEllipse(QPointF(nx, ny), gr, gr)
-                # Core
-                p.setBrush(QBrush(qcol(node_col, 200)))
-                p.drawEllipse(QPointF(nx, ny), r_base * 0.6, r_base * 0.6)
-
-        # Mode-specific overlays (respect config where applicable)
-        if mode == "coding" and self.config.show_nodes:
-            # Draw bracket decorations on some nodes
-            p.setPen(QPen(qcol(C.ACC2, 80), 1))
-            for i, nd in enumerate(self._nodes[:4]):
-                nx, ny = nd[0] * W, y0 + nd[1] * H
-                bl = 8
-                p.drawLine(QPointF(nx-bl, ny-bl), QPointF(nx-bl+4, ny-bl))
-                p.drawLine(QPointF(nx-bl, ny-bl), QPointF(nx-bl, ny-bl+4))
-
-        elif mode == "researching" and self.config.show_nodes:
-            # Draw expanding rings around hub nodes
-            if self._nodes:
-                hub = self._nodes[0]
-                hx, hy = hub[0] * W, y0 + hub[1] * H
-                t = (self._tick % 60) / 60.0
-                for ri in range(3):
-                    r = (t + ri / 3) * min(W, H) * 0.3
-                    a = max(0, int(120 * (1 - (t + ri / 3))))
-                    p.setPen(QPen(qcol(C.PURPLE, a), 1))
-                    p.setBrush(Qt.BrushStyle.NoBrush)
-                    p.drawEllipse(QPointF(hx, hy), r, r)
-
-        elif mode == "analyzing" and self.config.show_scanner:
-            # Scanning sweep line
-            sr = min(W, H) * 0.4
-            cx, cy = W * 0.5, y0 + H * 0.5
-            rad = math.radians(self._scan_angle)
-            p.setPen(QPen(qcol(C.PRI, 60), 1))
-            p.drawLine(QPointF(cx, cy),
-                       QPointF(cx + sr * math.cos(rad), cy + sr * math.sin(rad)))
-
-    def _draw_spectrum(self, p: QPainter, W: int, y0: int, H: int):
-        # Respect spectrum_type setting
-        if self.config.spectrum_type == "off" or not self.config.show_equalizer_bars:
-            return
-        if self.config.spectrum_type == "off":
-            return
-
-        n = len(self._bars)
-        if n == 0:
-            return
-        bw  = W / n
-        mid = y0 + H * 0.5
-
-        if self.config.spectrum_type == "waveform":
-            # Draw waveform instead of bars
-            for i in range(len(self._bars) - 1):
-                x1 = i * bw + bw/2
-                x2 = (i + 1) * bw + bw/2
-                y1 = mid - self._bars[i] * H * 0.8
-                y2 = mid - self._bars[i + 1] * H * 0.8
-                p.setPen(QPen(qcol(C.PRI, 180), 2))
-                p.drawLine(QPointF(x1, y1), QPointF(x2, y2))
-            # Glow effect for waveform
-            for i in range(len(self._bars) - 1):
-                x1 = i * bw + bw/2
-                x2 = (i + 1) * bw + bw/2
-                y1 = mid - self._bars[i] * H * 0.8
-                y2 = mid - self._bars[i + 1] * H * 0.8
-                p.setPen(QPen(qcol(C.WHITE, 60), 4))
-                p.drawLine(QPointF(x1, y1), QPointF(x2, y2))
-        else:
-            # Default bars style (original implementation)
-            for i, h in enumerate(self._bars):
-                bh  = h * H * 0.9
-                bx  = i * bw + 1
-                # Color gradient: low=cyan, mid=green, high=orange
-                t   = h / 0.6
-                if t < 0.5:
-                    col = qcol(C.PRI, 200)
-                elif t < 0.8:
-                    col = qcol(C.GREEN, 200)
-                else:
-                    col = qcol(C.ACC, 220)
-                p.fillRect(QRectF(bx, mid - bh/2, max(1, bw - 2), bh), col)
-                # Glow top
-                p.fillRect(QRectF(bx, mid - bh/2 - 2, max(1, bw - 2), 2),
-                           qcol(C.WHITE, 80))
 
 class TaskQueueWidget(QWidget):
     """Displays a live task queue parsed from JARVIS log messages."""
@@ -6722,7 +6311,6 @@ class MainWindow(QMainWindow):
     _sub_sig       = pyqtSignal(str)
     _sub_clear_sig = pyqtSignal()
     _sub_hold_sig  = pyqtSignal()
-    _mode_sig      = pyqtSignal(str)          # context mode for AIActivityCanvas
     _task_sig      = pyqtSignal(str, str)     # (task_name, status) for TaskQueueWidget
     _tool_sig      = pyqtSignal(str)          # tool log line for ToolLogWidget
     _theme_sig     = pyqtSignal(str)
@@ -6818,7 +6406,7 @@ class MainWindow(QMainWindow):
         self._left_panel = self._build_left_panel()
         self._right_panel = self._build_right_panel()
 
-        # ── AI Core area: HudCanvas, AI Activity Canvas, Subtitles ─────────────────────
+        # ── AI Core area: HudCanvas, Subtitles ─────────────────────
         self._ai_core_wrap = QWidget()
         self._ai_core_wrap.setObjectName("aiCore")
         self._ai_core_wrap.setStyleSheet(f"background: {C.BG};")
@@ -6828,7 +6416,6 @@ class MainWindow(QMainWindow):
 
         # Create configuration objects
         hud_config = HudConfig()
-        ai_config = AIActivityConfig()
 
         self.hud = HudCanvas(face_path, config=hud_config)
         self.hud.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -6843,10 +6430,6 @@ class MainWindow(QMainWindow):
             accessible_name="Presentation task progress",
         )
         ai_core_lay.addWidget(self._presentation_progress, stretch=0)
-
-        # AI Activity Canvas removed for cleaner layout
-        self._ai_canvas = AIActivityCanvas(config=ai_config)
-        self._ai_canvas.hide()
 
         # Subtitles — enhanced with speaker labels
         self._subtitle = _SubtitleWidget(parent=self._ai_core_wrap)
@@ -6937,7 +6520,6 @@ class MainWindow(QMainWindow):
         self._sub_sig.connect(self._subtitle.set_text)
         self._sub_clear_sig.connect(self._subtitle.clear_subtitle)
         self._sub_hold_sig.connect(self._subtitle.start_hold_timer)
-        self._mode_sig.connect(self._ai_canvas.set_mode)
         self._task_sig.connect(self._mission.task_widget.push_task)
         self._tool_sig.connect(self._mission.tool_widget.push)
         self._theme_sig.connect(ThemeManager.set_theme)
@@ -7258,8 +6840,6 @@ class MainWindow(QMainWindow):
 
         if hasattr(self, "hud"):
             self.hud.set_graphics_quality(value)
-        if hasattr(self, "_ai_canvas"):
-            self._ai_canvas.set_graphics_quality(value)
         if hasattr(self, "_metric_tmr"):
             self._metric_tmr.setInterval(int(profile["metrics_ms"]))
         if self._vision_preview is not None:
@@ -8667,17 +8247,6 @@ class MainWindow(QMainWindow):
             self._header_mode_lbl.setStyleSheet(
                 f"color: {state_color}; background: transparent; letter-spacing: 1px;"
             )
-        # Sync AI canvas state
-        if hasattr(self, "_ai_canvas"):
-            self._ai_canvas.state = state
-            # Map state to canvas mode if no specific context is set
-            if state == "SPEAKING":
-                self._ai_canvas.set_mode("speaking")
-            elif state == "THINKING":
-                self._ai_canvas.set_mode(getattr(self, "_context_mode", "thinking"))
-            elif state == "LISTENING":
-                self._ai_canvas.set_mode("listening")
-
         # Sync compact mode widget state
         if self._compact_widget:
             self._compact_widget.set_state(state)
@@ -8706,10 +8275,6 @@ class MainWindow(QMainWindow):
 
         if mode != getattr(self, "_context_mode", "idle"):
             self._context_mode = mode
-            try:
-                self._mode_sig.emit(mode)
-            except Exception:
-                pass
 
         # Task queue feeding
         TOOL_MAP = {
