@@ -10,7 +10,7 @@ from unittest.mock import patch
 from actions import computer_settings, file_controller, flight_finder, instagram_browser, weather_report, youtube_video
 from agent import error_handler
 from agent.task_queue import TaskPriority, TaskQueue
-from api import status as api_status
+from core import status as api_status
 from core import api_key_validator, live_model
 from memory import config_manager, memory_manager
 

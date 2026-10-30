@@ -12,7 +12,7 @@ from types import SimpleNamespace
 import sounddevice as sd
 from google import genai
 from google.genai import types
-from api import status as jarvis_status
+from core import status as jarvis_status
 from core.jarvis_client import JarvisClient
 from core.frases import frase
 from memory.memory_manager import (
