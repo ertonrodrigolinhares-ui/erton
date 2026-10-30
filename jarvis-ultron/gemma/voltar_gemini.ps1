@@ -33,6 +33,6 @@ try {
 }
 Write-Host "O Jarvis voltou a usar o Gemini como cerebro." -ForegroundColor Green
 Write-Host "Se o Jarvis estiver aberto (ou no icone perto do relogio), feche de verdade: botao direito"
-Write-Host "no icone > Quit JARVIS. Depois abra o 'Iniciar Jarvis Ultron'."
+Write-Host "no icone > Sair do Jarvis. Depois abra o 'Iniciar Jarvis Ultron'."
 Write-Host "Para usar o Gemma 4 de novo, rode o 'Instalar Gemma 4' (ele pula o que ja esta pronto)."
 Read-Host "Aperte Enter para fechar"

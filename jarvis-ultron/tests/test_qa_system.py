@@ -152,7 +152,7 @@ class QAModeSafetyTests(unittest.TestCase):
 
         jarvis._mark_self_quit_farewell_received()
         self.assertTrue(jarvis._complete_self_quit_after_audio())
-        self.assertEqual(commands, ["Quit JARVIS"])
+        self.assertEqual(commands, ["quit_jarvis"])  # ação interna da tela; o botão se chama "Sair do Jarvis"
         self.assertFalse(jarvis._pending_self_quit)
         self.assertFalse(jarvis._pending_self_quit_farewell_received)
 

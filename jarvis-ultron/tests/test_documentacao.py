@@ -191,10 +191,10 @@ class LeiaMeBateComOCodigoTests(unittest.TestCase):
         secao = _secao("## Tela e cérebro separados")
         self.assertNotIn("Fechando a janela, o cérebro fecha junto", secao)
         self.assertIn("continua ouvindo", secao)
-        self.assertIn("Quit JARVIS", secao)
+        self.assertIn("Sair do Jarvis", secao)
         claude = _secao("## Claude como chefe de tarefas")
         self.assertNotIn("valem quando você reabrir o Jarvis", claude)
-        self.assertIn("Quit JARVIS", claude)
+        self.assertIn("Sair do Jarvis", claude)
 
     def test_modo_privado_avisa_da_voz_da_microsoft(self):
         # main._falar_reserva manda o texto para a voz da internet sem JARVIS_VOZ_PRIVADA=1
@@ -236,11 +236,11 @@ class LeiaMeBateComOCodigoTests(unittest.TestCase):
                      "hermes/instalar_hermes.ps1"):
             texto = (RAIZ / nome).read_text(encoding="ascii")  # .ps1 só em ASCII (PowerShell 5.1)
             final = texto[texto.rindex("Pronto!" if "Pronto!" in texto else "voltou a usar o Gemini"):]
-            self.assertIn("Quit JARVIS", final, nome)
+            self.assertIn("Sair do Jarvis", final, nome)
             self.assertNotIn("Feche e abra o Jarvis de novo", texto, nome)
         gemma = _secao("## Cérebro Gemma 4 no seu PC")
         passo = gemma[gemma.index("2. "):gemma.index("Para voltar ao Gemini")]
-        self.assertIn("Quit JARVIS", passo)
+        self.assertIn("Sair do Jarvis", passo)
         self.assertNotIn("Abra o **\"Iniciar Jarvis Ultron\"** normalmente", gemma)
 
     def test_voz_privada_na_reserva_nao_promete_que_nada_sai_do_pc(self):
@@ -273,7 +273,7 @@ class FecharNoXTests(unittest.TestCase):
         janela.hide.assert_called_once()
         titulo, texto = bandeja.showMessage.call_args[0][:2]
         self.assertIn("continua ouvindo", texto)
-        self.assertIn("Quit JARVIS", texto)
+        self.assertIn("Sair do Jarvis", texto)
         self.assertNotIn("Running in background", titulo + texto)
 
 
@@ -340,7 +340,7 @@ class RoteiroBateComOCodigoTests(unittest.TestCase):
         self.assertIn("**feche o WhatsApp**", passo)
         self.assertIn("não envia mensagens", passo)
         self.assertIn("nada pode ser digitado", passo)
-        self.assertIn("Quit JARVIS", passo)
+        self.assertIn("Sair do Jarvis", passo)
 
 
 class TelaMaisLeveTests(unittest.TestCase):

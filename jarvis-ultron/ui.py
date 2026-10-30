@@ -13,6 +13,8 @@ from pathlib import Path
 
 import psutil
 
+from core.frases import frase
+
 from PyQt6.QtCore import (
     QEasingCurve, QEvent, QMimeData, QObject, QPointF, QPropertyAnimation,
     QRectF, QSize, Qt, QTimer, QUrl, pyqtSignal,
@@ -5574,7 +5576,7 @@ class MainWindow(QMainWindow):
     def __init__(self, face_path: str):
         super().__init__()
         _load_bundled_fonts()
-        self.setWindowTitle("J.A.R.V.I.S — MARK XXXIX")
+        self.setWindowTitle(frase("titulo_janela"))  # "Jarvis Ultron"; o computer_settings confere o mesmo
         self.setMinimumSize(_MIN_W, _MIN_H)
 
         # Set dark palette so no white leaks through any unstyled widget
@@ -5877,9 +5879,7 @@ class MainWindow(QMainWindow):
                 self.hide()
                 # Jarvis Ultron: o X não fecha; em português, para o Erton saber que ele continua ouvindo
                 self._tray.showMessage(
-                    "Jarvis continua ligado",
-                    "Ele continua ouvindo, no ícone perto do relógio. Clique no ícone para voltar; para "
-                    "fechar de verdade: botão direito no ícone → Quit JARVIS.",
+                    frase("x_so_esconde_titulo"), frase("x_so_esconde"),
                     QSystemTrayIcon.MessageIcon.Information, 6000
                 )
                 return
@@ -5907,7 +5907,7 @@ class MainWindow(QMainWindow):
         p.drawEllipse(10, 10, 12, 12)
         p.end()
         self._tray.setIcon(QIcon(px))
-        self._tray.setToolTip("J.A.R.V.I.S — MARK XXXIX")
+        self._tray.setToolTip(frase("titulo_janela"))
 
         tray_menu = QMenu()
         tray_menu.setStyleSheet(f"""
@@ -5918,17 +5918,17 @@ class MainWindow(QMainWindow):
             QMenu::item:selected {{ background: {C.PRI_GHO}; color: {C.PRI}; }}
         """)
 
-        show_action = QAction("Show JARVIS", self)
+        show_action = QAction(frase("menu_mostrar"), self)
         show_action.triggered.connect(self._tray_show)
         tray_menu.addAction(show_action)
 
-        mute_action = QAction("Toggle Mute", self)
+        mute_action = QAction(frase("menu_silenciar"), self)
         mute_action.triggered.connect(self._toggle_mute)
         tray_menu.addAction(mute_action)
 
         tray_menu.addSeparator()
 
-        quit_action = QAction("Quit JARVIS", self)
+        quit_action = QAction(frase("menu_sair"), self)
         quit_action.triggered.connect(self._tray_quit)
         tray_menu.addAction(quit_action)
 
@@ -6180,7 +6180,7 @@ class MainWindow(QMainWindow):
 
     def _handle_ui_command(self, action: str):
         action = str(action or "").strip().lower()
-        if action in {"quit jarvis", "quit_jarvis"}:
+        if action in {"quit jarvis", "quit_jarvis", "sair do jarvis"}:
             self._request_quit()
             return True
         if action == "open_command_center":
@@ -7053,8 +7053,8 @@ class MainWindow(QMainWindow):
 
         self._quit_btn = QPushButton("QUIT")
         self._quit_btn.setObjectName("JarvisQuitButton")
-        self._quit_btn.setAccessibleName("Quit JARVIS")
-        self._quit_btn.setToolTip("Quit JARVIS")
+        self._quit_btn.setAccessibleName(frase("menu_sair"))
+        self._quit_btn.setToolTip(frase("menu_sair"))
         self._quit_btn.setFixedSize(78, 44)
         self._quit_btn.setFont(QFont(UI_FONT, 8, QFont.Weight.DemiBold))
         self._quit_btn.setCursor(Qt.CursorShape.PointingHandCursor)

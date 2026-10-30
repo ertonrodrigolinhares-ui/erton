@@ -14,7 +14,7 @@ echo Baixando o modelo de voz em portugues (uns 500 MB, so na primeira vez)...
 ".venv\Scripts\python.exe" -c "from faster_whisper import WhisperModel; WhisperModel('small', device='cpu', compute_type='int8'); print('ok')" || goto erro
 echo.
 echo Pronto! A sua voz agora e transcrita no PC. Feche o Jarvis de verdade
-echo (botao direito no icone perto do relogio, Quit JARVIS) e abra de novo.
+echo (botao direito no icone perto do relogio, Sair do Jarvis) e abra de novo.
 pause
 exit /b 0
 :erro

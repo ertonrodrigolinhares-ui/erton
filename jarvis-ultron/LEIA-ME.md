@@ -98,7 +98,7 @@ aparece `[Ponte] Cérebro conectado`.
 - Se o cérebro parar, a tela avisa e **religa ele sozinha** (até 3 vezes em 5 minutos).
 - O **X** da janela **não fecha** o Jarvis: ele fica escondido no ícone perto do relógio (se não
   aparecer, clique na setinha ^ ao lado do relógio) e **continua ouvindo**. Para fechar de verdade:
-  botão direito nesse ícone → **Quit JARVIS** (ou o botão **QUIT** da tela antiga, ou feche a janela
+  botão direito nesse ícone → **Sair do Jarvis** (ou o botão **QUIT** da tela antiga, ou feche a janela
   preta). Aí o cérebro fecha junto. Feche assim antes de abrir o Jarvis de novo: senão ficam dois
   Jarvis ouvindo e respondendo ao mesmo tempo.
 - Para voltar ao jeito antigo (um programa só), ponha `JARVIS_UM_PROCESSO=1` no `.env`.
@@ -130,10 +130,10 @@ não sai do PC, então dá para usar com dados de clientes, sem limite e sem cha
    (10 a 18 GB, demora na primeira vez), instala o Whisper para transcrever sua voz no PC e liga
    o Jarvis no Gemma.
 2. Se o Jarvis estiver aberto, feche de verdade: botão direito no ícone perto do relógio →
-   **Quit JARVIS** (o X só esconde, e o Jarvis que já estava aberto continuaria no Gemini,
+   **Sair do Jarvis** (o X só esconde, e o Jarvis que já estava aberto continuaria no Gemini,
    ouvindo). Depois abra o **"Iniciar Jarvis Ultron"**.
 
-Para voltar ao Gemini: **"Voltar para o Gemini"** (e, do mesmo jeito, feche em **Quit JARVIS** e
+Para voltar ao Gemini: **"Voltar para o Gemini"** (e, do mesmo jeito, feche em **Sair do Jarvis** e
 abra de novo). Para usar o Gemma de novo: rode o "Instalar Gemma 4" (ele pula o que já está pronto).
 
 Bom saber:
@@ -176,7 +176,7 @@ O Gemini continua sendo a **voz** do Jarvis. Quando o pedido é grande, o Jarvis
 1. Dê dois cliques em **"Instalar Claude"**. Ele instala o Claude Code (instalador oficial, sem
    administrador), prepara a pasta `Documentos\Jarvis Ultron\Claude` com os 22 agentes e abre o
    Claude para você **entrar com a sua conta** (no fim, digite `/exit`).
-2. Abra o Jarvis (se ele estava aberto, feche de verdade, em **Quit JARVIS**, e abra de novo) e peça,
+2. Abra o Jarvis (se ele estava aberto, feche de verdade, em **Sair do Jarvis**, e abra de novo) e peça,
    por exemplo:
    - "Jarvis, pede para o Claude pesquisar as novidades da reforma tributária para holdings."
    - "Jarvis, manda o Claude analisar a planilha que deixei na pasta Entrada."
@@ -208,7 +208,7 @@ parecido nos índices. Para atualizar a coleção: troque os arquivos de `claude
 3. O Jarvis faz um **backup** (`Documentos\Jarvis Ultron\Backups`), roda os testes, o Claude
    aplica, e o Jarvis confere a escrita do código e roda os testes de novo.
 4. Se algo quebrar, o Jarvis **desfaz sozinho**, arquivo por arquivo. As mudanças valem quando
-   você fechar o Jarvis de verdade (botão direito no ícone perto do relógio → **Quit JARVIS**; o X
+   você fechar o Jarvis de verdade (botão direito no ícone perto do relógio → **Sair do Jarvis**; o X
    só esconde) e abrir de novo. O registro de cada mudança fica em `Claude\Mudancas`.
 5. Enquanto o Claude muda o código, o Jarvis não troca de modo (privado/normal). Se o Jarvis fechar
    ou o PC desligar no meio, o Claude para junto e, na próxima vez que você abrir, o Jarvis desfaz
@@ -340,7 +340,7 @@ Depois é só mandar mensagens para o robô no Telegram. Só o **seu** usuário 
 ## Automações novas: um arquivo só
 
 Toda automação nova vem em **um arquivo**: salve na pasta **`automacoes`** (dentro da pasta do
-Jarvis), feche o Jarvis de verdade (**Quit JARVIS**, no ícone perto do relógio) e abra de novo.
+Jarvis), feche o Jarvis de verdade (**Sair do Jarvis**, no ícone perto do relógio) e abra de novo.
 Não precisa atualizar o resto do projeto. Veja
 `automacoes/LEIA-ME.md`. Para desligar, apague o arquivo da pasta.
 
@@ -517,7 +517,7 @@ redes). Os **anúncios do Meta** ficam pelo app do Claude (veja "Limitações co
    - abre o navegador para você autorizar o **Metricool**;
    - cria a **rotina diária das 8h** e faz o Hermes ligar sozinho com o Windows.
 2. Se o Jarvis estiver aberto, feche de verdade (botão direito no ícone perto do relógio →
-   **Quit JARVIS**) e abra o **"Iniciar Jarvis Ultron"**.
+   **Sair do Jarvis**) e abra o **"Iniciar Jarvis Ultron"**.
 
 **Se o Jarvis disser "O Hermes está desligado":** dê dois cliques em **`Ligar Hermes`**. Ele liga o
 serviço e testa a ligação; se o serviço automático não subir, ele liga o Hermes na própria janela

@@ -1201,7 +1201,7 @@ def _aplicar_e_conferir(pasta: Path, antes: dict[str, str], backup: Path, falhas
     registro = registrar(pedido, plano, mudados, f"APLICADO ({situacao})", backup)
     # o X da janela só esconde o Jarvis perto do relógio: reabrindo assim, o antigo continuaria ligado
     fala = (f"Pronto: o Claude mudou {len(mudados)} arquivo(s) e {situacao}. As mudanças valem quando você "
-            f"fechar o Jarvis de verdade, no ícone perto do relógio, em Quit JARVIS, e abrir de novo. "
+            f"fechar o Jarvis de verdade, no ícone perto do relógio, em Sair do Jarvis, e abrir de novo. "
             f"{resposta.fala}").strip()
     return Resultado(True, fala, f"Arquivos: {', '.join(mudados)}. Backup: {backup}. Registro: {registro}")
 

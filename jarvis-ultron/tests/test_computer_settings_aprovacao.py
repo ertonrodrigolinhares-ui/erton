@@ -37,7 +37,7 @@ from test_contratos import UIFalsa  # noqa: E402
 REINICIAR = {"action": "restart", "description": "restart my computer"}
 DESLIGAR = {"action": "shutdown", "description": "shut down my computer"}
 JANELA = (42, "Sem título - Bloco de Notas")
-JANELA_DO_JARVIS = (7, "J.A.R.V.I.S — MARK XXXIX")
+JANELA_DO_JARVIS = (7, cs.TITULO_DO_JARVIS)  # "Jarvis Ultron" (core/frases.py), o mesmo da janela
 JANELA_DA_FRENTE = cs._janela_da_frente  # a de verdade (nos testes ela fica falsa)
 # fora do ACTION_MAP, também mandam texto ou teclas para o programa da frente
 TECLADO_FORA_DO_MAPA = {
@@ -775,8 +775,13 @@ class JanelaDoJarvisTests(BaseTests):
         self.assertEqual(self.teclado.method_calls, [])
 
     def test_titulo_e_o_da_janela_da_tela(self):
+        # a tela e esta trava leem o mesmo nome do core/frases.py: mudar lá muda nos dois
+        from core import frases
+
         ui = (RAIZ / "ui.py").read_text(encoding="utf-8")
-        self.assertIn(f'self.setWindowTitle("{cs.TITULO_DO_JARVIS}")', ui)
+        self.assertIn('self.setWindowTitle(frase("titulo_janela"))', ui)
+        self.assertEqual(frases.frase("titulo_janela"), cs.TITULO_DO_JARVIS)
+        self.assertEqual(cs.TITULO_DO_JARVIS, "Jarvis Ultron")
 
     def test_desligar_e_a_tecla_sleep_nao_dependem_da_janela(self):
         # vão para o Windows, não para a janela da frente: com a do Jarvis na frente, perguntam normalmente

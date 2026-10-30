@@ -214,7 +214,7 @@ class MudarCodigoTests(Base):
         # o X da janela só esconde o Jarvis perto do relógio: "reabrir" assim deixava dois Jarvis ouvindo
         r = self._aplicar("def soma(a, b):\n    return a - b\n")
         self.assertTrue(r.ok, r.fala)
-        self.assertIn("Quit JARVIS", r.fala)
+        self.assertIn("Sair do Jarvis", r.fala)
         self.assertNotIn("quando você reabrir", r.fala)
 
     def test_claude_sem_mudar_nada(self):

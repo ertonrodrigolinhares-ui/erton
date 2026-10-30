@@ -5,8 +5,7 @@ confere, no seu PC, o que os testes automáticos não veem: a voz, a tela e as t
 
 ## Antes de começar
 
-1. Feche o Jarvis de verdade: botão direito no ícone perto do relógio → **Quit JARVIS** (depois
-   da tradução da tela, o nome passa a ser **Sair do Jarvis**). O X só esconde.
+1. Feche o Jarvis de verdade: botão direito no ícone perto do relógio → **Sair do Jarvis**. O X só esconde.
 2. **Guarde a pasta da versão anterior** (não apague): é a sua volta segura.
 3. Extraia a versão nova numa pasta nova e **copie o seu `.env`** da pasta antiga para a nova.
 
@@ -41,7 +40,7 @@ Para cada passo, o que fazer e o que tem de acontecer.
    - Ele tem de dizer que não envia mensagens. Nada pode abrir, e nada pode ser digitado em nenhuma
      janela. Se ele perguntar se pode digitar ou apertar alguma tecla, responda **"não"** e avise.
    - Se ele abrir o WhatsApp ou digitar alguma coisa, feche o Jarvis na hora (botão direito no ícone →
-     **Quit JARVIS**) e avise.
+     **Sair do Jarvis**) e avise.
 8. **Reiniciar com "não":** salve o que estiver aberto antes, por garantia. Diga **"Jarvis, reinicia o
    computador"**. Ele pergunta se pode reiniciar (a pergunta também aparece escrita num aviso do Windows,
    perto do relógio): responda **"não"**.
@@ -78,7 +77,7 @@ Para cada passo, o que fazer e o que tem de acontecer.
     - A pasta `Documentos\Jarvis Ultron\Claude\Agency` existe, com o `INDICE.md` e uma pasta por área.
 14. **Fechar:** clique no **X** da janela.
     - A janela some, mas o ícone continua perto do relógio (o Jarvis continua ouvindo).
-    - Botão direito no ícone → **Quit JARVIS** (ou **Sair do Jarvis**): o Jarvis fecha de verdade,
+    - Botão direito no ícone → **Sair do Jarvis**: o Jarvis fecha de verdade,
       e a janela preta fecha junto.
 
 ## Se algo estranhar

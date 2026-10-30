@@ -1329,7 +1329,7 @@ class JarvisLive:
             self._self_quit_timer.cancel()
             self._self_quit_timer = None
         self.request_shutdown()
-        self.ui.handle_ui_command("Quit JARVIS")
+        self.ui.handle_ui_command("quit_jarvis")  # ação interna da tela (o botão se chama "Sair do Jarvis")
         return True
 
     def _encerrar_fim_do_teste(self) -> None:
