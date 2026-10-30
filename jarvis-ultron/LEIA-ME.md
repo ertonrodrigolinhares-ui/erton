@@ -62,7 +62,8 @@ Cópia do projeto **JARVIS-OS V.2** (licença MIT, veja `LICENSE`), com ajustes 
 2. Quando pedir a chave do Gemini, o site do Google abre sozinho: entre com o Gmail, clique em
    **Create API key**, copie, volte à janela preta, **clique com o botão direito** para colar e aperte **Enter**.
 3. Depois ele pergunta a chave do **Groq** (reserva grátis, opcional) e a **cidade** do clima.
-4. A tela do Jarvis abre. Na primeira vez ele mostra uma apresentação (em inglês). Depois é só **falar**.
+4. A tela do Jarvis abre. Na primeira vez ele pede a chave do Gemini, a voz e como chamar você (tudo em
+   português). Depois é só **falar**.
 5. **Deixe a janela preta aberta** enquanto usa. Ela mostra o que o Jarvis está fazendo.
 6. Para os agentes (posts, Metricool, rotina das 8h): dê dois cliques em **`Instalar Hermes`**.
 
@@ -494,7 +495,8 @@ o Jarvis não mexe nessas configurações do PC.
 
 ## Observações
 
-- A interface original é em **inglês**. O Jarvis fala e entende português.
+- As telas, os avisos e o menu do ícone perto do relógio são em **português**. A tela antiga (a do F2)
+  ainda tem partes em inglês.
 - Algumas funções exigem configuração extra (Gmail, Spotify). Veja `docs/USAGE.md`.
 - Os testes herdados do projeto original que cobravam telas do JARVIS-OS que não existem mais saíram
   (ficam guardados na etiqueta git `antes-da-reorganizacao`). Os testes que oscilam (hoje, só dois do
