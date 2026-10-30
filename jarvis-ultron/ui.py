@@ -4373,8 +4373,8 @@ class NameSignInOverlay(_OverlayBase):
             w.setStyleSheet(f"color: {color}; background: transparent;")
             return w
 
-        title_txt = "◈  UPDATE IDENTITY" if existing_name else "◈  IDENTITY PROTOCOL"
-        sub_txt   = f"Currently: {existing_name}" if existing_name else "JARVIS needs to know who it's talking to."
+        title_txt = "◈  MUDAR O NOME" if existing_name else "◈  COMO CHAMAR VOCÊ"
+        sub_txt   = f"Currently: {existing_name}" if existing_name else "O Jarvis precisa saber com quem está falando."
         layout.addWidget(_lbl(title_txt, 13, True))
         layout.addWidget(_lbl(sub_txt, 9, color=C.PRI_DIM))
         layout.addSpacing(4)
@@ -4383,11 +4383,11 @@ class NameSignInOverlay(_OverlayBase):
         sep.setStyleSheet(f"color: {C.BORDER};"); layout.addWidget(sep)
         layout.addSpacing(6)
 
-        layout.addWidget(_lbl("ENTER YOUR NAME", 8, color=C.TEXT_DIM,
+        layout.addWidget(_lbl("SEU NOME", 8, color=C.TEXT_DIM,
                                align=Qt.AlignmentFlag.AlignLeft))
 
         self._name_input = QLineEdit()
-        self._name_input.setPlaceholderText("e.g.  Tony,  Mirsab,  Alex …")
+        self._name_input.setPlaceholderText("ex.:  Ana,  Carlos …")
         if existing_name:
             self._name_input.setText(existing_name)
             self._name_input.selectAll()
@@ -4406,7 +4406,7 @@ class NameSignInOverlay(_OverlayBase):
 
         layout.addSpacing(4)
 
-        confirm_btn = QPushButton("▸  CONFIRM IDENTITY")
+        confirm_btn = QPushButton("▸  CONFIRMAR")
         confirm_btn.setFixedHeight(34)
         confirm_btn.setFont(QFont("Courier New", 9, QFont.Weight.Bold))
         confirm_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -4420,7 +4420,7 @@ class NameSignInOverlay(_OverlayBase):
         confirm_btn.clicked.connect(self._submit)
         layout.addWidget(confirm_btn)
 
-        skip_btn = QPushButton("Skip — default to Sir")
+        skip_btn = QPushButton("Pular — ele chama de \"senhor\"")
         skip_btn.setFixedHeight(26)
         skip_btn.setFont(QFont("Courier New", 7))
         skip_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -4431,12 +4431,12 @@ class NameSignInOverlay(_OverlayBase):
             }}
             QPushButton:hover {{ color: {C.TEXT_MED}; border: 1px solid {C.BORDER_B}; }}
         """)
-        skip_btn.clicked.connect(lambda: self.done.emit("Sir"))
+        skip_btn.clicked.connect(lambda: self.done.emit("Senhor"))
         layout.addWidget(skip_btn)
 
         layout.addSpacing(4)
         layout.addWidget(_lbl(
-            "Your name is stored locally and never sent to any server.",
+            "Seu nome fica só neste computador.",
             7, color=C.TEXT_DIM
         ))
 
@@ -4484,8 +4484,8 @@ class VoiceSelectOverlay(_OverlayBase):
             w.setStyleSheet(f"color: {color}; background: transparent;")
             return w
 
-        layout.addWidget(_lbl("◈  VOICE SELECTION", 13, True))
-        layout.addWidget(_lbl("Choose the voice JARVIS will speak with.", 9, color=C.PRI_DIM))
+        layout.addWidget(_lbl("◈  ESCOLHA A VOZ", 13, True))
+        layout.addWidget(_lbl("Escolha a voz com que o Jarvis vai falar.", 9, color=C.PRI_DIM))
         layout.addSpacing(4)
 
         sep = QFrame(); sep.setFrameShape(QFrame.Shape.HLine)
@@ -4515,7 +4515,7 @@ class VoiceSelectOverlay(_OverlayBase):
 
         layout.addSpacing(6)
 
-        confirm_btn = QPushButton("▸  CONFIRM VOICE")
+        confirm_btn = QPushButton("▸  CONFIRMAR A VOZ")
         confirm_btn.setFixedHeight(34)
         confirm_btn.setFont(QFont("Courier New", 9, QFont.Weight.Bold))
         confirm_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -7588,8 +7588,8 @@ class MainWindow(QMainWindow):
         if not name or not name.strip():
             # X button was pressed — don't overwrite saved name
             return
-        # Always save — "Sir" is the default when skipped
-        save_name = name.strip() if name.strip() else "Sir"
+        # Sempre guarda: "Senhor" é o padrão quando ele pula
+        save_name = name.strip() if name.strip() else "Senhor"
         try:
             from memory.memory_manager import update_memory
             update_memory({"identity": {"name": {"value": save_name}}})
@@ -7620,7 +7620,7 @@ class MainWindow(QMainWindow):
                 name = name_entry.get("value")
             elif isinstance(name_entry, str):
                 name = name_entry
-            if name and name.strip() and name.strip().lower() not in ("sir", "madam"):
+            if name and name.strip() and name.strip().lower() not in ("sir", "madam", "senhor", "senhora"):
                 display_name = name.strip()
                 if len(display_name) > 14:
                     display_name = display_name[:13].rstrip() + "…"
