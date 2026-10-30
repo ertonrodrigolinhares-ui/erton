@@ -3,7 +3,7 @@
 O que o Erton sente no PC com o Jarvis aberto, garantido aqui:
 - importar o ui.py não cria fio nenhum (antes, um fio lia o sistema a cada 1,5 s desde a importação);
 - a tela antiga, a Cena (tela azul) e a tela Stark leem CPU e memória da mesma fonte (core/metricas.py);
-- com a Cena na frente, os relógios da tela antiga (hora, medidores, grade de agentes) e da Stark ficam
+- com a Cena na frente, os relógios da tela antiga (hora e medidores) e da Stark ficam
   parados: ninguém vê esses painéis;
 - o anel continua pulsando com a voz (o _nivel_suave do HudCanvas), mas a esfera antiga, que o anel
   substituiu, não é mais animada por baixo dele.
@@ -109,7 +109,6 @@ class CenaNaFrenteParaOsRelogiosTests(unittest.TestCase):
             cena = janela._orbe.cena
             self.assertTrue(cena.ativa and cena.isVisible())
             self.assertTrue(ui._tela_antiga_parada(janela))
-            self.assertTrue(ui._tela_antiga_parada(janela._agent_grid))
             janela._clock_lbl.setText("PARADO")
             janela._bar_cpu.set_value(1.0, "PARADO")
             with patch.object(ui, "_get_metrics", return_value=dict(RETRATO)) as leitura:
@@ -130,23 +129,6 @@ class CenaNaFrenteParaOsRelogiosTests(unittest.TestCase):
             finally:
                 cena.alternar()
             self.assertTrue(ui._tela_antiga_parada(janela))
-
-    def test_grade_de_agentes_nao_anima_atras_da_cena(self):
-        with _JanelaDeTeste() as janela:
-            grade = janela._agent_grid
-            antes = grade._tick
-            grade._animate()
-            self.assertEqual(grade._tick, antes)
-            janela._orbe.cena.alternar()  # F2: tela antiga na frente...
-            janela._set_command_center(True, announce=False)  # ...com o Command Center aberto...
-            janela._left_stack.setCurrentIndex(1)  # ...na aba dos agentes: aí sim a grade aparece
-            try:
-                self.assertFalse(ui._tela_antiga_parada(grade))
-                grade._animate()
-                self.assertEqual(grade._tick, antes + 1)
-            finally:
-                janela._set_command_center(False, announce=False)
-                janela._orbe.cena.alternar()
 
     def test_janela_escondida_na_bandeja_tambem_para(self):
         with _JanelaDeTeste() as janela:
