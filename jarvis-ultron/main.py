@@ -303,7 +303,39 @@ def get_tool_declarations(*, cloud_safe: bool = False) -> list[dict]:
 # (open_app, web_search_action...), lidos na hora da chamada: os testes que os trocam continuam valendo.
 # O save_memory fica no _execute_tool, porque tem uma regra própria do modo privado.
 
-EXECUTORES = {}
+async def _ex_weather_report(jarvis, args):
+    r = await asyncio.to_thread(lambda: weather_action(parameters=args, player=jarvis.ui))
+    return r or "Weather delivered."
+
+
+async def _ex_web_search(jarvis, args):
+    r = await asyncio.to_thread(lambda: web_search_action(parameters=args, player=jarvis.ui))
+    return r or "Done."
+
+
+async def _ex_browser_control(jarvis, args):
+    r = await asyncio.to_thread(lambda: browser_control(parameters=args, player=jarvis.ui))
+    return r or "Done."
+
+
+async def _ex_media_control(jarvis, args):
+    r = await asyncio.to_thread(lambda: media_control(parameters=args, response=None, player=jarvis.ui))
+    return r or "Done."
+
+
+async def _ex_youtube_video(jarvis, args):
+    r = await asyncio.to_thread(lambda: youtube_video(parameters=args, response=None, player=jarvis.ui))
+    return r or "Done."
+
+
+EXECUTORES = {
+    # grupo 1: internet e mídia
+    "weather_report": _ex_weather_report,
+    "web_search": _ex_web_search,
+    "browser_control": _ex_browser_control,
+    "media_control": _ex_media_control,
+    "youtube_video": _ex_youtube_video,
+}
 
 
 class JarvisLive:
@@ -1638,14 +1670,6 @@ class JarvisLive:
                 from core.modelos import gerar_imagem
                 result = await asyncio.to_thread(gerar_imagem, args.get("prompt", ""))
 
-            elif name == "weather_report":
-                r = await asyncio.to_thread(lambda: weather_action(parameters=args, player=self.ui))
-                result = r or "Weather delivered."
-
-            elif name == "browser_control":
-                r = await asyncio.to_thread(lambda: browser_control(parameters=args, player=self.ui))
-                result = r or "Done."
-
             elif name == "file_controller":
                 if (
                     args.get("action", "").lower() == "open"
@@ -1675,14 +1699,6 @@ class JarvisLive:
                 r = await asyncio.to_thread(lambda: reminder(parameters=args, response=None, player=self.ui))
                 result = r or "Reminder set."
 
-            elif name == "youtube_video":
-                r = await asyncio.to_thread(lambda: youtube_video(parameters=args, response=None, player=self.ui))
-                result = r or "Done."
-
-            elif name == "media_control":
-                r = await asyncio.to_thread(lambda: media_control(parameters=args, response=None, player=self.ui))
-                result = r or "Done."
-
             elif name == "screen_process":
                 threading.Thread(
                     target=screen_process,
@@ -1704,9 +1720,6 @@ class JarvisLive:
                 r = await asyncio.to_thread(lambda: desktop_control(parameters=args, player=self.ui))
                 result = r or "Done."
 
-            elif name == "web_search":
-                r = await asyncio.to_thread(lambda: web_search_action(parameters=args, player=self.ui))
-                result = r or "Done."
             elif name == "file_processor":
                 if not args.get("file_path") and self.ui.current_file:
                     args["file_path"] = self.ui.current_file
