@@ -19,13 +19,11 @@
 # defeito, era teste velho. Ele esperava o nome do macOS ("Google Chrome") em qualquer sistema; no
 # Windows o open_app dá "chrome", que é o certo. O teste foi ajustado para o Windows e passa.
 #
-# 1 defeito de verdade, só visual (anotado na Etapa 2): a tela da chave do Gemini nasce com a posição
-# calculada antes de a janela abrir (a área do meio ainda com 640x480) e nada a traz para o centro depois:
-# ela fica no alto, à esquerda, enquanto confere a chave. Conferido também numa tela X de verdade (xvfb):
-# (90, 30) em vez de (410, 200). Consertar junto com a Etapa 7 (janelas por cima da Cena) e tirar daqui.
-tests/test_ui_regressions.py::UIRegressionTests::test_setup_overlay_is_centered_after_first_show
+# (O defeito da tela da chave nascendo no canto, anotado na Etapa 2, foi consertado na Etapa 7: a janela
+# recentra as janelinhas no resize usando isHidden(), não isVisible(), porque no primeiro show() o Qt manda
+# o resize antes de a janela ficar visível. O teste test_setup_overlay_is_centered_after_first_show passa.)
 
-# Outro defeito de verdade, só visual (anotado no reparo da Etapa 2): 23 linhas do ui.py pedem cor com
+# Defeito de verdade, só visual (anotado no reparo da Etapa 2): 23 linhas do ui.py pedem cor com
 # transparência escrevendo "{C.ENERGY}22" (#RRGGBBAA), mas o Qt lê #AARRGGBB: a cor some ou vira outra
 # (conferido: "background: #00d4ff22" não pinta nada; rgba(0, 212, 255, 34) pinta). Não é só a tela
 # antiga (F2): estão na conversa da tela antiga (ChatBubbleWidget), no "executando..." (ToolProgressWidget),

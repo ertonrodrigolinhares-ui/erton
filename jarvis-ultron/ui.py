@@ -3886,6 +3886,7 @@ class _OverlayBase(QWidget):
                 new_pos.setX(max(0, min(new_pos.x(), pr.width()  - self.width())))
                 new_pos.setY(max(0, min(new_pos.y(), pr.height() - self.height())))
             self.move(new_pos)
+            self._has_user_position = True  # a janela principal não recentra mais esta janelinha
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
@@ -5528,6 +5529,37 @@ class MainWindow(QMainWindow):
     _presentation_progress_hide_sig = pyqtSignal()
     _ui_command_sig = pyqtSignal(str)
 
+    # Jarvis Ultron: as janelinhas que abrem por cima da tela (chave do Gemini, nome, voz, voz externa,
+    # Ajustes, Atalhos e a janela da visão), numa lista só. A Cena (tela azul) as traz para a frente, e o
+    # redimensionar as recentra; os avisos (ToastManager) entram em janelas_por_cima() também.
+    JANELAS_POR_CIMA = ("_overlay", "_name_overlay", "_voice_overlay", "_tts_overlay",
+                        "_settings_overlay", "_shortcuts_overlay", "_vision_preview")
+    RECENTRAR = ("_overlay", "_name_overlay", "_voice_overlay", "_tts_overlay",
+                 "_settings_overlay", "_shortcuts_overlay")  # a visão fica no canto, por conta própria
+
+    def janelas_por_cima(self) -> list:
+        """As janelinhas e os avisos abertos agora, na ordem em que devem ficar por cima de tudo."""
+        janelas = []
+        for nome in self.JANELAS_POR_CIMA:
+            w = getattr(self, nome, None)
+            if w is not None and not w.isHidden():
+                janelas.append(w)
+        for aviso in list(ToastManager._toasts):
+            if ToastManager._is_alive(aviso):
+                janelas.append(aviso)
+        return janelas
+
+    def _reencaixar_janelas(self) -> None:
+        """Ao mudar de tamanho: recentra as janelinhas que o Erton não arrastou e traz todas para a frente.
+        Usa isHidden(), e não isVisible(): no primeiro show() o Qt manda o resize antes de a janela ficar
+        visível, e por isso a tela da chave nascia no canto (defeito anotado na Etapa 2)."""
+        cw = self.centralWidget()
+        recentraveis = [getattr(self, nome, None) for nome in self.RECENTRAR]
+        for w in self.janelas_por_cima():
+            if w in recentraveis and not getattr(w, "_has_user_position", False) and w.parentWidget() is cw:
+                w.move((cw.width() - w.width()) // 2, (cw.height() - w.height()) // 2)
+            w.raise_()
+
     def __init__(self, face_path: str):
         super().__init__()
         _load_bundled_fonts()
@@ -6301,28 +6333,7 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        cw = self.centralWidget()
-        if self._overlay and self._overlay.isVisible():
-            ow, oh = 460, 470
-            self._overlay.setGeometry(
-                (cw.width()  - ow) // 2,
-                (cw.height() - oh) // 2,
-                ow, oh,
-            )
-        if self._name_overlay and self._name_overlay.isVisible():
-            ow, oh = 420, 310
-            self._name_overlay.setGeometry(
-                (cw.width()  - ow) // 2,
-                (cw.height() - oh) // 2,
-                ow, oh,
-            )
-        if hasattr(self, "_voice_overlay") and self._voice_overlay and self._voice_overlay.isVisible():
-            ow, oh = 420, 380
-            self._voice_overlay.setGeometry(
-                (cw.width()  - ow) // 2,
-                (cw.height() - oh) // 2,
-                ow, oh,
-            )
+        self._reencaixar_janelas()
 
     def _update_metrics(self):
         if _tela_antiga_parada(self):

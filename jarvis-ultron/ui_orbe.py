@@ -763,11 +763,16 @@ class Cena(QWidget):
         return False
 
     def _trazer_janelas(self):
-        """A tela de chave do Gemini e a de nome precisam ficar por cima da cena."""
-        for nome in ("_overlay", "_name_overlay"):
-            w = getattr(self.win, nome, None)
-            if w is not None and w.isVisible():
-                w.raise_()
+        """As janelinhas (chave do Gemini, nome, voz, Ajustes, Atalhos, visão) e os avisos ficam por cima
+        da cena: a lista é uma só, a MainWindow.janelas_por_cima() (antes só a chave e o nome voltavam)."""
+        listar = getattr(self.win, "janelas_por_cima", None)
+        if callable(listar):
+            janelas = listar()
+        else:  # janela de teste sem a lista
+            janelas = [w for w in (getattr(self.win, n, None) for n in ("_overlay", "_name_overlay"))
+                       if w is not None and not w.isHidden()]
+        for w in janelas:
+            w.raise_()
 
     def _organizar(self):
         W, H = self.width(), self.height()
