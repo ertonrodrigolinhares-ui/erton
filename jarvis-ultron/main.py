@@ -398,7 +398,49 @@ async def _ex_reminder(jarvis, args):
     return r or "Reminder set."
 
 
+async def _ex_listening_mode(jarvis, args):
+    return jarvis._definir_modo_escuta(args.get("mode", ""))
+
+
+async def _ex_hermes_agent(jarvis, args):
+    return await jarvis._hermes_sem_travar(args.get("request", ""))
+
+
+async def _ex_school_tasks(jarvis, args):
+    return await jarvis._geekie_pendencias(bool(args.get("refresh", False)))
+
+
+async def _ex_self_diagnosis(jarvis, args):
+    return await asyncio.to_thread(jarvis._autodiagnostico, False)
+
+
+async def _ex_approve_publication(jarvis, args):
+    from core import hermes_ponte
+    # o "ok" é conferido no código: numa fala NOVA do Erton depois da proposta (core/aprovacao.py)
+    return await asyncio.to_thread(
+        hermes_ponte.aprovar_e_executar,
+        args.get("kind", ""), args.get("details", ""), jarvis, bool(args.get("confirm")),
+    )
+
+
+async def _ex_suspend_listening(jarvis, args):
+    return jarvis._suspender(args.get("minutes", 10))
+
+
+async def _ex_generate_image(jarvis, args):
+    from core.modelos import gerar_imagem
+    return await asyncio.to_thread(gerar_imagem, args.get("prompt", ""))
+
+
 EXECUTORES = {
+    # grupo 4: o Jarvis por dentro
+    "listening_mode": _ex_listening_mode,
+    "hermes_agent": _ex_hermes_agent,
+    "school_tasks": _ex_school_tasks,
+    "self_diagnosis": _ex_self_diagnosis,
+    "approve_publication": _ex_approve_publication,
+    "suspend_listening": _ex_suspend_listening,
+    "generate_image": _ex_generate_image,
     # grupo 3: e-mail e lembrete
     "email_control": _ex_email_control,
     "reminder": _ex_reminder,
@@ -1718,33 +1760,6 @@ class JarvisLive:
             executor = EXECUTORES.get(name)
             if executor is not None:
                 result = await executor(self, args)
-
-            elif name == "listening_mode":
-                result = self._definir_modo_escuta(args.get("mode", ""))
-
-            elif name == "hermes_agent":
-                result = await self._hermes_sem_travar(args.get("request", ""))
-
-            elif name == "school_tasks":
-                result = await self._geekie_pendencias(bool(args.get("refresh", False)))
-
-            elif name == "self_diagnosis":
-                result = await asyncio.to_thread(self._autodiagnostico, False)
-
-            elif name == "approve_publication":
-                from core import hermes_ponte
-                # o "ok" é conferido no código: numa fala NOVA do Erton depois da proposta (core/aprovacao.py)
-                result = await asyncio.to_thread(
-                    hermes_ponte.aprovar_e_executar,
-                    args.get("kind", ""), args.get("details", ""), self, bool(args.get("confirm")),
-                )
-
-            elif name == "suspend_listening":
-                result = self._suspender(args.get("minutes", 10))
-
-            elif name == "generate_image":
-                from core.modelos import gerar_imagem
-                result = await asyncio.to_thread(gerar_imagem, args.get("prompt", ""))
 
             elif name in FERRAMENTAS_DESLIGADAS:
                 # desligada de propósito (Etapa 3): responde e não chama nada
