@@ -1,4 +1,22 @@
-Jarvis Ultron - versão 2026-10-19.2
+Jarvis Ultron - versão 2026-10-30
+
+Novidades desta versão (Etapa 6 da reorganização: a tela mais leve):
+- O PC fica mais leve com o Jarvis aberto. A tela antiga (a do F2) e seus painéis ficavam trabalhando
+  escondidos atrás da tela azul: um medidor lia o sistema a cada 1,5 segundo (e abria programas de fora
+  para ler a placa de vídeo e a temperatura), um painel animado que nunca aparecia recalculava quadros
+  a 60 por segundo, a grade de "agentes" se redesenhava a cada 80 ms e a esfera antiga, que o anel
+  substituiu, continuava sendo animada por baixo dele. Agora, com a tela azul na frente (ou com o Jarvis
+  na bandeja ou minimizado), nada disso trabalha; a tela antiga volta a andar quando você aperta F2.
+  O anel, a voz e o "bom dia" não mudam.
+- "Jarvis, autodiagnóstico" passa a dizer quanto o próprio Jarvis está gastando: "CPU do Jarvis: tela
+  X%, cérebro Y% (com a memória de cada um)", a CPU do computador inteiro e a bateria (num computador
+  de mesa, "sem bateria" é normal). É o número para comparar esta versão com a anterior.
+- Todas as telas (azul, antiga e Stark) leem CPU e memória da mesma fonte, então mostram o mesmo
+  número; e as leituras de placa de vídeo e temperatura só acontecem se o PC tem como responder, sem
+  abrir janela preta.
+- Código morto da tela retirado (cerca de 620 linhas), sem mudar nada no uso.
+
+Versão anterior (2026-10-19.2):
 
 Novidades desta versão:
 - 282 especialistas extras para o Claude (coleção agency-agents, licença MIT): finanças, vendas,

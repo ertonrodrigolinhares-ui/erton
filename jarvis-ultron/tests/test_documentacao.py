@@ -343,5 +343,42 @@ class RoteiroBateComOCodigoTests(unittest.TestCase):
         self.assertIn("Quit JARVIS", passo)
 
 
+class TelaMaisLeveTests(unittest.TestCase):
+    def test_autodiagnostico_conta_a_cpu_do_jarvis_e_a_bateria(self):
+        # Etapa 6: o LEIA-ME, o VERSAO e o roteiro prometem os itens "CPU", "CPU do Jarvis" e "Bateria", e o
+        # PC de mesa sem bateria tem de ser "normal", não defeito (era o erro do assistente de referência)
+        from unittest.mock import patch
+
+        from core import autodiagnostico as ad
+        from core import metricas
+
+        with patch.object(metricas, "amostra_cpu", return_value=(5.0, {os.getpid(): 1.0}, {os.getpid(): 0})), \
+                patch.object(metricas, "bateria", return_value=None):
+            nomes = {i.nome for i in ad.verificar_processador()} | {ad.verificar_bateria().nome}
+            self.assertEqual(ad.verificar_bateria().estado, "ok")
+        self.assertEqual(nomes, {"CPU", "CPU do Jarvis", "Bateria"})
+        secao = _secao("## Autodiagnóstico (o Jarvis confere a si mesmo)")
+        for trecho in ("**quanto o próprio Jarvis está gastando**", "tela e cérebro", 'sem bateria" é normal'):
+            self.assertIn(trecho, secao)
+        novidades = _uma_linha(VERSAO[:VERSAO.index("Versão anterior (2026-10-19.2)")])
+        for trecho in ("CPU do Jarvis", "tela azul na frente", "F2", "mesma fonte", "sem abrir janela preta"):
+            self.assertIn(trecho, novidades)
+        roteiro = _uma_linha((RAIZ / "dev" / "ROTEIRO_DE_5_MINUTOS.md").read_text(encoding="utf-8"))
+        passo = roteiro[roteiro.index("**Quanto o Jarvis gasta:**"):roteiro.index("**Especialista do Claude**")]
+        for trecho in ("**CPU do Jarvis: tela X%, cérebro Y%**", "**Bateria**", "**Anote os números**"):
+            self.assertIn(trecho, passo)
+
+    def test_tela_antiga_para_atras_da_cena_e_o_ui_nao_le_o_sistema_sozinho(self):
+        # o VERSAO promete que a tela antiga não trabalha atrás da tela azul: o código tem a trava
+        import ui
+
+        fonte = Path(ui.__file__).read_text(encoding="utf-8")
+        self.assertNotIn("class _SysMetrics", fonte)
+        for nome in ("def _tela_antiga_parada", "    def _animar_esfera_antiga", "    def _ritmo_de_redesenho"):
+            self.assertIn(nome, fonte)
+        self.assertIn("def _coberta", (RAIZ / "ui_stark.py").read_text(encoding="utf-8"))
+        self.assertIn("metricas.ler()", (RAIZ / "ui_orbe.py").read_text(encoding="utf-8"))
+
+
 if __name__ == "__main__":
     unittest.main()
