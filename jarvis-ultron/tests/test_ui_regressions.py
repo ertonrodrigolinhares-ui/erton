@@ -174,7 +174,7 @@ class UIRegressionTests(unittest.TestCase):
         with patch.object(ui, "_get_metrics", return_value=dict(_SEM_SENSORES)):
             self.original_update_metrics(self.window)
         self.assertEqual(self.window._gpu_pct_lbl.text(), "N/A")
-        self.assertEqual(self.window._spark_tmp._value, "N/A")
+        self.assertEqual(self.window._bar_tmp._text, "N/A")  # a sparkline escondida saiu na etapa 6
         self.assertEqual(self.window._gpu_load_bar.value(), 0)
 
 

@@ -1393,470 +1393,6 @@ class CompactModeWidget(QWidget):
         self.expand_requested.emit()
 
 
-# ---------------------------------------------------------------------------
-# Popup System - Contextual holographic popups orbiting the AI Core
-# ---------------------------------------------------------------------------
-
-from enum import Enum
-from dataclasses import dataclass
-from typing import List, Optional
-
-
-class PopupType(Enum):
-    """Types of popups with different sizes, durations, and priorities."""
-    MICRO = "micro"
-    INFORMATION = "information"
-    ACTION = "action"
-    RESEARCH = "research"
-    CRITICAL = "critical"
-    PRESENCE = "presence"
-
-
-class PopupPriority(Enum):
-    """Priority levels for popup management."""
-    LOW = 1
-    MEDIUM = 2
-    HIGH = 3
-    CRITICAL = 4
-
-
-@dataclass
-class PopupConfig:
-    """Configuration for each popup type."""
-    type: PopupType
-    width: int
-    height: int
-    duration: int  # milliseconds, 0 for persistent (critical)
-    priority: PopupPriority
-    max_active: int
-    orbit_radius: int
-    opacity: float
-
-
-# Popup configurations
-POPUP_CONFIGS = {
-    PopupType.MICRO: PopupConfig(
-        type=PopupType.MICRO,
-        width=180,
-        height=50,
-        duration=2500,
-        priority=PopupPriority.LOW,
-        max_active=5,
-        orbit_radius=100,
-        opacity=0.9
-    ),
-    PopupType.INFORMATION: PopupConfig(
-        type=PopupType.INFORMATION,
-        width=220,
-        height=80,
-        duration=6000,
-        priority=PopupPriority.MEDIUM,
-        max_active=5,
-        orbit_radius=130,
-        opacity=0.9
-    ),
-    PopupType.ACTION: PopupConfig(
-        type=PopupType.ACTION,
-        width=250,
-        height=90,
-        duration=8000,
-        priority=PopupPriority.HIGH,
-        max_active=5,
-        orbit_radius=160,
-        opacity=0.9
-    ),
-    PopupType.RESEARCH: PopupConfig(
-        type=PopupType.RESEARCH,
-        width=300,
-        height=120,
-        duration=12000,
-        priority=PopupPriority.HIGH,
-        max_active=2,  # Max 2 large popups
-        orbit_radius=190,
-        opacity=0.9
-    ),
-    PopupType.CRITICAL: PopupConfig(
-        type=PopupType.CRITICAL,
-        width=280,
-        height=100,
-        duration=0,  # Persistent until acknowledged
-        priority=PopupPriority.CRITICAL,
-        max_active=5,
-        orbit_radius=160,
-        opacity=0.95
-    ),
-    PopupType.PRESENCE: PopupConfig(
-        type=PopupType.PRESENCE,
-        width=200,
-        height=60,
-        duration=4000,  # 4 seconds
-        priority=PopupPriority.LOW,
-        max_active=5,
-        orbit_radius=110,
-        opacity=0.85
-    )
-}
-
-
-class BasePopup(QWidget):
-    """Base class for all popup types."""
-
-    def __init__(self, parent: QWidget, message: str, popup_type: PopupType):
-        super().__init__(parent)
-        self.popup_type = popup_type
-        self.config = POPUP_CONFIGS[popup_type]
-        
-        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.setFixedSize(self.config.width, self.config.height)
-        
-        # Styling based on popup type
-        bg_colors = {
-            PopupType.MICRO: f"{C.PRI_GHO}cc",
-            PopupType.INFORMATION: f"{C.BORDER}aa",
-            PopupType.ACTION: f"{C.ACC}15",
-            PopupType.RESEARCH: f"{C.PURPLE}15",
-            PopupType.CRITICAL: f"{C.RED}20",
-        }
-        
-        border_colors = {
-            PopupType.MICRO: f"{C.PRI}44",
-            PopupType.INFORMATION: f"{C.BORDER}88",
-            PopupType.ACTION: f"{C.ACC}88",
-            PopupType.RESEARCH: f"{C.PURPLE}88",
-            PopupType.CRITICAL: f"{C.RED}cc",
-        }
-        
-        text_colors = {
-            PopupType.MICRO: C.PRI,
-            PopupType.INFORMATION: C.TEXT,
-            PopupType.ACTION: C.ACC,
-            PopupType.RESEARCH: C.PURPLE,
-            PopupType.CRITICAL: C.RED,
-        }
-        
-        bg = bg_colors.get(popup_type, f"{C.PRI_GHO}cc")
-        border = border_colors.get(popup_type, f"{C.PRI}44")
-        text_color = text_colors.get(popup_type, C.WHITE)
-        
-        self.setStyleSheet(f"""
-            BasePopup {{
-                background: {bg};
-                border: 1px solid {border};
-                border-radius: 8px;
-            }}
-        """)
-        
-        # Layout
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 8, 12, 8)
-        layout.setSpacing(4)
-        
-        # Icon/symbol
-        symbols = {
-            PopupType.MICRO: "◈",
-            PopupType.INFORMATION: "ⓘ",
-            PopupType.ACTION: "⚡",
-            PopupType.RESEARCH: "🔍",
-            PopupType.CRITICAL: "‼",
-        }
-        symbol = QLabel(symbols.get(popup_type, "◈"))
-        symbol.setFont(QFont("Courier New", 14, QFont.Weight.Bold))
-        symbol.setStyleSheet(f"color: {text_color}; background: transparent;")
-        layout.addWidget(symbol, alignment=Qt.AlignmentFlag.AlignLeft)
-        
-        # Message
-        msg_label = QLabel(message)
-        msg_label.setFont(QFont("Courier New", 9))
-        msg_label.setStyleSheet(f"color: {text_color}; background: transparent;")
-        msg_label.setWordWrap(True)
-        layout.addWidget(msg_label, stretch=1)
-        
-        # Close button for non-critical popups
-        if popup_type != PopupType.CRITICAL:
-            close_btn = QPushButton("✕")
-            close_btn.setFixedSize(20, 20)
-            close_btn.setFont(QFont("Courier New", 8))
-            close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            close_btn.setStyleSheet("""
-                QPushButton {
-                    background: transparent;
-                    color: %s88;
-                    border: none;
-                }
-                QPushButton:hover {
-                    color: %s;
-                    background: %s11;
-                }
-            """ % (text_color, text_color, text_color))
-            close_btn.clicked.connect(self._dismiss)
-            layout.addWidget(close_btn, alignment=Qt.AlignmentFlag.AlignRight)
-        
-        # Opacity effect for fade animations
-        self._opacity_effect = QGraphicsOpacityEffect(self)
-        self._opacity_effect.setOpacity(self.config.opacity)
-        self.setGraphicsEffect(self._opacity_effect)
-        
-        # Auto-dismiss timer (if not critical)
-        if self.config.duration > 0:
-            QTimer.singleShot(self.config.duration, self._dismiss)
-        
-        # Track creation time for priority management
-        self._created_at = time.time()
-    
-    def _dismiss(self):
-        """Dismiss the popup with fade-out animation."""
-        try:
-            if self._opacity_effect:
-                anim = QPropertyAnimation(self._opacity_effect, b"opacity")
-                anim.setDuration(300)
-                anim.setStartValue(self.config.opacity)
-                anim.setEndValue(0.0)
-                anim.setEasingCurve(QEasingCurve.Type.OutCubic)
-                anim.finished.connect(self.hide)
-                anim.start()
-                
-                # Actually delete after animation
-                QTimer.singleShot(350, self.deleteLater)
-            else:
-                self.hide()
-                self.deleteLater()
-        except Exception:
-            self.hide()
-            self.deleteLater()
-
-
-class PopupManager(QObject):
-    """Manages popup creation, positioning, and lifecycle."""
-    
-    popup_created = pyqtSignal(QWidget)
-    popup_destroyed = pyqtSignal(QWidget)
-    
-    def __init__(self, parent: QWidget):
-        super().__init__(parent)
-        self.parent_widget = parent
-        self.active_popups: List[BasePopup] = []
-        self._orbit_positions = self._calculate_orbit_positions()
-    
-    def _calculate_orbit_positions(self) -> List[QPointF]:
-        """Calculate orbit positions around the center."""
-        # 8 positions around a circle: top, top-right, right, bottom-right,
-        # bottom, bottom-left, left, top-left
-        positions = []
-        center_x = self.parent_widget.width() // 2
-        center_y = self.parent_widget.height() // 2
-        
-        # We'll dynamically calculate based on orbit radius when showing
-        # For now, return angles that we'll use with radius
-        angles = [0, 45, 90, 135, 180, 225, 270, 315]  # degrees
-        for angle in angles:
-            positions.append(angle)
-        return positions
-    
-    def show_popup(
-        self,
-        message: str,
-        popup_type: PopupType = PopupType.INFORMATION,
-        preferred_position: Optional[int] = None
-    ) -> Optional[BasePopup]:
-        """Show a popup with the given message and type."""
-        config = POPUP_CONFIGS[popup_type]
-        
-        # Enforce limits
-        if not self._can_show_popup(popup_type):
-            # Remove lowest priority popup to make room
-            self._remove_lowest_priority_popup()
-        
-        # Create popup
-        popup = BasePopup(self.parent_widget, message, popup_type)
-        
-        # Position it
-        pos = self._get_orbit_position(popup, preferred_position)
-        popup.move(int(pos.x()), int(pos.y()))
-        
-        # Show and raise
-        popup.show()
-        popup.raise_()
-        
-        # Track
-        self.active_popups.append(popup)
-        self.popup_created.emit(popup)
-        
-        # Clean up finished popups periodically
-        QTimer.singleShot(1000, self._cleanup_finished_popups)
-        
-        return popup
-    
-    def _can_show_popup(self, popup_type: PopupType) -> bool:
-        """Check if we can show a popup of this type given current limits."""
-        config = POPUP_CONFIGS[popup_type]
-        
-        # Count active popups of this type
-        type_count = sum(
-            1 for p in self.active_popups 
-            if p.popup_type == popup_type
-        )
-        
-        # Check type-specific limit
-        if type_count >= config.max_active:
-            return False
-        
-        # Check total limit
-        if len(self.active_popups) >= 5:  # MAX_POPUPS
-            return False
-        
-        # Check large popup limit (research popups are considered large)
-        if popup_type == PopupType.RESEARCH:
-            large_count = sum(
-                1 for p in self.active_popups 
-                if p.popup_type == PopupType.RESEARCH
-            )
-            if large_count >= 2:  # MAX_LARGE_POPUPS
-                return False
-        
-        return True
-    
-    def _remove_lowest_priority_popup(self):
-        """Remove the lowest priority popup to make room."""
-        if not self.active_popups:
-            return
-        
-        # Sort by priority (lowest first) and creation time (oldest first)
-        sorted_popups = sorted(
-            self.active_popups,
-            key=lambda p: (p.config.priority.value, p._created_at)
-        )
-        
-        # Remove the lowest priority/oldest popup
-        popup_to_remove = sorted_popups[0]
-        popup_to_remove._dismiss()
-    
-    def _get_orbit_position(
-        self,
-        popup: BasePopup,
-        preferred_position: Optional[int] = None
-    ) -> QPointF:
-        """Calculate position on orbit around the center."""
-        # Get center of parent (should be AI Core area)
-        center_x = self.parent_widget.width() // 2
-        center_y = self.parent_widget.height() // 2
-        
-        # Use popup's config orbit radius
-        radius = popup.config.orbit_radius
-        
-        # Determine angle
-        if preferred_position is not None and 0 <= preferred_position < 8:
-            angle_deg = preferred_position * 45  # 8 positions, 45 degrees each
-        else:
-            # Find least occupied position
-            angle_deg = self._find_least_occupied_orbit_position() * 45
-        
-        # Convert to radians
-        import math
-        angle_rad = math.radians(angle_deg)
-        
-        # Calculate position
-        x = center_x + radius * math.cos(angle_rad) - popup.width() // 2
-        y = center_y + radius * math.sin(angle_rad) - popup.height() // 2
-        
-        return QPointF(x, y)
-    
-    def _find_least_occupied_orbit_position(self) -> int:
-        """Find the orbit position with fewest popups."""
-        # Simple implementation: count popups in each 45-degree segment
-        position_counts = [0] * 8
-        
-        center_x = self.parent_widget.width() // 2
-        center_y = self.parent_widget.height() // 2
-        
-        for popup in self.active_popups:
-            try:
-                if not popup.isVisible():
-                    continue
-            except RuntimeError:
-                # Popup has been deleted, skip it
-                continue
-            
-            # Calculate angle of this popup from center
-            popup_center_x = popup.x() + popup.width() // 2
-            popup_center_y = popup.y() + popup.height() // 2
-            
-            dx = popup_center_x - center_x
-            dy = popup_center_y - center_y
-            
-            import math
-            angle = math.degrees(math.atan2(dy, dx))
-            if angle < 0:
-                angle += 360
-            
-            position_index = int((angle // 45) % 8)
-            position_counts[position_index] += 1
-        
-        # Return position with minimum count
-        return position_counts.index(min(position_counts))
-    
-    def _cleanup_finished_popups(self):
-        """Remove popups that are no longer visible."""
-        visible_popups = []
-        for p in self.active_popups:
-            try:
-                if p.isVisible():
-                    visible_popups.append(p)
-            except RuntimeError:
-                # Popup has been deleted, skip it
-                pass
-        self.active_popups = visible_popups
-        self.popup_destroyed.emit(QObject())  # Dummy signal
-    
-    def dismiss_all_popups(self):
-        """Dismiss all popups immediately."""
-        for popup in self.active_popups[:]:  # Copy list
-            popup._dismiss()
-        self.active_popups.clear()
-
-
-class PresenceSystem(QObject):
-    """System for proactive intelligence surfacing."""
-    
-    def __init__(self, popup_manager: PopupManager):
-        super().__init__()
-        self.popup_manager = popup_manager
-        self._presence_tmr = QTimer()
-        self._presence_tmr.timeout.connect(self._surface_presence)
-        self._presence_tmr.start(15000)  # Every 15 seconds
-        
-        self._last_surface = time.time()
-        self._surface_messages = [
-            "Memory synchronization complete.",
-            "Knowledge graph expanded.",
-            "Context retrieval complete.",
-            "Predictive model updated.",
-            "Cross-referencing memory clusters...",
-            "Building execution plan...",
-            "Monitoring active systems...",
-            "Research protocols standby.",
-            "Systems nominal.",
-            "All circuits functional.",
-        ]
-        self._message_index = 0
-    
-    def _surface_presence(self):
-        """Surface a piece of intelligence proactively."""
-        # Only surface if user hasn't interacted recently
-        # For now, we'll surface periodically
-        message = self._surface_messages[self._message_index]
-        self._message_index = (self._message_index + 1) % len(self._surface_messages)
-        
-        self.popup_manager.show_popup(
-            message,
-            PopupType.MICRO
-        )
-    
-    def set_active(self, active: bool):
-        """Enable or disable presence system."""
-        if active:
-            self._presence_tmr.start()
-        else:
-            self._presence_tmr.stop()
 class _SysMetrics:
     def __init__(self):
         self.cpu  = 0.0
@@ -3210,462 +2746,6 @@ class MetricBar(QWidget):
         p.setFont(QFont("Courier New", 9, QFont.Weight.Bold))
         p.setPen(QPen(bar_col if self._text != "--" else qcol(C.TEXT_DIM), 1))
         p.drawText(QRectF(0, 4, W - 6, 16), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, self._text)
-
-
-# ---------------------------------------------------------------------------
-# AgentGridWidget — live autonomous agent status panel
-# ---------------------------------------------------------------------------
-
-
-
-class SparklineBar(QWidget):
-    """Compact metric row with label, sparkline, and value."""
-
-    def __init__(self, label: str, color: str = C.TEXT_MED, parent=None):
-        super().__init__(parent)
-        self._label = label
-        self._color = color
-        self._value = "0"
-        self._unit = ""
-        self._history = [0.0] * 30
-        self.setFixedHeight(28)
-
-    def set_value(self, value: str, pct: float = 0.0, unit: str = ""):
-        """Update value and sparkline. pct is 0-1 for the bar height."""
-        self._value = value
-        self._unit = unit
-        self._history.append(max(0.0, min(1.0, pct)))
-        if len(self._history) > 30:
-            self._history = self._history[-30:]
-        self.update()
-
-    def paintEvent(self, event):
-        from PyQt6.QtGui import QPainter, QColor, QPen, QLinearGradient
-        from PyQt6.QtCore import QPointF
-        W, H = self.width(), self.height()
-        p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-        # Label (left)
-        p.setFont(QFont("Courier New", 6, QFont.Weight.Bold))
-        p.setPen(QColor(C.TEXT_DIM))
-        label_w = 44
-        p.drawText(0, 0, label_w, H, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, self._label)
-
-        # Sparkline (middle)
-        spark_x = label_w + 2
-        spark_w = W - label_w - 60
-        spark_h = H - 6
-        spark_y = 3
-
-        col = QColor(self._color)
-        col_dim = QColor(self._color)
-        col_dim.setAlpha(40)
-
-        # Fill area under curve
-        if len(self._history) > 1:
-            from PyQt6.QtGui import QPainterPath
-            path = QPainterPath()
-            step = spark_w / (len(self._history) - 1)
-            for i, v in enumerate(self._history):
-                x = spark_x + i * step
-                y = spark_y + spark_h * (1 - v)
-                if i == 0:
-                    path.moveTo(x, y)
-                else:
-                    path.lineTo(x, y)
-            # Close path for fill
-            fill = QPainterPath(path)
-            fill.lineTo(spark_x + spark_w, spark_y + spark_h)
-            fill.lineTo(spark_x, spark_y + spark_h)
-            fill.closeSubpath()
-            fill_col = QColor(self._color)
-            fill_col.setAlpha(15)
-            p.fillPath(fill, fill_col)
-            # Stroke line
-            p.setPen(QPen(col, 1.2))
-            p.drawPath(path)
-
-        # Value (right)
-        p.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
-        p.setPen(QColor(C.WHITE))
-        val_x = W - 55
-        val_w = 35
-        p.drawText(val_x, 0, val_w, H, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight, self._value)
-        # Unit
-        p.setFont(QFont("Courier New", 6))
-        p.setPen(QColor(C.TEXT_DIM))
-        p.drawText(val_x + val_w + 2, 0, 18, H, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, self._unit)
-
-        p.end()
-
-class AgentGridWidget(QWidget):
-    """
-    Vertical timeline agent display – polished JARVIS edition.
-    Implements all 12 feedback points: hierarchy, color, spacing, activity stream.
-    """
-
-    # ── Per-agent accent colors (points 4 & 9) ──────────────────────────────
-    _ACCENT = {
-        "CORE":       "#00E5FF",   # brightest cyan  (special)
-        "RESEARCH":   "#00E5FF",   # cyan
-        "SECURITY":   "#1E90FF",   # blue
-        "AUTOMATION": "#FFD700",   # gold
-        "MEMORY":     "#BF7FFF",   # purple
-        "VISION":     "#00FF7F",   # green
-        "DEV":        "#E0E0E0",   # white
-        "SYSTEM":     "#00CED1",   # teal
-    }
-
-    _STATUS = {
-        "CORE":       "PRIMARY",
-        "RESEARCH":   "ONLINE",
-        "SECURITY":   "ACTIVE",
-        "AUTOMATION": "IDLE",
-        "MEMORY":     "PROCESSING",
-        "VISION":     "ANALYZING",
-        "DEV":        "ONLINE",
-        "SYSTEM":     "ONLINE",
-    }
-
-    _ICONS = {
-        "CORE":       "◉",
-        "RESEARCH":   "⌕",
-        "SECURITY":   "◆",
-        "AUTOMATION": "⚡",
-        "MEMORY":     "◉",
-        "VISION":     "◎",
-        "DEV":        "‹›",
-        "SYSTEM":     "◈",
-    }
-
-    _AGENTS = [
-        "CORE",
-        "RESEARCH",
-        "SECURITY",
-        "AUTOMATION",
-        "MEMORY",
-        "VISION",
-        "DEV",
-        "SYSTEM",
-    ]
-
-    _OBJECTIVES = {
-        "CORE":       ["Primary intelligence framework", "Coordinating sub-systems",
-                       "Optimizing neural pathways", "Synchronizing agents"],
-        "RESEARCH":   ["Scanning knowledge base", "Cross-referencing sources",
-                       "Synthesizing findings", "Validating hypotheses"],
-        "SECURITY":   ["Monitoring threat vectors", "Scanning network perimeter",
-                       "Validating access tokens", "Auditing system logs"],
-        "AUTOMATION": ["Executing task pipeline", "Scheduling workflows",
-                       "Delegating subtasks", "Optimizing execution path"],
-        "MEMORY":     ["Indexing context graph", "Retrieving episodic memory",
-                       "Consolidating knowledge", "Pruning stale entries"],
-        "VISION":     ["Processing visual input", "Analyzing screen state",
-                       "Detecting UI elements", "Mapping spatial context"],
-        "DEV":        ["Analyzing code structure", "Tracing dependencies",
-                       "Reviewing logic flow", "Generating test cases"],
-        "SYSTEM":     ["Monitoring diagnostics", "Tracking resource usage",
-                       "Optimizing memory", "Balancing load distribution"],
-    }
-
-    # Event log entries for the Activity Stream (point 12)
-    _LOG_TEMPLATES = [
-        "Memory synchronized",
-        "Threat scan complete",
-        "Vision detected alignment",
-        "Workflow optimized",
-        "Knowledge base updated",
-        "Security token refreshed",
-        "Core cycle completed",
-        "Task pipeline flushed",
-        "Context graph pruned",
-        "Neural pathway calibrated",
-    ]
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setStyleSheet("background: transparent;")
-
-        self._agent_state: list[list] = []
-        for name in self._AGENTS:
-            self._agent_state.append([
-                random.uniform(0.55, 0.98),   # [0] confidence
-                random.uniform(0, 2 * math.pi),  # [1] phase
-                0,                             # [2] obj index
-                random.randint(60, 180),       # [3] obj countdown
-                "active",                      # [4] status string
-            ])
-
-        self._active_idx = 0
-
-        # Activity stream log (point 12)
-        self._log_lines: list[str] = []
-        self._log_scroll_offset = 0
-        self._log_tick = 0
-        for i in range(5):
-            self._push_log()
-
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(8, 4, 8, 4)
-        lay.setSpacing(0)
-
-        # ── Super-label (point 7): "COGNITIVE NETWORK" ──────────────────────
-        super_lbl = QLabel("COGNITIVE NETWORK")
-        super_lbl.setFont(QFont("Courier New", 7))
-        super_lbl.setStyleSheet(
-            f"color: {C.TEXT_DIM}; background: transparent; "
-            "letter-spacing: 3px; opacity: 0.28;"
-        )
-        lay.addWidget(super_lbl)
-
-        # ── Section header row (point 8: 13 px title) ───────────────────────
-        hdr_row = QHBoxLayout()
-        hdr = QLabel("AGENTS")
-        hdr.setFont(QFont("Courier New", 11, QFont.Weight.Bold))
-        hdr.setStyleSheet(f"color: {C.PRI}; background: transparent; letter-spacing: 3px;")
-        hdr_row.addWidget(hdr)
-        hdr_row.addStretch()
-        self._active_count_lbl = QLabel(f"{len(self._AGENTS)} ACTIVE")
-        self._active_count_lbl.setFont(QFont("Courier New", 7))
-        self._active_count_lbl.setStyleSheet(
-            f"color: {C.TEXT_DIM}; background: transparent; letter-spacing: 1px;"
-        )
-        hdr_row.addWidget(self._active_count_lbl)
-        lay.addLayout(hdr_row)
-        lay.addSpacing(4)
-
-        # ── Timeline entries (in scroll area so cards never get squashed) ────
-        from PyQt6.QtWidgets import QScrollArea
-        scroll_container = QWidget()
-        scroll_container.setStyleSheet('background: transparent;')
-        scroll_lay = QVBoxLayout(scroll_container)
-        scroll_lay.setContentsMargins(0, 0, 0, 0)
-        scroll_lay.setSpacing(0)
-        self._cards: list[dict] = []
-        for i, name in enumerate(self._AGENTS):
-            is_core = (name == 'CORE')
-            card = self._make_timeline_entry(name, i, is_core)
-            scroll_lay.addWidget(card['widget'])
-            self._cards.append(card)
-        scroll_lay.addStretch()
-        scroll_area = QScrollArea()
-        scroll_area.setWidget(scroll_container)
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll_area.setStyleSheet('QScrollArea { background: transparent; border: none; }')
-        lay.addWidget(scroll_area, stretch=1)
-        lay.addSpacing(2)
-        # ── Activity Stream (point 12) ───────────────────────────────────────
-        stream_super = QLabel("LIVE TELEMETRY")
-        stream_super.setFont(QFont("Courier New", 7))
-        stream_super.setStyleSheet(
-            f"color: {C.TEXT_DIM}; background: transparent; letter-spacing: 3px;"
-        )
-        lay.addWidget(stream_super)
-
-        stream_hdr = QLabel("EVENT LOG")
-        stream_hdr.setFont(QFont("Courier New", 9, QFont.Weight.Bold))
-        stream_hdr.setStyleSheet(
-            f"color: {C.PRI}; background: transparent; letter-spacing: 2px;"
-        )
-        lay.addWidget(stream_hdr)
-        lay.addSpacing(4)
-
-        self._log_widget = QLabel()
-        self._log_widget.setFont(QFont("Courier New", 7))
-        self._log_widget.setStyleSheet(
-            f"color: {C.TEXT_MED}; background: transparent; line-height: 160%;"
-        )
-        self._log_widget.setWordWrap(False)
-        lay.addWidget(self._log_widget)
-
-        lay.addStretch()
-
-        # ── Timer ────────────────────────────────────────────────────────────
-        self._tick = 0
-        self._tmr = QTimer(self)
-        self._tmr.timeout.connect(self._animate)
-        self._tmr.start(80)
-        # Force immediate first render so CORE is highlighted from frame 1
-        QTimer.singleShot(50, self._animate)
-
-    # ── helpers ──────────────────────────────────────────────────────────────
-
-    def _push_log(self):
-        import datetime
-        t = datetime.datetime.now().strftime("%H:%M")
-        msg = random.choice(self._LOG_TEMPLATES)
-        self._log_lines.insert(0, f"{t}  {msg}")
-        if len(self._log_lines) > 8:
-            self._log_lines.pop()
-
-    def _make_timeline_entry(self, name: str, idx: int, is_core: bool) -> dict:
-        accent = self._ACCENT.get(name, C.PRI)
-
-        # Uniform card height — CORE distinguished by color not size
-        height = 44
-        w = QWidget()
-        w.setStyleSheet("background: transparent;")
-        w.setFixedHeight(height)
-        wl = QVBoxLayout(w)
-        wl.setContentsMargins(4, 2, 4, 2)
-        wl.setSpacing(0)
-        wl.setSpacing(0)
-
-        # ── Top row: icon · name · status · conf ────────────────────────────
-        top = QHBoxLayout()
-        top.setSpacing(6)
-
-        # Single icon only (no separate dot — eliminates double-dot)
-        icon_lbl = QLabel(self._ICONS.get(name, "◈"))
-        icon_lbl.setFont(QFont("Courier New", 9))
-        icon_lbl.setStyleSheet(f"color: {accent}; background: transparent;")
-        icon_lbl.setFixedWidth(18)
-        top.addWidget(icon_lbl)
-
-        name_lbl = QLabel(name)
-        name_lbl.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
-        name_lbl.setStyleSheet(f"color: {accent}; background: transparent; letter-spacing: 1px;")
-        top.addWidget(name_lbl)
-
-        top.addStretch()
-
-        # Shorten status to 4 chars max to prevent clipping
-        _status_map = {"PRIMARY": "PRIM", "ONLINE": "ONLN", "ACTIVE": "ACTV",
-                       "IDLE": "IDLE", "PROCESSING": "PROC", "ANALYZING": "ANLZ"}
-        _st = _status_map.get(self._STATUS.get(name, "ONLINE"), "ONLN")
-        status_lbl = QLabel(_st)
-        status_lbl.setFont(QFont("Courier New", 6))
-        status_lbl.setStyleSheet(f"color: {accent}; background: transparent; letter-spacing: 1px;")
-        status_lbl.setFixedWidth(32)
-        top.addWidget(status_lbl)
-
-        conf_lbl = QLabel("92%")
-        conf_lbl.setFont(QFont("Courier New", 6))
-        conf_lbl.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent;")
-        conf_lbl.setFixedWidth(28)
-        top.addWidget(conf_lbl)
-
-        wl.addLayout(top)
-
-        # ── Bottom row: faint │ + objective text aligned under name ────────
-        bot = QHBoxLayout()
-        bot.setSpacing(4)
-
-        # No connector line — indent only
-        line_lbl = QLabel('')
-        line_lbl.setFixedWidth(8)
-        bot.addWidget(line_lbl)
-
-        # Spacer to align with name (icon width=18 + spacing=6 = 24px offset)
-        bot.addSpacing(6)
-
-        obj_lbl = QLabel(self._OBJECTIVES[name][0])
-        obj_lbl.setFont(QFont("Courier New", 6))
-        obj_lbl.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent;")
-        bot.addWidget(obj_lbl, stretch=1)
-
-        wl.addLayout(bot)
-
-        return {
-            "widget":     w,
-            "dot":        icon_lbl,   # alias so _animate still works
-            "name_lbl":   name_lbl,
-            "conf_lbl":   conf_lbl,
-            "obj_lbl":    obj_lbl,
-            "line_lbl":   line_lbl,
-            "icon_lbl":   icon_lbl,
-            "status_lbl": status_lbl,
-            "accent":     accent,
-            "is_core":    is_core,
-        }
-
-
-    def _animate(self):
-        self._tick += 1
-
-        # Rotate active agent every 10 s (125 * 80 ms = 10 000 ms)
-        if self._tick % 125 == 0:
-            self._active_idx = (self._active_idx + 1) % len(self._AGENTS)
-
-        # Push a new log entry every ~3 seconds
-        self._log_tick += 1
-        if self._log_tick % 38 == 0:
-            self._push_log()
-            self._log_widget.setText("\n".join(self._log_lines[:5]))
-
-        for i, name in enumerate(self._AGENTS):
-            st    = self._agent_state[i]
-            conf  = st[0]
-            phase = st[1]
-
-            # Pulse sine
-            pulse = 0.5 + 0.5 * math.sin(phase + self._tick * 0.08)
-            st[1] += 0.01
-
-            # Rotate objective text
-            st[3] -= 1
-            if st[3] <= 0:
-                objs  = self._OBJECTIVES.get(name, ["Operating"])
-                st[2] = (st[2] + 1) % len(objs)
-                st[3] = random.randint(90, 200)
-
-            # Confidence drift
-            conf += random.uniform(-0.02, 0.02)
-            conf  = max(0.50, min(0.99, conf))
-            st[0] = conf
-
-            card      = self._cards[i]
-            is_active = (i == self._active_idx)
-            accent    = card["accent"]
-
-            # ── Active agent: full accent color + highlight bg ───────────────
-            if is_active:
-                name_col   = accent
-                conf_col   = accent
-                obj_col    = C.TEXT_MED
-                dot_col    = accent
-                icon_col   = accent
-                status_col = accent
-                line_col   = accent
-                bg_style   = f"background: rgba(0,229,255,18); border-left: 3px solid {accent}; border-radius: 2px;"
-            else:
-                name_col   = "#5a9090"
-                conf_col   = "#3d6a6a"
-                obj_col    = "#335858"
-                dot_col    = "#3d6a6a"
-                icon_col   = "#3d6a6a"
-                status_col = "#335858"
-                line_col   = "#1a3535"
-                bg_style   = "background: transparent; border-left: 2px solid #1a3535;"
-
-            # Apply bg to card widget
-            _css(card["widget"], bg_style)
-            _css(card["dot"],
-                f"color: {dot_col}; background: transparent;"
-            )
-            _css(card["icon_lbl"],
-                f"color: {icon_col}; background: transparent;"
-            )
-            _css(card["name_lbl"],
-                f"color: {name_col}; background: transparent;"
-            )
-            _texto(card["conf_lbl"], f"{int(conf * 100)}%")
-            _css(card["conf_lbl"],
-                f"color: {conf_col}; background: transparent;"
-            )
-            _css(card["status_lbl"],
-                f"color: {status_col}; background: transparent; letter-spacing: 1px;"
-            )
-            _texto(card["obj_lbl"],
-                self._OBJECTIVES.get(name, ["Operating"])[st[2]]
-            )
-            _css(card["obj_lbl"],
-                f"color: {obj_col}; background: transparent;"
-            )
-            # line_lbl hidden — no connector
 
 
 class TaskQueueWidget(QWidget):
@@ -6420,10 +5500,6 @@ class MainWindow(QMainWindow):
         self._presentation_progress_hide_sig.connect(self._presentation_progress.dismiss)
         self._ui_command_sig.connect(self._handle_ui_command)
 
-
-        # ── Popup System Initialization ────────────────────────────────────────
-        self._popup_manager = PopupManager(self._ai_core_wrap)
-        self._presence_system = PresenceSystem(self._popup_manager)
         self._session_start = time.time()
 
         self._overlay: SetupOverlay | None = None
@@ -6509,13 +5585,6 @@ class MainWindow(QMainWindow):
         sc_esc = QShortcut(QKeySequence("Escape"), self)
         sc_esc.activated.connect(self._dismiss_overlays)
 
-
-
-        # Shortcuts to show panel content as popups
-        sc_show_left = QShortcut(QKeySequence("L"), self)
-        sc_show_left.activated.connect(self._show_left_panel_popup)
-        sc_show_right = QShortcut(QKeySequence("R"), self)
-        sc_show_right.activated.connect(self._show_right_panel_popup)
     def closeEvent(self, event):
         # Minimize to tray instead of quitting (if tray is available)
         try:
@@ -6732,8 +5801,7 @@ class MainWindow(QMainWindow):
 
         if hasattr(self, "_log"):
             self._log.append_log(f"SYS: Graphics quality set to {value.upper()}.")
-        if hasattr(self, "_popup_manager"):
-            self._show_toast(f"Graphics quality: {value.upper()}", "success")
+        self._show_toast(f"Graphics quality: {value.upper()}", "success")
 
     # ── Theme cycling ────────────────────────────────────────────────────
     def _cycle_theme(self):
@@ -6810,15 +5878,6 @@ class MainWindow(QMainWindow):
             self._settings_overlay.refresh_theme()
         if self._vision_preview is not None:
             self._vision_preview.refresh_theme()
-
-        for spark, color in (
-            (getattr(self, "_spark_cpu", None), C.PRI),
-            (getattr(self, "_spark_mem", None), C.ENERGY),
-            (getattr(self, "_spark_net", None), C.ACC2),
-            (getattr(self, "_spark_tmp", None), C.ACC),
-        ):
-            if spark is not None:
-                spark._color = color
 
         for widget in self.findChildren(QWidget):
             widget.update()
@@ -6904,7 +5963,7 @@ class MainWindow(QMainWindow):
                 self._tool_progress.show()
             elif not is_open:
                 self._tool_progress.hide()
-        if announce and hasattr(self, "_popup_manager"):
+        if announce:
             self._show_toast(
                 "Command Center open" if is_open else "Focus view restored",
                 "info",
@@ -7041,8 +6100,6 @@ class MainWindow(QMainWindow):
             except Exception:
                 cpu = 0.0
         self._bar_cpu.set_value(cpu, "{:.0f}%".format(cpu))
-        if hasattr(self, '_spark_cpu'):
-            self._spark_cpu.set_value("{:.0f}".format(cpu), cpu / 100.0, "%")
 
         # MEM
         mem = snap["mem"]
@@ -7053,8 +6110,6 @@ class MainWindow(QMainWindow):
             except Exception:
                 mem = 0.0
         self._bar_mem.set_value(mem, "{:.0f}%".format(mem))
-        if hasattr(self, '_spark_mem'):
-            self._spark_mem.set_value("{:.0f}".format(mem), mem / 100.0, "%")
 
         # NET
         net = snap["net"]
@@ -7064,8 +6119,6 @@ class MainWindow(QMainWindow):
             net_str = f"{net:.1f}MB/s"
         net_pct = min(100, net * 10)  # 10 MB/s = %100
         self._bar_net.set_value(net_pct, net_str)
-        if hasattr(self, '_spark_net'):
-            self._spark_net.set_value(net_str, net_pct / 100.0, "")
 
         # GPU — cache chip/VRAM from system_profiler, simulate load
         if not getattr(self, '_gpu_info_cached', False):
@@ -7098,13 +6151,9 @@ class MainWindow(QMainWindow):
         tmp = snap["tmp"]
         if tmp < 0:
             self._bar_tmp.set_value(0, "N/A")
-            if hasattr(self, '_spark_tmp'):
-                self._spark_tmp.set_value("N/A", 0.0, "")
         else:
             tmp_pct = min(100, tmp)
             self._bar_tmp.set_value(tmp_pct, "{:.0f}°C".format(tmp))
-            if hasattr(self, '_spark_tmp'):
-                self._spark_tmp.set_value("{:.0f}".format(tmp), tmp / 100.0, "°C")
 
         try:
             boot_t  = psutil.boot_time()
@@ -7130,20 +6179,6 @@ class MainWindow(QMainWindow):
                 ss = int(se % 60)
                 if hasattr(self, "_session_lbl"):
                     self._session_lbl.setText(f"SESSION  {sh:02d}:{sm:02d}:{ss:02d}")
-        except Exception:
-            pass
-
-        # AI Cognition bar — driven by state
-        try:
-            if hasattr(self, "_bar_cog") and hasattr(self, "hud"):
-                state = getattr(self.hud, "state", "LISTENING")
-                cog_pct = {
-                    "THINKING": random.uniform(70, 95),
-                    "PROCESSING": random.uniform(55, 80),
-                    "SPEAKING": random.uniform(30, 50),
-                    "LISTENING": random.uniform(5, 20),
-                }.get(state, random.uniform(2, 10))
-                self._bar_cog.set_value(cog_pct, f"{cog_pct:.0f}%")
         except Exception:
             pass
 
@@ -7217,24 +6252,6 @@ class MainWindow(QMainWindow):
             label = getattr(self, attr, None)
             if label is not None:
                 label.setStyleSheet(f"color: {color}; background: transparent;")
-        for button in (getattr(self, "_left_system_btn", None), getattr(self, "_left_agents_btn", None)):
-            if button is None:
-                continue
-            if button.isChecked():
-                button.setStyleSheet(f"""
-                    QPushButton {{
-                        background: {C.PRI_GHO}; color: {C.PRI};
-                        border: 1px solid {C.PRI_DIM}; border-radius: 5px;
-                    }}
-                """)
-            else:
-                button.setStyleSheet(f"""
-                    QPushButton {{
-                        background: transparent; color: {C.TEXT_MED};
-                        border: 1px solid {C.BORDER}; border-radius: 5px;
-                    }}
-                    QPushButton:hover {{ color: {C.WHITE}; border-color: {C.BORDER_B}; }}
-                """)
 
     def _style_command_button(self, button: QPushButton, color: str, hover: str):
         button.setStyleSheet(f"""
@@ -7464,17 +6481,6 @@ class MainWindow(QMainWindow):
         rail_title.setStyleSheet(f"color: {C.WHITE}; background: transparent;")
         lay.addWidget(rail_title)
 
-        nav = QHBoxLayout(); nav.setSpacing(4)
-        self._left_system_btn = QPushButton("System")
-        self._left_agents_btn = QPushButton("Agents")
-        for button in (self._left_system_btn, self._left_agents_btn):
-            button.setCheckable(True)
-            button.setCursor(Qt.CursorShape.PointingHandCursor)
-            button.setFixedHeight(30)
-            nav.addWidget(button)
-        self._left_system_btn.setChecked(True)
-        lay.addLayout(nav)
-
         # ── System Status (redesigned) ──────────────────────────────────────
         metrics_w = QWidget()
         metrics_w.setObjectName("systemOverview")
@@ -7489,16 +6495,6 @@ class MainWindow(QMainWindow):
         sys_hdr.setFont(QFont("Arial", 9, QFont.Weight.DemiBold))
         sys_hdr.setStyleSheet(f"color: {C.TEXT_MED}; background: transparent;")
         ml.addWidget(sys_hdr)
-
-        # Sparkline metrics — CPU, MEM, NET with live graphs
-        self._spark_cpu = SparklineBar("CPU", C.PRI)
-        self._spark_mem = SparklineBar("MEM", C.ENERGY)
-        self._spark_net = SparklineBar("NET", C.ACC2)
-        for spark in [self._spark_cpu, self._spark_mem, self._spark_net]:
-            ml.addWidget(spark)
-            spark.hide()
-
-        ml.addSpacing(6)
 
         # ── GPU Block (expanded) ────────────────────────────────────────────
         gpu_super = QLabel("HARDWARE")
@@ -7573,28 +6569,12 @@ class MainWindow(QMainWindow):
 
         ml.addSpacing(6)
 
-        # ── TMP sparkline (same style as CPU/MEM/NET) ───────────────────────
-        self._spark_tmp = SparklineBar("TMP", "#FF6B35")
-        ml.addWidget(self._spark_tmp)
-        self._spark_tmp.hide()
-
-        ml.addSpacing(4)
-
-        # Cognitive load with progress bar
-        cog_hdr = QLabel("COGNITIVE LOAD")
-        cog_hdr.setFont(QFont("Courier New", 6, QFont.Weight.Bold))
-        cog_hdr.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent; letter-spacing: 2px;")
-        ml.addWidget(cog_hdr)
-        cog_hdr.hide()
-        # Keep MetricBar references for data compatibility. Cognition is the
-        # only visible bar because the other values already use spark rows.
         self._bar_cpu = MetricBar("CPU", C.TEXT_MED)
         self._bar_mem = MetricBar("MEM", C.TEXT_MED)
         self._bar_net = MetricBar("NET", C.TEXT_MED)
         self._bar_gpu = MetricBar("GPU", C.TEXT_MED)
         self._bar_tmp = MetricBar("TMP", C.TEXT_MED)
-        self._bar_cog = MetricBar("COG", C.TEXT_MED)
-        for b in [self._bar_cpu, self._bar_mem, self._bar_net, self._bar_gpu, self._bar_tmp, self._bar_cog]:
+        for b in [self._bar_cpu, self._bar_mem, self._bar_net, self._bar_gpu, self._bar_tmp]:
             ml.addWidget(b)
 
         # Info row
@@ -7615,23 +6595,8 @@ class MainWindow(QMainWindow):
         self._proc_lbl.setStyleSheet(f"color: {C.TEXT_MED}; background: transparent;")
         ml.addWidget(self._proc_lbl)
 
-        self._left_stack = QStackedWidget()
-        self._left_stack.setStyleSheet("background: transparent; border: none;")
-        self._left_stack.addWidget(metrics_w)
-
-        # ── Agent grid (fills remaining space) ───────────────────────────────
-        self._agent_grid = AgentGridWidget()
-        self._left_stack.addWidget(self._agent_grid)
-        lay.addWidget(self._left_stack, stretch=1)
-
-        def _show_left_page(index: int):
-            self._left_stack.setCurrentIndex(index)
-            self._left_system_btn.setChecked(index == 0)
-            self._left_agents_btn.setChecked(index == 1)
-            self._style_left_nav()
-
-        self._left_system_btn.clicked.connect(lambda: _show_left_page(0))
-        self._left_agents_btn.clicked.connect(lambda: _show_left_page(1))
+        lay.addWidget(metrics_w)
+        lay.addStretch(1)
         self._style_left_nav()
 
         return w
@@ -7858,74 +6823,6 @@ class MainWindow(QMainWindow):
         self._style_maker_signature()
         return strip
 
-
-    def _show_left_panel_popup(self):
-        """Show left panel content as a popup."""
-        # Gather information from left panel components
-        info_lines = ["LEFT PANEL INFORMATION"]
-
-        # Add system metrics if available
-        if hasattr(self, '_bar_cpu'):
-            cpu_val = getattr(self._bar_cpu, 'value', 0)
-            info_lines.append(f"CPU Usage: {cpu_val:.0f}%")
-        if hasattr(self, '_bar_mem'):
-            mem_val = getattr(self._bar_mem, 'value', 0)
-            info_lines.append(f"Memory Usage: {mem_val:.0f}%")
-        if hasattr(self, '_bar_net'):
-            net_val = getattr(self._bar_net, 'value', 0)
-            info_lines.append(f"Network: {net_val:.0f}%")
-        if hasattr(self, '_bar_gpu'):
-            gpu_val = getattr(self._bar_gpu, 'value', 0)
-            info_lines.append(f"GPU: {gpu_val:.0f}%")
-
-        # Add agent info if available
-        if hasattr(self, '_agent_grid'):
-            # AgentGridWidget has a fixed number of agents
-            agent_count = len(self._agent_grid._AGENTS)
-            info_lines.append(f"Active Agents: {agent_count}")
-
-        info_lines.append("")
-        info_lines.append("Press L again to refresh this information")
-
-        # Join lines and show as popup
-        message = "\n".join(info_lines)
-        self._popup_manager.show_popup(
-            message,
-            PopupType.INFORMATION
-        )
-
-    def _show_right_panel_popup(self):
-        """Show right panel content as a popup."""
-        # Gather information from right panel components
-        info_lines = ["RIGHT PANEL INFORMATION"]
-
-        # Add mission info
-        info_lines.append("Mission Control Panel")
-
-        # Add chat status
-        if hasattr(self, '_mission'):
-            if hasattr(self._mission, 'log_widget'):
-                info_lines.append("Chat Status: Active")
-            else:
-                info_lines.append("Chat Status: Inactive")
-
-            # Add current tab info
-            if hasattr(self._mission, '_stack'):
-                current_index = self._mission._stack.currentIndex()
-                tab_names = ["COMMS", "INTEL", "FILES", "ASSETS", "TOOLS", "MEMORY"]
-                if 0 <= current_index < len(tab_names):
-                    current_tab = tab_names[current_index]
-                    info_lines.append(f"Current Tab: {current_tab}")
-
-        info_lines.append("")
-        info_lines.append("Press R again to refresh this information")
-
-        # Join lines and show as popup
-        message = "\n".join(info_lines)
-        self._popup_manager.show_popup(
-            message,
-            PopupType.INFORMATION
-        )
 
     def _on_file_selected(self, path: str):
         self._current_file = path
