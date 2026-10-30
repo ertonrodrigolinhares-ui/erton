@@ -1,5 +1,7 @@
 """Os executores das ferramentas nativas do Jarvis (Etapa 14 da reorganização; a tabela nasceu na 13).
 
+A tabela EXECUTORES (nome -> função) é montada em fichas.py, a partir da ficha de cada ferramenta.
+
 Cada ferramenta é uma função `async def _ex_<nome>(jarvis, args)` que faz exatamente o que o ramo
 "elif name == ..." do _execute_tool fazia, inclusive o texto padrão. As ações (open_app, web_search_action...)
 são carregadas só na hora de usar (_lazy_action) e lidas deste módulo na hora da chamada: os testes que as
@@ -239,39 +241,3 @@ async def _ex_task_status(jarvis, args):
 async def _ex_flight_finder(jarvis, args):
     r = await asyncio.to_thread(lambda: flight_finder(parameters=args, player=jarvis.ui))
     return r or "Done."
-
-
-EXECUTORES = {
-    # grupo 6: herdadas que ainda existem (a Etapa 18 decide, com o Erton)
-    "flight_finder": _ex_flight_finder,
-    # grupo 5: visão, arquivos e tarefas
-    "screen_process": _ex_screen_process,
-    "file_processor": _ex_file_processor,
-    "deep_research": _ex_deep_research,
-    "create_presentation": _ex_create_presentation,
-    "task_status": _ex_task_status,
-    # grupo 4: o Jarvis por dentro
-    "listening_mode": _ex_listening_mode,
-    "hermes_agent": _ex_hermes_agent,
-    "school_tasks": _ex_school_tasks,
-    "self_diagnosis": _ex_self_diagnosis,
-    "approve_publication": _ex_approve_publication,
-    "suspend_listening": _ex_suspend_listening,
-    "generate_image": _ex_generate_image,
-    # grupo 3: e-mail e lembrete
-    "email_control": _ex_email_control,
-    "reminder": _ex_reminder,
-    # grupo 2: o sistema e a própria tela
-    "open_app": _ex_open_app,
-    "computer_settings": _ex_computer_settings,
-    "desktop_control": _ex_desktop_control,
-    "file_controller": _ex_file_controller,
-    "graphics_quality": _ex_graphics_quality,
-    "jarvis_ui_control": _ex_jarvis_ui_control,
-    # grupo 1: internet e mídia
-    "weather_report": _ex_weather_report,
-    "web_search": _ex_web_search,
-    "browser_control": _ex_browser_control,
-    "media_control": _ex_media_control,
-    "youtube_video": _ex_youtube_video,
-}

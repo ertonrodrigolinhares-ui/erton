@@ -12,38 +12,13 @@ from __future__ import annotations
 
 from core.frases import frase
 
-# Tool names exposed by hosted clients. The names here are Gemini function
-# declaration names (which differ from a few implementation module names).
-CLOUD_SAFE_ACTIONS = frozenset({
-    "web_search",
-    "deep_research",
-    "create_presentation",
-    "flight_finder",
-    "email_control",
-    "youtube_video",
-})
-
-# Jarvis Ultron: no modo privado (JARVIS_CEREBRO=gemma) nada vai para IA na nuvem. Estas ferramentas
-# mandam o pedido (ou a tela) para o Gemini, o Hermes (modelos grátis da Nous) ou outra IA na nuvem:
-# não são oferecidas ao Gemma e são recusadas em _execute_tool. As automações da pasta marcam isso
-# com USA_IA_NUVEM = True (ex.: claude_task, generate_video).
-FERRAMENTAS_NUVEM_IA = frozenset({
-    "web_search", "deep_research", "agent_task", "generate_image", "hermes_agent", "approve_publication",
-    "create_presentation", "code_helper", "dev_agent", "file_processor", "screen_process", "flight_finder",
-    "computer_control", "desktop_control", "computer_settings",
-})
+# Etapa 14 (b): as listas são calculadas da ficha de cada ferramenta (fichas.py), com os mesmos nomes de antes.
+from cerebro.ferramentas.fichas import (  # noqa: E402,F401
+    CLOUD_SAFE_ACTIONS, EXECUTORES, FERRAMENTAS_DESLIGADAS, FERRAMENTAS_NUVEM_IA, MUDAM_ALGO,
+    REGRAS_DE_NUVEM, RESERVA_FERRAMENTAS_ESSENCIAIS,
+)
 
 AVISO_MODO_PRIVADO = frase("modo_privado_nuvem")  # o texto fica no core/frases.py (Etapa 8)
-
-# Ferramentas que mudam algo: num lote do Gemini, rodam em fila, uma depois da outra (as outras rodam
-# juntas). Era o conjunto "mutating" do _execute_tool_batch; a Etapa 14 passa a calculá-lo pela ficha de
-# cada ferramenta.
-MUDAM_ALGO = frozenset({
-    "send_message", "prepare_message_reply", "email_control", "reminder",
-    "computer_settings", "computer_control", "desktop_control", "file_controller",
-    "file_processor", "code_helper", "dev_agent", "game_updater",
-    "create_presentation", "save_memory", "jarvis_ui_control", "graphics_quality",
-})
 
 
 def bloqueio_do_modo_privado(nome: str, args: dict | None = None) -> str | None:
@@ -56,33 +31,15 @@ def bloqueio_do_modo_privado(nome: str, args: dict | None = None) -> str | None:
     args = args or {}
     if nome in FERRAMENTAS_NUVEM_IA:
         return AVISO_MODO_PRIVADO
-    if nome == "youtube_video" and str(args.get("action", "")).strip().lower() == "summarize":
-        return AVISO_MODO_PRIVADO  # o resumo do vídeo é feito pelo Gemini
-    if nome == "school_tasks" and args.get("refresh"):
-        return AVISO_MODO_PRIVADO  # ler o Geekie de novo é trabalho do Hermes
+    regra = REGRAS_DE_NUVEM.get(nome)  # ex.: o resumo do youtube_video é feito pelo Gemini (fichas.py)
+    if regra is not None and regra(args):
+        return AVISO_MODO_PRIVADO
     from cerebro.ferramentas.registro import carregar_automacoes  # (aqui, para não dar laço de import)
 
     automacao = carregar_automacoes().ferramentas.get(nome)
     if automacao is not None and getattr(automacao, "usa_ia_nuvem", False):
         return AVISO_MODO_PRIVADO
     return None
-
-
-# Jarvis Ultron: ferramentas herdadas DESLIGADAS de propósito (Etapa 3 do docs/PLANO-REORGANIZACAO.md,
-# decisão do Erton): agiam sem o "ok" dele conferido no código, ou ele não usa. Saíram da lista que o
-# Gemini vê, da reserva e do prompt; os arquivos ficam no lugar até a Etapa 18. Se alguém chamar mesmo
-# assim (um nome antigo, o modelo inventando), o _execute_tool responde isto e não chama nada.
-# Nome -> o que ela fazia (vai na resposta ao modelo, em inglês como as outras).
-FERRAMENTAS_DESLIGADAS = {
-    "send_message": "sending messages on WhatsApp, Telegram, Discord, Instagram or iMessage",
-    "prepare_message_reply": "drafting and sending message replies",
-    "check_messages": "reading messages and contacts",
-    "agent_task": "multi-step tasks that write and run AI-generated code",
-    "code_helper": "writing, running and building code",
-    "dev_agent": "building projects, installing packages and running code",
-    "computer_control": "clicking, typing and moving the mouse anywhere on the screen",
-    "game_updater": "installing and updating Steam and Epic games, which could shut down the computer",
-}
 
 
 def resposta_de_desligada(nome: str) -> str:

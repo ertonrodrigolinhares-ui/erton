@@ -43,5 +43,49 @@ class RegistroTests(unittest.TestCase):
         self.assertEqual(set(main.EXECUTORES) & set(main.FERRAMENTAS_DESLIGADAS), set())
 
 
+class FichasTests(unittest.TestCase):
+    """Etapa 14 (b): a ficha única de cada ferramenta; as listas antigas são calculadas dela."""
+
+    def test_toda_ferramenta_declarada_tem_ficha_e_toda_ficha_ligada_tem_declaracao(self):
+        from cerebro.ferramentas import fichas
+
+        declaradas = {d["name"] for d in TOOL_DECLARATIONS}
+        ligadas = {f.nome for f in fichas.FICHAS if not f.desligada}
+        self.assertEqual(ligadas, declaradas)
+        for f in fichas.FICHAS:
+            with self.subTest(ferramenta=f.nome):
+                self.assertEqual(f.declaracao is not None, not bool(f.desligada))
+                self.assertEqual(f.executar is None, bool(f.desligada) or f.nome == "save_memory")
+
+    def test_listas_antigas_sao_calculadas_das_fichas(self):
+        from cerebro.ferramentas import fichas, politica
+
+        self.assertIs(main.FERRAMENTAS_NUVEM_IA, fichas.FERRAMENTAS_NUVEM_IA)
+        self.assertIs(politica.MUDAM_ALGO, fichas.MUDAM_ALGO)
+        self.assertIs(main.JarvisLive.RESERVA_FERRAMENTAS_ESSENCIAIS, fichas.RESERVA_FERRAMENTAS_ESSENCIAIS)
+        self.assertEqual(main.FERRAMENTAS_DESLIGADAS, fichas.FERRAMENTAS_DESLIGADAS)
+        self.assertEqual(set(main.EXECUTORES), {f.nome for f in fichas.FICHAS if f.executar is not None})
+
+    def test_regra_por_argumento_do_modo_privado_vem_da_ficha(self):
+        from cerebro.ferramentas import fichas
+
+        self.assertTrue(fichas.REGRAS_DE_NUVEM["youtube_video"]({"action": "Summarize"}))
+        self.assertFalse(fichas.REGRAS_DE_NUVEM["youtube_video"]({"action": "play"}))
+        self.assertTrue(fichas.REGRAS_DE_NUVEM["school_tasks"]({"refresh": True}))
+        self.assertNotIn("youtube_video", fichas.FERRAMENTAS_NUVEM_IA)  # só o resumo vai para a nuvem
+
+    def test_resposta_padrao_da_ficha_e_a_do_executor(self):
+        # a frase da ficha é a que o executor devolve quando a ação não devolve nada (ou o molde dela)
+        import inspect
+
+        from cerebro.ferramentas import fichas
+
+        for f in fichas.FICHAS:
+            if f.executar is None or not f.resposta_padrao or "{" in f.resposta_padrao:
+                continue  # sem executor, sempre responde, ou a frase tem um {campo}
+            with self.subTest(ferramenta=f.nome):
+                self.assertIn(f.resposta_padrao, inspect.getsource(f.executar))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -192,8 +192,9 @@ from cerebro.ferramentas.politica import (  # noqa: E402
     bloqueio_do_modo_privado, resposta_de_desligada,
 )
 from cerebro.ferramentas.registro import carregar_automacoes  # noqa: E402,F401
+from cerebro.ferramentas.fichas import EXECUTORES, RESERVA_FERRAMENTAS_ESSENCIAIS as _RESERVA_DAS_FICHAS  # noqa: E402
 from cerebro.ferramentas.executores import (  # noqa: E402,F401
-    EXECUTORES, browser_control, computer_settings, desktop_control, email_control, file_controller,
+    browser_control, computer_settings, desktop_control, email_control, file_controller,
     file_processor, flight_finder, media_control, open_app, reminder, request_deep_research,
     request_presentation, screen_process, weather_action, web_search_action, youtube_video,
 )
@@ -1258,11 +1259,7 @@ class JarvisLive:
 
     # Ferramentas essenciais no modo reserva. Mandar TODAS ao Groq gasta muito do limite grátis, então
     # só as mais usadas por voz vão para a reserva (as automações da pasta entram sempre).
-    RESERVA_FERRAMENTAS_ESSENCIAIS = {
-        "open_app", "browser_control", "weather_report", "reminder", "media_control", "youtube_video",
-        "web_search", "email_control", "hermes_agent", "school_tasks",
-        "self_diagnosis", "save_memory", "generate_image", "listening_mode",
-    }
+    RESERVA_FERRAMENTAS_ESSENCIAIS = _RESERVA_DAS_FICHAS  # essencial_na_reserva=True nas fichas (Etapa 14)
 
     def _ferramentas_da_reserva(self):
         """Ferramentas do Jarvis no formato do Groq + a função que as executa (modo reserva).

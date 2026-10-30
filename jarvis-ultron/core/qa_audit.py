@@ -31,7 +31,7 @@ def dispatch_names(main_path: Path | None = None) -> set[str]:
     """As ferramentas que o _execute_tool sabe executar: as chaves da tabela EXECUTORES (Etapa 13, que desde a 14
     mora em cerebro/ferramentas/executores.py e é importada; o módulo não lê o .env) e o save_memory (que tem a
     regra própria do modo privado). O caminho do main.py continua aceito para quem chamava assim."""
-    from cerebro.ferramentas.executores import EXECUTORES
+    from cerebro.ferramentas.fichas import EXECUTORES
 
     return set(EXECUTORES) | {"save_memory"}
 
