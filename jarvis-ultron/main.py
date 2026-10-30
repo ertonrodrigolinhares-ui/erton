@@ -295,6 +295,17 @@ def get_tool_declarations(*, cloud_safe: bool = False) -> list[dict]:
     ]
 
 
+# ---------------------------------------------------------------------------------------------------------
+# Etapa 13: a tabela de executores. Cada ferramenta nativa é uma função `async def _ex_<nome>(jarvis, args)`
+# que faz exatamente o que o ramo "elif name == ..." do _execute_tool fazia, inclusive o texto padrão. As
+# travas do começo do _execute_tool (cloud_safe -> modo privado -> operational_ready -> modo QA ->
+# interceptar desligar -> save_memory) não passam por aqui. As ações continuam sendo os nomes deste módulo
+# (open_app, web_search_action...), lidos na hora da chamada: os testes que os trocam continuam valendo.
+# O save_memory fica no _execute_tool, porque tem uma regra própria do modo privado.
+
+EXECUTORES = {}
+
+
 class JarvisLive:
 
     def __init__(
@@ -1592,7 +1603,11 @@ class JarvisLive:
         result = "Done."
 
         try:
-            if name == "open_app":
+            executor = EXECUTORES.get(name)
+            if executor is not None:
+                result = await executor(self, args)
+
+            elif name == "open_app":
                 r = await asyncio.to_thread(lambda: open_app(parameters=args, response=None, player=self.ui))
                 result = r or f"Opened {args.get('app_name')}."
 

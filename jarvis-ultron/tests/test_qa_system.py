@@ -290,9 +290,12 @@ class ToolContractTests(unittest.TestCase):
         self.assertEqual(len(tools), len(set(tools)))
 
     def test_every_declared_tool_has_a_dispatch_path(self):
-        source = (ROOT / "main.py").read_text(encoding="utf-8")
+        # Etapa 13: pela tabela EXECUTORES (ou pelo ramo que ainda não foi para ela), não pelo texto
+        from core.qa_audit import dispatch_names
+
+        caminhos = dispatch_names(ROOT / "main.py")
         for name in declared_tools(ROOT / "main.py"):
-            self.assertIn(f'name == "{name}"', source, name)
+            self.assertIn(name, caminhos, name)
 
     def test_live_tool_schemas_have_names_parameters_and_properties(self):
         import main

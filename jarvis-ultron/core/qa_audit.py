@@ -28,6 +28,20 @@ def declared_tools(main_path: Path | None = None) -> list[str]:
     return [str(d.get("name")) for d in TOOL_DECLARATIONS if isinstance(d, dict) and d.get("name")]
 
 
+def dispatch_names(main_path: Path) -> set[str]:
+    """As ferramentas que o _execute_tool do main.py sabe executar: as chaves da tabela EXECUTORES (Etapa 13),
+    o save_memory (que tem a regra própria do modo privado) e, enquanto a tabela é preenchida, as que ainda
+    têm um ramo 'name == "x"'. Lido do texto do main.py (sem importá-lo: importar o main carrega o .env)."""
+    source = main_path.read_text(encoding="utf-8")
+    names = set(re.findall(r'name == "([a-z_]+)"', source)) | {"save_memory"}
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "EXECUTORES" for t in node.targets) \
+                and isinstance(node.value, ast.Dict):
+            names |= {k.value for k in node.value.keys if isinstance(k, ast.Constant) and isinstance(k.value, str)}
+    return names
+
+
 def repository_findings(root: Path) -> list[Finding]:
     findings: list[Finding] = []
     main_path = root / "main.py"
@@ -45,7 +59,7 @@ def repository_findings(root: Path) -> list[Finding]:
             "Every supported tool is declared exactly once.",
             f"Missing={missing}; duplicates={duplicates}",
         ))
-    unhandled = sorted(name for name in tools if f'name == "{name}"' not in main_source)
+    unhandled = sorted(set(tools) - dispatch_names(main_path))
     if unhandled:
         findings.append(Finding(
             "P0", "Declared tools lack dispatch branches", "Tool routing",
