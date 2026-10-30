@@ -19,6 +19,9 @@ from cerebro.ferramentas.fichas import (  # noqa: E402,F401
 )
 
 AVISO_MODO_PRIVADO = frase("modo_privado_nuvem")  # o texto fica no core/frases.py (Etapa 8)
+# Jarvis Ultron: o selo 🔒 só existe na tela azul (a cena do orbe); na tela antiga (F2, JARVIS_VISUAL=classico,
+# JARVIS_CENA=0) o sinal é a linha "🔒 Modo privado ligado" que a ponte escreve no registro ao trocar.
+ESPERE_O_MODO_PRIVADO = "espere o aviso \"🔒 Modo privado ligado\" (na tela azul, o selo 🔒 MODO PRIVADO)"
 
 
 def bloqueio_do_modo_privado(nome: str, args: dict | None = None) -> str | None:
