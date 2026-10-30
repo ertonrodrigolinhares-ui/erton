@@ -286,6 +286,24 @@ class JarvisLive:
         self._avisos_trava = threading.Lock()  # avisos guardados no modo chamada
         self._avisos_guardados = []
         self._avisos_ao_falar = []  # quem quer saber quando o aviso guardado foi falado
+        # Jarvis Ultron (etapa 15): tudo o que a JarvisLive guarda nasce aqui, e não no meio do caminho.
+        # O tests/test_contratos.py confere que todo getattr(self, ...) do main.py lê um atributo
+        # criado neste __init__: um erro de digitação dava para mudar o comportamento sem dar erro.
+        self._resposta_digitada_ate = 0.0  # até quando a resposta a um texto digitado é falada (modo chamada)
+        self._ja_cumprimentou = False  # a saudação da abertura já foi dita
+        self._idioma_recusado = False  # o modelo da voz não aceitou escolher o idioma
+        self._erro_ouvido_avisado = None  # o último erro do microfone da reserva já avisado (não repete)
+        self._ultima_fala_em = None  # quando o Erton falou por último (mede a demora da resposta)
+        self._leituras_sem_registro = 0  # resultados do Ultron que o Gemini vai ler sem escrever de novo
+        self._leituras_sem_registro_ate = 0.0  # ... e até quando isso vale
+        self._loop_reserva = None  # o laço assíncrono da reserva (Groq/Gemma), criado quando é preciso
+        self._reserva_ferramentas = None  # as ferramentas traduzidas para a reserva, montadas uma vez
+        self._suspensao = None  # a tarefa que acorda o Jarvis depois de "suspender por N minutos"
+        self._abrir_ultron = None  # o painel Ultron registra aqui como abrir/fechar (automacoes/painel_ultron.py)
+        # o "ok" das aprovações (core/aprovacao.py) escreve nestes três: a fala atual chega em pedaços?
+        self._fala_em_pedacos = False
+        self._fala_aberta = False
+        self._fala_mudou_em = 0.0
         self._iniciar_lembretes_geekie()
         threading.Thread(target=self._preparar_automacoes, daemon=True, name="Automacoes").start()
 

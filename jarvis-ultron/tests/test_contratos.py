@@ -162,6 +162,48 @@ FUNCOES_DO_MAIN = {
     "rodar_cerebro": "core/processo_cerebro.py (main.rodar_cerebro) e core/ponte.py",
     "carregar_automacoes": "automacoes/painel_ultron.py (from main import carregar_automacoes)",
 }
+# Atributos da JarvisLive que outros arquivos leem ou escrevem (etapa 15). Têm de nascer no __init__.
+ATRIBUTOS_USADOS_POR_OUTROS_ARQUIVOS = {
+    "session": "core/ponte.py e automacoes/painel_stark.py (conectado ao Gemini?)",
+    "_loop": "automacoes/rotinas.py (espera o Hermes no laço do cérebro)",
+    "_shutdown_requested": "automacoes/lembretes.py e memoria_hd.py (param quando o Jarvis fecha)",
+    "_reserva": "core/ponte.py e automacoes/autoconserto.py",
+    "_modo_reserva": "core/ponte.py, automacoes/painel_stark.py e autoconserto.py",
+    "_cerebro_nome": "automacoes/painel_stark.py (gemma ou gemini)",
+    "_abrir_ultron": "automacoes/painel_ultron.py registra; core/ponte.py chama",
+    "_fala_n": "core/aprovacao.py (o número da fala atual do Erton)",
+    "_fala_texto": "core/aprovacao.py (o texto da fala atual)",
+    "_fala_em_pedacos": "core/aprovacao.py (a fala chega em pedaços?)",
+    "_fala_aberta": "core/aprovacao.py (o pedaço atual ainda não fechou)",
+    "_fala_mudou_em": "core/aprovacao.py (quando a fala mudou por último)",
+}
+# Os fios (threads) em segundo plano que religar o cérebro mata (JarvisLive.TRABALHOS_QUE_PARAM): o
+# nome do fio é o contrato entre quem o abre e o aviso "o vídeo vai parar" do _avisar_o_que_para.
+FIOS_QUE_PARAM_AO_RELIGAR = {
+    "VideoVeo": "automacoes/videos.py",
+    "ClaudeTarefa": "automacoes/claude_tarefas.py",
+    "ClaudePlano": "automacoes/claude_tarefas.py",
+    "HermesPublicar": "core/hermes_ponte.py",
+}
+
+
+def atributos_do_init() -> set[str]:
+    """Os self.<nome> que o __init__ da JarvisLive cria (lendo o main.py, não o objeto)."""
+    import ast
+
+    arvore = ast.parse((RAIZ / "main.py").read_text(encoding="utf-8"))
+    classe = next(n for n in arvore.body if isinstance(n, ast.ClassDef) and n.name == "JarvisLive")
+    init = next(n for n in classe.body if isinstance(n, ast.FunctionDef) and n.name == "__init__")
+    nomes = set()
+    for no in ast.walk(init):
+        if isinstance(no, (ast.Assign, ast.AnnAssign)):
+            alvos = no.targets if isinstance(no, ast.Assign) else [no.target]
+            for alvo in alvos:
+                for parte in ast.walk(alvo):
+                    if isinstance(parte, ast.Attribute) and isinstance(parte.value, ast.Name) \
+                            and parte.value.id == "self":
+                        nomes.add(parte.attr)
+    return nomes
 
 # A ponte entre a tela e o cérebro (core/ponte.py): os 29 métodos da tela que o cérebro chama e os
 # avisos da tela para o cérebro. A JarvisUI (ui.py) e a UIRemota atendem por estes nomes.
@@ -420,6 +462,28 @@ class NomesTests(unittest.TestCase):
             self.assertTrue(callable(getattr(main.JarvisLive, nome, None)), f"JarvisLive.{nome} (usado por {quem})")
         for nome, quem in FUNCOES_DO_MAIN.items():
             self.assertTrue(callable(getattr(main, nome, None)), f"main.{nome} (usado por {quem})")
+
+    def test_todo_getattr_do_main_tem_o_nome_criado_no_init(self):
+        # getattr(self, "nome", padrão) com um nome que o __init__ não cria é um erro de digitação que não
+        # dá erro: o padrão vale para sempre e o comportamento muda calado
+        fonte = (RAIZ / "main.py").read_text(encoding="utf-8")
+        lidos = set(re.findall(r'getattr\(self, "(\w+)"', fonte))
+        self.assertTrue(lidos, "o main.py deixou de ter getattr(self, ...)? Então este teste pode sair")
+        nascem = atributos_do_init()
+        self.assertEqual(sorted(lidos - nascem), [], "getattr de um nome que o __init__ não cria")
+
+    def test_atributos_que_outros_arquivos_usam_nascem_no_init(self):
+        nascem = atributos_do_init()
+        for nome, quem in ATRIBUTOS_USADOS_POR_OUTROS_ARQUIVOS.items():
+            self.assertIn(nome, nascem, f"JarvisLive.{nome} (usado por {quem}) tem de nascer no __init__")
+
+    def test_fios_que_param_ao_religar_tem_o_nome_combinado(self):
+        import main
+
+        self.assertEqual(set(main.JarvisLive.TRABALHOS_QUE_PARAM), set(FIOS_QUE_PARAM_AO_RELIGAR))
+        for fio, arquivo in FIOS_QUE_PARAM_AO_RELIGAR.items():
+            fonte = (RAIZ / arquivo).read_text(encoding="utf-8")
+            self.assertIn(f'"{fio}"', fonte, f"{arquivo} deixou de abrir o fio {fio} com esse nome")
 
     def test_nomes_da_ponte_entre_a_tela_e_o_cerebro(self):
         from core import ponte
