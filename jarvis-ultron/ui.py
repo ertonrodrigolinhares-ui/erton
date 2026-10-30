@@ -5613,8 +5613,7 @@ class VoiceSelectorOverlay(_OverlayBase):
             self._tutorial.setGeometry(0, 0, self.width(), self.height())
 
 
-# Aliases so existing references keep working
-VoicePresetOverlay = VoiceSelectorOverlay
+# Alias so existing references keep working
 TTSProviderOverlay = VoiceSelectorOverlay
 
 
@@ -7664,23 +7663,6 @@ class MainWindow(QMainWindow):
         self._style_left_nav()
 
         return w
-
-    def _feed_sparklines(self):
-        """Feed sparkline bars from existing metric bar data."""
-        try:
-            # Extract numeric values from existing metric bars
-            cpu_text = self._bar_cpu._val.text() if hasattr(self._bar_cpu, '_val') else "0"
-            mem_text = self._bar_mem._val.text() if hasattr(self._bar_mem, '_val') else "0"
-            net_text = self._bar_net._val.text() if hasattr(self._bar_net, '_val') else "0"
-
-            cpu_pct = float(cpu_text.replace('%', '').strip() or '0') / 100.0
-            mem_pct = float(mem_text.replace('%', '').strip() or '0') / 100.0
-
-            self._spark_cpu.set_value(cpu_text.replace('%','').strip(), cpu_pct, "%")
-            self._spark_mem.set_value(mem_text.replace('%','').strip(), mem_pct, "%")
-            self._spark_net.set_value(net_text.strip(), 0.0, "")
-        except Exception:
-            pass
 
     def _build_right_panel(self) -> QWidget:
         w = QWidget()
