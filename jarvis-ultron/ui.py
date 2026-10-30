@@ -26,7 +26,7 @@ from PyQt6.QtGui import (
 from PyQt6.QtWidgets import (
     QApplication, QComboBox, QCheckBox, QFormLayout, QFrame, QGraphicsOpacityEffect,
     QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMenu, QPushButton,
-    QScrollArea, QSizePolicy, QSpinBox, QSplitter, QStackedWidget, QSystemTrayIcon,
+    QScrollArea, QSizePolicy, QSpinBox, QSplitter, QSystemTrayIcon,
     QVBoxLayout, QWidget, QProgressBar,
 )
 
