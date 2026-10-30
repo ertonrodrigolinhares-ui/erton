@@ -45,6 +45,14 @@ ou dados desse assunto nas telas.
 5. Funcione em telas pequenas (celular) e grandes, sem rolagem horizontal.
 6. Textos para o usuário em português do Brasil, curtos e claros.
 7. Nunca exponha chaves de API no navegador. Dados sensíveis passam pelo backend (`src/lib/api.ts`).
+8. TypeScript sem atalhos: nada de `any`, trate `null`/`undefined`, tipe as props e as respostas
+   da API.
+9. Tempo real (`use-jarvis-socket.ts`): mostre o estado da conexão (conectado, reconectando,
+   offline), reconecte sozinho sem abrir conexão duplicada, e feche a conexão ao sair da tela.
+   Se mostrar algo antes da resposta do servidor, desfaça quando der erro.
+10. Desempenho: não carregue o que a tela não usa, evite renderizar de novo a cada mensagem
+    recebida, e mantenha a animação do reator leve (sem travar a conversa).
+11. Se a mudança tiver lógica (não só visual), escreva ou atualize um teste junto.
 
 ## Antes de dizer que terminou
 
@@ -57,4 +65,6 @@ ou dados desse assunto nas telas.
 ## Como responder
 
 Explique em português do Brasil, de forma simples (quem lê não é programador): o que mudou na tela,
-em quais arquivos, e o que foi testado. Se algo não pôde ser testado, diga isso claramente.
+em quais arquivos, e o que foi testado. Se tomou alguma decisão importante (por exemplo, criar um
+componente novo em vez de mudar um existente), explique o porquê em uma frase. Se algo não pôde
+ser testado, diga isso claramente.

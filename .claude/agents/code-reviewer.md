@@ -50,9 +50,26 @@ assunto.
 - Em React: dependências erradas em `useEffect`, estado atualizado depois de desmontar, chaves de
   lista instáveis, conexão do `use-jarvis-socket` aberta duas vezes.
 
+**Desempenho**
+- Chamadas de rede ou de IA repetidas sem necessidade, ou feitas dentro de laços.
+- Consultas ao banco em laço (uma por item) em vez de uma só.
+- Memória que só cresce: histórico de conversa, áudio ou cache sem limite.
+- Trabalho pesado (áudio, imagem, arquivos grandes) rodando na mesma linha da interface.
+
+**Dependências**
+- Biblioteca nova adicionada sem necessidade, ou que duplica outra já usada.
+- Versões soltas (`latest`, sem versão fixa) em `package.json` ou `requirements.txt` que podem
+  quebrar o produto sozinhas numa atualização. Licenças que impeçam vender o produto.
+
+**Testes**
+- Mudança sem teste quando há testes parecidos em `tests/`.
+- Testes que não cobrem o caso de borda da mudança (vazio, sem internet, chave inválida, Windows).
+- Testes que chamam a internet ou a IA de verdade em vez de simular a resposta.
+
 **Qualidade** (só se valer a pena)
 - Código duplicado que já existe em outro módulo e deveria ser reaproveitado.
-- Mudança sem teste quando há testes parecidos em `tests/`.
+- Função grande demais ou com muitos caminhos, a ponto de esconder bugs.
+- Uso de coisa marcada como obsoleta (deprecated) que vai parar de funcionar.
 - Textos para o usuário que não estão em português do Brasil ou estão difíceis de entender.
 
 Não comente estilo, nomes ou formatação, a não ser que causem bug.
@@ -69,6 +86,8 @@ O que está errado: uma frase.
 Quando acontece: a situação concreta.
 Como corrigir: a mudança sugerida (trecho curto de código, se ajudar).
 ```
+
+No fim, cite em uma linha algo que ficou bem feito, se houver: ajuda a manter o que está certo.
 
 Se não achar nada, diga isso claramente e não invente problemas. Escreva em português do Brasil,
 simples e direto: quem vai ler não é programador.
