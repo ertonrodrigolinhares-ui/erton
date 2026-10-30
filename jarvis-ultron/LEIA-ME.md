@@ -514,12 +514,29 @@ o Jarvis não mexe nessas configurações do PC.
 
 - As telas, os avisos e o menu do ícone perto do relógio são em **português**. A tela antiga (a do F2)
   ainda tem partes em inglês.
-- Algumas funções exigem configuração extra (Gmail, Spotify). Veja `docs/USAGE.md`.
+- O Gmail pelo Jarvis (ler, procurar e preparar e-mails) precisa de uma configuração única no Google:
+  veja "Gmail pelo Jarvis" abaixo. Os manuais do projeto original, em inglês, estão em `docs/original/`.
 - Os testes herdados do projeto original que cobravam telas do JARVIS-OS que não existem mais saíram
   (ficam guardados na etiqueta git `antes-da-reorganizacao`). Os testes que oscilam (hoje, só dois do
   anel na placa de vídeo numa tela virtual) ficam anotados, com o motivo, em
   `tests/dados/falhas_conhecidas.txt`. O `python dev/conferir_testes.py` roda todos os testes e avisa só
   das falhas novas.
+
+## Gmail pelo Jarvis (ler, procurar e preparar e-mails)
+
+O Gmail entra pelo login do Google (OAuth), nunca por senha nem por chave. Uma vez só:
+
+1. No Google Cloud, crie (ou escolha) um projeto e ative a **Gmail API**.
+2. Em "Google Auth Platform", preencha a marca e o público; se o app estiver "Externo" e em teste,
+   adicione o seu Gmail como usuário de teste. Escopos: `gmail.readonly` e `gmail.send`.
+3. Crie um **ID do cliente OAuth** do tipo **Desktop app** e baixe o arquivo JSON.
+4. Arraste esse JSON para a tela do Jarvis e diga: **"Jarvis, conecta o Gmail com este arquivo"**. O
+   navegador abre para você autorizar.
+
+O Jarvis guarda a credencial no cofre do Windows (não em arquivo). Depois: "o Gmail está conectado?",
+"mostra meus e-mails não lidos", "prepara um e-mail para fulano com o assunto X dizendo Y". **Preparar não
+envia**: ele abre o Gmail no navegador, digita destinatário, assunto e corpo e deixa o rascunho aberto; só
+envia depois do seu "ok" ("aprova esse e-mail"). "Desconecta o Gmail" desfaz.
 
 ## Hermes: agentes, rotina das 8h e redes sociais
 
