@@ -599,16 +599,13 @@
   },
   {
     "name": "jarvis_ui_control",
-    "description": "Changes JARVIS's own interface. Use when the user asks to open or close the Command Center, change the theme or graphics quality, open settings, enter compact mode, toggle fullscreen, or show shortcuts.",
+    "description": "Changes JARVIS's own interface. Use when the user asks to change the graphics quality, open settings, enter compact mode, toggle fullscreen, or show shortcuts.",
     "parameters": {
       "type": "OBJECT",
       "properties": {
         "action": {
           "type": "STRING",
           "enum": [
-            "open_command_center",
-            "close_command_center",
-            "change_theme",
             "change_graphics_quality",
             "open_settings",
             "compact_mode",
@@ -616,17 +613,6 @@
             "show_shortcuts"
           ],
           "description": "The interface action to perform."
-        },
-        "theme": {
-          "type": "STRING",
-          "enum": [
-            "arc_reactor",
-            "stealth_red",
-            "vibranium_purple",
-            "nanotech_gold",
-            "platinum"
-          ],
-          "description": "Required for change_theme."
         },
         "graphics_quality": {
           "type": "STRING",

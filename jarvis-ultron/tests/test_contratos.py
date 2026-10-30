@@ -211,7 +211,12 @@ RESPOSTAS_PADRAO = (
     ("flight_finder", {}, "Done."),
     ("graphics_quality", {"quality": "low"}, "JARVIS graphics quality changed to low."),
     ("jarvis_ui_control", {"action": "open_settings"}, "JARVIS interface action completed: open settings."),
-    ("jarvis_ui_control", {"action": "change_theme", "theme": "platinum"}, "JARVIS theme changed to platinum."),
+    ("jarvis_ui_control", {"action": "change_theme", "theme": "platinum"},
+     "This action no longer exists: the blue screen has a fixed color and no Command Center (nothing changed). "
+     "Tell the user that in Portuguese."),
+    ("jarvis_ui_control", {"action": "open_command_center"},
+     "This action no longer exists: the blue screen has a fixed color and no Command Center (nothing changed). "
+     "Tell the user that in Portuguese."),
     ("jarvis_ui_control", {"action": "change_graphics_quality", "graphics_quality": "high"},
      "JARVIS graphics quality changed to high."),
     ("deep_research", {}, "Deep research preference requested."),
@@ -245,6 +250,8 @@ ACAO = {
     "graphics_quality": ("tela", "set_graphics_quality"), "jarvis_ui_control": ("tela", None),
 }
 ASSINCRONAS = {"_geekie_pendencias", "_hermes_sem_travar"}
+# ações do jarvis_ui_control que saíram na Etapa 7 (a tela azul tem cor fixa e não tem Command Center)
+ACOES_DA_TELA_QUE_SAIRAM = {"change_theme", "open_command_center", "close_command_center"}
 
 # Ferramentas herdadas DESLIGADAS de propósito na Etapa 3 (decisão do Erton: agiam sem o "ok" dele
 # conferido no código, ou ele não usa), com os módulos das ações delas, que nem podem ser usados quando
@@ -442,6 +449,10 @@ class RespostasPadraoTests(unittest.TestCase):
                     self.assertTrue(falsa.called, f"{nome} não chegou à ação {alvo}")
                 elif tipo == "fila" and alvo:
                     self.assertTrue(getattr(falsas["fila"], alvo).called, nome)
+                elif tipo == "tela" and args.get("action") in ACOES_DA_TELA_QUE_SAIRAM:
+                    # Etapa 7: tema e Command Center não existem na tela azul; a resposta explica e NADA é
+                    # pedido à tela (antes o Jarvis dizia "feito" e nada mudava)
+                    self.assertEqual([e for e in ui.eventos if e[0] in ("graficos", "tema", "tela")], [], nome)
                 elif tipo == "tela":
                     self.assertTrue(any(e[0] in ("graficos", "tema", "tela") for e in ui.eventos), nome)
                 falsas["speak_error"].assert_not_called()

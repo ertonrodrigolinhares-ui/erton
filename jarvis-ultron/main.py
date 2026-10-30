@@ -596,21 +596,16 @@ TOOL_DECLARATIONS = [
     {
         "name": "jarvis_ui_control",
         "description": (
-            "Changes JARVIS's own interface. Use when the user asks to open or close the Command Center, "
-            "change the theme or graphics quality, open settings, enter compact mode, toggle fullscreen, or show shortcuts."
+            "Changes JARVIS's own interface. Use when the user asks to "
+            "change the graphics quality, open settings, enter compact mode, toggle fullscreen, or show shortcuts."
         ),
         "parameters": {
             "type": "OBJECT",
             "properties": {
                 "action": {
                     "type": "STRING",
-                    "enum": ["open_command_center", "close_command_center", "change_theme", "change_graphics_quality", "open_settings", "compact_mode", "fullscreen", "show_shortcuts"],
+                    "enum": ["change_graphics_quality", "open_settings", "compact_mode", "fullscreen", "show_shortcuts"],
                     "description": "The interface action to perform."
-                },
-                "theme": {
-                    "type": "STRING",
-                    "enum": ["arc_reactor", "stealth_red", "vibranium_purple", "nanotech_gold", "platinum"],
-                    "description": "Required for change_theme."
                 },
                 "graphics_quality": {
                     "type": "STRING",
@@ -2431,13 +2426,11 @@ class JarvisLive:
 
             elif name == "jarvis_ui_control":
                 action = str(args.get("action") or "").strip().lower()
-                if action == "change_theme":
-                    theme = str(args.get("theme") or "").strip().lower()
-                    allowed = {"arc_reactor", "stealth_red", "vibranium_purple", "nanotech_gold", "platinum"}
-                    if theme not in allowed:
-                        raise ValueError(f"Unknown JARVIS theme: {theme or 'missing'}")
-                    self.ui.set_theme(theme)
-                    result = f"JARVIS theme changed to {theme.replace('_', ' ')}."
+                if action in ("change_theme", "open_command_center", "close_command_center"):
+                    # Jarvis Ultron (Etapa 7): na tela azul não há tema nem Command Center; antes o Jarvis
+                    # dizia que tinha feito e nada mudava na tela
+                    result = ("This action no longer exists: the blue screen has a fixed color and no "
+                              "Command Center (nothing changed). Tell the user that in Portuguese.")
                 elif action == "change_graphics_quality":
                     quality = str(args.get("graphics_quality") or "").strip().lower()
                     if quality not in {"low", "medium", "high"}:
