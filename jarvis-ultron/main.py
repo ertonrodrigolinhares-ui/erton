@@ -173,6 +173,7 @@ from cerebro.voz_saida import (  # noqa: E402,F401
     DEFAULT_VOICE_NAME, SUPPORTED_VOICE_NAMES, VozSaida, _AVISOS_EM_PORTUGUES, _limpar_para_falar,
     _load_voice_name, _normalize_voice_name,
 )
+from cerebro.ultron import Ultron  # noqa: E402
 
 
 def muda_algo(nome: str) -> bool:
@@ -198,7 +199,7 @@ def get_tool_declarations() -> list[dict]:
 
 
 
-class JarvisLive(Avisos, Escuta, Pontes, VozSaida):
+class JarvisLive(Avisos, Escuta, Pontes, VozSaida, Ultron):
 
     def __init__(
         self,
@@ -639,28 +640,6 @@ class JarvisLive(Avisos, Escuta, Pontes, VozSaida):
         threading.Thread(target=self._trocar_cerebro, args=(destino,), daemon=True, name="TrocarCerebro").start()
         return True
 
-    def _pedido_de_ultron(self, fala: str) -> bool:
-        """Jarvis Ultron: "modo ultron" abre o painel de automações; "modo jarvis" (ou "sair do modo
-        ultron") fecha. Vale digitado e falado (Gemini ao vivo e reserva). True se era isso."""
-        import unicodedata
-
-        texto = unicodedata.normalize("NFKD", str(fala or "").lower())
-        texto = "".join(c for c in texto if not unicodedata.combining(c))
-        texto = " ".join(re.sub(r"[^\w\s]", " ", texto).split())  # tira vírgula, ponto, "!" da transcrição
-        if not texto or len(texto.split()) > 6:  # só frases curtas (um pedido, não uma conversa)
-            return False
-        if not ("modo ultron" in texto or "modo jarvis" in texto or texto == "ultron"):
-            return False
-        # "Jarvis, modo Ultron" tem "jarvis" no começo: quem decide fechar é "modo jarvis", não o nome
-        fechar = "modo jarvis" in texto or bool(re.search(
-            r"\b(sai|sair|saia|fecha|fechar|feche|desliga|desligar|desligue|desativa|desativar|desative"
-            r"|encerra|encerrar|encerre|tira|tirar|tire)( do| o)? modo ultron\b", texto))
-        # o painel Ultron registra _abrir_ultron; com a tela em outro programa, vai pela ponte
-        abrir = getattr(self, "_abrir_ultron", None) or getattr(self.ui, "abrir_ultron", None)
-        if callable(abrir):
-            abrir(fechar=fechar)
-        return True
-
     def _trocar_cerebro(self, destino: str) -> None:
         from core.cerebro_gemma import modelo_instalado, whisper_instalado
 
@@ -859,43 +838,6 @@ class JarvisLive(Avisos, Escuta, Pontes, VozSaida):
         self._loop_reserva = laco
         threading.Thread(target=laco.run_forever, daemon=True, name="LoopReserva").start()
         return laco
-
-    def rodar_automacao_ultron(self, nome: str, args: dict | None = None) -> None:
-        """Painel Ultron: roda uma automação DIRETO (sem passar pela IA) e fala/mostra o resultado.
-        Funciona mesmo sem Gemini/Groq, porque chama a ferramenta na hora."""
-        def trabalhar():
-            self.ui.write_log(f"SYS: ⚙ Ultron: {nome}...")
-            try:
-                if nome == "self_diagnosis":
-                    # o relatório inteiro já vai para a tela (linhas SYS) e para Documentos;
-                    # a voz diz só o resumo curto (antes lia o relatório todo e a instrução em inglês)
-                    bruto = self._autodiagnostico(falar=False, so_resumo=True)
-                else:
-                    bruto = self._executar_ferramenta_reserva(nome, dict(args or {}))
-            except Exception as erro:
-                bruto = f"Não consegui rodar {nome}: {str(erro)[:150]}"
-            texto = _limpar_para_falar(bruto)
-            self.ui.write_log(f"Jarvis: {texto}")
-            self._falar_resultado_ultron(texto)
-        threading.Thread(target=trabalhar, daemon=True, name=f"Ultron-{nome}").start()
-
-    def _falar_resultado_ultron(self, texto: str) -> None:
-        """Fala o resultado pela voz que estiver disponível (Gemini ao vivo ou reserva)."""
-        if not texto:
-            return
-        session, loop = getattr(self, "session", None), getattr(self, "_loop", None)
-        if session is not None and loop is not None and not getattr(self, "_modo_reserva", False) \
-                and not self._chamada_fechada():
-            directiva = (f"[Resultado de automação] {texto}\nLeia isso ao usuário em português, "
-                         "sem acrescentar nada. Não chame ferramentas.")
-            # o resultado já está escrito no canal: a leitura do Gemini não entra de novo (ficava duplicado)
-            with self._trava_da_fala():
-                self._leituras_sem_registro = getattr(self, "_leituras_sem_registro", 0) + 1
-                self._leituras_sem_registro_ate = time.monotonic() + 30  # se o Gemini não ler, expira
-            asyncio.run_coroutine_threadsafe(
-                session.send_client_content(turns={"parts": [{"text": directiva}]}, turn_complete=True), loop)
-        else:
-            self._falar_reserva(texto)
 
     def _executar_ferramenta_reserva(self, nome: str, args: dict) -> str:
         """Roda uma ferramenta do Jarvis (a mesma _execute_tool do Gemini) e devolve só o texto."""
