@@ -2262,9 +2262,8 @@ class HudCanvas(QWidget):
                 ny = row / max(self._WAVE_ROWS - 1, 1)
                 self._wave_pts.append([nx, ny, random.uniform(0, 2 * math.pi)])
 
-        self._face_px = None
-        self._load_face(face_path)
-
+        # face_path: a foto (face.png) não existe mais e nunca era desenhada; o nome fica só porque
+        # o main.py e os testes abrem a tela com HudCanvas("face.png")/MainWindow("face.png").
         self._tmr = QTimer(self)
         self._tmr.timeout.connect(self._step)
         self.set_graphics_quality(get_graphics_quality())
@@ -2285,23 +2284,6 @@ class HudCanvas(QWidget):
         if not self._tmr.isActive():
             self._tmr.start()
         self.update()
-
-    def _load_face(self, path: str):
-        try:
-            from PIL import Image, ImageDraw
-            import io
-            img = Image.open(path).convert("RGBA")
-            sz  = min(img.size)
-            img = img.resize((sz, sz), Image.LANCZOS)
-            mk  = Image.new("L", (sz, sz), 0)
-            ImageDraw.Draw(mk).ellipse((2, 2, sz - 2, sz - 2), fill=255)
-            img.putalpha(mk)
-            buf = io.BytesIO()
-            img.save(buf, format="PNG")
-            px = QPixmap(); px.loadFromData(buf.getvalue())
-            self._face_px = px
-        except Exception:
-            self._face_px = None
 
     def _step(self):
         self._tick += 1
