@@ -27,7 +27,7 @@ from PyQt6.QtGui import (
 from PyQt6.QtWidgets import (
     QApplication, QComboBox, QCheckBox, QFormLayout, QFrame, QGraphicsOpacityEffect,
     QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMenu, QPushButton,
-    QScrollArea, QSizePolicy, QSpinBox, QSplitter, QStackedWidget, QSystemTrayIcon, QTextEdit,
+    QScrollArea, QSizePolicy, QSpinBox, QSplitter, QStackedWidget, QSystemTrayIcon,
     QVBoxLayout, QWidget, QProgressBar,
 )
 
@@ -643,7 +643,7 @@ class ChatBubbleWidget(QWidget):
         self.command_submitted.emit(txt)
 
     def append_log(self, text: str):
-        """Thread-safe message append — compatible with LogWidget API."""
+        """Thread-safe message append (same call the old text log had)."""
         self._sig.emit(text)
 
     def _on_message(self, text: str):
@@ -3936,8 +3936,8 @@ class MissionControlPanel(QWidget):
         self._stack.setStyleSheet("background: transparent;")
         outer.addWidget(self._stack, stretch=1)
 
-        # Page 0: COMMS — conversation log
-        self.log_widget = LogWidget()
+        # Page 0: COMMS — conversation log (the chat-bubble view; the raw text log is gone)
+        self.log_widget = ChatBubbleWidget()
         self._stack.addWidget(self.log_widget)
 
         # Page 1: TASKS — task queue
@@ -4007,95 +4007,6 @@ class MissionControlPanel(QWidget):
         lay.addWidget(w)
         lay.addStretch()
 
-
-class LogWidget(QTextEdit):
-    _sig = pyqtSignal(str)
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setReadOnly(True)
-        self.setFont(QFont("Courier New", 9))
-        self.setStyleSheet(f"""
-            QTextEdit {{
-                background: {C.PANEL};
-                color: {C.TEXT};
-                border: 1px solid {C.BORDER};
-                border-radius: 4px;
-                padding: 6px;
-                selection-background-color: {C.PRI_GHO};
-            }}
-            QScrollBar:vertical {{
-                background: {C.BG};
-                width: 8px;
-                border: none;
-            }}
-            QScrollBar::handle:vertical {{
-                background: {C.BORDER_B};
-                border-radius: 4px;
-                min-height: 20px;
-            }}
-        """)
-        self._queue: list[str] = []
-        self._typing  = False
-        self._text    = ""
-        self._pos     = 0
-        self._tag     = "sys"
-        self._tmr = QTimer(self)
-        self._tmr.timeout.connect(self._step)
-        self._sig.connect(self._enqueue)
-
-    def append_log(self, text: str):
-        self._sig.emit(text)
-
-    def _enqueue(self, text: str):
-        self._queue.append(text)
-        if not self._typing:
-            self._next()
-
-    def _next(self):
-        if not self._queue:
-            self._typing = False
-            return
-        self._typing = True
-        self._text   = self._queue.pop(0)
-        self._pos    = 0
-        tl = self._text.lower()
-        if   tl.startswith("you:"):    self._tag = "you"
-        elif tl.startswith("jarvis:"): self._tag = "ai"
-        elif tl.startswith("file:"):   self._tag = "file"
-        elif "err" in tl:              self._tag = "err"
-        else:                          self._tag = "sys"
-        self._tmr.start(16)
-
-    def _step(self):
-        if self._pos < len(self._text):
-            # Escreve vários caracteres por vez: mesma sensação de digitação, mas sem redesenhar
-            # a caixa de texto letra por letra (bem menos processador em linhas longas).
-            trecho = self._text[self._pos:self._pos + 3]
-            cur = self.textCursor()
-            fmt = cur.charFormat()
-            col = {
-                "you":  qcol(C.WHITE),
-                "ai":   qcol(C.PRI),
-                "err":  qcol(C.RED),
-                "file": qcol(C.GREEN),
-                "sys":  qcol(C.ACC2),
-            }.get(self._tag, qcol(C.TEXT))
-            fmt.setForeground(QBrush(col))
-            cur.movePosition(cur.MoveOperation.End)
-            cur.insertText(trecho, fmt)
-            self._pos += len(trecho)
-            if self._pos >= len(self._text):
-                self.setTextCursor(cur)
-                self.ensureCursorVisible()
-        else:
-            self._tmr.stop()
-            cur = self.textCursor()
-            cur.movePosition(cur.MoveOperation.End)
-            cur.insertText("\n")
-            self.setTextCursor(cur)
-            self.ensureCursorVisible()
-            QTimer.singleShot(20, self._next)
 
 _FILE_ICONS = {
     "image":   ("🖼", "#00d4ff"), "video":   ("🎬", "#ff6b00"),
@@ -7792,13 +7703,7 @@ class MainWindow(QMainWindow):
 
         # ── Mission Control Panel (tabbed) ───────────────────────────────────
         self._mission = MissionControlPanel()
-        # Use ChatBubbleWidget instead of raw LogWidget for COMMS tab
-        self._chat_bubble = ChatBubbleWidget()
-        self._mission._stack.removeWidget(self._mission.log_widget)
-        self._mission.log_widget.deleteLater()
-        self._mission._stack.insertWidget(0, self._chat_bubble)
-        self._mission.log_widget = self._chat_bubble
-        self._mission._switch_tab(0)
+        self._chat_bubble = self._mission.log_widget  # the COMMS tab (ChatBubbleWidget)
         self._log = self._chat_bubble  # keep _log reference for compatibility
         self._chat_bubble.command_submitted.connect(self._send)
 
