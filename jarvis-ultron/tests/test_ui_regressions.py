@@ -33,7 +33,6 @@ class UIRegressionTests(unittest.TestCase):
         cls.patchers = [
             patch.dict(os.environ),  # Jarvis Ultron: devolve as variáveis como estavam no fim
             patch.object(ui, "UI_SETTINGS_FILE", temp_path / "ui_settings.json"),
-            patch.object(ui, "LAYOUT_SETTINGS_FILE", temp_path / "layout_settings.json"),
             patch.object(ui, "API_FILE", temp_path / "api_keys.json"),
             patch.object(ui, "get_secret_store", return_value=_NoSecrets()),
             patch.object(ui, "BASE_DIR", temp_path),  # Jarvis Ultron: o .env que a tela regrava

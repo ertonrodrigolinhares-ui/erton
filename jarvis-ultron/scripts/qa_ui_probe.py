@@ -62,12 +62,10 @@ def main() -> int:
     args.output.mkdir(parents=True, exist_ok=True)
     app = QApplication.instance() or QApplication([])
     temp_settings = args.output / "ui-settings.json"
-    temp_layout = args.output / "layout-settings.json"
     temp_api = args.output / "api-keys.json"
 
     patchers = [
         patch.object(ui, "UI_SETTINGS_FILE", temp_settings),
-        patch.object(ui, "LAYOUT_SETTINGS_FILE", temp_layout),
         patch.object(ui, "API_FILE", temp_api),
         patch.object(ui, "get_secret_store", return_value=_NoSecrets()),
         patch.object(ui.MainWindow, "_setup_system_tray", lambda self: None),
