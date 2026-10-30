@@ -1328,7 +1328,7 @@ def nome_da_cidade(cidade: str) -> str:
 def _clima() -> dict:
     cidade = os.environ.get("JARVIS_CIDADE", "Campina Grande")
     try:
-        from ui_stark import buscar_clima
+        from core.fontes_do_dia import buscar_clima
         linhas = buscar_clima(cidade).splitlines()
     except Exception:
         return {"cidade": cidade, "ok": False}
@@ -1347,7 +1347,7 @@ def _clima() -> dict:
 
 def _noticias() -> list[str]:
     try:
-        from ui_stark import buscar_noticias
+        from core.fontes_do_dia import buscar_noticias
         return [t for t, _ in buscar_noticias(4)]
     except Exception:
         return []
@@ -1390,6 +1390,17 @@ def _emails() -> dict:
 
 
 DIAS = ["segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado", "domingo"]
+
+
+def saudacao(hora: int | None = None) -> str:
+    """"Bom dia" até as 11h59, "Boa tarde" até as 17h59, "Boa noite" depois (o cartão do bom dia também
+    aparece quando o Erton diz "bom dia" à tarde ou à noite)."""
+    hora = dt.datetime.now().hour if hora is None else int(hora)
+    if 5 <= hora < 12:
+        return "Bom dia"
+    if 12 <= hora < 18:
+        return "Boa tarde"
+    return "Boa noite"
 MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro",
          "novembro", "dezembro"]
 
@@ -1579,7 +1590,7 @@ class Resumo(QWidget):
                 grande.corpo.addWidget(rotulo("•  " + n, TEXTO, 9))
             grande.corpo.addWidget(rotulo('Gmail não conectado: diga "conectar o Gmail" para ver seus e-mails aqui.',
                                           APAGADO, 7.5))
-        saud = rotulo(f"Bom dia{', ' + nome if nome else ''} · {DIAS[hoje.weekday()]}, {hoje.day} de "
+        saud = rotulo(f"{saudacao()}{', ' + nome if nome else ''} · {DIAS[hoje.weekday()]}, {hoje.day} de "
                       f"{MESES[hoje.month - 1]}" + ("  ·  presença confirmada" if self._presenca else ""),
                       TEXTO2, 7.5, familia=MONO)
         grande.corpo.addWidget(saud)

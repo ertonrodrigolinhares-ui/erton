@@ -18,9 +18,10 @@ import os
 import threading
 import time
 import webbrowser
-import xml.etree.ElementTree as ET
 from pathlib import Path
-from urllib.parse import quote
+
+# os nomes continuam aqui para quem importava do ui_stark; o cérebro usa o core sem carregar o PyQt6
+from core.fontes_do_dia import buscar_clima, buscar_noticias  # noqa: F401
 
 from PyQt6.QtCore import QPointF, QRectF, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen, QRadialGradient
@@ -149,36 +150,7 @@ def _duracao(segundos: float) -> str:
     return f"{dias}d {horas}h {resto // 60}min" if dias else f"{horas}h {resto // 60}min"
 
 
-def buscar_clima(cidade: str) -> str:
-    import requests
-
-    r = requests.get(f"https://wttr.in/{quote(cidade)}?format=j1&lang=pt", timeout=15,
-                     headers={"User-Agent": "JarvisUltron"})
-    r.raise_for_status()
-    dados = r.json()
-    atual = dados["current_condition"][0]
-    descricao = (atual.get("lang_pt") or atual.get("weatherDesc") or [{"value": ""}])[0]["value"]
-    linhas = [f"{atual['temp_C']}°C  {descricao}", f"Sensação {atual['FeelsLikeC']}°C · Umidade {atual['humidity']}%"]
-    for dia in dados.get("weather", [])[:3]:
-        data = dt.date.fromisoformat(dia["date"])
-        linhas.append(f"{DIAS[data.weekday()][:3]}  {dia['mintempC']}° / {dia['maxtempC']}°")
-    return "\n".join(linhas)
-
-
-def buscar_noticias(limite: int = 5) -> list[tuple[str, str]]:
-    import requests
-
-    r = requests.get("https://news.google.com/rss?hl=pt-BR&gl=BR&ceid=BR:pt-419", timeout=15,
-                     headers={"User-Agent": "JarvisUltron"})
-    r.raise_for_status()
-    itens = []
-    for item in ET.fromstring(r.content).iter("item"):
-        titulo = (item.findtext("title") or "").rsplit(" - ", 1)[0].strip()
-        if titulo:
-            itens.append((titulo, item.findtext("link") or ""))
-        if len(itens) >= limite:
-            break
-    return itens
+# buscar_clima e buscar_noticias moram no core/fontes_do_dia.py (Etapa 9) e são importados no topo.
 
 
 # ---------------------------------------------------------------- peças visuais
