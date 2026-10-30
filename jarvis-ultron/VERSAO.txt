@@ -1,7 +1,12 @@
 Jarvis Ultron - versão 2026-10-30
 
-Novidades desta versão (Etapas 6 a 10 da reorganização: tela mais leve, nada some atrás do anel, tudo em
-português, clima falado, notícias, mapa, print salvo e música do PC):
+Novidades desta versão (Etapas 6 a 11 da reorganização: tela mais leve, nada some atrás do anel, tudo em
+português, clima falado, notícias, mapa, print salvo, música do PC e a pasta só com o que é seu):
+- A pasta do Jarvis passa a mostrar só o que é do seu Jarvis. O servidor web herdado do projeto original
+  (site, banco de dados, Docker, hospedagem), os scripts de Mac/Linux e os manuais em inglês foram
+  guardados em `arquivo/` e `docs/original/` (nada foi apagado; com a sua confirmação de que não usa).
+  O "modo de teste com prazo" (o Jarvis fechar sozinho depois de uma hora) saiu, também com o seu ok.
+  O README virou um texto curto em português apontando para o LEIA-ME, que ganhou a configuração do Gmail.
 - "Jarvis, tira um print" passa a salvar de verdade (Documentos\Jarvis Ultron\Capturas, nome com data e
   hora) e a dizer onde ficou; antes só abria o recorte do Windows. O print fica só no PC (a memória do HD
   não copia essa pasta). "Toca <música> do meu PC" toca o que está na sua pasta Música, sem internet. E,
