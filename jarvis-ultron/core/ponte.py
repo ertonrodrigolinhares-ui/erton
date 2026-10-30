@@ -55,9 +55,6 @@ INTERVALO_VOLUME = 0.025      # no máximo 40 avisos de volume da voz por segund
 ESPERA_CONEXAO = 90           # segundos para o cérebro abrir e se conectar (1ª vez é mais lenta)
 MAX_RELIGADAS = 3             # religadas automáticas a cada 5 minutos
 MAX_GUARDADAS = 20            # pedidos do usuário guardados enquanto o cérebro abre ou religa
-# O cérebro saiu de propósito (acabou o tempo de teste, JARVIS_TRIAL_KEYWORD): a tela fecha o
-# Jarvis inteiro, como no programa único, em vez de religar o cérebro com um tempo novo.
-SAIDA_FIM_DO_TESTE = 75
 
 
 def modo_separado() -> bool:
@@ -425,9 +422,6 @@ class PonteTela:
         if processo is None or self._encerrando:
             return
         if processo.poll() is not None:
-            if processo.returncode == SAIDA_FIM_DO_TESTE:
-                self._fim_do_teste()
-                return
             if self._religando_desde is not None:  # troca de cérebro: não é queda
                 self._religando_desde = None
                 self._fechar_conexao()
@@ -517,13 +511,6 @@ class PonteTela:
             havia = bool(self._pendentes)
             self._pendentes.clear()
         return " O que você pediu enquanto ele religava não foi entregue; repita depois." if havia else ""
-
-    def _fim_do_teste(self) -> None:
-        """O cérebro saiu com SAIDA_FIM_DO_TESTE: fecha o Jarvis inteiro (não religa)."""
-        self._processo = None
-        self._fechar_conexao()
-        self.ui.write_log("SYS: O tempo de teste do Jarvis acabou. Fechando...")
-        self.ui.handle_ui_command("quit jarvis")  # o mesmo caminho do botão de sair
 
     def trocar_cerebro(self, destino: str) -> None:
         """Modo privado (gemma) ou normal (gemini): grava no .env e religa só o programa do cérebro."""

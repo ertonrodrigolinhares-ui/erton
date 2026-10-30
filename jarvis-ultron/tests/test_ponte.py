@@ -217,7 +217,7 @@ class RodarCerebroTests(unittest.TestCase):
             async def run(self):
                 pass
 
-        sem = ("JARVIS_TRIAL_KEYWORD", "ELEVENLABS_API_KEY")
+        sem = ("ELEVENLABS_API_KEY",)
         try:
             with patch.object(main, "JarvisLive", JarvisFalso), \
                     patch.object(main, "_load_voice_name", return_value="Charon"), patch.dict(os.environ):
@@ -228,70 +228,6 @@ class RodarCerebroTests(unittest.TestCase):
         finally:
             ui._fechada.set()
             lado_tela.close()
-
-    def test_cerebro_religado_nao_ganha_hora_nova_de_teste_nem_no_modo_privado(self):
-        # A tela marcou o começo do teste há 61 minutos; o cérebro acabou de ser religado ("modo
-        # privado") e roda o Gemma, que nunca passa pela checagem de reconexão do Gemini.
-        import asyncio
-        import main
-
-        acabou = threading.Event()
-
-        class JarvisFalso:
-            runtime_limit_seconds = None
-
-            def __init__(self, tela, voz):
-                self.ui, self.session, self._loop = tela, None, None
-
-            def update_voice(self, voz):
-                pass
-
-            def request_shutdown(self):
-                pass
-
-            def _encerrar_fim_do_teste(self):
-                acabou.set()
-
-            async def run(self):  # o cérebro só fica de pé; quem fecha é o relógio do teste
-                for _ in range(100):
-                    if acabou.is_set():
-                        return
-                    await asyncio.sleep(0.02)
-
-        ui = NS(wait_for_api_key=lambda: None, write_log=lambda texto: None)
-        with patch.object(main, "JarvisLive", JarvisFalso), \
-                patch.object(main, "_load_voice_name", return_value="Charon"), patch.dict(os.environ):
-            for nome in ("ELEVENLABS_API_KEY",):
-                os.environ.pop(nome, None)
-            os.environ.update({"JARVIS_TRIAL_KEYWORD": "trial", "JARVIS_RUNTIME_SECONDS": "3600",
-                               "JARVIS_CEREBRO": "gemma", "JARVIS_TESTE_INICIO": repr(time.time() - 61 * 60)})
-            main.rodar_cerebro(ui)
-        self.assertTrue(acabou.is_set())
-
-    def test_comeco_do_teste_e_marcado_uma_vez(self):
-        import main
-
-        with patch.dict(os.environ):
-            os.environ.pop("JARVIS_TESTE_INICIO", None)
-            primeiro = main._inicio_do_teste()
-            self.assertEqual(os.environ["JARVIS_TESTE_INICIO"], repr(primeiro))  # os cérebros herdam
-            time.sleep(0.01)
-            self.assertEqual(main._inicio_do_teste(), primeiro)  # religar não recomeça
-            for estragado in ("abc", repr(time.time() + 3600), "-5"):  # no futuro não dá hora extra
-                os.environ["JARVIS_TESTE_INICIO"] = estragado
-                self.assertAlmostEqual(main._inicio_do_teste(), time.time(), delta=5)
-
-    def test_fim_do_tempo_de_teste_usa_o_codigo_proprio_no_cerebro_separado(self):
-        import main
-
-        jarvis = object.__new__(main.JarvisLive)
-        jarvis.runtime_limit_seconds = 3600
-        with patch.object(main.jarvis_status, "write_status"), patch.object(main.os, "_exit") as sair:
-            jarvis.ui = NS(remota=True)  # cérebro em programa próprio
-            jarvis._encerrar_fim_do_teste()
-            jarvis.ui = NS()  # programa único: sai sem "erro" para o .bat
-            jarvis._encerrar_fim_do_teste()
-        self.assertEqual([c.args for c in sair.call_args_list], [(ponte.SAIDA_FIM_DO_TESTE,), (0,)])
 
 
 CEREBRO_FALSO = textwrap.dedent("""
@@ -310,9 +246,6 @@ CEREBRO_FALSO = textwrap.dedent("""
     if modo == "cai":
         time.sleep(0.3)
         sys.exit(7)
-    if modo == "fim":
-        time.sleep(0.3)
-        sys.exit(int(os.environ["CODIGO_FIM"]))
     while True:
         try:
             m = c.recv()
@@ -490,7 +423,6 @@ class TextoAntesDoGeminiConectarTests(unittest.TestCase):
         jarvis.ui = NS(logs=logs, write_log=logs.append, set_state=lambda estado: None)
         jarvis.session, jarvis._loop, jarvis._reserva, jarvis._modo_reserva = None, None, None, False
         jarvis.cloud_safe, jarvis.external_audio, jarvis._api_key = True, True, "chave-de-teste"
-        jarvis.runtime_limit_seconds = None
         jarvis._falhas_seguidas = 0
         jarvis._shutdown_requested = threading.Event()
         return jarvis
@@ -609,16 +541,6 @@ class PonteDeVerdadeTests(unittest.TestCase):
             Client(endereco, authkey=b"senha-errada")  # outro programa, sem a senha
         socket.create_connection(endereco, timeout=2).close()  # abre e fecha
         self.assertTrue(_esperar(lambda: "SYS: cérebro falso no ar" in tela.logs, 20, self.app), tela.logs)
-        p.encerrar()
-
-    def test_fim_do_tempo_de_teste_fecha_o_jarvis_sem_religar(self):
-        tela, p = self._ponte("fim")
-        with patch.dict(os.environ, {"CODIGO_FIM": str(ponte.SAIDA_FIM_DO_TESTE)}):
-            p.iniciar()
-        self.assertTrue(_esperar(lambda: tela.comandos == ["quit jarvis"], 20, self.app), tela.logs)
-        _esperar(lambda: False, 0.6, self.app)
-        self.assertIsNone(p._processo)
-        self.assertFalse(any("Religando" in l for l in tela.logs), tela.logs)
         p.encerrar()
 
     def test_sem_cerebro_volta_ao_modo_de_um_programa(self):

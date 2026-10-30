@@ -132,7 +132,7 @@ METODOS_DA_JARVISLIVE = frozenset({
     "__init__", "_announce_startup", "_ativar_modo_reserva", "_autodiagnostico", "_avisar_o_que_para",
     "_avisar_se_nao_enviou", "_avisar_sem_ouvido", "_aviso_de_escuta", "_build_config", "_chamada_fechada",
     "_checar_pedido_de_modo", "_complete_self_quit_after_audio", "_definir_modo_escuta",
-    "_desativar_modo_reserva", "_encerrar_fim_do_teste", "_entregar_resultado_hermes", "_escutar_reserva",
+    "_desativar_modo_reserva", "_entregar_resultado_hermes", "_escutar_reserva",
     "_esquecer_sessao_ao_sair", "_executar_ferramenta_reserva", "_execute_tool", "_execute_tool_batch",
     "_falar_aviso", "_falar_avisos_guardados", "_falar_com_voz_externa", "_falar_no_pc", "_falar_reserva",
     "_falar_resultado_ultron", "_ferramentas_da_reserva", "_force_complete_self_quit",

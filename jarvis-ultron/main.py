@@ -1027,8 +1027,6 @@ class JarvisLive:
         self._falando_no_pc = 0  # Jarvis Ultron: a voz do Windows falando (trava própria do microfone)
         self._voz_externa_pendente = 0  # respostas que a voz externa (ElevenLabs...) ainda vai falar
         self.voice_name     = voice_name
-        # optional runtime limit in seconds (set by main)
-        self.runtime_limit_seconds: int | None = None
         self._textos_trava = threading.Lock()  # texto digitado antes de o Gemini conectar
         self._textos_esperando = []
         self.ui.on_text_command = self._on_text_command
@@ -1337,19 +1335,6 @@ class JarvisLive:
         self.request_shutdown()
         self.ui.handle_ui_command("quit_jarvis")  # ação interna da tela (o botão se chama "Sair do Jarvis")
         return True
-
-    def _encerrar_fim_do_teste(self) -> None:
-        """Acabou o tempo de teste (JARVIS_TRIAL_KEYWORD): fecha o Jarvis."""
-        print(f"[JARVIS] ⏱️ Runtime limit reached ({self.runtime_limit_seconds}s). Exiting.")
-        try:
-            jarvis_status.write_status({"state": "expired"})
-        except Exception:
-            pass
-        from core.ponte import SAIDA_FIM_DO_TESTE
-
-        # Cérebro em programa próprio: o código diz à tela para fechar tudo (e não religar o
-        # cérebro com um tempo novo). Num programa só, sai com 0 (o .bat não acusa erro).
-        os._exit(SAIDA_FIM_DO_TESTE if getattr(self.ui, "remota", False) else 0)
 
     def request_shutdown(self) -> None:
         """Stop live tasks and make the process exit after the UI closes."""
@@ -2837,12 +2822,6 @@ class JarvisLive:
         while True:
             if self._shutdown_requested.is_set():
                 return
-            # enforce runtime limit if configured (contado desde a abertura da tela, não deste cérebro)
-            if self.runtime_limit_seconds is not None:
-                elapsed = time.time() - _inicio_do_teste()
-                if elapsed >= float(self.runtime_limit_seconds):
-                    self._encerrar_fim_do_teste()
-
             # Jarvis Ultron: o modelo de voz que vai ser usado agora (3.x antes do 2.5; se um falhar,
             # a central passa para o próximo).
             modelo_voz = central_de_modelos.resolver(live_model_id)
@@ -3051,30 +3030,6 @@ def _contar_mudanca_desfeita(jarvis, espera: float = 8.0) -> None:
     threading.Thread(target=contar, daemon=True, name="ClaudeDesfeita").start()
 
 
-def _inicio_do_teste() -> float:
-    """Quando o tempo de teste (JARVIS_TRIAL_KEYWORD) começou. A tela marca JARVIS_TESTE_INICIO uma vez
-    e todo cérebro que ela abre herda: trocar de modo ou o cérebro cair e religar não dá uma hora nova."""
-    agora = time.time()
-    try:
-        inicio = float(os.environ.get("JARVIS_TESTE_INICIO", ""))
-    except ValueError:
-        inicio = 0.0
-    if not (0 < inicio <= agora):  # vazio, estragado ou no futuro: conta de agora
-        inicio = agora
-        os.environ["JARVIS_TESTE_INICIO"] = repr(inicio)
-    return inicio
-
-
-def _vigiar_fim_do_teste(jarvis) -> None:
-    """Fecha o Jarvis quando o tempo de teste acabar, qualquer que seja o cérebro (Gemini ao vivo
-    numa conversa longa, Gemma no modo privado ou a reserva): run() só conferia ao reconectar o Gemini."""
-    restante = float(jarvis.runtime_limit_seconds) - (time.time() - _inicio_do_teste())
-    relogio = threading.Timer(max(0.0, restante), jarvis._encerrar_fim_do_teste)
-    relogio.daemon = True
-    relogio.name = "FimDoTeste"
-    relogio.start()
-
-
 def rodar_cerebro(ui):
     """O cérebro do Jarvis (voz, IA, ferramentas). Roda num fio da tela (um programa só) ou
     no programa próprio do cérebro, com a UIRemota no lugar da tela (veja core/ponte.py)."""
@@ -3083,14 +3038,6 @@ def rodar_cerebro(ui):
     jarvis = JarvisLive(ui, voice_name)
     ui.on_quit_requested = jarvis.request_shutdown
     _contar_mudanca_desfeita(jarvis)
-
-    # Trial/keyword runtime limiting: set via env `JARVIS_TRIAL_KEYWORD`.
-    # If set to any non-empty string, jarvis will run for 3600 seconds (1 hour).
-    trial_kw = os.environ.get("JARVIS_TRIAL_KEYWORD")
-    if trial_kw:
-        jarvis.runtime_limit_seconds = int(os.environ.get("JARVIS_RUNTIME_SECONDS", "3600"))
-        jarvis.ui.write_log(f"SYS: Trial keyword detected. Running for {jarvis.runtime_limit_seconds} seconds.")
-        _vigiar_fim_do_teste(jarvis)
 
     ui.on_voice_change = jarvis.update_voice
     def _on_tts_change(provider, api_key, voice_id):
@@ -3186,9 +3133,6 @@ def main():
         print(f"[Automações] Tela: {exc}")
 
     from core.ponte import PonteTela, modo_separado
-
-    if os.environ.get("JARVIS_TRIAL_KEYWORD"):
-        _inicio_do_teste()  # marca a abertura uma vez; os cérebros que a tela abrir herdam (JARVIS_*)
 
     def no_mesmo_programa():
         threading.Thread(target=rodar_cerebro, args=(ui,), daemon=True, name="Cerebro").start()
