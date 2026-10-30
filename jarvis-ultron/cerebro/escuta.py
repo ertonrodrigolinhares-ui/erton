@@ -5,6 +5,7 @@ função e de atributo de antes. Nada aqui lê o ambiente nem toca no Gemini ao 
 
 - _definir_modo_escuta: a ferramenta que troca o modo (o portão é o core/palavra_ativacao.py);
 - _aviso_de_escuta: o som curto e o selo na tela quando ele começa ou para de ouvir;
+- _checar_pedido_de_modo: troca o modo pela frase falada, mesmo que a IA não chame a ferramenta;
 - _mostrar_selo e _mostrar_volume: o que a tela mostra do microfone."""
 
 
@@ -52,3 +53,12 @@ class Escuta:
         if callable(definir):
             from core.efeito_ultron import nivel_da_voz
             definir(nivel_da_voz(pcm))
+
+    def _checar_pedido_de_modo(self, fala: str) -> None:
+        """Troca o modo pela frase falada, mesmo que a IA não chame a ferramenta."""
+        from core.palavra_ativacao import modo_pedido
+
+        portao = getattr(self, "_portao", None)
+        modo = modo_pedido(fala)
+        if modo and portao is not None and portao.modo != modo:
+            self._definir_modo_escuta(modo)

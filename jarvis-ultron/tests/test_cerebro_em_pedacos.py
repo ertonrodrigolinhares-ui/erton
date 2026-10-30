@@ -21,7 +21,7 @@ PEDACOS = {
         "AVISO_ESPERA_AO_CHAMAR", "VOZ_DO_PC_ESPERA", "RESPOSTA_DIGITADA_FALA",
     }),
     "cerebro/escuta.py": ("Escuta", {
-        "_definir_modo_escuta", "_aviso_de_escuta", "_mostrar_selo", "_mostrar_volume",
+        "_definir_modo_escuta", "_aviso_de_escuta", "_checar_pedido_de_modo", "_mostrar_selo", "_mostrar_volume",
     }),
     "cerebro/pontes.py": ("Pontes", {
         "_hermes_sem_travar", "_entregar_resultado_hermes", "HERMES_ESPERA",
@@ -49,6 +49,10 @@ PEDACOS = {
         "_ativar_modo_reserva", "_ligar_cerebro_gemma", "_desativar_modo_reserva", "_responder_pela_reserva",
         "_avisar_sem_ouvido", "_ferramentas_da_reserva", "_garantir_loop_reserva", "_executar_ferramenta_reserva",
         "_falar_reserva", "_escutar_reserva", "RESERVA_FERRAMENTAS_ESSENCIAIS",
+    }),
+    "cerebro/modo_privado.py": ("ModoPrivado", {
+        "_pedido_de_cerebro", "_trocar_cerebro", "_avisar_o_que_para", "_recusar_troca",
+        "_troca_pela_voz_indisponivel", "TRABALHOS_QUE_PARAM",
     }),
 }
 
