@@ -800,7 +800,7 @@ class PeloExecuteToolTests(BaseTests):
 
         jarvis = object.__new__(main.JarvisLive)
         jarvis.ui = jarvis.client = UIFalsa()
-            jarvis.speak_error = Mock()
+        jarvis.speak_error = Mock()
         jarvis.anunciar = Mock(return_value="falado")
         return jarvis
 
