@@ -56,7 +56,6 @@ def _jarvis():
 
     jarvis = object.__new__(main.JarvisLive)
     jarvis.ui = jarvis.client = UIFalsa()
-    jarvis.cloud_safe = False
     jarvis.speak_error = Mock()
     jarvis.anunciar = Mock(return_value="falado")
     return jarvis

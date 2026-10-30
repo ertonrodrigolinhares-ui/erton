@@ -46,8 +46,7 @@ lista escrita à mão).
 - `send_message` e `prepare_message_reply` (digitavam e podiam enviar no WhatsApp, Telegram e Discord) e
   `check_messages` (lia as mensagens; sai junto porque o Erton não usa mensagens): **desligadas**.
 - `agent_task` (escrevia e rodava código gerado pela IA, em `agent/executor.py`): **desligada**.
-- `code_helper` e `dev_agent` (rodavam código e `pip install`): **desligadas**. O `code_helper` saiu
-  também da `CLOUD_SAFE_ACTIONS` (modo servidor): lá só é oferecido o que está declarado.
+- `code_helper` e `dev_agent` (rodavam código e `pip install`): **desligadas**.
 - `computer_control` (clicava e digitava em qualquer lugar): **desligada**. Digitar e apertar teclas
   continua pelo `computer_settings`, só com o "ok" do Erton desde a Etapa 4 (veja a porta fechada abaixo).
 - `game_updater` (podia desligar o PC): **desligada**.
@@ -167,27 +166,31 @@ frases de "desliga o Jarvis"), `test_core_resilience.py` (alvo explícito), `tes
 
 Toda chamada de ferramenta (Gemini, reserva, painel Ultron) passa por elas, **nesta ordem**:
 
-1. servidor (`cloud_safe`): fora da lista `CLOUD_SAFE_ACTIONS`, recusa sem tocar na tela;
-2. modo privado (`bloqueio_do_modo_privado`);
-3. Jarvis pronto (`operational_ready`);
-4. modo QA (`core/qa_mode.guard_tool_call`);
-5. desligar o Jarvis (`_intercept_ui_tool_call`);
-6. `save_memory` (não grava no modo privado);
-7. só então a ferramenta (uma ferramenta desligada na Etapa 3 responde que está desligada e não chama nada).
+1. modo privado (`bloqueio_do_modo_privado`, em `cerebro/ferramentas/politica.py`);
+2. Jarvis pronto (`operational_ready`);
+3. modo QA (`core/qa_mode.guard_tool_call`);
+4. desligar o Jarvis (`_intercept_ui_tool_call`);
+5. `save_memory` (não grava no modo privado);
+6. só então a ferramenta, pela tabela `EXECUTORES` das fichas (`cerebro/ferramentas/fichas.py`); uma
+   ferramenta desligada na Etapa 3 responde que está desligada e não chama nada.
+
+(A trava do servidor, `cloud_safe`, que vinha antes de todas, saiu com o servidor na Etapa 14.)
 
 A ordem pode mudar de arquivo, nunca de ordem. Teste: `test_invariantes.py` (`OrdemDasTravasTests`).
 
 ## 6. Lote de ferramentas do Gemini
 
-Num lote, as ferramentas que mudam algo (o `mutating` do `JarvisLive._execute_tool_batch`) rodam em fila e
-na ordem; as só de leitura rodam juntas. A lista só pode crescer. Testes: `test_invariantes.py`
-(`LoteDoGeminiTests`, `BaseEscritaAMaoTests`) e `test_contratos.py` (foto do `mutating`).
+Num lote, as ferramentas que mudam algo rodam em fila e na ordem; só as que SÓ LEEM rodam juntas. Desde a
+Etapa 14 (c) mudar algo é o padrão: a ficha marca `muda_algo=False` (web_search, weather_report, task_status,
+self_diagnosis, school_tasks) e a automação marca `MUDA_ALGO = False`; nome desconhecido vai para a fila
+(`main.muda_algo`). A lista (`MUDAM_ALGO`, calculada das fichas) só pode crescer. Testes: `test_invariantes.py`
+(`LoteDoGeminiTests`, `BaseEscritaAMaoTests`), `test_registro.py` (`FilaSeguraTests`) e `test_contratos.py`
+(foto do `mutating`).
 
-## 7. Modo servidor (herdado do JARVIS-OS)
+## 7. Modo servidor (herdado do JARVIS-OS): saiu
 
-`main.CLOUD_SAFE_ACTIONS` e o `cloud_safe` da `JarvisLive`: no servidor, só a lista liberada é oferecida, e
-nenhuma ferramenta que age no PC. Testes: `test_invariantes.py` (`ServidorTests`, cópia do
-`test_phase1_decoupling.py`, que sai com o servidor na Etapa 11). Os ramos `cloud_safe` saem na Etapa 14.
+O servidor web foi guardado em `arquivo/servidor-web/` (Etapa 11) e os ramos `cloud_safe`/`external_audio` da
+`JarvisLive`, com a lista `CLOUD_SAFE_ACTIONS`, saíram na Etapa 14. No PC não existe esse modo.
 
 ## 8. O que outros arquivos usam (não é trava, mas quebra o Jarvis se mudar)
 

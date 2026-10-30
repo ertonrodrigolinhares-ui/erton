@@ -422,7 +422,7 @@ class TextoAntesDoGeminiConectarTests(unittest.TestCase):
         logs = []
         jarvis.ui = NS(logs=logs, write_log=logs.append, set_state=lambda estado: None)
         jarvis.session, jarvis._loop, jarvis._reserva, jarvis._modo_reserva = None, None, None, False
-        jarvis.cloud_safe, jarvis.external_audio, jarvis._api_key = True, True, "chave-de-teste"
+        jarvis._api_key = "chave-de-teste"
         jarvis._falhas_seguidas = 0
         jarvis._shutdown_requested = threading.Event()
         return jarvis
@@ -453,7 +453,7 @@ class TextoAntesDoGeminiConectarTests(unittest.TestCase):
             return None
 
         jarvis._build_config = lambda modelo: None
-        jarvis._send_realtime = jarvis._receive_audio = jarvis._play_audio = nada
+        jarvis._send_realtime = jarvis._receive_audio = jarvis._play_audio = jarvis._listen_audio = nada
         cliente = NS(aio=NS(live=NS(connect=conectar)))
         with patch.object(main.genai, "Client", return_value=cliente), \
                 patch.object(main, "pick_live_model", return_value="models/voz-teste"), \

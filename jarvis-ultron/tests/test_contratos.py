@@ -3,7 +3,7 @@
 Uma foto guarda o que nenhuma mudança pode alterar sem querer:
   - o texto e a ordem das declarações das ferramentas (TOOL_DECLARATIONS): o Gemini escolhe a
     ferramenta por esse texto. Foto em tests/dados/declaracoes_antes.json;
-  - as listas de política: FERRAMENTAS_NUVEM_IA, CLOUD_SAFE_ACTIONS, RESERVA_FERRAMENTAS_ESSENCIAIS e o
+  - as listas de política: FERRAMENTAS_NUVEM_IA, RESERVA_FERRAMENTAS_ESSENCIAIS e o
     "mutating" do _execute_tool_batch (o que roda em fila num lote). Foto em tests/dados/politicas_antes.json;
   - os métodos da JarvisLive, os nomes que outros arquivos usam e os nomes da ponte entre a tela e o
     cérebro (core/ponte.py);
@@ -50,7 +50,7 @@ SOBRE_POLITICAS = (
     "nenhuma perde a marca)."
 )
 # as listas que têm de ficar IGUAIS à foto (a das automações só pode crescer: test_invariantes)
-POLITICAS_IGUAIS = ("FERRAMENTAS_NUVEM_IA", "CLOUD_SAFE_ACTIONS", "RESERVA_FERRAMENTAS_ESSENCIAIS", "mutating")
+POLITICAS_IGUAIS = ("FERRAMENTAS_NUVEM_IA", "RESERVA_FERRAMENTAS_ESSENCIAIS", "mutating")
 
 
 # ======================================================================= como as fotos são tiradas
@@ -105,12 +105,11 @@ def politicas_de_hoje() -> dict:
     automacoes = main.carregar_automacoes().ferramentas
     # o "mutating" é conferido em toda ferramenta conhecida, inclusive as que saírem da lista do Gemini
     candidatos = ({d.get("name") for d in main.TOOL_DECLARATIONS} | set(automacoes)
-                  | set(main.FERRAMENTAS_NUVEM_IA) | set(main.CLOUD_SAFE_ACTIONS)
+                  | set(main.FERRAMENTAS_NUVEM_IA)
                   | set(main.JarvisLive.RESERVA_FERRAMENTAS_ESSENCIAIS) | _nomes_da_foto())
     return {
         "_sobre": SOBRE_POLITICAS,
         "FERRAMENTAS_NUVEM_IA": sorted(main.FERRAMENTAS_NUVEM_IA),
-        "CLOUD_SAFE_ACTIONS": sorted(main.CLOUD_SAFE_ACTIONS),
         "RESERVA_FERRAMENTAS_ESSENCIAIS": sorted(main.JarvisLive.RESERVA_FERRAMENTAS_ESSENCIAIS),
         "mutating": em_fila(candidatos),
         "AUTOMACOES_NUVEM_IA": sorted(nome for nome, a in automacoes.items() if getattr(a, "usa_ia_nuvem", False)),
@@ -320,7 +319,6 @@ def rodar_ferramenta(nome: str, args: dict, *, privado: bool = False):
     ui = UIFalsa()
     jarvis = object.__new__(main.JarvisLive)
     jarvis.ui = jarvis.client = ui
-    jarvis.cloud_safe = False
     jarvis.speak_error = Mock()
     fila = FilaFalsa()
     falsas = {"fila": fila, "speak_error": jarvis.speak_error}
@@ -479,7 +477,6 @@ class RespostasPadraoTests(unittest.TestCase):
 
         jarvis = object.__new__(main.JarvisLive)
         jarvis.ui = jarvis.client = UIFalsa()
-        jarvis.cloud_safe = False
         with patch.dict(os.environ, {"JARVIS_CEREBRO": "gemini", "JARVIS_QA_MODE": "0"}), \
                 patch("cerebro.ferramentas.executores.web_search_action", side_effect=RuntimeError("caiu a rede")):
             jarvis.speak_error = Mock()
@@ -498,7 +495,6 @@ class DesligadasTests(unittest.TestCase):
         oferecidas = main.get_tool_declarations()
         self.assertEqual({d["name"] for d in oferecidas} & set(DESLIGADAS), set())
         self.assertEqual(set(main.JarvisLive.RESERVA_FERRAMENTAS_ESSENCIAIS) & set(DESLIGADAS), set())
-        self.assertEqual(set(main.CLOUD_SAFE_ACTIONS) & set(DESLIGADAS), set())  # nem no modo servidor
         # nem o texto de outra ferramenta manda o Gemini para uma delas
         texto = json.dumps(oferecidas, ensure_ascii=False)
         self.assertEqual({nome for nome in DESLIGADAS if re.search(rf"\b{nome}\b", texto)}, set())
@@ -510,7 +506,7 @@ class DesligadasTests(unittest.TestCase):
         prompt = (RAIZ / "core" / "prompt.txt").read_text(encoding="utf-8")
         existem = {d["name"] for d in main.get_tool_declarations()}
         # o que já foi ferramenta: as desligadas e os nomes das listas de política (que as guardam)
-        ja_foram = set(DESLIGADAS) | set(main.FERRAMENTAS_NUVEM_IA) | set(main.CLOUD_SAFE_ACTIONS) | _nomes_da_foto()
+        ja_foram = set(DESLIGADAS) | set(main.FERRAMENTAS_NUVEM_IA) | _nomes_da_foto()
         citadas = set(re.findall(r"\b[a-z]+(?:_[a-z]+)+\b", prompt))
         self.assertEqual((citadas & ja_foram) - existem, set())
         # cada linha "ferramenta: quando usar" fala de uma ferramenta que existe
@@ -580,7 +576,6 @@ class DesligadasTests(unittest.TestCase):
         self.assertIn("computer_settings", {d["name"] for d in main.get_tool_declarations()})
         jarvis = object.__new__(main.JarvisLive)
         jarvis.ui = jarvis.client = UIFalsa()
-        jarvis.cloud_safe = False
         jarvis.speak_error = Mock()
         jarvis._nova_fala("digita oi Ana e aperta enter, pode fazer")
         teclado = Mock()

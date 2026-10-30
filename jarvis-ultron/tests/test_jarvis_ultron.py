@@ -1444,11 +1444,9 @@ class AutomacoesTests(unittest.TestCase):
         with patch.object(registro, "_AUTOMACOES", carga):
             nomes = [d["name"] for d in main.get_tool_declarations()]
             self.assertIn("say_hi", nomes)
-            self.assertNotIn("say_hi", [d["name"] for d in main.get_tool_declarations(cloud_safe=True)])
             jarvis = object.__new__(main.JarvisLive)
             jarvis.ui = UIFalsa()
             jarvis.ui.set_state = lambda *a: None
-            jarvis.cloud_safe = False
 
             class Chamada:
                 name, args, id = "say_hi", {}, "1"
@@ -1859,7 +1857,7 @@ class SessaoQueCaiuTests(unittest.TestCase):
         jarvis = self._jarvis()
         jarvis.ui.set_state = lambda estado: None
         jarvis._loop, jarvis._reserva, jarvis._modo_reserva = None, None, False
-        jarvis.cloud_safe, jarvis.external_audio, jarvis._api_key = True, True, "chave-de-teste"
+        jarvis._api_key = "chave-de-teste"
         jarvis._falhas_seguidas = 0
         no_religar = {}
 
@@ -1880,7 +1878,7 @@ class SessaoQueCaiuTests(unittest.TestCase):
             jarvis._shutdown_requested.set()
 
         jarvis._build_config = lambda modelo: None
-        jarvis._send_realtime = jarvis._play_audio = nada
+        jarvis._send_realtime = jarvis._play_audio = jarvis._listen_audio = nada  # sem microfone nem som
         jarvis._receive_audio = caiu
         jarvis._wait_before_reconnect = esperar_para_religar
         cliente = SimpleNamespace(aio=SimpleNamespace(live=SimpleNamespace(connect=conectar)))
@@ -1907,7 +1905,7 @@ class SessaoQueCaiuTests(unittest.TestCase):
         jarvis.ui.set_state = lambda estado: None
         jarvis.ui.muted = True
         jarvis.session, jarvis._loop, jarvis._reserva, jarvis._modo_reserva = None, None, None, False
-        jarvis.cloud_safe, jarvis.external_audio, jarvis._api_key = True, True, "chave-de-teste"
+        jarvis._api_key = "chave-de-teste"
         jarvis._falhas_seguidas = 0
         sessao_ao_conectar, no_religar = [], {}
 
@@ -1942,7 +1940,7 @@ class SessaoQueCaiuTests(unittest.TestCase):
 
         jarvis._build_config = lambda modelo: None
         jarvis._play_audio = tocar_ate_fechar
-        jarvis._announce_startup = nada
+        jarvis._listen_audio = jarvis._announce_startup = nada  # sem microfone
         jarvis._wait_before_reconnect = esperar_para_religar
         cliente = SimpleNamespace(aio=SimpleNamespace(live=SimpleNamespace(connect=conectar)))
         with patch.dict(os.environ), patch.object(main.genai, "Client", return_value=cliente), \

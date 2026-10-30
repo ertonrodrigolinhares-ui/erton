@@ -17,14 +17,6 @@
     "screen_process",
     "web_search"
   ],
-  "CLOUD_SAFE_ACTIONS": [
-    "create_presentation",
-    "deep_research",
-    "email_control",
-    "flight_finder",
-    "web_search",
-    "youtube_video"
-  ],
   "RESERVA_FERRAMENTAS_ESSENCIAIS": [
     "browser_control",
     "email_control",

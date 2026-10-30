@@ -14,7 +14,7 @@ from core.frases import frase
 
 # Etapa 14 (b): as listas são calculadas da ficha de cada ferramenta (fichas.py), com os mesmos nomes de antes.
 from cerebro.ferramentas.fichas import (  # noqa: E402,F401
-    CLOUD_SAFE_ACTIONS, EXECUTORES, FERRAMENTAS_DESLIGADAS, FERRAMENTAS_NUVEM_IA, MUDAM_ALGO,
+    EXECUTORES, FERRAMENTAS_DESLIGADAS, FERRAMENTAS_NUVEM_IA, MUDAM_ALGO,
     REGRAS_DE_NUVEM, RESERVA_FERRAMENTAS_ESSENCIAIS,
 )
 

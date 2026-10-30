@@ -188,7 +188,7 @@ from cerebro.ferramentas.declaracoes import TOOL_DECLARATIONS  # Etapa 12: o tex
 # Etapas 12 a 14: as ferramentas moram em cerebro/ferramentas/ (declarações, regras, executores e o registro
 # das automações). Os nomes continuam aqui para quem usa main.<nome> (core/cerebro_gemma, painel_ultron, testes).
 from cerebro.ferramentas.politica import (  # noqa: E402
-    AVISO_MODO_PRIVADO, CLOUD_SAFE_ACTIONS, FERRAMENTAS_DESLIGADAS, FERRAMENTAS_NUVEM_IA, MUDAM_ALGO,
+    AVISO_MODO_PRIVADO, FERRAMENTAS_DESLIGADAS, FERRAMENTAS_NUVEM_IA, MUDAM_ALGO,
     bloqueio_do_modo_privado, resposta_de_desligada,
 )
 from cerebro.ferramentas.registro import carregar_automacoes  # noqa: E402,F401
@@ -216,16 +216,10 @@ def muda_algo(nome: str) -> bool:
     return True
 
 
-def get_tool_declarations(*, cloud_safe: bool = False) -> list[dict]:
-    """Return the Gemini tools available for the requested runtime."""
-    if not cloud_safe:
-        extras = [a.declaracao for a in carregar_automacoes().ferramentas.values()]
-        return list(TOOL_DECLARATIONS) + extras
-    return [
-        declaration
-        for declaration in TOOL_DECLARATIONS
-        if declaration.get("name") in CLOUD_SAFE_ACTIONS
-    ]
+def get_tool_declarations() -> list[dict]:
+    """As ferramentas que o Gemini recebe: as nativas e as automações da pasta."""
+    extras = [a.declaracao for a in carregar_automacoes().ferramentas.values()]
+    return list(TOOL_DECLARATIONS) + extras
 
 
 
@@ -236,18 +230,15 @@ class JarvisLive:
         client: JarvisClient,
         voice_name: str = "Puck",
         *,
-        cloud_safe: bool = False,
         api_key: str | None = None,
-        external_audio: bool = False,
     ):
         # Keep ``ui`` as a compatibility alias for desktop integrations that
         # already inspect JarvisLive.ui. The engine contract is JarvisClient.
+        # (Etapa 14 d: os modos do servidor web, cloud_safe e external_audio, saíram com o servidor.)
         self.client         = client
         self.ui             = client
-        self.cloud_safe     = bool(cloud_safe)
-        self.external_audio = bool(external_audio)
         self._api_key       = api_key.strip() if isinstance(api_key, str) else None
-        self.tool_declarations = get_tool_declarations(cloud_safe=self.cloud_safe)
+        self.tool_declarations = get_tool_declarations()
         self.session        = None
         self.audio_in_queue = None
         self.out_queue      = None
@@ -276,33 +267,27 @@ class JarvisLive:
         self._shutdown_requested = threading.Event()
         # Jarvis Ultron: palavra de ativação ("Hey Jarvis") e IA reserva (Groq)
         from core.palavra_ativacao import PortaoDeVoz
-        if self.external_audio or self.cloud_safe:
-            self._portao = PortaoDeVoz(None, ativo=False)
-        else:
-            self._portao = PortaoDeVoz.da_configuracao(avisar=self.ui.write_log)
-            self._portao.ao_mudar = self._aviso_de_escuta
-            self._mostrar_selo(self._portao.estado)  # selo na tela desde a abertura, sem som
+        self._portao = PortaoDeVoz.da_configuracao(avisar=self.ui.write_log)
+        self._portao.ao_mudar = self._aviso_de_escuta
+        self._mostrar_selo(self._portao.estado)  # selo na tela desde a abertura, sem som
         from core.cerebro_gemma import CerebroGemma, cerebro_gemma
 
-        if self.cloud_safe:
-            self._reserva = None
-        elif cerebro_gemma():  # Jarvis Ultron: Gemma 4 no PC como cérebro principal
+        if cerebro_gemma():  # Jarvis Ultron: Gemma 4 no PC como cérebro principal
             self._reserva = CerebroGemma.da_configuracao()
         else:  # Groq e/ou outra empresa (JARVIS_RESERVA), em fila: quando o limite de uma acaba, vai a outra
             from core.reserva_outra import reserva_da_configuracao
 
             self._reserva = reserva_da_configuracao()
         # modo privado mesmo se o Gemma não subiu (assim "modo normal" digitado ainda troca)
-        self._cerebro_nome = "gemma" if (not self.cloud_safe and cerebro_gemma()) else "gemini"
+        self._cerebro_nome = "gemma" if cerebro_gemma() else "gemini"
         self._trocando_cerebro = False  # indo para o modo privado: nada do microfone/texto vai para a nuvem
         self._modo_reserva = False
         self._falhas_seguidas = 0
         self._avisos_trava = threading.Lock()  # avisos guardados no modo chamada
         self._avisos_guardados = []
         self._avisos_ao_falar = []  # quem quer saber quando o aviso guardado foi falado
-        if not self.cloud_safe:
-            self._iniciar_lembretes_geekie()
-            threading.Thread(target=self._preparar_automacoes, daemon=True, name="Automacoes").start()
+        self._iniciar_lembretes_geekie()
+        threading.Thread(target=self._preparar_automacoes, daemon=True, name="Automacoes").start()
 
     def _on_text_command(self, text: str):
         # Jarvis Ultron: "modo chamada" / "modo mãos livres" (botões ou digitado) trocam na hora,
@@ -1222,13 +1207,10 @@ class JarvisLive:
             self._ligar_cerebro_gemma()
             return
         self._modo_reserva = True
-        com_ferramentas = not getattr(self, "cloud_safe", False)
         self.ui.write_log(f"SYS: Gemini indisponível. Modo reserva ({getattr(self._reserva, 'nome', 'Groq')}) ligado: "
-                          + ("converso e executo as tarefas." if com_ferramentas else "converso, mas sem ferramentas."))
+                          "converso e executo as tarefas.")
         threading.Thread(target=self._escutar_reserva, daemon=True).start()
-        aviso = ("A conexão principal caiu. Estou no modo reserva, mas continuo executando suas tarefas."
-                 if com_ferramentas else
-                 "A conexão principal caiu. Estou no modo reserva: posso conversar, mas sem as ferramentas até ela voltar.")
+        aviso = "A conexão principal caiu. Estou no modo reserva, mas continuo executando suas tarefas."
         threading.Thread(target=self._falar_reserva, daemon=True, args=(aviso,)).start()
 
     def _ligar_cerebro_gemma(self) -> None:
@@ -1279,11 +1261,8 @@ class JarvisLive:
 
     def _ferramentas_da_reserva(self):
         """Ferramentas do Jarvis no formato do Groq + a função que as executa (modo reserva).
-        No modo nuvem (cloud_safe) a reserva fica só na conversa, sem ferramentas.
         JARVIS_RESERVA_FERRAMENTAS=0 no .env desliga as ferramentas (fica só conversa, mais leve).
         No modo privado (Gemma) só vão as que não usam IA na nuvem, e sem gravar memória."""
-        if getattr(self, "cloud_safe", False):
-            return None, None
         if os.environ.get("JARVIS_RESERVA_FERRAMENTAS", "1").strip() in ("0", "nao", "não", "false"):
             return None, None
         if getattr(self, "_reserva_ferramentas", None) is None:
@@ -1450,21 +1429,10 @@ class JarvisLive:
         name = fc.name
         args = dict(fc.args or {})
 
-        if getattr(self, "cloud_safe", False) and name not in CLOUD_SAFE_ACTIONS:
-            return types.FunctionResponse(
-                id=fc.id,
-                name=name,
-                response={
-                    "result": (
-                        f"Tool '{name}' is unavailable in cloud-safe mode."
-                    )
-                },
-            )
-
         # Jarvis Ultron: modo privado. Trava no código (não só no prompt do Gemma): vale também para o
-        # painel Ultron e para chamadas que o modelo inventar. No modo nuvem (cloud_safe) a conversa já é
-        # o Gemini e o Gemma não é usado (igual ao __init__), então não há modo privado para travar.
-        bloqueio = None if getattr(self, "cloud_safe", False) else bloqueio_do_modo_privado(name, args)
+        # painel Ultron e para chamadas que o modelo inventar. (A trava do servidor, cloud_safe, que vinha
+        # antes desta, saiu com o servidor na Etapa 14.)
+        bloqueio = bloqueio_do_modo_privado(name, args)
         if bloqueio is not None:
             self.ui.write_log(f"SYS: 🔒 {name} não é usado no modo privado (usa IA na nuvem).")
             return types.FunctionResponse(id=fc.id, name=name, response={"result": bloqueio})
@@ -1773,16 +1741,14 @@ class JarvisLive:
         from core.efeito_ultron import criar_efeito
         efeito_ultron = criar_efeito(RECEIVE_SAMPLE_RATE)
 
-        stream = None
-        if not self.external_audio:
-            stream = sd.RawOutputStream(
-                samplerate=RECEIVE_SAMPLE_RATE,
-                channels=CHANNELS,
-                dtype="int16",
-                blocksize=CHUNK_SIZE,
-                latency=_latencia_audio(),
-            )
-            stream.start()
+        stream = sd.RawOutputStream(
+            samplerate=RECEIVE_SAMPLE_RATE,
+            channels=CHANNELS,
+            dtype="int16",
+            blocksize=CHUNK_SIZE,
+            latency=_latencia_audio(),
+        )
+        stream.start()
 
         try:
             while True:
@@ -1813,11 +1779,7 @@ class JarvisLive:
                     pass  # drain silently
                 else:
                     self.set_speaking(True)
-                    if self.external_audio:
-                        send_audio = getattr(self.client, "send_audio", None)
-                        if callable(send_audio):
-                            send_audio(chunk, f"audio/pcm;rate={RECEIVE_SAMPLE_RATE}")
-                    elif stream is not None:
+                    if stream is not None:
                         if efeito_ultron is not None:
                             chunk = efeito_ultron.processar(chunk)
                         self._mostrar_volume(chunk)
@@ -1845,10 +1807,9 @@ class JarvisLive:
 
     async def run(self):
         # Jarvis Ultron: cérebro Gemma 4 no PC. Não usa o Gemini: liga o cérebro local e fica de pé.
-        # No modo nuvem (cloud_safe, o servidor web) o Gemma não é usado (igual ao __init__): vai ao Gemini.
         from core.cerebro_gemma import cerebro_gemma
 
-        if not getattr(self, "cloud_safe", False) and cerebro_gemma():
+        if cerebro_gemma():
             if self._reserva is not None:
                 self._ativar_modo_reserva()
             else:
@@ -1913,19 +1874,17 @@ class JarvisLive:
                         self._desativar_modo_reserva()
                     self.ui.set_state("LISTENING")
                     self.ui.write_log("SYS: JARVIS online.")
-                    if not self.cloud_safe:
-                        try:
-                            jarvis_status.write_status({
-                                "state": "online",
-                                "voice": self._get_current_voice(),
-                                "pid": os.getpid(),
-                            })
-                        except Exception:
-                            pass
+                    try:
+                        jarvis_status.write_status({
+                            "state": "online",
+                            "voice": self._get_current_voice(),
+                            "pid": os.getpid(),
+                        })
+                    except Exception:
+                        pass
 
                     tg.create_task(self._send_realtime())
-                    if not self.external_audio:
-                        tg.create_task(self._listen_audio())
+                    tg.create_task(self._listen_audio())
                     tg.create_task(self._receive_audio())
                     tg.create_task(self._play_audio())
                     tg.create_task(self._announce_startup())
@@ -1964,18 +1923,16 @@ class JarvisLive:
                     )
                     print(f"[JARVIS] ⚠️ Voice '{old_voice}' unsupported; falling back to {DEFAULT_VOICE_NAME}.")
                     self.ui.sync_voice_display(DEFAULT_VOICE_NAME)
-                    if not self.cloud_safe:
-                        try:
-                            jarvis_status.write_status({"state": "voice_fallback", "voice": DEFAULT_VOICE_NAME})
-                        except Exception:
-                            pass
+                    try:
+                        jarvis_status.write_status({"state": "voice_fallback", "voice": DEFAULT_VOICE_NAME})
+                    except Exception:
+                        pass
                 elif isinstance(actual, genai.errors.APIError) and "1000" in str(actual):
                     print("[JARVIS] 🔌 Session ended normally.")
-                    if not self.cloud_safe:
-                        try:
-                            jarvis_status.write_status({"state": "offline"})
-                        except Exception:
-                            pass
+                    try:
+                        jarvis_status.write_status({"state": "offline"})
+                    except Exception:
+                        pass
                     # Jarvis Ultron: religa logo, mas sem ficar em laço se o Google fechar toda sessão nova
                     await self._wait_before_reconnect(1)
                 else:

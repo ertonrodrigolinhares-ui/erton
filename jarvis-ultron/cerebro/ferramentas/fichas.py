@@ -10,7 +10,6 @@ cada uma é UMA ficha, e as listas são CALCULADAS daqui, com os mesmos nomes de
   padrão: só o que SÓ LÊ (web_search, weather_report, task_status, self_diagnosis, school_tasks) marca
   False. Antes, publicar, gerar vídeo pago, abrir programa e trocar o modo de escuta podiam rodar ao mesmo
   tempo e disputar o mesmo "ok";
-- CLOUD_SAFE_ACTIONS: nuvem_ok=True (as que o servidor web, hoje guardado, oferecia);
 - RESERVA_FERRAMENTAS_ESSENCIAIS: essencial_na_reserva=True (vão para o Groq);
 - FERRAMENTAS_DESLIGADAS: as fichas desligadas (Etapa 3), com o motivo;
 - EXECUTORES: nome -> função, das fichas que têm executar.
@@ -40,7 +39,6 @@ class Ficha:
     muda_algo: bool = True             # num lote do Gemini, roda em fila (uma depois da outra). É o padrão
                                        # seguro (Etapa 14 c): só o que SÓ LÊ marca False e roda em paralelo
     precisa_ok: bool = False           # a ação confere o "ok" do Erton no código (core/aprovacao.py)
-    nuvem_ok: bool = False             # o servidor web (guardado) podia oferecê-la
     essencial_na_reserva: bool = False  # vai para o Groq no modo reserva
     desligada: str = ""                # Etapa 3: o que ela fazia (vai na resposta ao modelo); "" = ligada
 
@@ -59,10 +57,10 @@ REGRAS_DE_NUVEM: dict[str, Callable[[dict], bool]] = {
 FICHAS: tuple[Ficha, ...] = (
     # internet e mídia
     Ficha("weather_report", ex._ex_weather_report, "Weather delivered.", muda_algo=False, essencial_na_reserva=True),
-    Ficha("web_search", ex._ex_web_search, usa_ia_nuvem=True, muda_algo=False, nuvem_ok=True, essencial_na_reserva=True),
+    Ficha("web_search", ex._ex_web_search, usa_ia_nuvem=True, muda_algo=False, essencial_na_reserva=True),
     Ficha("browser_control", ex._ex_browser_control, essencial_na_reserva=True),
     Ficha("media_control", ex._ex_media_control, essencial_na_reserva=True),
-    Ficha("youtube_video", ex._ex_youtube_video, nuvem_ok=True, essencial_na_reserva=True),
+    Ficha("youtube_video", ex._ex_youtube_video, essencial_na_reserva=True),
     # o sistema e a própria tela
     Ficha("open_app", ex._ex_open_app, "Opened {app_name}.", essencial_na_reserva=True),
     Ficha("computer_settings", ex._ex_computer_settings, usa_ia_nuvem=True, precisa_ok=True),
@@ -71,7 +69,7 @@ FICHAS: tuple[Ficha, ...] = (
     Ficha("graphics_quality", ex._ex_graphics_quality, "JARVIS graphics quality changed to {quality}."),
     Ficha("jarvis_ui_control", ex._ex_jarvis_ui_control, "JARVIS interface action completed: {action}."),
     # e-mail e lembrete
-    Ficha("email_control", ex._ex_email_control, "Email action completed.", nuvem_ok=True, essencial_na_reserva=True),
+    Ficha("email_control", ex._ex_email_control, "Email action completed.", essencial_na_reserva=True),
     Ficha("reminder", ex._ex_reminder, "Reminder set.", essencial_na_reserva=True),
     # o Jarvis por dentro
     Ficha("listening_mode", ex._ex_listening_mode, "", essencial_na_reserva=True),
@@ -85,14 +83,14 @@ FICHAS: tuple[Ficha, ...] = (
     Ficha("screen_process", ex._ex_screen_process,
           "Vision module activated. Stay completely silent — vision module will speak directly.", usa_ia_nuvem=True),
     Ficha("file_processor", ex._ex_file_processor, usa_ia_nuvem=True),
-    Ficha("deep_research", ex._ex_deep_research, "Deep research preference requested.", usa_ia_nuvem=True, nuvem_ok=True),
+    Ficha("deep_research", ex._ex_deep_research, "Deep research preference requested.", usa_ia_nuvem=True),
     Ficha("create_presentation", ex._ex_create_presentation, "Presentation preference requested.", usa_ia_nuvem=True,
-          nuvem_ok=True),
+          ),
     Ficha("task_status", ex._ex_task_status, "", muda_algo=False),
     # memória: tratada no próprio _execute_tool (não grava no modo privado), por isso sem executar aqui
     Ficha("save_memory", None, "ok", essencial_na_reserva=True),
     # herdada que ainda existe (a Etapa 18 decide, com o Erton)
-    Ficha("flight_finder", ex._ex_flight_finder, usa_ia_nuvem=True, nuvem_ok=True),
+    Ficha("flight_finder", ex._ex_flight_finder, usa_ia_nuvem=True),
     # desligadas de propósito (Etapa 3, decisão do Erton): sem declaração, sem executor; chamadas mesmo assim,
     # o _execute_tool responde o motivo e não chama nada
     Ficha("send_message",
@@ -115,6 +113,5 @@ assert len(POR_NOME) == len(FICHAS), "ficha repetida"
 EXECUTORES: dict[str, Callable] = {f.nome: f.executar for f in FICHAS if f.executar is not None}
 FERRAMENTAS_NUVEM_IA = frozenset(f.nome for f in FICHAS if f.usa_ia_nuvem)
 MUDAM_ALGO = frozenset(f.nome for f in FICHAS if f.muda_algo)
-CLOUD_SAFE_ACTIONS = frozenset(f.nome for f in FICHAS if f.nuvem_ok)
 RESERVA_FERRAMENTAS_ESSENCIAIS = frozenset(f.nome for f in FICHAS if f.essencial_na_reserva)
 FERRAMENTAS_DESLIGADAS: dict[str, str] = {f.nome: f.desligada for f in FICHAS if f.desligada}

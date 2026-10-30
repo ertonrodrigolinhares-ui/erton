@@ -9,16 +9,15 @@ está no core/SEGURANCA.md.
   - a lista de nuvem (FERRAMENTAS_NUVEM_IA) só cresce enquanto a ferramenta existir. A base dessas
     regras fica escrita à mão AQUI (NUVEM_MINIMA...), e não só na foto: o --gravar-fotos regrava a foto
     com o código do momento e apagaria a base junto;
-  - a ORDEM das travas no começo do _execute_tool: servidor (cloud_safe) → modo privado → Jarvis pronto
-    → modo QA → desligar o Jarvis → save_memory (que não grava no modo privado);
+  - a ORDEM das travas no começo do _execute_tool: modo privado → Jarvis pronto → modo QA → desligar o
+    Jarvis → save_memory (que não grava no modo privado);
   - um "ok" antigo não aprova publicação nem vídeo;
   - a chave do Gemini nunca vai para o config/api_keys.json (nem aparece no registro da tela);
   - num lote do Gemini, o que muda algo roda em fila e na ordem.
 
-Também guarda as conferências de segurança que ficavam em testes ligados ao servidor (o
-test_phase1_decoupling, a reserva do test_cerebro_gemma e o lote do test_qa_system), para não se
-perderem quando o servidor for guardado (Etapa 11). As do servidor saem junto com os ramos cloud_safe
-(Etapa 14)."""
+Também guarda as conferências de segurança que ficavam em testes ligados ao servidor (a reserva do
+test_cerebro_gemma e o lote do test_qa_system). O servidor foi guardado na Etapa 11 e os ramos cloud_safe
+saíram na Etapa 14, com os testes só dele."""
 
 import asyncio
 import importlib.util
@@ -41,11 +40,6 @@ sys.path.insert(0, str(RAIZ / "tests"))
 
 from core.aprovacao import nova_fala  # noqa: E402
 from test_contratos import FOTO_POLITICAS, UIFalsa, acoes_do_main, em_fila, ler_foto  # noqa: E402
-
-# As ferramentas que só agem no PC (cópia da LOCAL_MACHINE_ONLY_ACTIONS, que a Etapa 5 apagou do
-# main.py): o modo servidor nunca pode oferecê-las.
-AGEM_NO_PC = frozenset({"computer_control", "open_app", "file_controller", "media_control",
-                        "desktop_control", "computer_settings"})
 
 # A base das regras, escrita à mão com os nomes de hoje (Etapa 1). NÃO é lida da foto: o
 # "python tests/test_contratos.py --gravar-fotos" regrava o tests/dados/politicas_antes.json com o código
@@ -70,7 +64,6 @@ def _jarvis(ui=None):
 
     jarvis = object.__new__(main.JarvisLive)
     jarvis.ui = jarvis.client = ui or UIFalsa()
-    jarvis.cloud_safe = False
     jarvis.speak_error = Mock()
     jarvis._current_input_transcript = ""
     jarvis._last_input_transcript = ""
@@ -88,7 +81,7 @@ def _existentes() -> set[str]:
     import main
 
     return ({d["name"] for d in main.TOOL_DECLARATIONS} | set(main.carregar_automacoes().ferramentas)
-            | set(main.FERRAMENTAS_NUVEM_IA) | set(main.CLOUD_SAFE_ACTIONS)
+            | set(main.FERRAMENTAS_NUVEM_IA)
             | set(main.JarvisLive.RESERVA_FERRAMENTAS_ESSENCIAIS))
 
 
@@ -281,26 +274,11 @@ class BaseEscritaAMaoTests(unittest.TestCase):
 # ======================================================================= ordem das travas
 
 class OrdemDasTravasTests(unittest.TestCase):
-    """cloud_safe → modo privado → Jarvis pronto → modo QA → desligar o Jarvis → save_memory."""
+    """modo privado → Jarvis pronto → modo QA → desligar o Jarvis → save_memory (a trava do servidor saiu na Etapa 14)."""
 
     def _ambiente(self, pilha, privado=False, qa=False):
         pilha.enter_context(patch.dict(os.environ, {"JARVIS_CEREBRO": "gemma" if privado else "gemini",
                                                     "JARVIS_QA_MODE": "1" if qa else "0"}))
-
-    def test_servidor_vem_antes_de_tudo(self):
-        import main
-
-        ui = UIFalsa()
-        ui.operational_ready = False
-        jarvis = _jarvis(ui)
-        jarvis.cloud_safe = True
-        with ExitStack() as pilha:
-            self._ambiente(pilha, privado=True, qa=True)
-            pilha.enter_context(patch("core.qa_mode.guard_tool_call", side_effect=AssertionError("QA")))
-            resposta = _chamar(jarvis, "hermes_agent", {"request": "x"})
-        self.assertIn("unavailable in cloud-safe mode", resposta["result"])
-        self.assertNotEqual(resposta["result"], main.AVISO_MODO_PRIVADO)
-        self.assertEqual(ui.eventos, [])
 
     def test_modo_privado_vem_antes_do_jarvis_pronto_e_do_qa(self):
         import main
@@ -532,68 +510,6 @@ class LoteDoGeminiTests(unittest.TestCase):
         resultados, maximo = _rodar_lote(["weather_report", "web_search"])
         self.assertEqual(resultados, ["weather_report", "web_search"])
         self.assertEqual(maximo, 2)
-
-
-# ======================================================================= servidor (cloud_safe)
-
-class ClienteFalso:
-    """O mínimo do contrato JarvisClient para abrir a JarvisLive no modo servidor."""
-
-    def __init__(self):
-        self.on_text_command = None
-        self.muted = False
-        self.current_file = None
-        self._voice_combo = None
-        self.eventos = []
-
-    def write_log(self, texto):
-        self.eventos.append(("log", texto))
-
-    def set_state(self, estado):
-        self.eventos.append(("estado", estado))
-
-    def show_subtitle(self, texto):
-        self.eventos.append(("legenda", texto))
-
-    def clear_subtitle(self):
-        self.eventos.append(("legenda", None))
-
-    def set_theme(self, tema):
-        self.eventos.append(("tema", tema))
-
-    def set_graphics_quality(self, qualidade):
-        self.eventos.append(("graficos", qualidade))
-
-    def sync_voice_display(self, voz):
-        self.eventos.append(("voz", voz))
-
-    def handle_ui_command(self, acao):
-        self.eventos.append(("tela", acao))
-
-
-class ServidorTests(unittest.TestCase):
-    # (cópia do tests/test_phase1_decoupling.py, que sai junto com o servidor)
-    def test_modo_servidor_so_oferece_a_lista_liberada(self):
-        import main
-
-        jarvis = main.JarvisLive(ClienteFalso(), cloud_safe=True)
-        nomes = {d["name"] for d in jarvis.tool_declarations}
-        self.assertTrue(nomes)
-        self.assertLessEqual(nomes, set(main.CLOUD_SAFE_ACTIONS))
-        self.assertEqual(nomes & AGEM_NO_PC, set())
-
-    def test_modo_servidor_recusa_o_resto_sem_tocar_na_tela(self):
-        import main
-
-        cliente = ClienteFalso()
-        jarvis = main.JarvisLive(cliente, cloud_safe=True)
-        resto = (({d["name"] for d in main.TOOL_DECLARATIONS} | set(main.carregar_automacoes().ferramentas))
-                 - set(main.CLOUD_SAFE_ACTIONS))
-        for nome in sorted(resto | AGEM_NO_PC):
-            with self.subTest(ferramenta=nome):
-                resposta = _chamar(jarvis, nome)
-                self.assertIn("unavailable in cloud-safe mode", resposta["result"])
-        self.assertEqual(cliente.eventos, [])
 
 
 if __name__ == "__main__":
