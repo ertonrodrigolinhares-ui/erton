@@ -1439,7 +1439,9 @@ class AutomacoesTests(unittest.TestCase):
         carga = Carga(ferramentas={"say_hi": Automacao(
             "say_hi", {"name": "say_hi", "description": "Says hi.", "parameters": {"type": "OBJECT", "properties": {}}},
             lambda args, jarvis: "oi!", Path("x.py"))})
-        with patch.object(main, "_AUTOMACOES", carga):
+        from cerebro.ferramentas import registro
+
+        with patch.object(registro, "_AUTOMACOES", carga):
             nomes = [d["name"] for d in main.get_tool_declarations()]
             self.assertIn("say_hi", nomes)
             self.assertNotIn("say_hi", [d["name"] for d in main.get_tool_declarations(cloud_safe=True)])

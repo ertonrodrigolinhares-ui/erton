@@ -278,7 +278,7 @@ class GemmaNoJarvisTests(unittest.TestCase):
         jarvis = self._jarvis(None)
         jarvis.cloud_safe = True
         with patch.dict(os.environ, {"JARVIS_CEREBRO": "gemma"}), \
-                patch("main.web_search_action", return_value="resultado da busca") as busca:
+                patch("cerebro.ferramentas.executores.web_search_action", return_value="resultado da busca") as busca:
             resposta = asyncio.run(jarvis._execute_tool(NS(name="web_search", args={"query": "x"}, id="1")))
         busca.assert_called_once()
         self.assertNotEqual(resposta.response["result"], main.AVISO_MODO_PRIVADO)
@@ -312,10 +312,10 @@ class GemmaNoJarvisTests(unittest.TestCase):
         jarvis = self._jarvis(CerebroGemma(cliente=ClienteOllamaFalso()))
         nuvem = AssertionError("não pode mandar para a IA na nuvem no modo privado")
         with patch.dict(os.environ, {"JARVIS_CEREBRO": "gemma"}), \
-                patch("main.web_search_action", side_effect=nuvem), \
+                patch("cerebro.ferramentas.executores.web_search_action", side_effect=nuvem), \
                 patch("core.hermes_ponte.perguntar", side_effect=nuvem), \
                 patch("core.modelos.gerar_imagem", side_effect=nuvem), \
-                patch("main.youtube_video", side_effect=nuvem):
+                patch("cerebro.ferramentas.executores.youtube_video", side_effect=nuvem):
             for nome, args in (("web_search", {"query": "cliente Fulano CNPJ 123"}),
                                ("hermes_agent", {"request": "resumo do cliente Fulano"}),
                                ("generate_image", {"prompt": "x"}),

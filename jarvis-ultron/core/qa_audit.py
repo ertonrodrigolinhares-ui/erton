@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import ast
 import re
 from pathlib import Path
 
@@ -28,18 +27,13 @@ def declared_tools(main_path: Path | None = None) -> list[str]:
     return [str(d.get("name")) for d in TOOL_DECLARATIONS if isinstance(d, dict) and d.get("name")]
 
 
-def dispatch_names(main_path: Path) -> set[str]:
-    """As ferramentas que o _execute_tool do main.py sabe executar: as chaves da tabela EXECUTORES (Etapa 13) e
-    o save_memory (que tem a regra própria do modo privado). Lido do texto do main.py (sem importá-lo:
-    importar o main carrega o .env)."""
-    source = main_path.read_text(encoding="utf-8")
-    names = {"save_memory"}
-    tree = ast.parse(source)
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "EXECUTORES" for t in node.targets) \
-                and isinstance(node.value, ast.Dict):
-            names |= {k.value for k in node.value.keys if isinstance(k, ast.Constant) and isinstance(k.value, str)}
-    return names
+def dispatch_names(main_path: Path | None = None) -> set[str]:
+    """As ferramentas que o _execute_tool sabe executar: as chaves da tabela EXECUTORES (Etapa 13, que desde a 14
+    mora em cerebro/ferramentas/executores.py e é importada; o módulo não lê o .env) e o save_memory (que tem a
+    regra própria do modo privado). O caminho do main.py continua aceito para quem chamava assim."""
+    from cerebro.ferramentas.executores import EXECUTORES
+
+    return set(EXECUTORES) | {"save_memory"}
 
 
 def repository_findings(root: Path) -> list[Finding]:
@@ -49,7 +43,6 @@ def repository_findings(root: Path) -> list[Finding]:
     tools = declared_tools(main_path)
     missing = sorted(EXPECTED_TOOLS - set(tools))
     duplicates = sorted({name for name in tools if tools.count(name) > 1})
-    main_source = main_path.read_text(encoding="utf-8")
 
     if missing or duplicates:
         findings.append(Finding(

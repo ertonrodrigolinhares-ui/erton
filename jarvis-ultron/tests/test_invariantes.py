@@ -154,8 +154,10 @@ class ModoPrivadoTests(unittest.TestCase):
         """Troca tudo o que vem depois da trava do modo privado por falsas que falham se chamadas."""
         import main
 
+        from cerebro.ferramentas import executores
+
         nada = AssertionError("passou da trava do modo privado")
-        falsas = [pilha.enter_context(patch.object(main, acao, Mock(side_effect=nada))) for acao in acoes_do_main()]
+        falsas = [pilha.enter_context(patch.object(executores, acao, Mock(side_effect=nada))) for acao in acoes_do_main()]
         for alvo in ("core.hermes_ponte.perguntar", "core.hermes_ponte.aprovar_e_executar",
                      "core.modelos.gerar_imagem", "agent.task_queue.get_queue", "core.qa_mode.guard_tool_call"):
             falsas.append(pilha.enter_context(patch(alvo, Mock(side_effect=nada))))
@@ -245,7 +247,11 @@ class BaseEscritaAMaoTests(unittest.TestCase):
         # no modo privado, a tela do Erton iria para o Gemini
         import main
 
+        from cerebro.ferramentas import politica
+
+        # a lista mora na politica (a trava lê de lá); o main.py só reexporta: os dois nomes são trocados
         with patch.object(main, "FERRAMENTAS_NUVEM_IA", main.FERRAMENTAS_NUVEM_IA - {"screen_process"}), \
+                patch.object(politica, "FERRAMENTAS_NUVEM_IA", main.FERRAMENTAS_NUVEM_IA - {"screen_process"}), \
                 self._foto_regravada_sem("FERRAMENTAS_NUVEM_IA", "screen_process"):
             self.assertEqual(_sairam_da_lista_de_nuvem(), {"screen_process"})
             self.assertIn("screen_process", _de_nuvem())  # e o modo privado continua cobrando a recusa
@@ -253,8 +259,11 @@ class BaseEscritaAMaoTests(unittest.TestCase):
     def test_tirar_a_marca_da_automacao_e_regravar_a_foto_nao_passa(self):
         import main
 
+        from cerebro.ferramentas import registro
+
         automacoes = dict(main.carregar_automacoes().ferramentas, claude_task=NS(usa_ia_nuvem=False))
         with patch.object(main, "carregar_automacoes", return_value=NS(ferramentas=automacoes)), \
+                patch.object(registro, "carregar_automacoes", return_value=NS(ferramentas=automacoes)), \
                 self._foto_regravada_sem("AUTOMACOES_NUVEM_IA", "claude_task"):
             self.assertEqual(_perderam_a_marca(), {"claude_task"})
 

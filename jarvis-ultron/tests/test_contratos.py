@@ -304,10 +304,11 @@ class FilaFalsa:
 
 
 def acoes_do_main() -> list[str]:
-    """As ações das ferramentas nativas no main.py (carregadas só na hora de usar: _lazy_action)."""
-    import main
+    """As ações das ferramentas nativas (carregadas só na hora de usar: _lazy_action). Desde a Etapa 14 elas
+    moram em cerebro/ferramentas/executores.py (o main.py só reexporta): é lá que o patch tem de ser feito."""
+    from cerebro.ferramentas import executores
 
-    return sorted(nome for nome, valor in vars(main).items()
+    return sorted(nome for nome, valor in vars(executores).items()
                   if getattr(valor, "__qualname__", "") == "_lazy_action.<locals>.invoke")
 
 
@@ -326,8 +327,10 @@ def rodar_ferramenta(nome: str, args: dict, *, privado: bool = False):
     with ExitStack() as pilha:
         pilha.enter_context(patch.dict(os.environ, {"JARVIS_CEREBRO": "gemma" if privado else "gemini",
                                                     "JARVIS_QA_MODE": "0"}))
+        from cerebro.ferramentas import executores
+
         for acao in acoes_do_main():
-            falsas[acao] = pilha.enter_context(patch.object(main, acao, Mock(return_value=None)))
+            falsas[acao] = pilha.enter_context(patch.object(executores, acao, Mock(return_value=None)))
         for metodo in ("_definir_modo_escuta", "_geekie_pendencias", "_autodiagnostico",
                        "_hermes_sem_travar", "_suspender"):
             falsa = AsyncMock(return_value=None) if metodo in ASSINCRONAS else Mock(return_value=None)
@@ -478,7 +481,7 @@ class RespostasPadraoTests(unittest.TestCase):
         jarvis.ui = jarvis.client = UIFalsa()
         jarvis.cloud_safe = False
         with patch.dict(os.environ, {"JARVIS_CEREBRO": "gemini", "JARVIS_QA_MODE": "0"}), \
-                patch.object(main, "web_search_action", side_effect=RuntimeError("caiu a rede")):
+                patch("cerebro.ferramentas.executores.web_search_action", side_effect=RuntimeError("caiu a rede")):
             jarvis.speak_error = Mock()
             resposta = asyncio.run(jarvis._execute_tool(NS(id="1", name="web_search", args={"query": "x"})))
         self.assertEqual(resposta.response, {"result": "Tool 'web_search' failed: caiu a rede"})
@@ -536,8 +539,9 @@ class DesligadasTests(unittest.TestCase):
 
         import core.automacoes
         import main
+        from cerebro.ferramentas import registro  # o cache das automações mora lá (Etapa 14)
 
-        guardadas = main._AUTOMACOES
+        guardadas = registro._AUTOMACOES
         with tempfile.TemporaryDirectory() as pasta:
             for nome in DESLIGADAS:
                 (Path(pasta) / f"{nome}.py").write_text(
@@ -548,7 +552,7 @@ class DesligadasTests(unittest.TestCase):
                     carga = main.carregar_automacoes(recarregar=True)
                     oferecidas = {d["name"] for d in main.get_tool_declarations()}
             finally:
-                main._AUTOMACOES = guardadas
+                registro._AUTOMACOES = guardadas
         self.assertEqual(carga.ferramentas, {})
         self.assertEqual(sorted(a for a, _ in carga.erros), sorted(f"{nome}.py" for nome in DESLIGADAS))
         self.assertTrue(all("já existe no Jarvis" in erro for _, erro in carga.erros))

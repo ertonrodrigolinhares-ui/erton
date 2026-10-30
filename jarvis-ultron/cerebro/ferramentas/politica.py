@@ -2,8 +2,10 @@
 
 Saíram do main.py sem mudar um nome. A foto tests/dados/politicas_antes.json confere os conjuntos, e o
 tests/test_invariantes.py garante que a lista do modo privado só cresce enquanto a ferramenta existir.
-O main.py reexporta os nomes (core/cerebro_gemma e os testes usam main.FERRAMENTAS_NUVEM_IA). A função
-bloqueio_do_modo_privado continua no main.py por enquanto (usa o carregar_automacoes, que os testes trocam).
+O main.py reexporta os nomes (core/cerebro_gemma e os testes usam main.FERRAMENTAS_NUVEM_IA). Desde a
+Etapa 14 moram aqui também as ferramentas DESLIGADAS e o bloqueio_do_modo_privado, a trava que recusa, no
+modo privado, tudo o que mandaria o pedido para uma IA na nuvem (os testes que mexem nela fazem patch em
+cerebro.ferramentas.politica.FERRAMENTAS_NUVEM_IA e em cerebro.ferramentas.registro.carregar_automacoes).
 """
 
 from __future__ import annotations
@@ -42,3 +44,49 @@ MUDAM_ALGO = frozenset({
     "file_processor", "code_helper", "dev_agent", "game_updater",
     "create_presentation", "save_memory", "jarvis_ui_control", "graphics_quality",
 })
+
+
+def bloqueio_do_modo_privado(nome: str, args: dict | None = None) -> str | None:
+    """Jarvis Ultron: no modo privado, a recusa (em português) para uma ferramenta que usa IA na nuvem;
+    None quando pode rodar. Vale para o Gemma, o painel Ultron e qualquer outra chamada."""
+    from core.cerebro_gemma import cerebro_gemma
+
+    if not cerebro_gemma():
+        return None
+    args = args or {}
+    if nome in FERRAMENTAS_NUVEM_IA:
+        return AVISO_MODO_PRIVADO
+    if nome == "youtube_video" and str(args.get("action", "")).strip().lower() == "summarize":
+        return AVISO_MODO_PRIVADO  # o resumo do vídeo é feito pelo Gemini
+    if nome == "school_tasks" and args.get("refresh"):
+        return AVISO_MODO_PRIVADO  # ler o Geekie de novo é trabalho do Hermes
+    from cerebro.ferramentas.registro import carregar_automacoes  # (aqui, para não dar laço de import)
+
+    automacao = carregar_automacoes().ferramentas.get(nome)
+    if automacao is not None and getattr(automacao, "usa_ia_nuvem", False):
+        return AVISO_MODO_PRIVADO
+    return None
+
+
+# Jarvis Ultron: ferramentas herdadas DESLIGADAS de propósito (Etapa 3 do docs/PLANO-REORGANIZACAO.md,
+# decisão do Erton): agiam sem o "ok" dele conferido no código, ou ele não usa. Saíram da lista que o
+# Gemini vê, da reserva e do prompt; os arquivos ficam no lugar até a Etapa 18. Se alguém chamar mesmo
+# assim (um nome antigo, o modelo inventando), o _execute_tool responde isto e não chama nada.
+# Nome -> o que ela fazia (vai na resposta ao modelo, em inglês como as outras).
+FERRAMENTAS_DESLIGADAS = {
+    "send_message": "sending messages on WhatsApp, Telegram, Discord, Instagram or iMessage",
+    "prepare_message_reply": "drafting and sending message replies",
+    "check_messages": "reading messages and contacts",
+    "agent_task": "multi-step tasks that write and run AI-generated code",
+    "code_helper": "writing, running and building code",
+    "dev_agent": "building projects, installing packages and running code",
+    "computer_control": "clicking, typing and moving the mouse anywhere on the screen",
+    "game_updater": "installing and updating Steam and Epic games, which could shut down the computer",
+}
+
+
+def resposta_de_desligada(nome: str) -> str:
+    """O que volta para o modelo quando ele chama uma ferramenta desligada (nada é chamado)."""
+    return (f"Tool '{nome}' ({FERRAMENTAS_DESLIGADAS[nome]}) is turned off in Jarvis Ultron. "
+            "Do not try to do this with another tool. Tell the user, in one short sentence in Portuguese, "
+            "that you do not do this.")

@@ -18,42 +18,10 @@ from core.frases import frase
 from memory.memory_manager import (
     load_memory, update_memory, format_memory_for_prompt,
 )
-import hashlib
-import importlib
 import time
 
 from core.live_model import pick_live_model
 
-
-def _lazy_action(module_name: str, attribute: str):
-    """Keep desktop-only dependencies out of headless API process startup."""
-
-    def invoke(*args, **kwargs):
-        action = getattr(importlib.import_module(module_name), attribute)
-        return action(*args, **kwargs)
-
-    invoke.__name__ = attribute
-    return invoke
-
-
-# Preserve the historical module-level action surface for patches/plugins while
-# deferring platform-specific imports until a declared action actually runs.
-file_processor = _lazy_action("actions.file_processor", "file_processor")
-flight_finder = _lazy_action("actions.flight_finder", "flight_finder")
-open_app = _lazy_action("actions.open_app", "open_app")
-weather_action = _lazy_action("actions.weather_report", "weather_action")
-email_control = _lazy_action("actions.email_control", "email_control")
-reminder = _lazy_action("actions.reminder", "reminder")
-computer_settings = _lazy_action("actions.computer_settings", "computer_settings")
-screen_process = _lazy_action("actions.screen_processor", "screen_process")
-youtube_video = _lazy_action("actions.youtube_video", "youtube_video")
-media_control = _lazy_action("actions.media_control", "media_control")
-desktop_control = _lazy_action("actions.desktop", "desktop_control")
-browser_control = _lazy_action("actions.browser_control", "browser_control")
-file_controller = _lazy_action("actions.file_controller", "file_controller")
-web_search_action = _lazy_action("actions.web_search", "web_search")
-request_presentation = _lazy_action("actions.presentation_maker", "request_presentation")
-request_deep_research = _lazy_action("actions.deep_research", "request_deep_research")
 
 
 def get_base_dir():
@@ -217,70 +185,18 @@ def _clean_transcript(text: str) -> str:
 
 from cerebro.ferramentas.declaracoes import TOOL_DECLARATIONS  # Etapa 12: o texto mora lá, igual ao de antes
 
-# Etapa 12: as regras (o que pode ir para a nuvem, o que roda em fila) moram em cerebro/ferramentas/politica.py;
-# os nomes continuam aqui para quem usa main.FERRAMENTAS_NUVEM_IA (core/cerebro_gemma, testes).
+# Etapas 12 a 14: as ferramentas moram em cerebro/ferramentas/ (declarações, regras, executores e o registro
+# das automações). Os nomes continuam aqui para quem usa main.<nome> (core/cerebro_gemma, painel_ultron, testes).
 from cerebro.ferramentas.politica import (  # noqa: E402
-    AVISO_MODO_PRIVADO, CLOUD_SAFE_ACTIONS, FERRAMENTAS_NUVEM_IA, MUDAM_ALGO,
+    AVISO_MODO_PRIVADO, CLOUD_SAFE_ACTIONS, FERRAMENTAS_DESLIGADAS, FERRAMENTAS_NUVEM_IA, MUDAM_ALGO,
+    bloqueio_do_modo_privado, resposta_de_desligada,
 )
-
-
-def bloqueio_do_modo_privado(nome: str, args: dict | None = None) -> str | None:
-    """Jarvis Ultron: no modo privado, a recusa (em português) para uma ferramenta que usa IA na nuvem;
-    None quando pode rodar. Vale para o Gemma, o painel Ultron e qualquer outra chamada."""
-    from core.cerebro_gemma import cerebro_gemma
-
-    if not cerebro_gemma():
-        return None
-    args = args or {}
-    if nome in FERRAMENTAS_NUVEM_IA:
-        return AVISO_MODO_PRIVADO
-    if nome == "youtube_video" and str(args.get("action", "")).strip().lower() == "summarize":
-        return AVISO_MODO_PRIVADO  # o resumo do vídeo é feito pelo Gemini
-    if nome == "school_tasks" and args.get("refresh"):
-        return AVISO_MODO_PRIVADO  # ler o Geekie de novo é trabalho do Hermes
-    automacao = carregar_automacoes().ferramentas.get(nome)
-    if automacao is not None and getattr(automacao, "usa_ia_nuvem", False):
-        return AVISO_MODO_PRIVADO
-    return None
-
-
-# Jarvis Ultron: ferramentas herdadas DESLIGADAS de propósito (Etapa 3 do docs/PLANO-REORGANIZACAO.md,
-# decisão do Erton): agiam sem o "ok" dele conferido no código, ou ele não usa. Saíram da lista que o
-# Gemini vê, da reserva e do prompt; os arquivos ficam no lugar até a Etapa 18. Se alguém chamar mesmo
-# assim (um nome antigo, o modelo inventando), o _execute_tool responde isto e não chama nada.
-# Nome -> o que ela fazia (vai na resposta ao modelo, em inglês como as outras).
-FERRAMENTAS_DESLIGADAS = {
-    "send_message": "sending messages on WhatsApp, Telegram, Discord, Instagram or iMessage",
-    "prepare_message_reply": "drafting and sending message replies",
-    "check_messages": "reading messages and contacts",
-    "agent_task": "multi-step tasks that write and run AI-generated code",
-    "code_helper": "writing, running and building code",
-    "dev_agent": "building projects, installing packages and running code",
-    "computer_control": "clicking, typing and moving the mouse anywhere on the screen",
-    "game_updater": "installing and updating Steam and Epic games, which could shut down the computer",
-}
-
-
-def resposta_de_desligada(nome: str) -> str:
-    """O que volta para o modelo quando ele chama uma ferramenta desligada (nada é chamado)."""
-    return (f"Tool '{nome}' ({FERRAMENTAS_DESLIGADAS[nome]}) is turned off in Jarvis Ultron. "
-            "Do not try to do this with another tool. Tell the user, in one short sentence in Portuguese, "
-            "that you do not do this.")
-
-
-_AUTOMACOES = None
-
-
-def carregar_automacoes(recarregar: bool = False):
-    """Jarvis Ultron: ferramentas da pasta 'automacoes' (um arquivo .py por automação)."""
-    global _AUTOMACOES
-    if _AUTOMACOES is None or recarregar:
-        from core.automacoes import carregar_ferramentas
-
-        # as desligadas também ficam reservadas: uma automação com o nome delas não carrega
-        _AUTOMACOES = carregar_ferramentas(reservados={d.get("name") for d in TOOL_DECLARATIONS}
-                                           | set(FERRAMENTAS_DESLIGADAS))
-    return _AUTOMACOES
+from cerebro.ferramentas.registro import carregar_automacoes  # noqa: E402,F401
+from cerebro.ferramentas.executores import (  # noqa: E402,F401
+    EXECUTORES, browser_control, computer_settings, desktop_control, email_control, file_controller,
+    file_processor, flight_finder, media_control, open_app, reminder, request_deep_research,
+    request_presentation, screen_process, weather_action, web_search_action, youtube_video,
+)
 
 
 def get_tool_declarations(*, cloud_safe: bool = False) -> list[dict]:
@@ -294,240 +210,6 @@ def get_tool_declarations(*, cloud_safe: bool = False) -> list[dict]:
         if declaration.get("name") in CLOUD_SAFE_ACTIONS
     ]
 
-
-# ---------------------------------------------------------------------------------------------------------
-# Etapa 13: a tabela de executores. Cada ferramenta nativa é uma função `async def _ex_<nome>(jarvis, args)`
-# que faz exatamente o que o ramo "elif name == ..." do _execute_tool fazia, inclusive o texto padrão. As
-# travas do começo do _execute_tool (cloud_safe -> modo privado -> operational_ready -> modo QA ->
-# interceptar desligar -> save_memory) não passam por aqui. As ações continuam sendo os nomes deste módulo
-# (open_app, web_search_action...), lidos na hora da chamada: os testes que os trocam continuam valendo.
-# O save_memory fica no _execute_tool, porque tem uma regra própria do modo privado.
-
-async def _ex_weather_report(jarvis, args):
-    r = await asyncio.to_thread(lambda: weather_action(parameters=args, player=jarvis.ui))
-    return r or "Weather delivered."
-
-
-async def _ex_web_search(jarvis, args):
-    r = await asyncio.to_thread(lambda: web_search_action(parameters=args, player=jarvis.ui))
-    return r or "Done."
-
-
-async def _ex_browser_control(jarvis, args):
-    r = await asyncio.to_thread(lambda: browser_control(parameters=args, player=jarvis.ui))
-    return r or "Done."
-
-
-async def _ex_media_control(jarvis, args):
-    r = await asyncio.to_thread(lambda: media_control(parameters=args, response=None, player=jarvis.ui))
-    return r or "Done."
-
-
-async def _ex_youtube_video(jarvis, args):
-    r = await asyncio.to_thread(lambda: youtube_video(parameters=args, response=None, player=jarvis.ui))
-    return r or "Done."
-
-
-async def _ex_open_app(jarvis, args):
-    r = await asyncio.to_thread(lambda: open_app(parameters=args, response=None, player=jarvis.ui))
-    return r or f"Opened {args.get('app_name')}."
-
-
-async def _ex_computer_settings(jarvis, args):
-    # desligar, reiniciar, digitar e apertar teclas só com o "ok" do Erton, conferido na ação
-    # (core/aprovacao.py)
-    r = await asyncio.to_thread(lambda: computer_settings(parameters=args, response=None, player=jarvis.ui,
-                                                          jarvis=jarvis))
-    return r or "Done."
-
-
-async def _ex_desktop_control(jarvis, args):
-    r = await asyncio.to_thread(lambda: desktop_control(parameters=args, player=jarvis.ui))
-    return r or "Done."
-
-
-async def _ex_file_controller(jarvis, args):
-    if (
-        args.get("action", "").lower() == "open"
-        and not args.get("path")
-        and not args.get("name")
-    ):
-        current_file = getattr(jarvis.ui, "current_file", None)
-        if current_file:
-            args["path"] = current_file
-    r = await asyncio.to_thread(lambda: file_controller(parameters=args, player=jarvis.ui))
-    return r or "Done."
-
-
-async def _ex_graphics_quality(jarvis, args):
-    quality = str(args.get("quality") or "").strip().lower()
-    if quality not in {"low", "medium", "high"}:
-        raise ValueError("Graphics quality must be low, medium, or high.")
-    jarvis.ui.set_graphics_quality(quality)
-    return f"JARVIS graphics quality changed to {quality}."
-
-
-async def _ex_jarvis_ui_control(jarvis, args):
-    action = str(args.get("action") or "").strip().lower()
-    if action in ("change_theme", "open_command_center", "close_command_center"):
-        # Jarvis Ultron (Etapa 7): na tela azul não há tema nem Command Center; antes o Jarvis
-        # dizia que tinha feito e nada mudava na tela
-        return ("This action no longer exists: the blue screen has a fixed color and no "
-                "Command Center (nothing changed). Tell the user that in Portuguese.")
-    if action == "change_graphics_quality":
-        quality = str(args.get("graphics_quality") or "").strip().lower()
-        if quality not in {"low", "medium", "high"}:
-            raise ValueError(f"Unknown graphics quality: {quality or 'missing'}")
-        jarvis.ui.set_graphics_quality(quality)
-        return f"JARVIS graphics quality changed to {quality}."
-    jarvis.ui.handle_ui_command(action)
-    return f"JARVIS interface action completed: {action.replace('_', ' ')}."
-
-
-async def _ex_email_control(jarvis, args):
-    if args.get("action", "").lower() == "connect" and not args.get("credentials_path"):
-        current_file = getattr(jarvis.ui, "current_file", None)
-        if current_file and Path(str(current_file)).suffix.lower() == ".json":
-            args["credentials_path"] = current_file
-    r = await asyncio.to_thread(lambda: email_control(parameters=args, response=None, player=jarvis.ui, session_memory=None))
-    return r or "Email action completed."
-
-
-async def _ex_reminder(jarvis, args):
-    r = await asyncio.to_thread(lambda: reminder(parameters=args, response=None, player=jarvis.ui))
-    return r or "Reminder set."
-
-
-async def _ex_listening_mode(jarvis, args):
-    return jarvis._definir_modo_escuta(args.get("mode", ""))
-
-
-async def _ex_hermes_agent(jarvis, args):
-    return await jarvis._hermes_sem_travar(args.get("request", ""))
-
-
-async def _ex_school_tasks(jarvis, args):
-    return await jarvis._geekie_pendencias(bool(args.get("refresh", False)))
-
-
-async def _ex_self_diagnosis(jarvis, args):
-    return await asyncio.to_thread(jarvis._autodiagnostico, False)
-
-
-async def _ex_approve_publication(jarvis, args):
-    from core import hermes_ponte
-    # o "ok" é conferido no código: numa fala NOVA do Erton depois da proposta (core/aprovacao.py)
-    return await asyncio.to_thread(
-        hermes_ponte.aprovar_e_executar,
-        args.get("kind", ""), args.get("details", ""), jarvis, bool(args.get("confirm")),
-    )
-
-
-async def _ex_suspend_listening(jarvis, args):
-    return jarvis._suspender(args.get("minutes", 10))
-
-
-async def _ex_generate_image(jarvis, args):
-    from core.modelos import gerar_imagem
-    return await asyncio.to_thread(gerar_imagem, args.get("prompt", ""))
-
-
-async def _ex_screen_process(jarvis, args):
-    threading.Thread(
-        target=screen_process,
-        kwargs={"parameters": args, "response": None,
-                "player": jarvis.ui, "session_memory": None,
-                "speak": jarvis._speak_vision_result},
-        daemon=True
-    ).start()
-    return "Vision module activated. Stay completely silent — vision module will speak directly."
-
-
-async def _ex_file_processor(jarvis, args):
-    if not args.get("file_path") and jarvis.ui.current_file:
-        args["file_path"] = jarvis.ui.current_file
-    r = await asyncio.to_thread(
-        lambda: file_processor(parameters=args, player=jarvis.ui, speak=jarvis.speak)
-    )
-    return r or "Done."
-
-
-async def _ex_deep_research(jarvis, args):
-    r = request_deep_research(parameters=args, player=jarvis.ui, speak=jarvis.speak)
-    return r or "Deep research preference requested."
-
-
-async def _ex_create_presentation(jarvis, args):
-    current_file = getattr(jarvis.ui, "current_file", None)
-    supported_sources = {
-        ".txt", ".md", ".rst", ".csv", ".json", ".jsonl", ".docx", ".pptx",
-        ".pdf", ".xlsx", ".xls", ".png", ".jpg", ".jpeg", ".webp",
-        ".wav", ".mp3", ".m4a", ".mp4", ".mov", ".avi", ".webm",
-    }
-    if (
-        not args.get("source_file")
-        and not args.get("source_files")
-        and current_file
-        and Path(str(current_file)).suffix.lower() in supported_sources
-    ):
-        args["source_files"] = [current_file]
-    r = request_presentation(parameters=args, player=jarvis.ui, speak=jarvis.speak)
-    return r or "Presentation preference requested."
-
-
-async def _ex_task_status(jarvis, args):
-    from agent.task_queue import get_queue
-
-    queue = get_queue()
-    action = str(args.get("action") or "get").lower()
-    task_id = str(args.get("task_id") or "").strip()
-    if action == "all" or not task_id:
-        return json.dumps(queue.get_all_statuses(), ensure_ascii=False)
-    if action == "cancel":
-        return f"Task {task_id} cancelled." if queue.cancel(task_id) else f"Task {task_id} could not be cancelled."
-    status = queue.get_status(task_id)
-    return json.dumps(status, ensure_ascii=False) if status else f"Task {task_id} was not found."
-
-
-async def _ex_flight_finder(jarvis, args):
-    r = await asyncio.to_thread(lambda: flight_finder(parameters=args, player=jarvis.ui))
-    return r or "Done."
-
-
-EXECUTORES = {
-    # grupo 6: herdadas que ainda existem (a Etapa 18 decide, com o Erton)
-    "flight_finder": _ex_flight_finder,
-    # grupo 5: visão, arquivos e tarefas
-    "screen_process": _ex_screen_process,
-    "file_processor": _ex_file_processor,
-    "deep_research": _ex_deep_research,
-    "create_presentation": _ex_create_presentation,
-    "task_status": _ex_task_status,
-    # grupo 4: o Jarvis por dentro
-    "listening_mode": _ex_listening_mode,
-    "hermes_agent": _ex_hermes_agent,
-    "school_tasks": _ex_school_tasks,
-    "self_diagnosis": _ex_self_diagnosis,
-    "approve_publication": _ex_approve_publication,
-    "suspend_listening": _ex_suspend_listening,
-    "generate_image": _ex_generate_image,
-    # grupo 3: e-mail e lembrete
-    "email_control": _ex_email_control,
-    "reminder": _ex_reminder,
-    # grupo 2: o sistema e a própria tela
-    "open_app": _ex_open_app,
-    "computer_settings": _ex_computer_settings,
-    "desktop_control": _ex_desktop_control,
-    "file_controller": _ex_file_controller,
-    "graphics_quality": _ex_graphics_quality,
-    "jarvis_ui_control": _ex_jarvis_ui_control,
-    # grupo 1: internet e mídia
-    "weather_report": _ex_weather_report,
-    "web_search": _ex_web_search,
-    "browser_control": _ex_browser_control,
-    "media_control": _ex_media_control,
-    "youtube_video": _ex_youtube_video,
-}
 
 
 class JarvisLive:
