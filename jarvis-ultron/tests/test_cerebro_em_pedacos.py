@@ -23,6 +23,11 @@ PEDACOS = {
     "cerebro/escuta.py": ("Escuta", {
         "_definir_modo_escuta", "_aviso_de_escuta", "_mostrar_selo", "_mostrar_volume",
     }),
+    "cerebro/pontes.py": ("Pontes", {
+        "_hermes_sem_travar", "_entregar_resultado_hermes", "HERMES_ESPERA",
+        "_geekie_pendencias", "_verificar_lembretes_geekie", "_iniciar_lembretes_geekie",
+        "_autodiagnostico", "_preparar_automacoes",
+    }),
 }
 
 

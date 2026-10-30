@@ -170,7 +170,7 @@ class AutomacoesDeTelaTests(unittest.TestCase):
                    na_tela={"painel_ultron.py"})
         jarvis = object.__new__(main.JarvisLive)
         jarvis.ui = NS(remota=True, write_log=lambda t: None)
-        with patch.object(main, "carregar_automacoes", return_value=carga), \
+        with patch("cerebro.pontes.carregar_automacoes", return_value=carga), \
                 patch("core.automacoes.sincronizar_habilidades", return_value=NS(habilidades=[], erros=[])):
             jarvis._preparar_automacoes()
         self.assertEqual(rodados, ["lembretes"])
