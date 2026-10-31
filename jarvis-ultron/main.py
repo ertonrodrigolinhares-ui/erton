@@ -842,6 +842,9 @@ class JarvisLive(Avisos, Escuta, Pontes, VozSaida, Ultron, Desligar, Entrada, Re
                     actual = e.exceptions[0]
 
                 actual = _erro_da_api(e) or actual  # Jarvis Ultron: acha o erro do Google dentro do grupo
+                if self._modo_reserva and not getattr(self.ui, "muted", False):
+                    # a reserva está ouvindo: o anel volta a "OUVINDO" em vez de ficar em "PENSANDO" até o Gemini voltar
+                    self.ui.set_state("LISTENING")
                 argumento_invalido = "1007" in str(actual) or "invalid argument" in str(actual).lower()
                 if _chave_recusada(actual):
                     # Jarvis Ultron: o Google recusou a CHAVE, não o modelo (o aviso também vem com o código

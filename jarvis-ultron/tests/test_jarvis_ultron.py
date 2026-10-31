@@ -209,7 +209,8 @@ class ChaveDoGeminiRecusadaTests(unittest.TestCase):
 
         jarvis = object.__new__(main.JarvisLive)
         jarvis.ui = UIFalsa()
-        jarvis.ui.set_state = lambda estado: None
+        jarvis.ui.estados = []
+        jarvis.ui.set_state = jarvis.ui.estados.append
         jarvis._portao = PortaoDeVoz(None, ativo=False)
         jarvis._shutdown_requested = threading.Event()
         jarvis._fala_n, jarvis._fala_texto = 0, ""
@@ -219,7 +220,12 @@ class ChaveDoGeminiRecusadaTests(unittest.TestCase):
         jarvis._textos_esperando, jarvis._textos_trava = [], threading.Lock()
         jarvis._reserva = object() if com_reserva else None
         ligou, esperas, tentativas = [], [], []
-        jarvis._ativar_modo_reserva = lambda: ligou.append(1)
+
+        def ligar_reserva():
+            ligou.append(1)
+            jarvis._modo_reserva = True
+
+        jarvis._ativar_modo_reserva = ligar_reserva
 
         async def esperar(segundos):
             esperas.append(segundos)
@@ -262,6 +268,8 @@ class ChaveDoGeminiRecusadaTests(unittest.TestCase):
         self.assertEqual(len(tentativas), 3)
         self.assertTrue(ligou)  # a reserva (Groq/Gemma) assume
         self.assertFalse(jarvis._idioma_recusado)  # a chave errada não é culpa do idioma
+        # com a reserva ouvindo, o anel não fica em "PENSANDO" (THINKING) até o Gemini voltar
+        self.assertEqual(jarvis.ui.estados[-1], "LISTENING", jarvis.ui.estados)
 
     def test_chave_recusada_sem_reserva_so_avisa_e_espera(self):
         jarvis, _, esperas, ligou = self._rodar(self._chave_invalida(), com_reserva=False)
