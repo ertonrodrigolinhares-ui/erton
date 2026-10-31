@@ -843,7 +843,19 @@ class JarvisLive(Avisos, Escuta, Pontes, VozSaida, Ultron, Desligar, Entrada, Re
 
                 actual = _erro_da_api(e) or actual  # Jarvis Ultron: acha o erro do Google dentro do grupo
                 argumento_invalido = "1007" in str(actual) or "invalid argument" in str(actual).lower()
-                if (self._idioma_voz() and isinstance(actual, genai.errors.APIError)
+                if _chave_recusada(actual):
+                    # Jarvis Ultron: o Google recusou a CHAVE, não o modelo (o aviso também vem com o código
+                    # 1007). Avisa uma vez, cai para a reserva e espera cada vez mais entre as tentativas.
+                    # Antes caía no "modelo recusou a configuração" e ficava em laço a cada 2 s, enchendo o
+                    # Canal com três avisos por volta.
+                    self._falhas_seguidas += 1
+                    if self._falhas_seguidas == 1:
+                        self.ui.write_log(f"SYS: {frase('chave_gemini_recusada')}")
+                    print(f"[JARVIS] ⚠️ Chave do Gemini recusada: {str(actual)[:120]}")
+                    if self._reserva is not None:
+                        self._ativar_modo_reserva()
+                    await self._wait_before_reconnect(min(300, 30 * 2 ** min(self._falhas_seguidas - 1, 4)))
+                elif (self._idioma_voz() and isinstance(actual, genai.errors.APIError)
                         and ("language" in str(actual).lower() or argumento_invalido)):
                     # Jarvis Ultron: este modelo de voz não aceita escolher o idioma; segue só com a regra
                     print(f"[JARVIS] ⚠️ O modelo de voz não aceitou language_code ({str(actual)[:120]}); "
@@ -854,10 +866,19 @@ class JarvisLive(Avisos, Escuta, Pontes, VozSaida, Ultron, Desligar, Entrada, Re
                     # deixa ele de lado e tenta o próximo modelo do Gemini.
                     central_de_modelos.pular(modelo_voz)
                     proximo = central_de_modelos.resolver(live_model_id)
-                    self.ui.write_log(f"SYS: A voz {modelo_voz} recusou a configuração. Tentando {proximo}...")
-                    print(f"[Modelos] Voz: {modelo_voz} recusou a configuração (1007); trocando para {proximo}.")
-                    self._idioma_recusado = False  # o próximo modelo pode aceitar o idioma
-                    await self._wait_before_reconnect(2)
+                    if proximo == modelo_voz:
+                        # não há outro modelo para tentar: espera cada vez mais (antes ficava em laço a cada 2 s)
+                        self._falhas_seguidas += 1
+                        if self._falhas_seguidas == 1:
+                            self.ui.write_log(f"SYS: A voz {modelo_voz} recusou a configuração. Vou tentar de novo "
+                                              "daqui a pouco.")
+                        print(f"[Modelos] Voz: {modelo_voz} recusou a configuração (1007); sem outro modelo para tentar.")
+                        await self._wait_before_reconnect(min(60, 2 ** min(self._falhas_seguidas, 6)))
+                    else:
+                        self.ui.write_log(f"SYS: A voz {modelo_voz} recusou a configuração. Tentando {proximo}...")
+                        print(f"[Modelos] Voz: {modelo_voz} recusou a configuração (1007); trocando para {proximo}.")
+                        self._idioma_recusado = False  # o próximo modelo pode aceitar o idioma
+                        await self._wait_before_reconnect(2)
                 elif _is_unsupported_voice_error(actual) and self.voice_name != DEFAULT_VOICE_NAME:
                     old_voice = self.voice_name
                     self.voice_name = DEFAULT_VOICE_NAME
@@ -921,6 +942,13 @@ def _erro_da_api(erro: BaseException):
             return achado
     causa = erro.__cause__ or erro.__context__
     return _erro_da_api(causa) if isinstance(causa, BaseException) and causa is not erro else None
+
+
+def _chave_recusada(erro: BaseException) -> bool:
+    """O Google recusou a chave do Gemini (errada, apagada ou vencida). Não é erro do modelo nem da internet."""
+    texto = f"{erro}".lower()
+    return any(p in texto for p in ("api key not valid", "api_key_invalid", "invalid api key", "api key expired",
+                                    "api_key_expired"))
 
 
 def _modelo_indisponivel(erro: Exception) -> bool:

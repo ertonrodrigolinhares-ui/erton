@@ -54,6 +54,10 @@ FRASES: dict[str, str] = {
                    "do Jarvis Ultron e depois abra o Jarvis de novo."),
     # ferramentas
     "erro_na_ferramenta": "Erro na ferramenta {ferramenta}",
+    # o Google recusou a chave do Gemini (chave errada, apagada ou vencida)
+    "chave_gemini_recusada": ("O Google recusou a chave do Gemini. Confira a chave no .env (dois cliques em "
+                              "'Testar chave do Gemini') e abra o Jarvis de novo. Enquanto isso, sigo pela reserva "
+                              "se ela estiver configurada."),
     "erro_na_ferramenta_falado": "Senhor, a ferramenta {ferramenta} deu erro. {detalhe}",
 }
 

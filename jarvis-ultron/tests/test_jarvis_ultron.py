@@ -194,6 +194,91 @@ class EfeitoUltronTests(unittest.TestCase):
         self.assertNotEqual(inteiro, audio.tobytes())
 
 
+
+class ChaveDoGeminiRecusadaTests(unittest.TestCase):
+    """O Google recusou a CHAVE do Gemini (o aviso vem com o código 1007, "API key not valid"). Antes o cérebro
+    tratava isso como "o modelo recusou a configuração" e ficava em laço a cada 2 s, enchendo o Canal com três
+    avisos por volta (achado no ensaio da Etapa 15). Agora: avisa uma vez, cai para a reserva e espera cada vez
+    mais. O mesmo vale para um 1007 de verdade quando não há outro modelo para tentar."""
+
+    def _rodar(self, erro, com_reserva=True, tentativas_max=3):
+        import contextlib
+        import os
+        import threading
+        import main
+
+        jarvis = object.__new__(main.JarvisLive)
+        jarvis.ui = UIFalsa()
+        jarvis.ui.set_state = lambda estado: None
+        jarvis._portao = PortaoDeVoz(None, ativo=False)
+        jarvis._shutdown_requested = threading.Event()
+        jarvis._fala_n, jarvis._fala_texto = 0, ""
+        jarvis._loop = jarvis.session = None
+        jarvis._modo_reserva, jarvis._falhas_seguidas, jarvis._idioma_recusado = False, 0, False
+        jarvis._api_key = "chave-de-teste"
+        jarvis._textos_esperando, jarvis._textos_trava = [], threading.Lock()
+        jarvis._reserva = object() if com_reserva else None
+        ligou, esperas, tentativas = [], [], []
+        jarvis._ativar_modo_reserva = lambda: ligou.append(1)
+
+        async def esperar(segundos):
+            esperas.append(segundos)
+            if len(tentativas) >= tentativas_max:
+                jarvis._shutdown_requested.set()
+
+        jarvis._wait_before_reconnect = esperar
+        jarvis._build_config = lambda modelo: None
+
+        @contextlib.asynccontextmanager
+        async def conectar(model, config):
+            tentativas.append(model)
+            if len(tentativas) > tentativas_max + 2:  # não travou no laço esperado: encerra em vez de travar o teste
+                jarvis._shutdown_requested.set()
+            raise erro
+            yield  # noqa (nunca chega aqui)
+
+        cliente = SimpleNamespace(aio=SimpleNamespace(live=SimpleNamespace(connect=conectar)))
+        with patch.dict(os.environ), patch.object(main.genai, "Client", return_value=cliente), \
+                patch.object(main, "pick_live_model", return_value="models/voz-teste"), \
+                patch("core.modelos.resolver", side_effect=lambda pedido: pedido), \
+                patch("core.modelos.pular"):
+            for nome in ("JARVIS_CEREBRO", "JARVIS_SEM_GEMINI", "JARVIS_IDIOMA"):
+                os.environ.pop(nome, None)
+            asyncio.run(asyncio.wait_for(jarvis.run(), 5))
+        return jarvis, tentativas, esperas, ligou
+
+    def _chave_invalida(self):
+        from google.genai import errors
+
+        return errors.APIError(1007, {"error": {"message": "API key not valid. Please pass a valid API key."}})
+
+    def test_chave_recusada_avisa_uma_vez_cai_para_a_reserva_e_espera_cada_vez_mais(self):
+        jarvis, tentativas, esperas, ligou = self._rodar(self._chave_invalida())
+        avisos = [l for l in jarvis.ui.logs if "recusou a chave do Gemini" in l]
+        self.assertEqual(len(avisos), 1, jarvis.ui.logs)
+        self.assertIn("Testar chave do Gemini", avisos[0])
+        self.assertFalse(any("recusou a configuração" in l for l in jarvis.ui.logs), jarvis.ui.logs)
+        self.assertEqual(esperas, [30, 60, 120])  # e não 2 s em laço
+        self.assertEqual(len(tentativas), 3)
+        self.assertTrue(ligou)  # a reserva (Groq/Gemma) assume
+        self.assertFalse(jarvis._idioma_recusado)  # a chave errada não é culpa do idioma
+
+    def test_chave_recusada_sem_reserva_so_avisa_e_espera(self):
+        jarvis, _, esperas, ligou = self._rodar(self._chave_invalida(), com_reserva=False)
+        self.assertEqual(ligou, [])
+        self.assertEqual(esperas, [30, 60, 120])
+        self.assertEqual(sum("recusou a chave do Gemini" in l for l in jarvis.ui.logs), 1)
+
+    def test_1007_de_verdade_sem_outro_modelo_para_tentar_nao_fica_em_laco(self):
+        from google.genai import errors
+
+        erro = errors.APIError(1007, {"error": {"message": "Request contains an invalid argument."}})
+        jarvis, tentativas, esperas, _ = self._rodar(erro, tentativas_max=4)
+        # 1ª tentativa: tira o idioma e tenta de novo na hora; depois, sem outro modelo, espera 2 s, 4 s, 8 s
+        self.assertEqual(esperas, [2, 4, 8])
+        self.assertEqual(sum("recusou a configuração" in l for l in jarvis.ui.logs), 1, jarvis.ui.logs)
+        self.assertEqual(len(tentativas), 4)
+
 if __name__ == "__main__":
     unittest.main()
 
